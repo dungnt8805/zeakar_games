@@ -1,0 +1,30 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { stripLegacyPresentation } from '../src/lib/policy-presentation.mjs';
+const root = resolve(import.meta.dirname, '..');
+const load = async path => JSON.parse(await readFile(resolve(root,path),'utf8'));
+const manifest = await load('docs/ui-review/legacy-policy-manifest.json');
+const documents = await load('src/data/privacy-translations.json');
+const media = await load('src/data/game-media.json');
+const names = {'aster-strike':'Aster Strike','blokito-puzzle':'Blokito Puzzle','grill-pop':'Foodie: Grill Pop','mochi-tiles':'Mochi Tiles','memory-pairs':'Memory Pairs','math-challenge':'Math Challenge','sudoku-challenge':'Sudoku Challenge'};
+const locales = {en:'English',vi:'Tiếng Việt',zh:'简体中文',fr:'Français',th:'ไทย',ja:'日本語',ko:'한국어'};
+let count = 0;
+for (const file of manifest.files) {
+  if (!file.path.endsWith('.html') && !file.outputPath?.endsWith('.html')) continue;
+  const target = resolve(root,`dist${file.outputPath ?? file.path}`);
+  let original = stripLegacyPresentation(await readFile(target,'utf8'));
+  let game = Object.entries(documents).find(([,doc]) => [new URL(doc.originalUrl).pathname,new URL(doc.termsUrl).pathname,`/${doc.sourceFile}`].includes(file.path))?.[0];
+  game ??= file.path.includes('math') ? 'math-challenge' : file.path.includes('sudoku') ? 'sudoku-challenge' : 'memory-pairs';
+  const terms = /tos/.test(file.path);
+  const title = terms ? 'Terms of service' : 'Privacy policy';
+  const date = original.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  const dateLabel = date ? `Effective date · <time datetime="${date}">${date}</time>` : title;
+  const languages = terms ? '' : `<details class="legal-language"><summary>Translations</summary><nav>${Object.entries(locales).map(([locale,label]) => `<a lang="${locale}" href="${locale==='en'?'':`/${locale}`}/policies/${game}">${label}</a>`).join('')}</nav></details>`;
+  const head = '<!-- milaan-policy-head:start --><link rel="stylesheet" href="/assets/css/policy-pages.css"><!-- milaan-policy-head:end -->';
+  const start = `<!-- milaan-policy-shell:start --><header class="legal-header"><div class="legal-header-inner"><a class="legal-brand" href="/"><span class="legal-brand-mark" aria-hidden="true">m</span><span>MILAAN<small>GAMES STUDIO</small></span></a><div class="legal-header-links"><a href="/policies">Privacy and policies</a>${languages}</div></div></header><main id="main-content" class="legal-page"><a class="legal-back" href="/policies">← Privacy and policies</a><div class="legal-hero"><img class="legal-game-icon" src="${media[game].en.icon}" alt="" width="64" height="64"><div><p class="legal-kicker">MILAAN GAMES / ${title}</p><h1 class="legal-title">${names[game]}</h1><p class="legal-subtitle">${title}</p></div></div><details class="legal-mobile-toc"><summary>On this page</summary><nav class="legal-toc" data-legacy-toc></nav></details><div class="legal-layout"><aside class="legal-sidebar"><p class="legal-sidebar-title">On this page</p><nav class="legal-toc" data-legacy-toc></nav><div class="legal-sidebar-source"><a href="/policies/${game}">Privacy policy ↗</a></div></aside><div class="legal-paper"><div class="legal-meta"><span>${dateLabel}</span><span class="legal-status">Original English</span></div><article class="legal-legacy-content"><!-- milaan-policy-shell:end -->`;
+  const end = `<!-- milaan-policy-footer:start --></article><footer class="legal-paper-footer"><a href="${documents[game].termsUrl}">Terms of service ↗</a><a href="#main-content">Back to top ↑</a></footer></div></div><footer class="legal-bottom"><span>© ${new Date().getFullYear()} Milaan Games</span><a href="/">Back to home ↗</a></footer></main><script src="/assets/js/policy-pages.js" defer></script><!-- milaan-policy-footer:end -->`;
+  const styled = original.replace(/<\/head>/i,`${head}</head>`).replace(/<body\b[^>]*>/i,match=>match+start).replace(/<\/body>/i,`${end}</body>`);
+  if (stripLegacyPresentation(styled) !== original) throw new Error(`Original content changed: ${file.path}`);
+  await writeFile(target,styled);count++;
+}
+console.log(`Styled ${count} legacy policy documents; original HTML is recoverable byte-for-byte.`);

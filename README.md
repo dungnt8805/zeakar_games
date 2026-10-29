@@ -81,3 +81,7 @@ Run `npm run verify` and publish the **contents of `dist/`** to the existing sta
 The current snapshot was retrieved on 2026-10-29. Any later upstream policy or app-ads changes should be incorporated before publishing; update the provenance manifest only after reviewing the replacement content. Existing rating/download figures and gameplay descriptions were not refreshed as part of the image update.
 
 Workflow references: [Astro on GitHub Pages](https://docs.astro.build/en/guides/deploy/github/) and [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+## Policy presentation
+
+`npm run build` builds Astro and applies the shared legal-document layout to the 20 original HTML policy/terms routes. Styling is added as marked, removable HTML wrappers; the source documents in `public/` and `legacy/` remain untouched. The build verifier removes only those presentation wrappers and checks the original payload against its preserved SHA-256 value. Translated policy pages use the same stylesheet, semantic section headings, desktop contents navigation and a collapsible mobile contents menu. Policy text, dates, contacts and app URLs are preserved.

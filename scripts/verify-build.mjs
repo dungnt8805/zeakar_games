@@ -2,11 +2,17 @@ import { readFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { stripLegacyPresentation, preparePolicyHtml } from '../src/lib/policy-presentation.mjs';
 const root = resolve(import.meta.dirname, '..');
 const read = path => readFile(resolve(root, path));
 const policies = JSON.parse(await read('docs/ui-review/legacy-policy-manifest.json'));
 for (const file of policies.files) {
-  const bytes = await read(`dist${file.outputPath ?? file.path}`);
+  let bytes = await read(`dist${file.outputPath ?? file.path}`);
+  if (file.path.endsWith('.html') || file.outputPath?.endsWith('.html')) {
+    const styled = bytes.toString();
+    assert(styled.includes('milaan-policy-head:start'), `Missing shared policy style: ${file.path}`);
+    bytes = Buffer.from(stripLegacyPresentation(styled));
+  }
   assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256, `Legacy file changed or missing: ${file.path}`);
 }
 const dataSource = await read('src/data/games.ts');
@@ -57,7 +63,7 @@ for (const locale of locales) {
     assert(!/<script|<style|data-cfemail|\{(?:app|provider|date)\}/i.test(html), `Unresolved/unsafe policy markup: ${locale}/${id}`);
     const document = (await read(`dist/${prefix}policies/${id}/index.html`)).toString();
     assert(document.includes(`<html lang="${langTags[locale]}"`), `Wrong policy language: ${locale}/${id}`);
-    assert(document.includes(html), `Translated document differs from source: ${locale}/${id}`);
+    assert(document.includes(preparePolicyHtml(html).html), `Translated document differs from source: ${locale}/${id}`);
     assert(document.includes(policy.originalUrl), `No original policy link: ${locale}/${id}`);
     assert(directory.includes(`/${prefix}policies/${id}`), `Policy not linked from directory: ${locale}/${id}`);
     // Translations must preserve source dates and the applicable child-age thresholds.

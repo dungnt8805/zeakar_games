@@ -3,22 +3,39 @@ import Layout from '../layouts/Layout.astro';
 import LanguageSwitcher from './LanguageSwitcher.astro';
 import PRIVACY from '../data/privacy-translations.json';
 import { getGames } from '../data/games';
-import { type Locale, localizedPath, UI_TRANSLATIONS } from '../i18n/ui';
+import { preparePolicyHtml } from '../lib/policy-presentation.mjs';
+import { type Locale, localizedPath, UI_TRANSLATIONS, LANGUAGE_NAMES } from '../i18n/ui';
 interface Props { lang: Locale; gameId: keyof typeof PRIVACY; }
 const { lang, gameId } = Astro.props;
 const policy = PRIVACY[gameId];
 const game = getGames(lang).find(game => game.id === gameId)!;
 const t = UI_TRANSLATIONS[lang].policy;
+const document = preparePolicyHtml(policy.locales[lang]);
+const date = policy.locales.en.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+const formattedDate = date ? new Intl.DateTimeFormat(lang, {dateStyle:'long', timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)) : '';
 ---
 <Layout lang={lang} title={`${game.title} | ${t.title}`} description={`${game.title} — ${t.title}`}>
-  <header class="site-header"><div class="header-inner"><a class="studio-brand" href={localizedPath(lang)}>MILAAN<span class="brand-subtitle">GAMES</span></a><LanguageSwitcher currentLang={lang} /></div></header>
-  <main id="main-content" tabindex="-1" class="mx-auto max-w-4xl px-5 sm:px-8 py-10 sm:py-16">
-    <a class="text-sm text-slate-400 hover:text-amber-400" href={localizedPath(lang,'/policies')}>← {t.title}</a>
-    <h1 class="section-title mt-8">{game.title}</h1>
-    <p class="mt-3 text-sm text-amber-400">{t.title}</p>
-    {lang !== 'en' && <p class="mt-5 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-xs leading-relaxed text-slate-400">{t.translationNote}</p>}
-    <a href={policy.originalUrl} class="mt-5 inline-block text-sm text-amber-400 underline underline-offset-4">{t.original} ↗</a>
-    <article class="policy-content mt-10" set:html={policy.locales[lang]} />
-    <div class="mt-10 border-t border-slate-800 pt-6"><a class="text-sm text-amber-400 underline" href={policy.termsUrl}>{t.terms} ↗</a></div>
+  <link slot="head" rel="stylesheet" href="/assets/css/policy-pages.css" />
+  <header class="legal-header"><div class="legal-header-inner"><a class="legal-brand" href={localizedPath(lang)}><span class="legal-brand-mark" aria-hidden="true">m</span><span>MILAAN<small>GAMES STUDIO</small></span></a><div class="legal-header-links"><a href={localizedPath(lang,'/policies')}>{t.legal}</a><LanguageSwitcher currentLang={lang} /></div></div></header>
+  <main id="main-content" tabindex="-1" class="legal-page">
+    <a class="legal-back" href={localizedPath(lang,'/policies')}><span aria-hidden="true">←</span>{t.title}</a>
+    <div class="legal-hero"><img class="legal-game-icon" src={game.icon} alt="" width="64" height="64" /><div><p class="legal-kicker">MILAAN GAMES / {UI_TRANSLATIONS[lang].footer.privacy}</p><h1 class="legal-title">{game.title}</h1><p class="legal-subtitle">{t.legal}</p></div></div>
+    <details class="legal-mobile-toc"><summary>{t.contents}</summary><nav class="legal-toc" aria-label={t.contents}>{document.sections.map(section => <a href={`#${section.id}`}>{section.title}</a>)}</nav></details>
+    <div class="legal-layout">
+      <aside class="legal-sidebar"><p class="legal-sidebar-title">{t.contents}</p><nav class="legal-toc" aria-label={t.contents}>{document.sections.map(section => <a href={`#${section.id}`}>{section.title}</a>)}</nav><div class="legal-sidebar-source"><a href={policy.originalUrl}>{t.original} ↗</a></div></aside>
+      <div class="legal-paper">
+        <div class="legal-meta"><span class="legal-meta-date">{t.effective} <time datetime={date}>{formattedDate}</time></span><span class="legal-status">{LANGUAGE_NAMES[lang]}</span></div>
+        {lang !== 'en' && <p class="legal-note">{t.translationNote}</p>}
+        <article class="policy-content" set:html={document.html} />
+        <footer class="legal-paper-footer"><a href={policy.termsUrl}>{t.terms} ↗</a><a href="#main-content">{t.backTop} ↑</a></footer>
+      </div>
+    </div>
+    <footer class="legal-bottom"><span>© {new Date().getFullYear()} Milaan Games</span><a href={localizedPath(lang)}>{t.back} ↗</a></footer>
   </main>
 </Layout>
+
+<script>
+for (const link of document.querySelectorAll('.legal-mobile-toc a')) {
+ link.addEventListener('click', () => { const menu = link.closest('details'); if (menu) menu.open = false; });
+}
+</script>

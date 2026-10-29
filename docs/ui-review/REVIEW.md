@@ -79,3 +79,11 @@ Added 49 localized privacy documents (7 English plus 42 translations) at `/polic
 Validation: `npm run verify` passed with 76 generated pages, 28 original files/routes unchanged, all app URLs matching their published listings, 78 image hashes, complete locale keys and 49 privacy pages. Checks include the original effective dates, applicable child-age thresholds, translation placeholders, page language tags and links from each directory to each game's translation. Browser: 390px checks passed for all seven homepages, all with 7 cards, zero broken loaded images and no document horizontal overflow. Japanese dialog opened the correct translated policy; switching to French retained Aster Strike. The English root is the default and the picker lists all 7 languages. Screenshots: `seven-languages.jpg`, `korean-mobile.jpg`; details: `i18n-browser-checks.json`.
 
 During QA the old dev module graph and a stale browser error tab required a server/tab restart. Checks above were repeated successfully on a clean browser tab after the restart. No production push or deployment was performed. The existing Pages action runs the expanded verification automatically.
+
+## Policy document styling — 2026-10-29
+
+Updated translated privacy pages and all 20 original HTML privacy/terms documents with a shared studio header, game icon, effective-date metadata, warm light reading surface, clearer headings, desktop contents, collapsible mobile contents, document links and back-to-top navigation. The original policy text, dates, contacts and URLs remain unchanged.
+
+Original `public/` and `legacy/` sources remain untouched. Build postprocessing adds marked presentation wrappers; verification strips those wrappers and compares the recovered original HTML to its preserved SHA-256. Localized policy data is unchanged; existing section titles are promoted to semantic headings for presentation.
+
+`npm run verify` passed for all 76 generated routes, 28 original payloads and 49 localized documents. Browser QA covered original `/privacy/` at 390px, a working Security contents anchor at about 110px from the viewport top, menu auto-close, no horizontal overflow, and French Aster Strike on desktop/mobile. The existing Pages workflow handles deployment.
