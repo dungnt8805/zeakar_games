@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate static privacy translations from the preserved English originals.
+"""Generate static privacy translations from the current approved English policies.
 
 No network calls. Every substantive text segment must have a translation.
 Original public/ and legacy/ policy files are never changed.
@@ -74,5 +74,5 @@ for game,(filename,path,terms) in FILES.items():
   coverage[f'{locale}/{game}']={'segments':len(parser.ids),'source_sha256':hashlib.sha256(original.encode()).hexdigest()}
  output[game]={'originalUrl':'https://game.lamian.dev'+path,'termsUrl':'https://game.lamian.dev'+terms,'sourceFile':filename,'locales':locales}
 (ROOT/'src/data/privacy-translations.json').write_text(json.dumps(output,ensure_ascii=False,indent=2)+'\n')
-(ROOT/'docs/ui-review/privacy-translation-coverage.json').write_text(json.dumps({'source':'Preserved English app privacy policies; dates, providers, links and emails retained.','translations':'Prepared by Codex. Original English policies remain unchanged.','coverage':coverage},indent=2)+'\n')
+(ROOT/'docs/ui-review/privacy-translation-coverage.json').write_text(json.dumps({'source':'Current approved English app privacy policies; translations retain source dates, providers, links and emails. Aster Strike revised 2026-10-30; earlier revision archived.','translations':'Prepared by Codex. Translation generation does not modify English source policies.','coverage':coverage},indent=2)+'\n')
 print('Generated 49 complete privacy documents across 7 languages; no missing text segments.')

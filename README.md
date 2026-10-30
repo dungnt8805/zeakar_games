@@ -33,7 +33,7 @@ The target repository `dungnt8805/zeakar_games` currently uses **master** as its
 - Builds and checks pull requests targeting `master`, without deploying them.
 - Builds and deploys on pushes to `master`.
 - Allows manual runs from **Actions → Build and deploy GitHub Pages → Run workflow**. Select `master` to deploy; runs on other branches only build.
-- Runs `npm ci` with Node.js 24, then `npm run verify`. A missing or modified legacy policy blocks deployment.
+- Runs `npm ci` with Node.js 24, then `npm run verify`. A missing policy or an unreviewed change to its recorded hash blocks deployment.
 
 ### One-time repository setup
 
@@ -49,7 +49,7 @@ The workflow publishes the entire verified build, including all legacy policy fi
 
 `/policies/` is the default English directory. Other languages use `/{locale}/policies/`; each game has a readable policy at `/{locale}/policies/{game-id}/` (omit `/en` for canonical English). The language picker preserves the current game/page. Every translated policy links to its original English URL.
 
-The original policy URLs in the table below continue to serve **the unchanged original English documents**. The user requested translations only: no data practices, contact details, effective dates or original app policy URLs were revised. Terms of service remain available through their original English links from the directory.
+The original policy URLs in the table below continue to serve the English documents. Aster Strike was revised at the owner’s request on 2026-10-30 for accounts, asynchronous co-op, purchases and account deletion, with all seven language versions updated. Its previous revision is archived in `docs/policies/archive/`; approved revisions and hashes are recorded in the manifest. All other app policies remain unchanged. Terms of service remain available through their original English links from the directory.
 
 Translations are maintained in `src/i18n/privacy-dictionary.json`, with original text segments in `src/i18n/privacy-source.json`. Generate localized documents without calling any external service:
 
@@ -84,4 +84,4 @@ Workflow references: [Astro on GitHub Pages](https://docs.astro.build/en/guides/
 
 ## Policy presentation
 
-`npm run build` builds Astro and applies the shared legal-document layout to the 20 original HTML policy/terms routes. Styling is added as marked, removable HTML wrappers; the source documents in `public/` and `legacy/` remain untouched. The build verifier removes only those presentation wrappers and checks the original payload against its preserved SHA-256 value. Translated policy pages use the same stylesheet, semantic section headings, desktop contents navigation and a collapsible mobile contents menu. Policy text, dates, contacts and app URLs are preserved.
+`npm run build` builds Astro and applies the shared legal-document layout to the 20 original HTML policy/terms routes. Styling is added as marked, removable HTML wrappers; the source documents in `public/` and `legacy/` remain untouched. The build verifier removes only those presentation wrappers and checks the original payload against its preserved SHA-256 value. Translated policy pages use the same stylesheet, semantic section headings, desktop contents navigation and a collapsible mobile contents menu. Presentation changes preserve policy text, dates, contacts and app URLs. Owner-authorized content revisions are tracked separately in the manifest and policy revision notes.

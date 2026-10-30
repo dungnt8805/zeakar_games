@@ -7,6 +7,9 @@ const root = resolve(import.meta.dirname, '..');
 const read = path => readFile(resolve(root, path));
 const policies = JSON.parse(await read('docs/ui-review/legacy-policy-manifest.json'));
 for (const file of policies.files) {
+  for (const revision of file.revisions ?? []) {
+    assert.equal(createHash('sha256').update(await read(revision.archive)).digest('hex'), revision.previousSha256, `Previous policy revision lost: ${file.path}`);
+  }
   let bytes = await read(`dist${file.outputPath ?? file.path}`);
   if (file.path.endsWith('.html') || file.outputPath?.endsWith('.html')) {
     const styled = bytes.toString();
@@ -59,6 +62,14 @@ for (const locale of locales) {
   for (const [id, policy] of Object.entries(translatedPolicies)) {
     assert.equal(policy.originalUrl, appPolicies[id], `Original policy URL changed: ${id}`);
     const html = policy.locales[locale];
+    if (id === 'aster-strike') {
+      assert(html.includes('2026-10-30'), `Aster effective date missing: ${locale}`);
+      assert(html.includes('href="https://aster.lamian.dev/delete-account"'), `Aster deletion link missing: ${locale}`);
+      for (const value of ['30', '90', 'Firebase Authentication', 'Cloud Firestore', 'Cloud Functions for Firebase']) {
+        assert(html.includes(value), `Aster account disclosure missing ${value}: ${locale}`);
+      }
+      assert(!html.includes('Only aggregated, anonymized data'), 'Outdated Aster sharing disclosure');
+    }
     assert(html?.length > 1000, `Missing policy translation: ${locale}/${id}`);
     assert(!/<script|<style|data-cfemail|\{(?:app|provider|date)\}/i.test(html), `Unresolved/unsafe policy markup: ${locale}/${id}`);
     const document = (await read(`dist/${prefix}policies/${id}/index.html`)).toString();
@@ -71,4 +82,4 @@ for (const locale of locales) {
     assert(html.includes(id === 'memory-pairs' || id === 'math-challenge' || id === 'sudoku-challenge' ? '13' : '16'), `Child-age threshold missing: ${locale}/${id}`);
   }
 }
-console.log(`Verified ${policies.files.length} unchanged legacy files, 7 app URLs, ${mediaManifest.assets.length} store images, 7 site languages and 49 complete privacy documents.`);
+console.log(`Verified ${policies.files.length} policy/support files against approved hashes, archived revisions, 7 app URLs, ${mediaManifest.assets.length} store images, 7 site languages and 49 complete privacy documents.`);
