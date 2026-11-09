@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Game } from '../data/games';
 import type { Locale } from '../i18n/ui';
-import { localizedPolicyPath, UI_TRANSLATIONS } from '../i18n/ui';
+import { localizedGamePath, localizedPolicyPath, UI_TRANSLATIONS } from '../i18n/ui';
 import { StoreButtons } from './StoreButtons';
 
 interface GameDetailModalProps {
@@ -161,6 +161,9 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({ game, lang = '
 						<p className="text-slate-300 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
 							{game.longDescription || game.description}
 						</p>
+						<a href={localizedGamePath(lang, game.id)} className="inline-block text-sm text-amber-400 underline underline-offset-4">
+							{UI_TRANSLATIONS[lang].page.details} <span aria-hidden="true">↗</span>
+						</a>
 					</div>
 
 					<div className="space-y-4 bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80">

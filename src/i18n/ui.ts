@@ -5,5 +5,12 @@ export const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', vi: 'Tiáº
 export const HTML_LANG: Record<Locale, string> = { en: 'en', vi: 'vi', zh: 'zh-Hans', fr: 'fr', th: 'th', ja: 'ja', ko: 'ko' };
 export const localizedPath = (lang: Locale, path = '/') => `${lang === 'en' ? '' : `/${lang}`}${path === '/' ? '/' : path}`;
 export const localizedPolicyPath = (lang: Locale, id: string) => localizedPath(lang, `/policies/${id}`);
+export const localizedGamePath = (lang: Locale, id: string) => localizedPath(lang, `/games/${id}/`);
+
+export function unlocalizedPath(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean);
+  if (LOCALES.includes(segments[0] as Locale)) segments.shift();
+  return segments.length ? `/${segments.join('/')}/` : '/';
+}
 
 export const UI_TRANSLATIONS = EXTRA_MESSAGES;

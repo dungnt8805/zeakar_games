@@ -51,6 +51,33 @@ const messages = JSON.parse(await read('src/i18n/messages.json'));
 const translatedPolicies = JSON.parse(await read('src/data/privacy-translations.json'));
 const locales = ['en', 'vi', 'zh', 'fr', 'th', 'ja', 'ko'];
 const langTags = { en:'en', vi:'vi', zh:'zh-Hans', fr:'fr', th:'th', ja:'ja', ko:'ko' };
+const site = `https://${(await read('dist/CNAME')).toString().trim()}`;
+const localizedRoute = (locale, route) => `${locale === 'en' ? '' : `/${locale}`}${route}`;
+const gameRoutes = Object.keys(appPolicies).map(id => `/games/${id}/`);
+const searchRoutes = ['/', ...gameRoutes];
+const sitemap = (await read('dist/sitemap.xml')).toString();
+const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+const expectedUrls = locales.flatMap(locale => searchRoutes.map(route => site + localizedRoute(locale, route)));
+assert.deepEqual(sitemapUrls.sort(), expectedUrls.sort(), 'Sitemap must list each canonical homepage and game page once');
+assert((await read('dist/robots.txt')).toString().includes(`Sitemap: ${site}/sitemap.xml`), 'Missing robots.txt sitemap URL');
+
+function verifySeo(html, locale, route) {
+  assert(html.includes(`<link rel="canonical" href="${site}${localizedRoute(locale, route)}">`), `Wrong canonical: ${locale}${route}`);
+  for (const alternate of locales) {
+    assert(html.includes(`<link rel="alternate" hreflang="${langTags[alternate]}" href="${site}${localizedRoute(alternate, route)}">`),
+      `Missing ${alternate} alternate: ${locale}${route}`);
+  }
+  assert(html.includes(`<link rel="alternate" hreflang="x-default" href="${site}${route}">`), `Missing x-default: ${locale}${route}`);
+}
+
+const englishAlias = (await read('dist/en/index.html')).toString();
+verifySeo(englishAlias, 'en', '/');
+const verificationToken = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+if (verificationToken) {
+  const home = (await read('dist/index.html')).toString();
+  assert(home.includes(`<meta name="google-site-verification" content="${verificationToken}">`), 'Search Console verification tag is missing');
+}
+
 const flattenKeys = (value, prefix = '') => Object.entries(value).flatMap(([key, value]) => typeof value === 'object' ? flattenKeys(value, `${prefix}${key}.`) : [`${prefix}${key}`]).sort();
 for (const locale of locales) {
   assert.deepEqual(flattenKeys(messages[locale]), flattenKeys(messages.en), `Translation keys differ: ${locale}`);
@@ -58,6 +85,15 @@ for (const locale of locales) {
   const home = (await read(`dist/${prefix}index.html`)).toString();
   assert(home.includes(`<html lang="${langTags[locale]}"`), `Wrong homepage language: ${locale}`);
   assert(home.includes(messages[locale].page.line1), `Wrong homepage copy: ${locale}`);
+  verifySeo(home, locale, '/');
+  for (const route of gameRoutes) {
+    const path = localizedRoute(locale, route);
+    const html = (await read(`dist${path}index.html`)).toString();
+    assert(home.includes(`href="${path}"`), `Missing game link on homepage: ${path}`);
+    assert(html.includes(`<html lang="${langTags[locale]}"`), `Wrong game page language: ${path}`);
+    assert(/<h1\b/.test(html) && html.includes('https://play.google.com/store/apps/details?id='), `Incomplete game page: ${path}`);
+    verifySeo(html, locale, route);
+  }
   const directory = (await read(`dist/${prefix}policies/index.html`)).toString();
   for (const [id, policy] of Object.entries(translatedPolicies)) {
     assert.equal(policy.originalUrl, appPolicies[id], `Original policy URL changed: ${id}`);
@@ -83,3 +119,4 @@ for (const locale of locales) {
   }
 }
 console.log(`Verified ${policies.files.length} policy/support files against approved hashes, archived revisions, 7 app URLs, ${mediaManifest.assets.length} store images, 7 site languages and 49 complete privacy documents.`);
+console.log(`Verified sitemap and SEO metadata for ${expectedUrls.length} canonical URLs, including ${gameRoutes.length * locales.length} game pages.`);

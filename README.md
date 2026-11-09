@@ -45,6 +45,27 @@ The target repository `dungnt8805/zeakar_games` currently uses **master** as its
 
 The workflow publishes the entire verified build, including all legacy policy files, `CNAME`, `.nojekyll`, `_astro/`, and `media/`. It does not commit build output back into the source branch. Existing policy URLs in apps and Google Play require no changes.
 
+## Refresh the Aster Strike browser demo
+
+The Aster Strike game page embeds a self-contained HTML5 build from the Galaxy Shooter project's playable ad sources. The website's GitHub Pages build uses the bundled copy and does not need access to the game repository.
+
+```sh
+python3 -I scripts/sync-aster-playable.py /path/to/galaxy-shooter
+npm run verify
+```
+
+Use a checkout with the playable assets available through Git LFS. Commit the refreshed files under `public/playable/aster-strike/` with the site changes.
+
+## Google Search Console
+
+The site builds a static `/sitemap.xml` with the seven homepages and all localized game pages. Each game has an English URL at `/games/{game-id}/` and a localized URL at `/{locale}/games/{game-id}/`. The sitemap lists the canonical marketing pages. Legacy aliases and legal documents stay accessible at their existing URLs.
+
+1. In [Google Search Console](https://search.google.com/search-console), add the URL-prefix property `https://game.lamian.dev/` and select **HTML tag**.
+2. Copy the value inside the tag's `content` attribute into the GitHub repository variable `GOOGLE_SITE_VERIFICATION` under **Settings → Secrets and variables → Actions → Variables**.
+3. Deploy the site, click **Verify** in Search Console, then submit `sitemap.xml` under **Sitemaps**. Keep the variable set for future builds.
+
+For local builds, pass the same variable as an environment variable or put it in an untracked `.env` file.
+
 ## Localized privacy policies
 
 `/policies/` is the default English directory. Other languages use `/{locale}/policies/`; each game has a readable policy at `/{locale}/policies/{game-id}/` (omit `/en` for canonical English). The language picker preserves the current game/page. Every translated policy links to its original English URL.

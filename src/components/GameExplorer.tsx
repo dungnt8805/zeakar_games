@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Game } from '../data/games';
 import type { Locale } from '../i18n/ui';
-import { UI_TRANSLATIONS } from '../i18n/ui';
+import { localizedGamePath, UI_TRANSLATIONS } from '../i18n/ui';
 import { StoreButtons } from './StoreButtons';
 import { GameDetailModal } from './GameDetailModal';
 import { FeaturedShowcase } from './FeaturedShowcase';
@@ -28,7 +28,22 @@ export const GameExplorer: React.FC<GameExplorerProps> = ({ games, lang = 'en' }
       <div className="catalog-toolbar"><div className="category-list" role="group" aria-label={page.filter}>{categories.map(cat => <button className="category-button" key={cat.id} aria-pressed={category === cat.id} onClick={() => setCategory(cat.id)}>{cat.label}<span>{cat.id === 'All' ? games.length : games.filter(game => game.category === cat.id).length}</span></button>)}</div><p className="catalog-count" role="status">{new Intl.NumberFormat(lang).format(filtered.length)} {page.count}</p></div>
       {filtered.length ? <div className="game-grid">{filtered.map(game => <article className="game-card" key={game.id}>
         <button className="game-preview" onClick={() => setActiveGame(game)} aria-label={`${page.details} ${game.title}`}><img src={game.banner} alt="" loading="lazy" width="160" height="285" /><img src={game.screenshots.find(shot => shot !== game.banner) || game.banner} alt="" loading="lazy" width="160" height="285" /></button>
-        <div className="game-card-body"><div className="game-card-heading"><img src={game.icon} alt="" loading="lazy" width="48" height="48" /><div><h3><button onClick={() => setActiveGame(game)}>{game.title.split(':')[0]}</button></h3><span className="game-category">{game.categoryLabel}</span></div></div><p className="game-card-description">{game.description}</p><div className="game-card-actions"><StoreButtons lang={lang} googlePlayUrl={game.googlePlayUrl} appStoreUrl={game.appStoreUrl} size="sm" /><button className="game-detail-link" onClick={() => setActiveGame(game)}>{page.details} <span aria-hidden="true">↗</span></button></div></div>
+        <div className="game-card-body">
+          <div className="game-card-heading">
+            <img src={game.icon} alt="" loading="lazy" width="48" height="48" />
+            <div>
+              <h3><a href={localizedGamePath(lang, game.id)}>{game.title.split(':')[0]}</a></h3>
+              <span className="game-category">{game.categoryLabel}</span>
+            </div>
+          </div>
+          <p className="game-card-description">{game.description}</p>
+          <div className="game-card-actions">
+            <StoreButtons lang={lang} googlePlayUrl={game.googlePlayUrl} appStoreUrl={game.appStoreUrl} size="sm" />
+            <a className="game-detail-link" href={localizedGamePath(lang, game.id)} aria-label={`${page.details} ${game.title}`}>
+              {page.details} <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
       </article>)}</div> : <div className="empty-catalog"><p>{t.noResults}</p><button className="primary-action" onClick={reset}>{t.clearFilter} <span aria-hidden="true">↗</span></button></div>}
     </section>
     <GameDetailModal game={activeGame} lang={lang} onClose={() => setActiveGame(null)} />
