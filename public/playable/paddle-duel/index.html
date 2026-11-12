@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paddle Duel</title>
+<style>
+:root {
+  --bg: #0f1b31;
+  --ink: #1b2a44;
+  --text: #f4f7ff;
+  --muted: #9fb0cf;
+  --p1: #ff5f5f;
+  --p2: #35d6a4;
+  --accent: #ffb02e;
+  --accent-dark: #d98a0b;
+  --paper: #fffaf0;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at 50% 40%, #1b3157, var(--bg) 70%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; max-width: 480px; width: 100%; margin: 0 auto; }
+.side { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 14px; background: #ffffff10; box-shadow: inset 0 0 0 1px #ffffff14; }
+.side.top { flex-direction: row-reverse; text-align: right; }
+.side i { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; }
+.side.bottom i { background: var(--p1); box-shadow: 0 0 10px var(--p1); }
+.side.top i { background: var(--p2); box-shadow: 0 0 10px var(--p2); }
+.side div { min-width: 0; flex: 1; }
+.side small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+.side strong { display: block; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mid { display: flex; flex-direction: column; align-items: center; gap: 3px; max-width: 110px; }
+.mid small { font-size: 10px; font-weight: 800; color: var(--muted); text-align: center; line-height: 1.2; }
+.icon-btn { width: 38px; height: 34px; display: grid; place-items: center; border-radius: 12px; background: #ffffff14; font-size: 18px; font-weight: 900; }
+.icon-btn:active { transform: translateY(1px); }
+.stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; }
+canvas { display: block; border-radius: 18px; touch-action: none; background: #1d5fae; box-shadow: 0 0 0 4px #0b1424, 0 0 0 6px #ffffff12, 0 20px 40px #0009; }
+canvas:focus-visible { outline: 3px solid #ffb02e88; outline-offset: 6px; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #0a1222a8; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--paper); color: var(--ink); border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--p1); }
+.logo { font-size: 40px; line-height: 1.1; }
+.text { margin-top: 6px; font-size: 14px; color: #5d6a85; line-height: 1.45; }
+.field { margin-top: 14px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #6c7894; margin-bottom: 6px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #efe6d4; }
+.seg button { flex: 1; min-width: 0; padding: 9px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: #6c7894; line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #dccfb5; }
+.hint { margin-top: 12px; font-size: 12px; color: #6c7894; line-height: 1.45; }
+.final { margin-top: 8px; font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.final b:first-child { color: var(--p1); }
+.final b:last-child { color: #1fae82; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--accent); color: #432800; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--accent); color: #3a2300; font-size: 19px; font-weight: 900; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #efe6d4; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #dccfb5; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="hud">
+    <div class="side bottom"><i aria-hidden="true"></i><div><small id="name-0"></small><strong id="score-0">0</strong></div></div>
+    <div class="mid"><small id="first-to"></small><button type="button" class="icon-btn" id="menu" data-i18n-label="menu">≡</button></div>
+    <div class="side top"><i aria-hidden="true"></i><div><small id="name-1"></small><strong id="score-1">0</strong></div></div>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true">🏓</div>
+    <h2 id="setup-title">Paddle <span>Duel</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="cpu" data-i18n="vsCpu"></button><button type="button" data-value="pvp" data-i18n="twoP"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <p class="hint" id="hint"></p>
+    <p class="hint" id="record"></p>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="logo" id="result-emoji" aria-hidden="true">🏆</div>
+    <h2 id="result-title"></h2>
+    <p class="final" id="final"><b></b> – <b></b></p>
+    <p class="text" id="longest"></p>
+    <p class="badge" id="new-record" data-i18n="newRecord" hidden></p>
+    <p class="hint" id="result-record"></p>
+    <button type="button" class="cta" id="rematch" data-i18n="rematch"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Fast table-tennis duels — beat the computer or a friend!', mode: 'Mode', vsCpu: 'vs Computer', twoP: '2 Players', difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', start: 'Start match', controlsCpu: 'Drag to move your paddle, or use ← → / A D.', controls2p: 'Each player drags in their own half. Keyboard: A D (top) and ← → (bottom).', you: 'You', cpu: 'CPU', p1: 'Player 1', p2: 'Player 2', firstTo: n => `First to ${n}`, rally: n => `Rally ${n}`, pointYou: 'Your point!', pointCpu: 'CPU’s point', pointP1: 'Point to Player 1', pointP2: 'Point to Player 2', winYou: 'You win!', winCpu: 'CPU wins', winP1: 'Player 1 wins!', winP2: 'Player 2 wins!', longest: n => `Longest rally: ${n} ${n === 1 ? 'hit' : 'hits'}`, newRecord: 'New rally record!', record: (w, l) => `Your record on this level: ${w} W · ${l} L`, rematch: 'Rematch', change: 'Change mode', menu: 'Menu', canvas: 'Paddle Duel table', matchPoint: 'Match point!' },
+    vi: { tagline: 'Đấu bóng bàn tốc độ — hạ gục máy hoặc bạn bè!', mode: 'Chế độ', vsCpu: 'Đấu với máy', twoP: '2 người chơi', difficulty: 'Độ khó', easy: 'Dễ', normal: 'Vừa', hard: 'Khó', start: 'Bắt đầu', controlsCpu: 'Kéo để di chuyển vợt, hoặc dùng phím ← → / A D.', controls2p: 'Mỗi người kéo trong nửa bàn của mình. Bàn phím: A D (bên trên) và ← → (bên dưới).', you: 'Bạn', cpu: 'Máy', p1: 'Người 1', p2: 'Người 2', firstTo: n => `Chạm ${n} là thắng`, rally: n => `${n} lượt đánh`, pointYou: 'Bạn ghi điểm!', pointCpu: 'Máy ghi điểm', pointP1: 'Người 1 ghi điểm', pointP2: 'Người 2 ghi điểm', winYou: 'Bạn thắng!', winCpu: 'Máy thắng', winP1: 'Người 1 thắng!', winP2: 'Người 2 thắng!', longest: n => `Pha bóng dài nhất: ${n} lượt đánh`, newRecord: 'Kỷ lục pha bóng mới!', record: (w, l) => `Thành tích ở mức này: ${w} thắng · ${l} thua`, rematch: 'Đấu lại', change: 'Đổi chế độ', menu: 'Menu', canvas: 'Bàn bóng Paddle Duel', matchPoint: 'Điểm quyết định!' },
+    zh: { tagline: '快节奏乒乓对决——挑战电脑或好友！', mode: '模式', vsCpu: '人机对战', twoP: '双人对战', difficulty: '难度', easy: '简单', normal: '普通', hard: '困难', start: '开始比赛', controlsCpu: '拖动球拍移动，或使用 ← → / A D 键。', controls2p: '双方各自在自己的半场拖动。键盘：A D（上方）和 ← →（下方）。', you: '你', cpu: '电脑', p1: '玩家 1', p2: '玩家 2', firstTo: n => `先得 ${n} 分获胜`, rally: n => `连续 ${n} 拍`, pointYou: '你得分！', pointCpu: '电脑得分', pointP1: '玩家 1 得分', pointP2: '玩家 2 得分', winYou: '你赢了！', winCpu: '电脑获胜', winP1: '玩家 1 获胜！', winP2: '玩家 2 获胜！', longest: n => `最长回合：${n} 拍`, newRecord: '回合新纪录！', record: (w, l) => `本难度战绩：${w} 胜 · ${l} 负`, rematch: '再来一局', change: '更换模式', menu: '菜单', canvas: 'Paddle Duel 球桌', matchPoint: '赛点！' },
+    fr: { tagline: 'Des duels de ping-pong survoltés contre l’ordi ou un ami !', mode: 'Mode', vsCpu: 'Contre l’ordi', twoP: '2 joueurs', difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile', start: 'Lancer le match', controlsCpu: 'Glissez pour déplacer votre raquette, ou utilisez ← → / A D.', controls2p: 'Chaque joueur glisse dans sa moitié. Clavier : A D (en haut) et ← → (en bas).', you: 'Vous', cpu: 'Ordi', p1: 'Joueur 1', p2: 'Joueur 2', firstTo: n => `Premier à ${n}`, rally: n => `Échange : ${n}`, pointYou: 'Point pour vous !', pointCpu: 'Point pour l’ordi', pointP1: 'Point pour le joueur 1', pointP2: 'Point pour le joueur 2', winYou: 'Vous gagnez !', winCpu: 'L’ordi gagne', winP1: 'Le joueur 1 gagne !', winP2: 'Le joueur 2 gagne !', longest: n => `Plus long échange : ${n} ${n > 1 ? 'frappes' : 'frappe'}`, newRecord: 'Record d’échange !', record: (w, l) => `Votre bilan à ce niveau : ${w} V · ${l} D`, rematch: 'Revanche', change: 'Changer de mode', menu: 'Menu', canvas: 'Table de Paddle Duel', matchPoint: 'Balle de match !' },
+    th: { tagline: 'ดวลปิงปองสุดมันส์ สู้กับคอมพิวเตอร์หรือเพื่อนก็ได้!', mode: 'โหมด', vsCpu: 'เล่นกับคอม', twoP: '2 ผู้เล่น', difficulty: 'ระดับ', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก', start: 'เริ่มแข่ง', controlsCpu: 'ลากเพื่อเลื่อนไม้ หรือใช้ปุ่ม ← → / A D', controls2p: 'ผู้เล่นแต่ละคนลากในฝั่งของตัวเอง คีย์บอร์ด: A D (ฝั่งบน) และ ← → (ฝั่งล่าง)', you: 'คุณ', cpu: 'คอม', p1: 'ผู้เล่น 1', p2: 'ผู้เล่น 2', firstTo: n => `ถึง ${n} แต้มชนะ`, rally: n => `ตีโต้ ${n} ครั้ง`, pointYou: 'คุณได้แต้ม!', pointCpu: 'คอมได้แต้ม', pointP1: 'ผู้เล่น 1 ได้แต้ม', pointP2: 'ผู้เล่น 2 ได้แต้ม', winYou: 'คุณชนะ!', winCpu: 'คอมชนะ', winP1: 'ผู้เล่น 1 ชนะ!', winP2: 'ผู้เล่น 2 ชนะ!', longest: n => `ตีโต้ยาวที่สุด: ${n} ครั้ง`, newRecord: 'สถิติตีโต้ใหม่!', record: (w, l) => `สถิติในระดับนี้: ชนะ ${w} · แพ้ ${l}`, rematch: 'แข่งอีกรอบ', change: 'เปลี่ยนโหมด', menu: 'เมนู', canvas: 'โต๊ะ Paddle Duel', matchPoint: 'แมตช์พอยต์!' },
+    ja: { tagline: 'スピード感あふれる卓球バトル。CPUや友だちと勝負しよう！', mode: 'モード', vsCpu: 'CPU対戦', twoP: '2人対戦', difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', start: '試合開始', controlsCpu: 'ドラッグでラケットを移動。← → / A D キーでも操作できます。', controls2p: 'それぞれ自分の側でドラッグ。キーボードは A D（上）と ← →（下）。', you: 'あなた', cpu: 'CPU', p1: 'プレイヤー1', p2: 'プレイヤー2', firstTo: n => `${n}点先取`, rally: n => `ラリー ${n}`, pointYou: 'あなたの得点！', pointCpu: 'CPUの得点', pointP1: 'プレイヤー1の得点', pointP2: 'プレイヤー2の得点', winYou: 'あなたの勝ち！', winCpu: 'CPUの勝ち', winP1: 'プレイヤー1の勝ち！', winP2: 'プレイヤー2の勝ち！', longest: n => `最長ラリー：${n}回`, newRecord: 'ラリー記録更新！', record: (w, l) => `この難易度の戦績：${w}勝 ${l}敗`, rematch: '再戦', change: 'モード変更', menu: 'メニュー', canvas: 'Paddle Duel の卓球台', matchPoint: 'マッチポイント！' },
+    ko: { tagline: '스피드 넘치는 탁구 대결! 컴퓨터나 친구와 겨뤄 보세요!', mode: '모드', vsCpu: '컴퓨터 대전', twoP: '2인 대전', difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', start: '경기 시작', controlsCpu: '드래그해서 라켓을 움직이거나 ← → / A D 키를 사용하세요.', controls2p: '각자 자기 쪽 코트에서 드래그하세요. 키보드: A D(위), ← →(아래).', you: '나', cpu: 'CPU', p1: '플레이어 1', p2: '플레이어 2', firstTo: n => `${n}점 선승`, rally: n => `랠리 ${n}`, pointYou: '득점!', pointCpu: 'CPU 득점', pointP1: '플레이어 1 득점', pointP2: '플레이어 2 득점', winYou: '승리!', winCpu: 'CPU 승리', winP1: '플레이어 1 승리!', winP2: '플레이어 2 승리!', longest: n => `최장 랠리: ${n}회`, newRecord: '랠리 신기록!', record: (w, l) => `이 난이도 전적: ${w}승 ${l}패`, rematch: '재대결', change: '모드 변경', menu: '메뉴', canvas: 'Paddle Duel 탁구대', matchPoint: '매치 포인트!' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // The table is a fixed 360×640 portrait field, scaled to fit the stage. Player 0 is at the bottom.
+  const W = 360, H = 640, EDGE = 10;
+  const PW = 74, PH = 14, BALL_R = 7;
+  const PADDLE_Y = [H - 54, 54];
+  const START_SPEED = 300, SPEED_UP = 16, MAX_SPEED = 700, MAX_ANGLE = Math.PI * 0.33;
+  const WIN_SCORE = 7, STEP = 1 / 240;
+  const COLORS = ['#ff5f5f', '#35d6a4'];
+  // reaction: seconds between AI re-reads of the ball; error: aim noise in px; aim: chance to angle a return;
+  // miss: base chance of a misread return, which grows with ball speed so long rallies stay winnable;
+  // sight: how far up the table (0–1) the AI starts reading the ball's path instead of just following it.
+  const AI = { easy: { reaction: 0.3, speed: 220, error: 30, aim: 0, sight: 0.5, miss: 0.12 }, normal: { reaction: 0.16, speed: 310, error: 18, aim: 0.35, sight: 0.75, miss: 0.06 }, hard: { reaction: 0.08, speed: 400, error: 10, aim: 0.8, sight: 1, miss: 0.025 } };
+  const KEY = 'milaan.paddleDuel.';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(KEY + key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(KEY + key, JSON.stringify(value)); } catch {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  const settings = Object.assign({ mode: 'cpu', level: 'normal' }, read('settings', {}));
+  if (!AI[settings.level]) settings.level = 'normal';
+  if (settings.mode !== 'pvp') settings.mode = 'cpu';
+  const stats = Object.assign({ easy: { w: 0, l: 0 }, normal: { w: 0, l: 0 }, hard: { w: 0, l: 0 } }, read('stats', {}));
+  let longestRally = Number(read('longestRally', 0)) || 0;
+
+  let scale = 1;
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = `${W * scale}px`;
+    canvas.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  const keys = [{ left: false, right: false }, { left: false, right: false }];
+  const pointers = new Map();
+  let game = newGameState();
+
+  function newGameState() {
+    return { mode: settings.mode, level: settings.level, scores: [0, 0], server: 0, state: 'menu', timer: 0, rally: 0, longest: 0,
+      paddles: [{ x: W / 2, target: null, vx: 0 }, { x: W / 2, target: null, vx: 0 }],
+      ball: { x: W / 2, y: H / 2, vx: 0, vy: 0, speed: START_SPEED }, trail: [], particles: [], ai: { timer: 0, target: W / 2, err: 0, aim: 0 }, flash: 0 };
+  }
+
+  const names = () => (game.mode === 'cpu' ? [t.you, t.cpu] : [t.p1, t.p2]);
+
+  function updateHud() {
+    const [n0, n1] = names();
+    $('name-0').textContent = n0;
+    $('name-1').textContent = n1;
+    $('score-0').textContent = String(game.scores[0]);
+    $('score-1').textContent = String(game.scores[1]);
+    $('first-to').textContent = t.firstTo(WIN_SCORE);
+  }
+
+  function startMatch() {
+    game = newGameState();
+    game.server = Math.random() < 0.5 ? 0 : 1;
+    write('settings', settings);
+    $('setup').hidden = true;
+    $('result').hidden = true;
+    updateHud();
+    prepareServe();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function prepareServe() {
+    game.state = 'serve';
+    game.timer = 1.1;
+    game.rally = 0;
+    game.trail = [];
+    const b = game.ball;
+    b.vx = b.vy = 0;
+    b.speed = START_SPEED;
+    placeOnServer();
+    rollAi();
+  }
+
+  function placeOnServer() {
+    const s = game.server;
+    game.ball.x = game.paddles[s].x;
+    game.ball.y = PADDLE_Y[s] + (s === 0 ? -1 : 1) * (PH / 2 + BALL_R + 3);
+  }
+
+  function serve() {
+    const s = game.server;
+    const angle = rand(-0.35, 0.35) + clamp(game.paddles[s].vx / 2000, -0.2, 0.2);
+    const b = game.ball;
+    b.vx = Math.sin(angle) * b.speed;
+    b.vy = (s === 0 ? -1 : 1) * Math.cos(angle) * b.speed;
+    game.state = 'play';
+  }
+
+  function rollAi() {
+    const cfg = AI[game.level], ai = game.ai;
+    // Faster balls make the computer's read less precise.
+    const pace = game.ball.speed / START_SPEED;
+    const whiff = Math.random() < cfg.miss * pace * pace;
+    ai.err = whiff ? (Math.random() < 0.5 ? -1 : 1) * rand(PW * 0.7, PW) : rand(-1, 1) * cfg.error * pace;
+    ai.aim = Math.random() < cfg.aim ? (game.paddles[0].x < W / 2 ? -1 : 1) * PW * 0.32 : 0;
+    ai.serveX = rand(EDGE + PW, W - EDGE - PW);
+  }
+
+  // Where will the ball cross height y, and after how many side-wall bounces?
+  function predict(y) {
+    const b = game.ball;
+    if (!b.vy) return { x: b.x, bounces: 0 };
+    const time = (y - b.y) / b.vy;
+    const min = EDGE + BALL_R, span = W - EDGE * 2 - BALL_R * 2;
+    const raw = b.x + b.vx * time - min;
+    let u = raw % (2 * span);
+    if (u < 0) u += 2 * span;
+    return { x: min + (u > span ? 2 * span - u : u), bounces: Math.abs(Math.floor(raw / span)) };
+  }
+
+  function updateAi(dt) {
+    const cfg = AI[game.level], ai = game.ai, p = game.paddles[1], b = game.ball;
+    ai.timer -= dt;
+    if (ai.timer <= 0) {
+      ai.timer = cfg.reaction;
+      const seen = b.y < H * cfg.sight;
+      if (game.state === 'play' && b.vy < 0 && seen) {
+        const guess = predict(PADDLE_Y[1]);
+        ai.target = guess.x + ai.err * (1 + guess.bounces * 0.6) + ai.aim;
+      } else if (game.state === 'play' && b.vy < 0) ai.target = b.x;
+      else if (game.state === 'serve' && game.server === 1) ai.target = ai.serveX;
+      else ai.target = W / 2 + (b.x - W / 2) * 0.35;
+    }
+    const prev = p.x;
+    p.x = clamp(p.x + clamp(ai.target - p.x, -cfg.speed * dt, cfg.speed * dt), EDGE + PW / 2, W - EDGE - PW / 2);
+    p.vx = (p.x - prev) / dt;
+  }
+
+  function movePaddle(i, dt) {
+    const p = game.paddles[i], k = keys[i];
+    const prev = p.x;
+    const dir = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+    if (dir) { p.target = null; p.x += dir * 420 * dt; }
+    else if (p.target !== null) p.x += clamp(p.target - p.x, -1600 * dt, 1600 * dt);
+    p.x = clamp(p.x, EDGE + PW / 2, W - EDGE - PW / 2);
+    p.vx = (p.x - prev) / dt;
+  }
+
+  function sparks(x, y, color, count, speed) {
+    if (reducedMotion.matches) count = Math.ceil(count / 3);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random());
+      game.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.5), color });
+    }
+  }
+
+  function paddleHit(i) {
+    const p = game.paddles[i], b = game.ball;
+    const toward = i === 0 ? b.vy > 0 : b.vy < 0;
+    if (!toward || Math.abs(b.x - p.x) > PW / 2 + BALL_R) return;
+    const top = PADDLE_Y[i] - PH / 2, bottom = PADDLE_Y[i] + PH / 2;
+    if (b.y + BALL_R < top || b.y - BALL_R > bottom) return;
+    // Hit position sets the angle; paddle motion adds a touch of spin.
+    const rel = clamp((b.x - p.x) / (PW / 2 + BALL_R), -1, 1);
+    const angle = clamp(rel * MAX_ANGLE + p.vx / 4000, -MAX_ANGLE, MAX_ANGLE);
+    b.speed = Math.min(MAX_SPEED, b.speed + SPEED_UP);
+    b.vx = Math.sin(angle) * b.speed;
+    b.vy = (i === 0 ? -1 : 1) * Math.cos(angle) * b.speed;
+    b.y = i === 0 ? top - BALL_R : bottom + BALL_R;
+    game.rally += 1;
+    game.flash = 0.12;
+    sparks(b.x, b.y, COLORS[i], 10, 140);
+    if (i === 0) rollAi();
+  }
+
+  function stepBall(dt) {
+    const b = game.ball;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    if (b.x < EDGE + BALL_R) { b.x = EDGE + BALL_R; b.vx = Math.abs(b.vx); sparks(b.x - BALL_R, b.y, '#ffffff', 4, 70); }
+    if (b.x > W - EDGE - BALL_R) { b.x = W - EDGE - BALL_R; b.vx = -Math.abs(b.vx); sparks(b.x + BALL_R, b.y, '#ffffff', 4, 70); }
+    paddleHit(0);
+    paddleHit(1);
+    if (b.y > H + BALL_R * 2) pointTo(1);
+    else if (b.y < -BALL_R * 2) pointTo(0);
+  }
+
+  function pointTo(scorer) {
+    game.scores[scorer] += 1;
+    game.longest = Math.max(game.longest, game.rally);
+    game.state = 'point';
+    game.timer = 1.0;
+    game.server = 1 - game.server;
+    const b = game.ball;
+    sparks(clamp(b.x, 20, W - 20), scorer === 0 ? 8 : H - 8, COLORS[scorer], 26, 220);
+    updateHud();
+    const label = game.mode === 'cpu' ? (scorer === 0 ? t.pointYou : t.pointCpu) : (scorer === 0 ? t.pointP1 : t.pointP2);
+    $('announcer').textContent = `${label} ${game.scores[0]}–${game.scores[1]}`;
+    if (game.scores[scorer] >= WIN_SCORE) { game.state = 'won'; game.timer = 0.9; game.winner = scorer; }
+  }
+
+  function finishMatch() {
+    game.state = 'over';
+    const winner = game.winner;
+    const isRecord = game.longest > longestRally;
+    if (isRecord) { longestRally = game.longest; write('longestRally', longestRally); }
+    let title;
+    if (game.mode === 'cpu') {
+      const s = stats[game.level];
+      if (winner === 0) s.w += 1; else s.l += 1;
+      write('stats', stats);
+      title = winner === 0 ? t.winYou : t.winCpu;
+      $('result-record').textContent = t.record(s.w, s.l);
+      $('result-emoji').textContent = winner === 0 ? '🏆' : '😵';
+    } else {
+      title = winner === 0 ? t.winP1 : t.winP2;
+      $('result-record').textContent = '';
+      $('result-emoji').textContent = '🏆';
+    }
+    $('result-title').textContent = title;
+    const [a, b] = $('final').querySelectorAll('b');
+    a.textContent = String(game.scores[0]);
+    b.textContent = String(game.scores[1]);
+    $('longest').textContent = t.longest(game.longest);
+    $('new-record').hidden = !isRecord;
+    $('result').hidden = false;
+    $('announcer').textContent = `${title} ${game.scores[0]}–${game.scores[1]}. ${t.longest(game.longest)}`;
+    $('rematch').focus({ preventScroll: true });
+  }
+
+  function update(dt) {
+    movePaddle(0, dt);
+    if (game.mode === 'cpu') updateAi(dt); else movePaddle(1, dt);
+    if (game.state === 'serve') {
+      placeOnServer();
+      game.timer -= dt;
+      if (game.timer <= 0) serve();
+    } else if (game.state === 'play') {
+      stepBall(dt);
+    } else if (game.state === 'point' || game.state === 'won') {
+      game.timer -= dt;
+      if (game.timer <= 0) { if (game.state === 'won') finishMatch(); else prepareServe(); }
+    }
+  }
+
+  function updateEffects(dt) {
+    if (game.state === 'play' || game.state === 'serve') {
+      game.trail.push({ x: game.ball.x, y: game.ball.y });
+      if (game.trail.length > (reducedMotion.matches ? 0 : 12)) game.trail.shift();
+    } else if (game.trail.length) game.trail.shift();
+    for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.95; p.vy *= 0.95; p.life -= dt; }
+    game.particles = game.particles.filter(p => p.life > 0);
+    game.flash = Math.max(0, game.flash - dt);
+  }
+
+  // ---- Drawing ----
+  function drawTable() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#2369c0');
+    g.addColorStop(0.5, '#1d5fae');
+    g.addColorStop(1, '#2369c0');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#eef4ff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(EDGE - 1.5, EDGE - 1.5, W - EDGE * 2 + 3, H - EDGE * 2 + 3);
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W / 2, EDGE); ctx.lineTo(W / 2, H - EDGE); ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.font = '900 120px ui-rounded, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff14';
+    ctx.fillText(String(game.scores[0]), W / 2, H * 0.74);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.26);
+    if (game.mode === 'pvp') ctx.rotate(Math.PI);
+    ctx.fillText(String(game.scores[1]), 0, 0);
+    ctx.restore();
+
+    // Net across the middle, with its posts poking past the table edge.
+    ctx.fillStyle = '#0b1a3366';
+    ctx.fillRect(0, H / 2 - 4, W, 8);
+    ctx.strokeStyle = '#ffffff40';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 4; x < W; x += 6) { ctx.moveTo(x, H / 2 - 4); ctx.lineTo(x, H / 2 + 4); }
+    ctx.stroke();
+    ctx.fillStyle = '#f4f7ff';
+    ctx.fillRect(0, H / 2 - 5, W, 2.5);
+    ctx.fillStyle = '#0b1424';
+    ctx.fillRect(0, H / 2 - 7, 5, 14);
+    ctx.fillRect(W - 5, H / 2 - 7, 5, 14);
+  }
+
+  function drawPaddle(i) {
+    const p = game.paddles[i], y = PADDLE_Y[i];
+    ctx.save();
+    ctx.shadowColor = COLORS[i];
+    ctx.shadowBlur = game.flash > 0 ? 22 : 12;
+    ctx.fillStyle = COLORS[i];
+    ctx.beginPath(); ctx.roundRect(p.x - PW / 2, y - PH / 2, PW, PH, PH / 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff66';
+    ctx.beginPath(); ctx.roundRect(p.x - PW / 2 + 6, y - PH / 2 + 3, PW - 12, 3, 2); ctx.fill();
+    ctx.fillStyle = '#00000030';
+    ctx.beginPath(); ctx.roundRect(p.x - PW / 2 + 6, y + PH / 2 - 5, PW - 12, 2, 1); ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    drawTable();
+    const trail = game.trail;
+    for (let i = 0; i < trail.length; i++) {
+      const k = (i + 1) / trail.length;
+      ctx.globalAlpha = k * 0.35;
+      ctx.fillStyle = '#ffb02e';
+      ctx.beginPath(); ctx.arc(trail[i].x, trail[i].y, BALL_R * (0.4 + 0.6 * k), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const p of game.particles) { ctx.globalAlpha = Math.min(1, p.life * 3); ctx.fillStyle = p.color; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    ctx.globalAlpha = 1;
+    drawPaddle(0);
+    drawPaddle(1);
+    if (game.state !== 'point' && game.state !== 'won' && game.state !== 'over') {
+      const b = game.ball;
+      ctx.save();
+      ctx.shadowColor = '#ffb02e';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#fff8e6';
+      ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.font = '800 13px ui-rounded, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffffaa';
+    if (game.rally >= 2 && game.state === 'play') ctx.fillText(t.rally(game.rally), W - EDGE - 8, H / 2 + 18);
+    if (game.state === 'serve' && Math.max(...game.scores) === WIN_SCORE - 1) {
+      ctx.textAlign = 'center';
+      ctx.font = '900 22px ui-rounded, system-ui, sans-serif';
+      ctx.fillStyle = '#ffb02e';
+      ctx.fillText(t.matchPoint, W / 2, H / 2 + (game.server === 0 ? 40 : -40));
+    }
+  }
+
+  let last = performance.now(), acc = 0;
+  function tick(time) {
+    // Clamp dt so a stalled frame (tab switch, slow device) never teleports the ball.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (game.state !== 'menu' && game.state !== 'over') {
+      acc += dt;
+      while (acc >= STEP) { update(STEP); acc -= STEP; }
+    } else acc = 0;
+    updateEffects(dt);
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // ---- Input ----
+  function toWorld(event) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
+  }
+  const sideFor = y => (game.mode === 'cpu' || y > H / 2 ? 0 : 1);
+  canvas.addEventListener('pointerdown', event => {
+    const pos = toWorld(event);
+    const side = sideFor(pos.y);
+    pointers.set(event.pointerId, side);
+    game.paddles[side].target = pos.x;
+    try { canvas.setPointerCapture(event.pointerId); } catch {}
+  });
+  canvas.addEventListener('pointermove', event => {
+    const pos = toWorld(event);
+    if (pointers.has(event.pointerId)) game.paddles[pointers.get(event.pointerId)].target = pos.x;
+    else if (event.pointerType === 'mouse' && game.mode === 'cpu') game.paddles[0].target = pos.x;
+  });
+  const release = event => pointers.delete(event.pointerId);
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+
+  const keyTarget = key => {
+    if (key === 'ArrowLeft') return [0, 'left'];
+    if (key === 'ArrowRight') return [0, 'right'];
+    const side = game.mode === 'cpu' ? 0 : 1;
+    if (key === 'a' || key === 'A') return [side, 'left'];
+    if (key === 'd' || key === 'D') return [side, 'right'];
+    return null;
+  };
+  const playing = () => $('setup').hidden && $('result').hidden;
+  document.addEventListener('keydown', event => {
+    const k = keyTarget(event.key);
+    if (!k || !playing()) return;
+    keys[k[0]][k[1]] = true;
+    event.preventDefault();
+  });
+  document.addEventListener('keyup', event => {
+    const k = keyTarget(event.key);
+    if (k) keys[k[0]][k[1]] = false;
+  });
+  const releaseAll = () => { for (const k of keys) k.left = k.right = false; pointers.clear(); };
+  window.addEventListener('blur', releaseAll);
+  document.addEventListener('visibilitychange', () => { releaseAll(); last = performance.now(); });
+
+  // ---- Panels ----
+  function syncSetup() {
+    for (const group of document.querySelectorAll('.seg')) {
+      for (const btn of group.querySelectorAll('button')) btn.setAttribute('aria-pressed', String(settings[group.dataset.key] === btn.dataset.value));
+    }
+    $('level-field').hidden = settings.mode !== 'cpu';
+    $('hint').textContent = settings.mode === 'cpu' ? t.controlsCpu : t.controls2p;
+    const s = stats[settings.level];
+    $('record').textContent = settings.mode === 'cpu' && (s.w || s.l) ? t.record(s.w, s.l) : '';
+  }
+  for (const group of document.querySelectorAll('.seg')) {
+    group.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      settings[group.dataset.key] = btn.dataset.value;
+      syncSetup();
+    });
+  }
+  function openSetup() {
+    game.state = 'menu';
+    releaseAll();
+    $('result').hidden = true;
+    $('setup').hidden = false;
+    syncSetup();
+    $('start').focus({ preventScroll: true });
+  }
+  $('menu').addEventListener('click', openSetup);
+  $('change').addEventListener('click', openSetup);
+  $('start').addEventListener('click', startMatch);
+  $('rematch').addEventListener('click', startMatch);
+
+  syncSetup();
+  updateHud();
+  new ResizeObserver(resize).observe($('stage'));
+  requestAnimationFrame(tick);
+  $('start').focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

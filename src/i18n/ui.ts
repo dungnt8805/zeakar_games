@@ -6,6 +6,7 @@ export const HTML_LANG: Record<Locale, string> = { en: 'en', vi: 'vi', zh: 'zh-H
 export const localizedPath = (lang: Locale, path = '/') => `${lang === 'en' ? '' : `/${lang}`}${path === '/' ? '/' : path}`;
 export const localizedPolicyPath = (lang: Locale, id: string) => localizedPath(lang, `/policies/${id}`);
 export const localizedGamePath = (lang: Locale, id: string) => localizedPath(lang, `/games/${id}/`);
+export const localizedArcadePath = (lang: Locale, id?: string) => localizedPath(lang, id ? `/play/${id}/` : '/play/');
 
 export function unlocalizedPath(pathname: string) {
   const segments = pathname.split('/').filter(Boolean);

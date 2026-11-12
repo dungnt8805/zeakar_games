@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Candy Rope</title>
+<style>
+:root {
+  --ink: #3d2a3a;
+  --muted: #8a6d79;
+  --paper: #fffaf2;
+  --peach: #ffe4cf;
+  --candy: #ff4f7b;
+  --candy-dark: #d13560;
+  --mint: #6fcf8f;
+  --star: #ffb92e;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--peach);
+  background-image: radial-gradient(#ffd6bd 2px, transparent 2.5px);
+  background-size: 26px 26px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--candy-dark); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 560px; margin: auto; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.hud { display: flex; align-items: center; gap: 8px; }
+.hud-mid { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 12px; border-radius: 16px; background: #ffffffb8; }
+.hud-mid strong { font-size: 18px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-stars { font-size: 20px; letter-spacing: 2px; color: #e8d5c4; white-space: nowrap; }
+.hud-stars b { color: var(--star); text-shadow: 0 1px 0 #c97f00; }
+.icon-btn { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 #e7b99a; }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #e7b99a; }
+
+.stage { flex: 1; min-height: 0; display: grid; place-items: center; }
+.board { position: relative; }
+canvas { display: block; width: 100%; height: 100%; border-radius: 22px; touch-action: none; cursor: crosshair; background: #fff1df; box-shadow: 0 0 0 3px #fffaf2, 0 14px 30px #b3584a33; }
+canvas:focus-visible { outline: 3px solid #d1356066; outline-offset: 4px; }
+.hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: max-content; max-width: 88%; padding: 7px 14px; border-radius: 99px; background: #3d2a3ae0; color: #fff; font-size: 14px; font-weight: 800; line-height: 1.3; text-align: center; pointer-events: none; animation: drop .4s ease-out; }
+.hint[hidden] { display: none; }
+@keyframes drop { from { opacity: 0; transform: translate(-50%, -8px); } }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: #3d2a3a66; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 24px 22px; text-align: center; box-shadow: 0 20px 50px #0005; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h1 { font-size: 36px; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.panel h1 span { color: var(--candy); }
+.panel h2 { font-size: 25px; font-weight: 900; line-height: 1.2; }
+.panel .emoji { font-size: 46px; line-height: 1.1; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .small { font-size: 13px; }
+.stars { margin-top: 6px; font-size: 40px; letter-spacing: 4px; color: #eadbc9; }
+.stars b { color: var(--star); text-shadow: 0 2px 0 #c97f00; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--candy); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--candy-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--candy-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #f0d9c6; font-weight: 800; }
+.total { font-weight: 800; color: var(--ink) !important; }
+.level-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-top: 14px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 12px; background: #ffeedd; box-shadow: 0 3px 0 #efc7a6; font-size: 16px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 0; color: var(--star); min-height: 11px; }
+.level-btn.current { background: var(--candy); color: #fff; box-shadow: 0 3px 0 var(--candy-dark); }
+.level-btn.current small { color: #ffe9a8; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="hud">
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+    <div class="hud-mid">
+      <strong id="level-name"></strong>
+      <span class="hud-stars" id="hud-stars"></span>
+    </div>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="board" id="board">
+      <canvas id="canvas" tabindex="0" role="application" data-i18n-label="board"></canvas>
+      <p class="hint" id="hint" hidden></p>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🍬</p>
+    <h1 id="start-title">Candy <span>Rope</span></h1>
+    <p data-i18n="tagline"></p>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">😋</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="win-stars"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="fail" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="fail-title">
+    <p class="emoji" aria-hidden="true">🥺</p>
+    <h2 id="fail-title"></h2>
+    <p data-i18n="failText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="secondary" id="fail-levels" data-i18n="levels"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <p class="total" id="total"></p>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Snip the ropes and drop the candy into the hungry monster’s mouth!', controls: 'Swipe across a rope to cut it. Tap bubbles and air cushions. Keys: Tab to pick, Enter to use, R to restart.', play: 'Play', levelN: n => `Level ${n}`, levels: 'Levels', restart: 'Restart level', board: 'Candy Rope board. Tab selects ropes, bubbles and air cushions; Enter uses them.', won: n => `Level ${n} complete!`, allDone: 'You fed the monster in every level!', next: 'Next level', replay: 'Replay level', retry: 'Try again', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, total: (a, b) => `★ ${a} / ${b}`, fell: 'The candy fell!', spiked: 'Ouch, spikes!', floated: 'The candy floated away!', failText: 'The monster is still hungry. Give it another go!', newBest: 'New star record!', starGot: n => `Star ${n} of 3!`, cut: 'Rope cut', popped: 'Bubble popped', whoosh: 'Whoosh!', selRope: (i, n) => `Rope ${i} of ${n}`, selBubble: 'Bubble', selBlower: i => `Air cushion ${i}`,
+      hints: { cut: 'Swipe across the rope to cut it', swing: 'Cut mid-swing to fling the candy', stars: 'Collect all 3 stars on the way', bubble: 'Bubbles lift the candy upward', pop: 'Tap the bubble to pop it', blower: 'Tap the air cushion to blow the candy', spikes: 'Keep the candy away from the spikes!', pin: 'Pins catch the candy with a new rope', moving: 'Sliding anchors: time your cut' } },
+    vi: { tagline: 'Cắt dây và cho chú quái vật háu ăn ăn kẹo!', controls: 'Vuốt ngang sợi dây để cắt. Chạm vào bong bóng và đệm hơi. Bàn phím: Tab để chọn, Enter để dùng, R để chơi lại.', play: 'Chơi', levelN: n => `Màn ${n}`, levels: 'Chọn màn', restart: 'Chơi lại màn', board: 'Bàn chơi Candy Rope. Tab để chọn dây, bong bóng và đệm hơi; Enter để sử dụng.', won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã cho quái vật ăn kẹo ở mọi màn!', next: 'Màn tiếp theo', replay: 'Chơi lại màn này', retry: 'Thử lại', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, total: (a, b) => `★ ${a}/${b}`, fell: 'Kẹo rơi mất rồi!', spiked: 'Ối, gai nhọn!', floated: 'Kẹo bay mất rồi!', failText: 'Quái vật vẫn còn đói. Thử lại nhé!', newBest: 'Kỷ lục sao mới!', starGot: n => `Sao ${n}/3!`, cut: 'Đã cắt dây', popped: 'Bong bóng đã vỡ', whoosh: 'Vù!', selRope: (i, n) => `Dây ${i}/${n}`, selBubble: 'Bong bóng', selBlower: i => `Đệm hơi ${i}`,
+      hints: { cut: 'Vuốt ngang sợi dây để cắt', swing: 'Cắt khi kẹo đang đung đưa để hất nó đi', stars: 'Nhặt đủ 3 ngôi sao trên đường đi', bubble: 'Bong bóng sẽ nâng kẹo bay lên', pop: 'Chạm vào bong bóng để làm vỡ', blower: 'Chạm vào đệm hơi để thổi kẹo', spikes: 'Đừng để kẹo chạm vào gai!', pin: 'Chốt sẽ móc kẹo bằng một sợi dây mới', moving: 'Móc dây di chuyển: canh đúng lúc để cắt' } },
+    zh: { tagline: '剪断绳子，把糖果喂给饥饿的小怪兽！', controls: '划过绳子即可剪断，点击泡泡和气垫。键盘：Tab 选择，Enter 使用，R 重来。', play: '开始', levelN: n => `第 ${n} 关`, levels: '选择关卡', restart: '重玩本关', board: 'Candy Rope 游戏区。按 Tab 选择绳子、泡泡和气垫，按 Enter 使用。', won: n => `第 ${n} 关完成！`, allDone: '每一关都喂饱了小怪兽！', next: '下一关', replay: '重玩本关', retry: '再试一次', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, total: (a, b) => `★ ${a}/${b}`, fell: '糖果掉下去了！', spiked: '哎呀，扎到尖刺了！', floated: '糖果飘走了！', failText: '小怪兽还饿着呢，再试一次吧！', newBest: '星星新纪录！', starGot: n => `第 ${n} 颗星！`, cut: '绳子已剪断', popped: '泡泡破了', whoosh: '呼——！', selRope: (i, n) => `绳子 ${i}/${n}`, selBubble: '泡泡', selBlower: i => `气垫 ${i}`,
+      hints: { cut: '划过绳子把它剪断', swing: '趁摆动时剪断，把糖果甩出去', stars: '沿途收集全部 3 颗星', bubble: '泡泡会把糖果托起来', pop: '点击泡泡把它戳破', blower: '点击气垫吹动糖果', spikes: '别让糖果碰到尖刺！', pin: '钉子会用新绳子抓住糖果', moving: '锚点会移动，看准时机再剪' } },
+    fr: { tagline: 'Coupez les cordes et donnez le bonbon au petit monstre gourmand !', controls: 'Balayez une corde pour la couper. Touchez les bulles et les coussins d’air. Clavier : Tab pour choisir, Entrée pour agir, R pour recommencer.', play: 'Jouer', levelN: n => `Niveau ${n}`, levels: 'Niveaux', restart: 'Recommencer le niveau', board: 'Plateau de Candy Rope. Tab sélectionne les cordes, bulles et coussins d’air ; Entrée les active.', won: n => `Niveau ${n} terminé !`, allDone: 'Vous avez nourri le monstre à chaque niveau !', next: 'Niveau suivant', replay: 'Rejouer le niveau', retry: 'Réessayer', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, total: (a, b) => `★ ${a} / ${b}`, fell: 'Le bonbon est tombé !', spiked: 'Aïe, les piques !', floated: 'Le bonbon s’est envolé !', failText: 'Le monstre a encore faim. Retentez votre chance !', newBest: 'Nouveau record d’étoiles !', starGot: n => `Étoile ${n} sur 3 !`, cut: 'Corde coupée', popped: 'Bulle éclatée', whoosh: 'Pfiou !', selRope: (i, n) => `Corde ${i} sur ${n}`, selBubble: 'Bulle', selBlower: i => `Coussin d’air ${i}`,
+      hints: { cut: 'Balayez la corde pour la couper', swing: 'Coupez pendant le balancement pour lancer le bonbon', stars: 'Ramassez les 3 étoiles en chemin', bubble: 'Les bulles font monter le bonbon', pop: 'Touchez la bulle pour l’éclater', blower: 'Touchez le coussin d’air pour souffler sur le bonbon', spikes: 'Gardez le bonbon loin des piques !', pin: 'Les clous rattrapent le bonbon avec une nouvelle corde', moving: 'Ancres mobiles : choisissez bien le moment' } },
+    th: { tagline: 'ตัดเชือกแล้วป้อนลูกอมให้เจ้าตัวน้อยจอมหิว!', controls: 'ปัดผ่านเชือกเพื่อตัด แตะฟองสบู่และเบาะลม คีย์บอร์ด: Tab เพื่อเลือก Enter เพื่อใช้ R เพื่อเริ่มใหม่', play: 'เล่น', levelN: n => `ด่าน ${n}`, levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', board: 'กระดานเกม Candy Rope กด Tab เพื่อเลือกเชือก ฟองสบู่ และเบาะลม กด Enter เพื่อใช้งาน', won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณป้อนลูกอมให้เจ้าตัวน้อยครบทุกด่านแล้ว!', next: 'ด่านถัดไป', replay: 'เล่นด่านนี้อีกครั้ง', retry: 'ลองอีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, total: (a, b) => `★ ${a}/${b}`, fell: 'ลูกอมตกแล้ว!', spiked: 'โอ๊ย โดนหนาม!', floated: 'ลูกอมลอยหายไปแล้ว!', failText: 'เจ้าตัวน้อยยังหิวอยู่ ลองอีกครั้งนะ!', newBest: 'สถิติดาวใหม่!', starGot: n => `ดาวดวงที่ ${n} จาก 3!`, cut: 'ตัดเชือกแล้ว', popped: 'ฟองสบู่แตกแล้ว', whoosh: 'ฟู่!', selRope: (i, n) => `เชือก ${i} จาก ${n}`, selBubble: 'ฟองสบู่', selBlower: i => `เบาะลม ${i}`,
+      hints: { cut: 'ปัดผ่านเชือกเพื่อตัด', swing: 'ตัดตอนลูกอมกำลังแกว่งเพื่อเหวี่ยงออกไป', stars: 'เก็บดาวให้ครบ 3 ดวงระหว่างทาง', bubble: 'ฟองสบู่จะพาลูกอมลอยขึ้น', pop: 'แตะฟองสบู่เพื่อทำให้แตก', blower: 'แตะเบาะลมเพื่อเป่าลูกอม', spikes: 'อย่าให้ลูกอมโดนหนาม!', pin: 'หมุดจะคว้าลูกอมด้วยเชือกเส้นใหม่', moving: 'หมุดเลื่อนไปมา จับจังหวะดีๆ ก่อนตัด' } },
+    ja: { tagline: 'ロープを切って、はらぺこモンスターにキャンディを食べさせよう！', controls: 'ロープをなぞって切ろう。泡やエアクッションはタップ。キーボード：Tab で選択、Enter で実行、R でやり直し。', play: 'プレイ', levelN: n => `レベル ${n}`, levels: 'レベル選択', restart: 'レベルをやり直す', board: 'Candy Rope のゲーム画面。Tab でロープ・泡・エアクッションを選び、Enter で使います。', won: n => `レベル ${n} クリア！`, allDone: '全レベルでモンスターをおなかいっぱいにしたよ！', next: '次のレベル', replay: 'もう一度プレイ', retry: 'もう一度', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, total: (a, b) => `★ ${a}/${b}`, fell: 'キャンディが落ちちゃった！', spiked: 'いたっ、トゲだ！', floated: 'キャンディが飛んでいっちゃった！', failText: 'モンスターはまだおなかぺこぺこ。もう一度挑戦しよう！', newBest: '星の自己ベスト更新！', starGot: n => `星 ${n}/3 ゲット！`, cut: 'ロープを切った', popped: '泡がはじけた', whoosh: 'ビュン！', selRope: (i, n) => `ロープ ${i}/${n}`, selBubble: '泡', selBlower: i => `エアクッション ${i}`,
+      hints: { cut: 'ロープをなぞって切ろう', swing: '揺れている間に切ってキャンディを飛ばそう', stars: '途中で星を3つ全部集めよう', bubble: '泡はキャンディを持ち上げるよ', pop: '泡をタップして割ろう', blower: 'エアクッションをタップしてキャンディを吹き飛ばそう', spikes: 'キャンディをトゲに当てないで！', pin: 'ピンが新しいロープでキャンディをキャッチ', moving: '動く留め具：タイミングよく切ろう' } },
+    ko: { tagline: '밧줄을 끊어 배고픈 몬스터에게 사탕을 먹여 주세요!', controls: '밧줄을 가로질러 스와이프하면 끊어져요. 거품과 에어 쿠션은 탭하세요. 키보드: Tab으로 선택, Enter로 사용, R로 다시 시작.', play: '시작', levelN: n => `레벨 ${n}`, levels: '레벨 선택', restart: '레벨 다시 하기', board: 'Candy Rope 게임 화면. Tab으로 밧줄, 거품, 에어 쿠션을 선택하고 Enter로 사용하세요.', won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨에서 몬스터에게 사탕을 먹였어요!', next: '다음 레벨', replay: '이 레벨 다시 하기', retry: '다시 하기', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, total: (a, b) => `★ ${a}/${b}`, fell: '사탕이 떨어졌어요!', spiked: '앗, 가시에 찔렸어요!', floated: '사탕이 날아가 버렸어요!', failText: '몬스터가 아직 배고파요. 다시 도전해 보세요!', newBest: '별 최고 기록!', starGot: n => `별 ${n}/3 획득!`, cut: '밧줄을 끊었어요', popped: '거품이 터졌어요', whoosh: '휘익!', selRope: (i, n) => `밧줄 ${i}/${n}`, selBubble: '거품', selBlower: i => `에어 쿠션 ${i}`,
+      hints: { cut: '밧줄을 가로질러 스와이프해서 끊으세요', swing: '흔들릴 때 끊어서 사탕을 날려 보내세요', stars: '가는 길에 별 3개를 모두 모으세요', bubble: '거품이 사탕을 위로 띄워 올려요', pop: '거품을 탭해서 터뜨리세요', blower: '에어 쿠션을 탭해서 사탕을 불어 보내세요', spikes: '사탕이 가시에 닿지 않게 하세요!', pin: '핀이 새 밧줄로 사탕을 붙잡아요', moving: '움직이는 고리: 타이밍을 맞춰 끊으세요' } },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // The world is a fixed 360×640 portrait box, scaled to fit the stage.
+  const W = 360, H = 640;
+  const STEP = 1 / 120, ITERATIONS = 14, GRAVITY = 1000;
+  const CANDY_R = 15, CANDY_INV = 0.02, SEG_LEN = 12;
+  const ROPE_DAMP = 0.995, CANDY_DAMP = 0.9995, BUBBLE_DAMP = 0.98;
+  const BUBBLE_R = 26, BUBBLE_LIFT = -600;
+  const BLOW_RANGE = 250, BLOW_CONE = 0.62, BLOW_SPEED = 430;
+  const STAR_R = 13, EAT_R = 28, SCRAP_LIFE = 1.4;
+  const STORAGE_KEY = 'milaan.candyRope.progress';
+
+  // Ropes: { x, y, len?, mx?, my?, period?, orbit? } — mx/my make the anchor slide (or orbit) around x, y.
+  // blowers: [x, y, direction°], spikes: [x1, y1, x2, y2], pins: [x, y, grab radius].
+  const LEVELS = [
+    { hint: 'cut', candy: [180, 250], ropes: [{ x: 180, y: 90 }], stars: [[180, 330], [180, 410], [180, 480]], monster: [180, 565] },
+    { hint: 'swing', candy: [60, 170], ropes: [{ x: 180, y: 90 }], stars: [[180, 236], [282, 320], [284, 440]], monster: [290, 565] },
+    { hint: 'stars', candy: [180, 240], ropes: [{ x: 60, y: 110 }, { x: 300, y: 110 }], stars: [[120, 300], [90, 400], [80, 480]], monster: [80, 565] },
+    { candy: [180, 230], ropes: [{ x: 40, y: 130 }, { x: 320, y: 130 }, { x: 180, y: 70 }], stars: [[205, 258], [252, 340], [288, 450]], monster: [290, 565] },
+    { hint: 'bubble', candy: [180, 450], ropes: [{ x: 180, y: 590 }], bubbles: [[180, 450]], stars: [[180, 360], [180, 280], [180, 210]], monster: [180, 120] },
+    { hint: 'pop', candy: [90, 470], ropes: [{ x: 290, y: 470 }], bubbles: [[90, 470]], stars: [[170, 380], [262, 274], [292, 420]], monster: [290, 565] },
+    { hint: 'blower', candy: [180, 250], ropes: [{ x: 180, y: 90 }], blowers: [[40, 260, 0]], stars: [[240, 236], [285, 330], [295, 450]], monster: [290, 565] },
+    { hint: 'spikes', candy: [180, 260], ropes: [{ x: 60, y: 100 }, { x: 300, y: 100 }], spikes: [[70, 430, 220, 430]], stars: [[240, 290], [290, 380], [300, 470]], monster: [300, 570] },
+    { hint: 'pin', candy: [50, 200], ropes: [{ x: 170, y: 90 }], pins: [[250, 320, 80]], stars: [[170, 250], [250, 420], [200, 480]], monster: [180, 570] },
+    { hint: 'moving', candy: [180, 240], ropes: [{ x: 180, y: 90, mx: 100, period: 6 }], stars: [[300, 238], [160, 236], [104, 400]], monster: [80, 565] },
+    { candy: [80, 520], ropes: [{ x: 80, y: 610 }], bubbles: [[80, 520]], blowers: [[30, 330, 0]], spikes: [[20, 80, 340, 80]], stars: [[80, 420], [122, 374], [207, 474]], monster: [290, 565] },
+    { candy: [70, 200], ropes: [{ x: 30, y: 100 }, { x: 160, y: 110 }], pins: [[260, 330, 85]], spikes: [[180, 400, 180, 620]], stars: [[127, 233], [220, 222], [262, 413]], monster: [280, 565] },
+    { candy: [180, 200], ropes: [{ x: 180, y: 80 }], blowers: [[40, 420, -15], [320, 300, 195]], stars: [[130, 190], [96, 178], [72, 300]], monster: [70, 565] },
+    { candy: [180, 230], ropes: [{ x: 180, y: 90, mx: 110, period: 5, len: 150 }], spikes: [[120, 420, 240, 420]], stars: [[212, 236], [246, 305], [279, 462]], monster: [290, 565] },
+    { candy: [40, 150], ropes: [{ x: 110, y: 80 }], pins: [[190, 200, 60], [300, 300, 70]], spikes: [[220, 380, 220, 640], [20, 610, 220, 610]], stars: [[132, 182], [214, 256], [246, 389]], monster: [300, 565] },
+    { candy: [180, 500], ropes: [{ x: 180, y: 600, mx: 120, period: 4 }], bubbles: [[180, 500]], spikes: [[20, 60, 340, 60]], stars: [[240, 521], [294, 502], [273, 361]], monster: [290, 130] },
+    { candy: [180, 260], ropes: [{ x: 40, y: 150 }, { x: 320, y: 150 }, { x: 180, y: 420 }], spikes: [[30, 360, 130, 440]], stars: [[259, 317], [295, 390], [190, 580]], monster: [80, 565] },
+    { candy: [70, 540], ropes: [{ x: 70, y: 620 }], bubbles: [[70, 540]], blowers: [[30, 330, -40]], spikes: [[150, 250, 150, 640], [20, 60, 340, 60]], stars: [[70, 430], [131, 191], [231, 290]], monster: [290, 565] },
+    { candy: [180, 250], ropes: [{ x: 180, y: 140, mx: 40, my: 40, period: 4, orbit: true, len: 110 }], spikes: [[40, 470, 130, 470], [230, 470, 320, 470]], stars: [[230, 289], [82, 236], [191, 400]], monster: [180, 565] },
+    { candy: [40, 200], ropes: [{ x: 150, y: 80 }], bubbles: [[200, 330]], spikes: [[20, 620, 340, 620]], stars: [[110, 240], [172, 310], [232, 230]], monster: [238, 120] },
+    { candy: [180, 230], ropes: [{ x: 50, y: 90, len: 230 }, { x: 310, y: 90, len: 230 }, { x: 180, y: 120 }], spikes: [[90, 480, 250, 480]], stars: [[180, 262], [223, 307], [273, 399]], monster: [300, 570] },
+    { candy: [180, 520], ropes: [{ x: 180, y: 610 }], bubbles: [[180, 520]], blowers: [[30, 250, 0], [330, 380, 180]], spikes: [[20, 70, 340, 70], [230, 200, 340, 200]], stars: [[180, 457], [143, 453], [100, 515]], monster: [80, 565] },
+    { candy: [180, 220], ropes: [{ x: 100, y: 90, mx: 60, period: 3 }, { x: 260, y: 90, mx: 60, period: 5 }], spikes: [[120, 440, 170, 440]], stars: [[226, 224], [213, 285], [194, 440]], monster: [180, 565] },
+    { candy: [60, 160], ropes: [{ x: 160, y: 80 }], pins: [[270, 260, 70]], bubbles: [[150, 470]], blowers: [[335, 450, 195]], spikes: [[20, 60, 340, 60], [60, 330, 180, 330]], stars: [[166, 208], [310, 318], [173, 413]], monster: [80, 565] },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { board: $('board'), stage: $('stage'), hint: $('hint'), levelName: $('level-name'), hudStars: $('hud-stars'), announcer: $('announcer'), start: $('start'), win: $('win'), winTitle: $('win-title'), winStars: $('win-stars'), newBest: $('new-best'), next: $('next'), fail: $('fail'), failTitle: $('fail-title'), levels: $('levels'), levelGrid: $('level-grid'), total: $('total') };
+
+  const readProgress = () => { try { return { unlocked: 1, stars: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { unlocked: 1, stars: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let progress = readProgress();
+  let game = null;
+  let scale = 1;
+  let selected = -1;
+  let last = performance.now();
+  const trail = [];
+  const effects = { particles: [], time: 0 };
+
+  function segDist(px, py, [x1, y1, x2, y2]) {
+    const dx = x2 - x1, dy = y2 - y1, len = dx * dx + dy * dy;
+    const u = len ? clamp(((px - x1) * dx + (py - y1) * dy) / len, 0, 1) : 0;
+    return Math.hypot(px - (x1 + dx * u), py - (y1 + dy * u));
+  }
+  const side = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const crosses = (a, b, c, d) => (side(c, d, a) > 0) !== (side(c, d, b) > 0) && (side(a, b, c) > 0) !== (side(a, b, d) > 0);
+
+  const point = (x, y, inv = 1) => ({ x, y, px: x, py: y, inv });
+
+  function placeAnchor(a, time) {
+    if (!a.period) return;
+    const phase = (time / a.period) * Math.PI * 2;
+    a.x = a.bx + a.mx * (a.orbit ? Math.cos(phase) : Math.sin(phase));
+    a.y = a.by + a.my * Math.sin(phase);
+  }
+
+  function makeRope(anchor, len) {
+    const c = game.candy;
+    const n = Math.max(3, Math.round(len / SEG_LEN));
+    const pts = [anchor];
+    for (let i = 1; i < n; i++) pts.push(point(anchor.x + (c.x - anchor.x) * i / n, anchor.y + (c.y - anchor.y) * i / n));
+    pts.push(c);
+    return { pts, seg: len / n };
+  }
+
+  function loadLevel(number) {
+    const def = LEVELS[number - 1];
+    const candy = point(def.candy[0], def.candy[1], CANDY_INV);
+    candy.isCandy = true;
+    game = {
+      level: number, def, t: 0, acc: 0, state: 'play', endTime: 0, reason: '', candy, spin: 0, shown: false,
+      ropes: [], scraps: [], anchors: [], got: 0, held: null, acted: false,
+      stars: def.stars.map(([x, y]) => ({ x, y, got: false })),
+      bubbles: (def.bubbles || []).map(([x, y]) => ({ x, y, state: 'idle' })),
+      blowers: (def.blowers || []).map(([x, y, deg]) => ({ x, y, angle: deg * Math.PI / 180, puff: 0 })),
+      spikes: def.spikes || [],
+      pins: (def.pins || []).map(([x, y, r]) => ({ x, y, r, used: false })),
+      monster: { x: def.monster[0], y: def.monster[1], open: 0, chew: 0 },
+    };
+    for (const r of def.ropes) {
+      const anchor = { x: r.x, y: r.y, bx: r.x, by: r.y, mx: r.mx || 0, my: r.my || 0, period: r.period || 0, orbit: !!r.orbit, inv: 0 };
+      placeAnchor(anchor, 0);
+      game.anchors.push(anchor);
+      game.ropes.push(makeRope(anchor, Math.max(r.len || 0, dist(anchor, candy))));
+    }
+    effects.particles.length = 0;
+    trail.length = 0;
+    selected = -1;
+    for (const overlay of [els.win, els.fail, els.levels]) overlay.hidden = true;
+    els.levelName.textContent = t.levelN(number);
+    els.hint.textContent = def.hint ? t.hints[def.hint] : '';
+    els.hint.hidden = !def.hint;
+    updateStars();
+    els.announcer.textContent = t.levelN(number);
+  }
+
+  function updateStars() {
+    els.hudStars.innerHTML = starText(game.got);
+    els.hudStars.setAttribute('aria-label', t.starsLabel(game.got));
+  }
+
+  function integrate(p, ay, damp) {
+    const vx = (p.x - p.px) * damp, vy = (p.y - p.py) * damp;
+    p.px = p.x; p.py = p.y;
+    p.x += vx;
+    p.y += vy + ay * STEP * STEP;
+  }
+
+  // Ropes only resist stretching, so slack ropes droop naturally.
+  function link(a, b, len, ia, ib) {
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+    if (d <= len || ia + ib === 0) return;
+    const k = (d - len) / (d * (ia + ib));
+    a.x += dx * k * ia; a.y += dy * k * ia;
+    b.x -= dx * k * ib; b.y -= dy * k * ib;
+  }
+
+  function solveRope(pts, seg, live) {
+    const mass = p => (!live && p.isCandy ? 0 : p.inv);
+    for (let i = 0; i < pts.length - 1; i++) link(pts[i], pts[i + 1], seg, mass(pts[i]), mass(pts[i + 1]));
+    // Long-range tethers from the fixed end keep a heavy candy from stretching the chain.
+    const a = pts[0];
+    if (mass(a) !== 0) return;
+    for (let i = 2; i < pts.length; i++) {
+      const p = pts[i], max = seg * i, d = dist(a, p);
+      if (d > max && mass(p) > 0) { const k = (d - max) / d; p.x -= (p.x - a.x) * k; p.y -= (p.y - a.y) * k; }
+    }
+  }
+
+  function simStep() {
+    const g = game, c = g.candy;
+    g.t += STEP;
+    for (const a of g.anchors) placeAnchor(a, g.t);
+    if (g.state === 'play') {
+      integrate(c, g.held ? BUBBLE_LIFT : GRAVITY, g.held ? BUBBLE_DAMP : CANDY_DAMP);
+      g.spin += (c.x - c.px) / CANDY_R;
+    }
+    for (const rope of g.ropes) for (let i = 1; i < rope.pts.length - 1; i++) integrate(rope.pts[i], GRAVITY, ROPE_DAMP);
+    for (const s of g.scraps) {
+      s.life -= STEP;
+      for (const p of s.pts) if (p.inv > 0 && !p.isCandy) integrate(p, GRAVITY, ROPE_DAMP);
+    }
+    g.scraps = g.scraps.filter(s => s.life > 0);
+    for (let k = 0; k < ITERATIONS; k++) {
+      for (const rope of g.ropes) solveRope(rope.pts, rope.seg, true);
+      for (const s of g.scraps) solveRope(s.pts, s.seg, false);
+    }
+    if (g.state === 'play') interact();
+  }
+
+  function interact() {
+    const g = game, c = g.candy;
+    if (!g.held) {
+      const bubble = g.bubbles.find(b => b.state === 'idle' && dist(b, c) < BUBBLE_R + CANDY_R * 0.4);
+      if (bubble) { bubble.state = 'held'; g.held = bubble; slow(c, 0.5); }
+    }
+    if (g.held) { g.held.x = c.x; g.held.y = c.y; }
+    for (const pin of g.pins) {
+      if (pin.used || dist(pin, c) > pin.r) continue;
+      pin.used = true;
+      g.ropes.push(makeRope({ x: pin.x, y: pin.y, inv: 0 }, Math.max(dist(pin, c), 20)));
+    }
+    for (const star of g.stars) {
+      if (star.got || dist(star, c) > CANDY_R + STAR_R) continue;
+      star.got = true;
+      g.got += 1;
+      burst(star.x, star.y, '#ffc93c', 12);
+      updateStars();
+      els.announcer.textContent = t.starGot(g.got);
+    }
+    for (const spike of g.spikes) {
+      const d = segDist(c.x, c.y, spike);
+      if (g.held && d < BUBBLE_R + 12) popBubble();
+      if (d < CANDY_R + 3) return fail('spiked');
+    }
+    const m = g.monster;
+    const toMouth = Math.hypot(c.x - m.x, c.y - m.y - 4);
+    if (toMouth < EAT_R) return win();
+    if (c.y > H + 60 || c.x < -60 || c.x > W + 60) return fail('fell');
+    if (c.y < -60) return fail('floated');
+  }
+
+  function slow(p, k) {
+    p.px = p.x - (p.x - p.px) * k;
+    p.py = p.y - (p.y - p.py) * k;
+  }
+
+  function act() { if (!game.acted) { game.acted = true; els.hint.hidden = true; } }
+
+  function cutRope(rope, at) {
+    const g = game;
+    const index = g.ropes.indexOf(rope);
+    if (index < 0) return;
+    const i = at ?? Math.floor((rope.pts.length - 1) / 2);
+    g.ropes.splice(index, 1);
+    const head = rope.pts.slice(0, i + 1), tail = rope.pts.slice(i + 1).reverse();
+    if (head.length > 1) g.scraps.push({ pts: head, seg: rope.seg, life: SCRAP_LIFE });
+    if (tail.length > 1) g.scraps.push({ pts: tail, seg: rope.seg, life: SCRAP_LIFE });
+  }
+
+  function popBubble() {
+    const b = game.held;
+    if (!b) return;
+    b.state = 'popped';
+    game.held = null;
+    // The burst soaks up most of the drift so the candy drops rather than flies on.
+    slow(game.candy, 0.4);
+    burst(b.x, b.y, '#bfe6ff', 14);
+    els.announcer.textContent = t.popped;
+  }
+
+  function blow(blower) {
+    blower.puff = 1;
+    const dx = Math.cos(blower.angle), dy = Math.sin(blower.angle);
+    for (let i = 0; i < 6; i++) effects.particles.push({ x: blower.x + dx * 26, y: blower.y + dy * 26, vx: dx * (160 + Math.random() * 120) + (Math.random() - 0.5) * 60, vy: dy * (160 + Math.random() * 120) + (Math.random() - 0.5) * 60, life: 0.5, color: '#ffffff', size: 5, g: 0 });
+    const c = game.candy;
+    if (game.state !== 'play') return;
+    const ox = c.x - blower.x, oy = c.y - blower.y, d = Math.hypot(ox, oy);
+    if (d > BLOW_RANGE || d < 1) return;
+    const off = Math.acos(clamp((ox * dx + oy * dy) / d, -1, 1));
+    if (off > BLOW_CONE) return;
+    const push = BLOW_SPEED * (1 - 0.5 * d / BLOW_RANGE) * STEP;
+    c.px -= dx * push;
+    c.py -= dy * push;
+  }
+
+  function win() {
+    const g = game;
+    g.state = 'won';
+    g.endTime = g.t;
+    g.monster.chew = 1;
+    detachAll();
+    const key = String(g.level);
+    const previous = progress.stars[key] ?? -1;
+    progress.stars[key] = Math.max(previous, g.got);
+    progress.unlocked = Math.min(LEVELS.length, Math.max(progress.unlocked, g.level + 1));
+    saveProgress();
+    g.record = previous >= 0 && g.got > previous;
+    burst(g.monster.x, g.monster.y - 10, '#ff7aa0', 16);
+  }
+
+  function fail(reason) {
+    const g = game;
+    g.state = 'lost';
+    g.reason = reason;
+    g.endTime = g.t;
+    if (g.held) popBubble();
+    if (reason === 'spiked') burst(g.candy.x, g.candy.y, '#ff4f7b', 18);
+    detachAll();
+  }
+
+  function detachAll() {
+    for (const rope of game.ropes.slice()) cutRope(rope, rope.pts.length - 2);
+    game.scraps = game.scraps.filter(s => !s.pts[0].isCandy);
+  }
+
+  function burst(x, y, color, count) {
+    if (reduceMotion) count = Math.ceil(count / 3);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 160;
+      effects.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, color, size: 4, g: 400 });
+    }
+  }
+
+  // Keyboard targets: live ropes, the bubble holding the candy, then air cushions.
+  function targets() {
+    if (!game || game.state !== 'play') return [];
+    const list = game.ropes.map((rope, i) => ({ kind: 'rope', rope, label: t.selRope(i + 1, game.ropes.length) }));
+    if (game.held) list.push({ kind: 'bubble', label: t.selBubble });
+    game.blowers.forEach((b, i) => list.push({ kind: 'blower', blower: b, label: t.selBlower(i + 1) }));
+    return list;
+  }
+
+  function useTarget(target) {
+    act();
+    if (target.kind === 'rope') { cutRope(target.rope); els.announcer.textContent = t.cut; }
+    else if (target.kind === 'bubble') popBubble();
+    else { blow(target.blower); els.announcer.textContent = t.whoosh; }
+    const list = targets();
+    selected = list.length ? Math.min(selected, list.length - 1) : -1;
+  }
+
+  function swipe(a, b) {
+    let cut = false;
+    for (const rope of game.ropes.slice()) {
+      for (let i = 0; i < rope.pts.length - 1; i++) {
+        if (!crosses(a, b, rope.pts[i], rope.pts[i + 1])) continue;
+        cutRope(rope, i);
+        cut = true;
+        break;
+      }
+    }
+    if (cut) { act(); els.announcer.textContent = t.cut; }
+  }
+
+  function tap(p) {
+    if (game.held && dist(game.held, p) < BUBBLE_R + 12) { act(); popBubble(); return; }
+    const blower = game.blowers.find(b => dist(b, p) < 32);
+    if (blower) { act(); blow(blower); }
+  }
+
+  // ---- rendering ----
+  function resize() {
+    const box = els.stage.getBoundingClientRect();
+    scale = Math.min(box.width / W, box.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.board.style.width = `${W * scale}px`;
+    els.board.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  const DOTS = Array.from({ length: 46 }, (_, i) => ({ x: (i * 97) % W, y: (i * 151) % H, r: 3 + (i % 4) * 2 }));
+
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#fff3e3');
+    grad.addColorStop(1, '#ffdfe6');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff80';
+    for (const d of DOTS) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  function strokePath(pts, width, color, dash) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = color;
+    ctx.setLineDash(dash || []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawRope(pts, alpha = 1, highlight = false) {
+    ctx.globalAlpha = alpha;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (highlight) strokePath(pts, 13, '#ffd23f99');
+    strokePath(pts, 5, '#8a5a3c');
+    strokePath(pts, 2.5, '#d9a877', [5, 5]);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawAnchor(a) {
+    if (a.period) {
+      ctx.strokeStyle = '#3d2a3a1f'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (a.orbit) ctx.ellipse(a.bx, a.by, Math.abs(a.mx) || 1, Math.abs(a.my) || 1, 0, 0, Math.PI * 2);
+      else { ctx.moveTo(a.bx - a.mx, a.by - a.my); ctx.lineTo(a.bx + a.mx, a.by + a.my); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#c4935a';
+    ctx.beginPath(); ctx.arc(a.x, a.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6f4a2b';
+    ctx.beginPath(); ctx.arc(a.x, a.y, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawPin(pin, time) {
+    if (!pin.used) {
+      ctx.strokeStyle = '#8b6cd9aa'; ctx.lineWidth = 2;
+      ctx.setLineDash([7, 7]);
+      ctx.lineDashOffset = reduceMotion ? 0 : -time * 12;
+      ctx.beginPath(); ctx.arc(pin.x, pin.y, pin.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    }
+    ctx.fillStyle = '#8b6cd9';
+    ctx.beginPath(); ctx.arc(pin.x, pin.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e6dcff';
+    ctx.beginPath(); ctx.arc(pin.x - 2, pin.y - 2, 3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function starPath(x, y, outer, inner) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? inner : outer, a = -Math.PI / 2 + i * Math.PI / 5;
+      ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+  }
+
+  function drawStar(s, time) {
+    if (s.got) return;
+    const bob = reduceMotion ? 0 : Math.sin(time * 3 + s.x) * 2.5;
+    ctx.fillStyle = '#ffe9a033';
+    ctx.beginPath(); ctx.arc(s.x, s.y + bob, STAR_R + 7, 0, Math.PI * 2); ctx.fill();
+    starPath(s.x, s.y + bob, STAR_R, STAR_R * 0.48);
+    ctx.fillStyle = '#ffc93c'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#e8941a'; ctx.stroke();
+  }
+
+  function drawSpikes([x1, y1, x2, y2]) {
+    const len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len, nx = -uy, ny = ux;
+    const teeth = Math.max(1, Math.round(len / 11)), step = len / teeth;
+    ctx.fillStyle = '#a3a9b6'; ctx.strokeStyle = '#5c6270'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    for (let i = 0; i < teeth; i++) {
+      const cx = x1 + ux * (i + 0.5) * step, cy = y1 + uy * (i + 0.5) * step;
+      for (const dir of [1, -1]) {
+        ctx.beginPath();
+        ctx.moveTo(cx - ux * step / 2, cy - uy * step / 2);
+        ctx.lineTo(cx + nx * 9 * dir, cy + ny * 9 * dir);
+        ctx.lineTo(cx + ux * step / 2, cy + uy * step / 2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.lineCap = 'round';
+    strokePath([{ x: x1, y: y1 }, { x: x2, y: y2 }], 6, '#6b7180');
+  }
+
+  function drawBubble(b, time) {
+    if (b.state === 'popped') return;
+    const bob = b.state === 'idle' && !reduceMotion ? Math.sin(time * 2 + b.x) * 2 : 0;
+    ctx.fillStyle = '#a5dcff40';
+    ctx.strokeStyle = '#ffffffe6'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(b.x, b.y + bob, BUBBLE_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(b.x, b.y + bob, BUBBLE_R - 7, Math.PI * 1.1, Math.PI * 1.4); ctx.stroke();
+  }
+
+  function drawBlower(b, highlight) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle);
+    if (highlight) { ctx.fillStyle = '#ffd23f88'; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill(); }
+    const squash = 1 - b.puff * 0.25;
+    ctx.fillStyle = '#ff8fb1'; ctx.strokeStyle = '#d65a85'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(-20, -15 * squash, 30, 30 * squash, 9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffc2d4';
+    ctx.beginPath(); ctx.roundRect(-15, -9 * squash, 8, 18 * squash, 4); ctx.fill();
+    ctx.fillStyle = '#d65a85';
+    ctx.beginPath(); ctx.moveTo(10, -7); ctx.lineTo(22, -11); ctx.lineTo(22, 11); ctx.lineTo(10, 7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCandy(c, spin, size = 1) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(spin);
+    ctx.scale(size, size);
+    ctx.fillStyle = '#ff9fbf';
+    for (const dir of [1, -1]) {
+      ctx.beginPath();
+      ctx.moveTo(dir * (CANDY_R - 3), 0);
+      ctx.lineTo(dir * (CANDY_R + 9), -9);
+      ctx.lineTo(dir * (CANDY_R + 9), 9);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#ff4f7b';
+    ctx.beginPath(); ctx.arc(0, 0, CANDY_R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath(); ctx.arc(0, 0, CANDY_R - 5, k * 2.1, k * 2.1 + 1.1); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = '#ffffffb0';
+    ctx.beginPath(); ctx.ellipse(c.x - 5 * size, c.y - 6 * size, 4 * size, 2.5 * size, -0.6, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawMonster(m, time) {
+    const g = game;
+    const { x, y } = m;
+    ctx.fillStyle = '#d99b62';
+    ctx.beginPath(); ctx.roundRect(x - 36, y + 18, 72, 36, 8); ctx.fill();
+    ctx.fillStyle = '#efc08b';
+    ctx.fillRect(x - 36, y + 26, 72, 8);
+    const breathe = reduceMotion ? 0 : Math.sin(time * 2.4) * 1.2;
+    const chew = m.chew > 0 && !reduceMotion ? Math.abs(Math.sin(time * 18)) * 3 : 0;
+    ctx.fillStyle = '#6fcf8f';
+    ctx.beginPath(); ctx.moveTo(x - 20, y - 22); ctx.lineTo(x - 14, y - 36); ctx.lineTo(x - 6, y - 24); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 20, y - 22); ctx.lineTo(x + 14, y - 36); ctx.lineTo(x + 6, y - 24); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + 2 - breathe / 2, 31 + chew / 2, 27 + breathe - chew / 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9be3ae';
+    ctx.beginPath(); ctx.ellipse(x, y + 12, 18, 11, 0, 0, Math.PI * 2); ctx.fill();
+    const c = g.candy;
+    const look = g.state === 'won' ? { x: 0, y: 0 } : { x: clamp((c.x - x) / 60, -1, 1) * 3, y: clamp((c.y - y) / 60, -1, 1) * 3 };
+    for (const ex of [-11, 11]) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(x + ex, y - 9, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b1d2a';
+      ctx.beginPath(); ctx.arc(x + ex + look.x, y - 9 + look.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#7a2340';
+    if (g.state === 'lost') {
+      ctx.strokeStyle = '#2b1d2a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x, y + 14, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    } else if (m.open > 0.05) {
+      ctx.beginPath(); ctx.ellipse(x, y + 7, 8 + m.open * 8, 3 + m.open * 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff7aa0';
+      ctx.beginPath(); ctx.ellipse(x, y + 9 + m.open * 5, 5 + m.open * 4, 2 + m.open * 3, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#2b1d2a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x, y + 4, 7, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    const g = game, time = effects.time;
+    const list = targets(), sel = list[selected];
+    drawBackground();
+    for (const pin of g.pins) drawPin(pin, time);
+    for (const spike of g.spikes) drawSpikes(spike);
+    drawMonster(g.monster, time);
+    for (const s of g.stars) drawStar(s, time);
+    for (const b of g.blowers) drawBlower(b, sel?.blower === b);
+    for (const s of g.scraps) drawRope(s.pts, clamp(s.life / 0.5, 0, 1));
+    for (const rope of g.ropes) drawRope(rope.pts, 1, sel?.rope === rope);
+    for (const a of g.anchors) drawAnchor(a);
+    const c = g.candy;
+    if (g.state === 'play') drawCandy(c, g.spin);
+    else if (g.state === 'won') {
+      const k = clamp((g.t - g.endTime) / 0.25, 0, 1);
+      const m = g.monster;
+      if (k < 1) drawCandy({ x: c.x + (m.x - c.x) * k, y: c.y + (m.y + 6 - c.y) * k }, g.spin, 1 - k * 0.8);
+    } else if (g.reason !== 'spiked') drawCandy(c, g.spin);
+    for (const b of g.bubbles) drawBubble(b, time);
+    if (sel?.kind === 'bubble') { ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c.x, c.y, BUBBLE_R + 5, 0, Math.PI * 2); ctx.stroke(); }
+    for (const p of effects.particles) {
+      ctx.globalAlpha = clamp(p.life * 2, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (trail.length > 1) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (let i = 1; i < trail.length; i++) {
+        ctx.globalAlpha = clamp(trail[i].life * 4, 0, 1);
+        strokePath([trail[i - 1], trail[i]], 5, '#ffffff');
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---- loop & UI ----
+  const paused = () => !els.start.hidden || !els.levels.hidden || document.hidden;
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (game && !paused()) {
+      game.acc += dt;
+      while (game.acc >= STEP) { game.acc -= STEP; simStep(); }
+      tickEffects(dt);
+      if (game.state !== 'play' && !game.shown && game.t - game.endTime > (game.state === 'won' ? 1 : 0.9)) showEnd();
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function tickEffects(dt) {
+    effects.time += dt;
+    const g = game, m = g.monster, c = g.candy;
+    const near = g.state === 'play' && Math.hypot(c.x - m.x, c.y - m.y) < 120;
+    m.open += ((near ? 1 : 0) - m.open) * Math.min(1, dt * 10);
+    if (m.chew > 0) m.chew = Math.max(0, m.chew - dt * 0.9);
+    for (const b of g.blowers) b.puff = Math.max(0, b.puff - dt * 4);
+    for (const p of effects.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt; p.life -= dt; }
+    effects.particles = effects.particles.filter(p => p.life > 0);
+    for (const p of trail) p.life -= dt;
+    while (trail.length && trail[0].life <= 0) trail.shift();
+  }
+
+  function showEnd() {
+    const g = game;
+    g.shown = true;
+    if (g.state === 'won') {
+      const lastLevel = g.level === LEVELS.length;
+      els.winTitle.textContent = lastLevel ? t.allDone : t.won(g.level);
+      els.winStars.innerHTML = starText(g.got);
+      els.winStars.setAttribute('aria-label', t.starsLabel(g.got));
+      els.newBest.hidden = !g.record;
+      els.next.hidden = lastLevel;
+      els.win.hidden = false;
+      els.announcer.textContent = `${els.winTitle.textContent} ${t.starsLabel(g.got)}`;
+      (lastLevel ? $('replay') : els.next).focus({ preventScroll: true });
+    } else {
+      els.failTitle.textContent = t[g.reason];
+      els.fail.hidden = false;
+      els.announcer.textContent = `${t[g.reason]} ${t.failText}`;
+      $('retry').focus({ preventScroll: true });
+    }
+  }
+
+  function startLevel(number) {
+    loadLevel(number);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function openLevels() {
+    const earned = Object.values(progress.stars).reduce((sum, n) => sum + n, 0);
+    els.total.textContent = t.total(earned, LEVELS.length * 3);
+    els.levelGrid.replaceChildren(...LEVELS.map((_, index) => {
+      const number = index + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-btn${number === game.level ? ' current' : ''}`;
+      const locked = number > progress.unlocked;
+      const stars = progress.stars[number] ?? 0;
+      button.disabled = locked;
+      button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}</small>`;
+      button.setAttribute('aria-label', `${t.levelN(number)}, ${locked ? t.locked : t.starsLabel(stars)}`);
+      button.addEventListener('click', () => { els.levels.hidden = true; startLevel(number); });
+      return button;
+    }));
+    for (const overlay of [els.win, els.fail]) overlay.hidden = true;
+    els.levels.hidden = false;
+    els.levelGrid.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  function toWorld(event) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
+  }
+
+  let pointer = null;
+  canvas.addEventListener('pointerdown', event => {
+    if (!game || game.state !== 'play') return;
+    canvas.setPointerCapture(event.pointerId);
+    const p = toWorld(event);
+    pointer = { id: event.pointerId, ...p };
+    trail.push({ ...p, life: 0.25 });
+    tap(p);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!pointer || pointer.id !== event.pointerId || game.state !== 'play') return;
+    const p = toWorld(event);
+    swipe(pointer, p);
+    pointer.x = p.x; pointer.y = p.y;
+    trail.push({ ...p, life: 0.25 });
+  });
+  const endPointer = () => { pointer = null; };
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
+  // Tab walks through ropes and gadgets on the board, then lets focus leave as usual.
+  canvas.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const list = targets();
+    if (event.key === 'Tab') {
+      if (!list.length) { selected = -1; return; }
+      const next = event.shiftKey ? (selected < 0 ? list.length - 1 : selected - 1) : selected + 1;
+      if (next < 0 || next >= list.length) { selected = -1; return; }
+      event.preventDefault();
+      selected = next;
+      els.announcer.textContent = list[selected].label;
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (list[selected]) useTarget(list[selected]);
+      else if (list.length) { selected = 0; els.announcer.textContent = list[0].label; }
+    }
+  });
+  canvas.addEventListener('blur', () => { selected = -1; });
+  document.addEventListener('keydown', event => {
+    if ((event.key === 'r' || event.key === 'R') && !event.ctrlKey && !event.metaKey && !event.altKey && els.start.hidden && els.levels.hidden) {
+      event.preventDefault();
+      startLevel(game.level);
+    }
+  });
+
+  $('play').addEventListener('click', () => { els.start.hidden = true; startLevel(game.level); });
+  $('restart').addEventListener('click', () => startLevel(game.level));
+  $('open-levels').addEventListener('click', openLevels);
+  $('fail-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; if (game.state === 'play') canvas.focus({ preventScroll: true }); else showEnd(); });
+  els.next.addEventListener('click', () => startLevel(game.level + 1));
+  $('replay').addEventListener('click', () => startLevel(game.level));
+  $('retry').addEventListener('click', () => startLevel(game.level));
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+  new ResizeObserver(resize).observe(els.stage);
+  loadLevel(Math.min(progress.unlocked, LEVELS.length));
+  requestAnimationFrame(frame);
+  $('play').focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

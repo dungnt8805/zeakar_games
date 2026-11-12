@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Candy Match</title>
+<style>
+:root {
+  --ink: #3d1645;
+  --muted: #8a5a8f;
+  --pink: #ff5fa2;
+  --pink-dark: #d63c80;
+  --paper: #fff5fa;
+  --plum: #5a2266;
+  --star: #ffb627;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: linear-gradient(160deg, #ffc2dd 0%, #ffd9b8 55%, #ffe9a8 100%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+body::before { content: ""; position: fixed; inset: 0; background-image: radial-gradient(#ffffff70 2px, transparent 2.5px); background-size: 26px 26px; pointer-events: none; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.app { position: relative; height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 8px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 6px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--pink-dark); }
+.pill { padding: 6px 12px; border-radius: 99px; background: var(--plum); color: #fff; font-size: 14px; font-weight: 800; white-space: nowrap; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--paper); font-size: 19px; font-weight: 900; box-shadow: 0 3px 0 #e7a3c4; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #e7a3c4; }
+.hud { display: flex; gap: 6px; align-items: stretch; }
+.stat { min-width: 0; padding: 5px 8px; border-radius: 14px; background: #fff5facc; text-align: center; position: relative; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat.moves { flex: 0 0 64px; }
+.stat.moves strong { font-size: 24px; line-height: 1.05; }
+.stat.moves strong.low { color: #e0245e; }
+.stat.score { flex: 0 0 86px; }
+.stat.goals { flex: 1; }
+.goal-list { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 26px; flex-wrap: wrap; }
+.goal-list[hidden] { display: none; }
+.goal { display: inline-flex; align-items: center; gap: 3px; font-size: 16px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.goal canvas, .goal i { width: 22px; height: 22px; display: block; }
+.goal i { border-radius: 6px; background: #ff8fc8; box-shadow: inset 0 0 0 2px #ff5fa8; }
+.goal.done { color: #2e9d57; }
+.gain { position: absolute; left: 0; right: 0; top: 4px; font-size: 15px; font-weight: 900; color: var(--pink-dark); opacity: 0; pointer-events: none; }
+.gain.show { animation: gain .7s ease-out; }
+@keyframes gain { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-26px); } }
+
+.stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; }
+canvas#board { display: block; touch-action: none; cursor: pointer; border-radius: 22px; }
+canvas#board:focus-visible { outline: 3px solid #3d164588; outline-offset: 3px; }
+.hint { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #3d164566; animation: fade .25s; }
+.overlay[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } }
+.panel { width: min(100%, 350px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 24px 20px; text-align: center; box-shadow: 0 20px 50px #3d164555; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; line-height: 1.15; }
+.panel .emoji { font-size: 40px; line-height: 1.2; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .goal-text { color: var(--ink); font-size: 18px; font-weight: 800; }
+.panel .goal-list { margin-top: 12px; gap: 14px; }
+.panel .goal { font-size: 20px; }
+.panel .goal canvas, .panel .goal i { width: 30px; height: 30px; }
+.stars { margin-top: 6px; font-size: 40px; letter-spacing: 4px; color: #ecd5df; }
+.stars b { color: var(--star); }
+.result { font-size: 18px; font-weight: 800; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 14px; border-radius: 18px; background: var(--pink); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--pink-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--pink-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; border: 2px solid #f2c6da; font-weight: 800; }
+.row { display: flex; gap: 8px; }
+.row .secondary { flex: 1; }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #ffe3f0; box-shadow: 0 3px 0 #f0a9c9; font-size: 17px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: var(--star); min-height: 11px; }
+.level-btn.current { background: var(--pink); color: #fff; box-shadow: 0 3px 0 var(--pink-dark); }
+.level-btn.current small { color: #fff3b0; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Candy <span>Match</span></h1>
+    <span class="pill" id="level-pill"></span>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="hud">
+    <div class="stat moves"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat goals"><small data-i18n="goal"></small><div class="goal-list" id="goals"></div></div>
+    <div class="stat score"><small data-i18n="score"></small><strong id="score">0</strong><span class="gain" id="gain" aria-hidden="true"></span></div>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="board" tabindex="0" role="application" aria-roledescription="Candy Match" aria-describedby="hint"></canvas>
+  </div>
+  <p class="hint" id="hint" data-i18n="hint"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="intro" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <p class="emoji" aria-hidden="true">🍬</p>
+    <h2 id="intro-title"></h2>
+    <p class="goal-text" id="intro-goal"></p>
+    <div class="goal-list" id="intro-goals" aria-hidden="true"></div>
+    <p id="intro-moves"></p>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+    <button type="button" class="secondary" id="intro-levels" data-i18n="levels"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p id="bonus"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <div class="row">
+      <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+      <button type="button" class="secondary" id="win-levels" data-i18n="levels"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">🍭</p>
+    <h2 id="lose-title" data-i18n="lost"></h2>
+    <p data-i18n="lostText"></p>
+    <div class="goal-list" id="lose-goals" aria-hidden="true"></div>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="secondary" id="lose-levels" data-i18n="levels"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { level: 'Level', levelN: n => `Level ${n}`, moves: 'Moves', goal: 'Goal', score: 'Score', levels: 'Levels', restart: 'Restart level', hint: 'Swap neighbouring candies to line up 3 or more', play: 'Play', movesN: n => `${n} moves`, goalScore: n => `Score ${n} points`, goalJelly: 'Clear all the jelly', goalCollect: 'Collect the candies', won: n => `Level ${n} complete!`, allDone: 'You finished every level!', result: s => `Score ${s}`, bonus: (m, p) => `${m} moves left · +${p} bonus`, newBest: 'New best!', next: 'Next level', replay: 'Replay', lost: 'Out of moves', lostText: 'So close! Have another go at this level.', retry: 'Try again', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, shuffle: 'No moves left — shuffling!', praise: ['Sweet!', 'Tasty!', 'Delicious!', 'Divine!'], made: { row: 'Striped candy!', col: 'Striped candy!', wrap: 'Wrapped candy!', bomb: 'Colour bomb!' }, colors: ['red drop', 'orange caramel', 'yellow star', 'green gumdrop', 'blue gem', 'purple heart'], kinds: { row: 'striped across', col: 'striped down', wrap: 'wrapped', bomb: 'colour bomb' }, cell: (r, c, d) => `Row ${r}, column ${c}: ${d}`, jelly: n => (n > 1 ? 'double jelly' : 'jelly'), selected: 'selected', fewMoves: n => `${n} moves left`, goalLeft: n => `${n} to go` },
+    vi: { level: 'Màn', levelN: n => `Màn ${n}`, moves: 'Lượt', goal: 'Mục tiêu', score: 'Điểm', levels: 'Chọn màn', restart: 'Chơi lại màn', hint: 'Đổi chỗ hai viên kẹo cạnh nhau để xếp 3 viên trở lên', play: 'Chơi', movesN: n => `${n} lượt đi`, goalScore: n => `Đạt ${n} điểm`, goalJelly: 'Xóa sạch lớp thạch', goalCollect: 'Thu thập đủ kẹo', won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã phá đảo tất cả các màn!', result: s => `Điểm ${s}`, bonus: (m, p) => `Còn ${m} lượt · thưởng +${p}`, newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại', lost: 'Hết lượt rồi', lostText: 'Suýt nữa thôi! Thử lại màn này nhé.', retry: 'Thử lại', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, shuffle: 'Hết nước đi — xáo lại kẹo!', praise: ['Ngọt quá!', 'Ngon tuyệt!', 'Tuyệt hảo!', 'Thần sầu!'], made: { row: 'Kẹo sọc!', col: 'Kẹo sọc!', wrap: 'Kẹo gói!', bomb: 'Bom màu!' }, colors: ['giọt đỏ', 'caramen cam', 'sao vàng', 'kẹo dẻo xanh lá', 'đá quý xanh dương', 'tim tím'], kinds: { row: 'sọc ngang', col: 'sọc dọc', wrap: 'kẹo gói', bomb: 'bom màu' }, cell: (r, c, d) => `Hàng ${r}, cột ${c}: ${d}`, jelly: n => (n > 1 ? 'thạch hai lớp' : 'thạch'), selected: 'đang chọn', fewMoves: n => `Còn ${n} lượt`, goalLeft: n => `Còn ${n}` },
+    zh: { level: '关卡', levelN: n => `第 ${n} 关`, moves: '步数', goal: '目标', score: '得分', levels: '选择关卡', restart: '重玩本关', hint: '交换相邻的糖果，连成 3 个或更多', play: '开始', movesN: n => `${n} 步`, goalScore: n => `得到 ${n} 分`, goalJelly: '清除所有果冻', goalCollect: '收集指定糖果', won: n => `第 ${n} 关完成！`, allDone: '你已通关所有关卡！', result: s => `得分 ${s}`, bonus: (m, p) => `剩余 ${m} 步 · 奖励 +${p}`, newBest: '新纪录！', next: '下一关', replay: '重玩', lost: '步数用完了', lostText: '差一点！再挑战一次吧。', retry: '再试一次', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, shuffle: '没有可走的步了——重新洗牌！', praise: ['好甜！', '美味！', '太好吃了！', '甜到心里！'], made: { row: '条纹糖！', col: '条纹糖！', wrap: '包装糖！', bomb: '彩虹炸弹！' }, colors: ['红色水滴糖', '橙色焦糖', '黄色星星糖', '绿色软糖', '蓝色宝石糖', '紫色爱心糖'], kinds: { row: '横条纹', col: '竖条纹', wrap: '包装糖', bomb: '彩虹炸弹' }, cell: (r, c, d) => `第 ${r} 行第 ${c} 列：${d}`, jelly: n => (n > 1 ? '双层果冻' : '果冻'), selected: '已选中', fewMoves: n => `还剩 ${n} 步`, goalLeft: n => `还差 ${n}` },
+    fr: { level: 'Niveau', levelN: n => `Niveau ${n}`, moves: 'Coups', goal: 'Objectif', score: 'Score', levels: 'Niveaux', restart: 'Recommencer le niveau', hint: 'Échangez deux bonbons voisins pour en aligner 3 ou plus', play: 'Jouer', movesN: n => `${n} coups`, goalScore: n => `Marquez ${n} points`, goalJelly: 'Effacez toute la gelée', goalCollect: 'Récoltez les bonbons', won: n => `Niveau ${n} terminé !`, allDone: 'Vous avez terminé tous les niveaux !', result: s => `Score ${s}`, bonus: (m, p) => `${m} coups restants · bonus +${p}`, newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer', lost: 'Plus de coups', lostText: 'Presque ! Retentez ce niveau.', retry: 'Réessayer', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, shuffle: 'Plus de coups possibles : on mélange !', praise: ['Sucré !', 'Savoureux !', 'Délicieux !', 'Divin !'], made: { row: 'Bonbon rayé !', col: 'Bonbon rayé !', wrap: 'Bonbon emballé !', bomb: 'Bombe de couleur !' }, colors: ['goutte rouge', 'caramel orange', 'étoile jaune', 'gomme verte', 'gemme bleue', 'cœur violet'], kinds: { row: 'rayé horizontal', col: 'rayé vertical', wrap: 'emballé', bomb: 'bombe de couleur' }, cell: (r, c, d) => `Ligne ${r}, colonne ${c} : ${d}`, jelly: n => (n > 1 ? 'double gelée' : 'gelée'), selected: 'sélectionné', fewMoves: n => `Plus que ${n} coups`, goalLeft: n => `Encore ${n}` },
+    th: { level: 'ด่าน', levelN: n => `ด่าน ${n}`, moves: 'ตา', goal: 'เป้าหมาย', score: 'คะแนน', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', hint: 'สลับลูกอมที่อยู่ติดกันให้เรียงกัน 3 เม็ดขึ้นไป', play: 'เล่น', movesN: n => `${n} ตา`, goalScore: n => `ทำคะแนนให้ได้ ${n}`, goalJelly: 'เคลียร์เยลลี่ให้หมด', goalCollect: 'เก็บลูกอมให้ครบ', won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณผ่านครบทุกด่านแล้ว!', result: s => `คะแนน ${s}`, bonus: (m, p) => `เหลือ ${m} ตา · โบนัส +${p}`, newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', lost: 'หมดตาเดินแล้ว', lostText: 'เกือบแล้ว! ลองด่านนี้อีกครั้งนะ', retry: 'ลองอีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, shuffle: 'ไม่มีตาเดินแล้ว กำลังสับลูกอมใหม่!', praise: ['หวานจัง!', 'อร่อย!', 'อร่อยสุดๆ!', 'สุดยอด!'], made: { row: 'ลูกอมลายทาง!', col: 'ลูกอมลายทาง!', wrap: 'ลูกอมห่อ!', bomb: 'ระเบิดสี!' }, colors: ['หยดแดง', 'คาราเมลส้ม', 'ดาวเหลือง', 'เยลลี่เขียว', 'อัญมณีฟ้า', 'หัวใจม่วง'], kinds: { row: 'ลายแนวนอน', col: 'ลายแนวตั้ง', wrap: 'ลูกอมห่อ', bomb: 'ระเบิดสี' }, cell: (r, c, d) => `แถว ${r} คอลัมน์ ${c}: ${d}`, jelly: n => (n > 1 ? 'เยลลี่สองชั้น' : 'เยลลี่'), selected: 'เลือกอยู่', fewMoves: n => `เหลือ ${n} ตา`, goalLeft: n => `อีก ${n}` },
+    ja: { level: 'レベル', levelN: n => `レベル ${n}`, moves: '残り手数', goal: '目標', score: 'スコア', levels: 'レベル選択', restart: 'レベルをやり直す', hint: '隣のキャンディを入れ替えて3つ以上そろえよう', play: 'プレイ', movesN: n => `${n}手`, goalScore: n => `${n}点をめざそう`, goalJelly: 'ゼリーを全部消そう', goalCollect: 'キャンディを集めよう', won: n => `レベル ${n} クリア！`, allDone: '全レベルクリア！', result: s => `スコア ${s}`, bonus: (m, p) => `残り${m}手 · ボーナス +${p}`, newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度', lost: '手数切れ', lostText: 'あと少し！もう一度挑戦しよう。', retry: 'リトライ', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, shuffle: '動かせる手がないのでシャッフル！', praise: ['スイート！', 'おいしい！', 'デリシャス！', 'さいこう！'], made: { row: 'ストライプキャンディ！', col: 'ストライプキャンディ！', wrap: '包みキャンディ！', bomb: 'カラーボム！' }, colors: ['赤いしずく', 'オレンジキャラメル', '黄色い星', '緑のグミ', '青い宝石', '紫のハート'], kinds: { row: '横ストライプ', col: '縦ストライプ', wrap: '包みキャンディ', bomb: 'カラーボム' }, cell: (r, c, d) => `${r}行${c}列：${d}`, jelly: n => (n > 1 ? '二重ゼリー' : 'ゼリー'), selected: '選択中', fewMoves: n => `残り${n}手`, goalLeft: n => `あと${n}` },
+    ko: { level: '레벨', levelN: n => `레벨 ${n}`, moves: '남은 이동', goal: '목표', score: '점수', levels: '레벨 선택', restart: '레벨 다시 하기', hint: '이웃한 사탕을 바꿔 3개 이상 맞추세요', play: '시작', movesN: n => `${n}번 이동`, goalScore: n => `${n}점 달성하기`, goalJelly: '젤리를 모두 없애기', goalCollect: '사탕 모으기', won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨을 클리어했어요!', result: s => `점수 ${s}`, bonus: (m, p) => `${m}번 남음 · 보너스 +${p}`, newBest: '최고 기록!', next: '다음 레벨', replay: '다시 하기', lost: '이동 횟수 끝', lostText: '아깝다! 이 레벨에 다시 도전해 보세요.', retry: '다시 도전', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, shuffle: '움직일 수 있는 사탕이 없어요 — 섞는 중!', praise: ['달콤해!', '맛있어!', '최고의 맛!', '환상적이야!'], made: { row: '줄무늬 사탕!', col: '줄무늬 사탕!', wrap: '포장 사탕!', bomb: '컬러 폭탄!' }, colors: ['빨간 물방울', '주황 캐러멜', '노란 별', '초록 젤리', '파란 보석', '보라 하트'], kinds: { row: '가로 줄무늬', col: '세로 줄무늬', wrap: '포장 사탕', bomb: '컬러 폭탄' }, cell: (r, c, d) => `${r}행 ${c}열: ${d}`, jelly: n => (n > 1 ? '이중 젤리' : '젤리'), selected: '선택됨', fewMoves: n => `${n}번 남았어요`, goalLeft: n => `${n}개 남음` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const N = 8, CELL = 56, PAD = 8, SIZE = N * CELL + PAD * 2;
+  const COLORS = [
+    { fill: '#ff4d6d', light: '#ffb3c1', dark: '#c9184a' },
+    { fill: '#ff9505', light: '#ffd29a', dark: '#c46500' },
+    { fill: '#ffd23f', light: '#fff4b8', dark: '#d89f00' },
+    { fill: '#2ecc71', light: '#a8f0c6', dark: '#16884a' },
+    { fill: '#3fa7ff', light: '#b5ddff', dark: '#1563c4' },
+    { fill: '#a55eea', light: '#dcc0ff', dark: '#6827a8' },
+  ];
+  const J1 = ['........', '........', '..1111..', '..1111..', '..1111..', '..1111..', '........', '........'];
+  const JX = ['........', '.1....1.', '..1..1..', '...11...', '...11...', '..1..1..', '.1....1.', '........'];
+  const JRING = ['........', '.111111.', '.1....1.', '.1....1.', '.1....1.', '.1....1.', '.111111.', '........'];
+  const JFULL = ['.111111.', '11111111', '11111111', '11111111', '11111111', '11111111', '11111111', '.111111.'];
+  const J2 = ['........', '.111111.', '.122221.', '.12..21.', '.12..21.', '.122221.', '.111111.', '........'];
+  const JCHECK = ['.2.11.2.', '2..11..2', '..1..1..', '11.11.11', '11.11.11', '..1..1..', '2..11..2', '.2.11.2.'];
+  const JHALF = ['.111111.', '11111111', '11111111', '11111111', '12211221', '12211221', '22222222', '.222222.'];
+  const JFINAL = ['.111111.', '12222221', '12222221', '12222221', '12222221', '12222221', '12222221', '.111111.'];
+  const score = n => [{ type: 'score', n }];
+  const collect = (n, ...colors) => colors.map(color => ({ type: 'collect', color, n }));
+  const jelly = [{ type: 'jelly' }];
+  const LEVELS = [
+    { moves: 20, goals: score(1500) },
+    { moves: 20, goals: collect(18, 0) },
+    { moves: 22, goals: jelly, jelly: J1 },
+    { moves: 20, goals: score(3000) },
+    { moves: 22, goals: collect(20, 2, 4) },
+    { moves: 24, goals: jelly, jelly: JX },
+    { moves: 22, goals: score(4000) },
+    { moves: 28, goals: jelly, jelly: JRING },
+    { moves: 24, goals: collect(15, 0, 3, 5) },
+    { moves: 34, goals: jelly, jelly: JFULL },
+    { moves: 24, goals: score(5500) },
+    { moves: 32, goals: jelly, jelly: J2 },
+    { moves: 24, goals: collect(28, 5) },
+    { moves: 38, goals: jelly, jelly: JCHECK },
+    { moves: 26, goals: score(7000) },
+    { moves: 24, goals: collect(26, 1, 3) },
+    { moves: 44, goals: jelly, jelly: JHALF },
+    { moves: 28, goals: score(9000) },
+    { moves: 28, goals: collect(24, 0, 2, 4) },
+    { moves: 42, goals: jelly, jelly: JFINAL },
+  ];
+  const STORAGE_KEY = 'milaan.candyMatch.progress';
+  const POINTS = { candy: 20, jelly: 40, row: 100, col: 100, wrap: 150, bomb: 250 };
+  const BONUS_PER_MOVE = 150;
+  const HINT_AFTER = 5000;
+  const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('board');
+  const ctx = canvas.getContext('2d');
+  const els = { levelPill: $('level-pill'), moves: $('moves'), goals: $('goals'), score: $('score'), gain: $('gain'), announcer: $('announcer'), intro: $('intro'), introTitle: $('intro-title'), introGoal: $('intro-goal'), introGoals: $('intro-goals'), introMoves: $('intro-moves'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), bonus: $('bonus'), newBest: $('new-best'), next: $('next'), lose: $('lose'), loseGoals: $('lose-goals'), levels: $('levels'), levelGrid: $('level-grid') };
+
+  const readProgress = () => { try { return { unlocked: 1, stars: {}, best: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { unlocked: 1, stars: {}, best: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const easeOut = p => 1 - (1 - p) * (1 - p);
+  const easeIn = p => p * p;
+  const linear = p => p;
+  const key = (r, c) => r * N + c;
+  const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+
+  // --- Candy artwork: six distinct silhouettes, painted once per size into sprites.
+  function roundPoly(g, points, radius) {
+    g.beginPath();
+    const n = points.length;
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const start = mid(points[n - 1], points[0]);
+    g.moveTo(start[0], start[1]);
+    for (let i = 0; i < n; i++) { const p = points[i], q = points[(i + 1) % n]; g.arcTo(p[0], p[1], q[0], q[1], radius); }
+    g.closePath();
+  }
+
+  function shapePath(g, color, R) {
+    if (color === 0) { g.beginPath(); g.moveTo(0, -R * 1.05); g.bezierCurveTo(R * 0.55, -R * 0.4, R * 0.95, 0, R * 0.92, R * 0.3); g.arc(0, R * 0.3, R * 0.92, 0, Math.PI); g.bezierCurveTo(-R * 0.95, 0, -R * 0.55, -R * 0.4, 0, -R * 1.05); g.closePath(); }
+    else if (color === 1) { g.beginPath(); g.roundRect(-R * 0.86, -R * 0.86, R * 1.72, R * 1.72, R * 0.36); }
+    else if (color === 2) { const pts = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, d = i % 2 ? R * 0.52 : R * 1.08; pts.push([Math.cos(a) * d, Math.sin(a) * d + R * 0.06]); } roundPoly(g, pts, R * 0.14); }
+    else if (color === 3) { g.beginPath(); g.moveTo(-R * 0.95, R * 0.8); g.lineTo(R * 0.95, R * 0.8); g.quadraticCurveTo(R * 1.02, R * 0.3, R * 0.6, -R * 0.4); g.quadraticCurveTo(0, -R * 1.25, -R * 0.6, -R * 0.4); g.quadraticCurveTo(-R * 1.02, R * 0.3, -R * 0.95, R * 0.8); g.closePath(); }
+    else if (color === 4) roundPoly(g, [[0, -R * 1.05], [R * 0.95, -R * 0.25], [0, R * 1.05], [-R * 0.95, -R * 0.25]], R * 0.18);
+    else { g.beginPath(); g.moveTo(0, R * 0.98); g.bezierCurveTo(-R * 1.35, R * 0.05, -R * 0.95, -R * 1.15, 0, -R * 0.45); g.bezierCurveTo(R * 0.95, -R * 1.15, R * 1.35, R * 0.05, 0, R * 0.98); g.closePath(); }
+  }
+
+  function paintBomb(g, R) {
+    const grad = g.createRadialGradient(-R * 0.3, -R * 0.35, R * 0.1, 0, 0, R);
+    grad.addColorStop(0, '#9b6a4a'); grad.addColorStop(0.6, '#5a3522'); grad.addColorStop(1, '#2e1a10');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(0, 0, R * 0.95, 0, Math.PI * 2); g.fill();
+    for (let i = 0; i < 18; i++) {
+      const a = i * 2.39996, d = R * 0.78 * Math.sqrt((i + 0.5) / 18);
+      g.save(); g.translate(Math.cos(a) * d, Math.sin(a) * d); g.rotate(a * 3);
+      g.fillStyle = COLORS[i % 6].fill;
+      g.beginPath(); g.roundRect(-R * 0.13, -R * 0.045, R * 0.26, R * 0.09, R * 0.045); g.fill();
+      g.restore();
+    }
+    g.fillStyle = '#ffffff50';
+    g.beginPath(); g.ellipse(-R * 0.35, -R * 0.45, R * 0.3, R * 0.16, -0.6, 0, Math.PI * 2); g.fill();
+  }
+
+  function paintCandy(g, color, special) {
+    const R = CELL * 0.37;
+    if (special === 'bomb') return paintBomb(g, R);
+    const c = COLORS[color];
+    if (special === 'wrap') {
+      g.fillStyle = c.light;
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * R * 0.7, 0); g.lineTo(s * R * 1.28, -R * 0.55); g.quadraticCurveTo(s * R * 1.1, 0, s * R * 1.28, R * 0.55); g.closePath(); g.fill(); }
+      g.fillStyle = `${c.light}cc`;
+      g.beginPath(); g.roundRect(-R * 1.02, -R * 1.02, R * 2.04, R * 2.04, R * 0.5); g.fill();
+      g.strokeStyle = c.dark; g.lineWidth = 2; g.stroke();
+    }
+    const size = special === 'wrap' ? 0.78 : 1;
+    g.save();
+    g.scale(size, size);
+    const grad = g.createLinearGradient(0, -R, 0, R);
+    grad.addColorStop(0, c.light); grad.addColorStop(0.45, c.fill); grad.addColorStop(1, c.dark);
+    shapePath(g, color, R);
+    g.fillStyle = grad; g.fill();
+    g.lineWidth = 2.2; g.strokeStyle = c.dark; g.stroke();
+    if (special === 'row' || special === 'col') {
+      g.save();
+      shapePath(g, color, R); g.clip();
+      g.fillStyle = '#ffffffd0';
+      for (const off of [-0.5, 0, 0.5]) {
+        if (special === 'row') g.fillRect(-R * 1.2, off * R * 1.3 - R * 0.11, R * 2.4, R * 0.22);
+        else g.fillRect(off * R * 1.3 - R * 0.11, -R * 1.2, R * 0.22, R * 2.4);
+      }
+      g.restore();
+    }
+    g.fillStyle = '#ffffff8c';
+    g.beginPath(); g.ellipse(-R * 0.3, -R * 0.42, R * 0.26, R * 0.13, -0.5, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+
+  let scale = 1, dpr = 1;
+  const sprites = new Map();
+  function sprite(color, special) {
+    const id = special === 'bomb' ? 'bomb' : `${color}:${special || ''}`;
+    let s = sprites.get(id);
+    if (!s) {
+      const px = scale * dpr;
+      s = document.createElement('canvas');
+      s.width = s.height = Math.ceil(CELL * px);
+      const g = s.getContext('2d');
+      g.setTransform(px, 0, 0, px, CELL / 2 * px, CELL / 2 * px);
+      paintCandy(g, color, special);
+      sprites.set(id, s);
+    }
+    return s;
+  }
+
+  function candyIcon(color, size) {
+    const icon = document.createElement('canvas');
+    const px = Math.min(window.devicePixelRatio || 1, 2);
+    icon.width = icon.height = Math.round(size * px);
+    const g = icon.getContext('2d');
+    const k = size * px / CELL;
+    g.setTransform(k * 1.15, 0, 0, k * 1.15, size * px / 2, size * px / 2);
+    paintCandy(g, color, null);
+    return icon;
+  }
+
+  // --- Tweens: animations are promises so the turn logic can await them.
+  const tweens = new Set();
+  function tween(ms, fn, ease = easeOut) {
+    return new Promise(resolve => {
+      if (reduced || ms <= 0) { fn(1); resolve(); return; }
+      tweens.add({ t: 0, ms, fn, ease, resolve });
+    });
+  }
+  function stepTweens(dtMs) {
+    for (const tw of [...tweens]) {
+      tw.t += dtMs;
+      const p = Math.min(1, tw.t / tw.ms);
+      tw.fn(tw.ease(p));
+      if (p >= 1) { tweens.delete(tw); tw.resolve(); }
+    }
+  }
+
+  let progress = readProgress();
+  let game;
+  let candyId = 0;
+
+  const makeCandy = (color, special = null, r = 0, c = 0) => ({ id: candyId++, color: special === 'bomb' ? -1 : color, special, x: c, y: r, s: 1, a: 1 });
+  const colorAt = (r, c) => { const candy = game.board[r][c]; return candy && candy.special !== 'bomb' ? candy.color : -1; };
+  const randomColor = () => Math.floor(Math.random() * COLORS.length);
+
+  function fillBoard() {
+    // Fill without ready-made lines, and retry until at least one move exists.
+    do {
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        let color;
+        do color = randomColor();
+        while ((c >= 2 && colorAt(r, c - 1) === color && colorAt(r, c - 2) === color) || (r >= 2 && colorAt(r - 1, c) === color && colorAt(r - 2, c) === color));
+        game.board[r][c] = makeCandy(color, null, r, c);
+      }
+    } while (!findMove());
+  }
+
+  // --- Matching.
+  function findRuns() {
+    const runs = [];
+    for (const dir of ['h', 'v']) {
+      for (let a = 0; a < N; a++) {
+        let b = 0;
+        while (b < N) {
+          const [r0, c0] = dir === 'h' ? [a, b] : [b, a];
+          const color = colorAt(r0, c0);
+          let end = b + 1;
+          while (end < N && color >= 0 && colorAt(dir === 'h' ? a : end, dir === 'h' ? end : a) === color) end++;
+          if (color >= 0 && end - b >= 3) {
+            const cells = [];
+            for (let i = b; i < end; i++) cells.push(dir === 'h' ? [a, i] : [i, a]);
+            runs.push({ dir, color, cells });
+          }
+          b = end;
+        }
+      }
+    }
+    return runs;
+  }
+
+  function findGroups() {
+    const runs = findRuns();
+    const owner = new Map();
+    const groups = [];
+    for (const run of runs) {
+      // Runs sharing a cell (L, T and + shapes) merge into one group.
+      const [first, ...others] = new Set(run.cells.map(([r, c]) => owner.get(key(r, c))).filter(Boolean));
+      let group = first;
+      if (group) {
+        for (const other of others) { group.runs.push(...other.runs); for (const k of other.cells) owner.set(k, group); other.cells.forEach(k => group.cells.add(k)); groups.splice(groups.indexOf(other), 1); }
+      } else { group = { runs: [], cells: new Set(), color: run.color }; groups.push(group); }
+      group.runs.push(run);
+      for (const [r, c] of run.cells) { group.cells.add(key(r, c)); owner.set(key(r, c), group); }
+    }
+    return groups;
+  }
+
+  function matchAt(r, c) {
+    const color = colorAt(r, c);
+    if (color < 0) return false;
+    let h = 1, v = 1;
+    for (let i = c - 1; i >= 0 && colorAt(r, i) === color; i--) h++;
+    for (let i = c + 1; i < N && colorAt(r, i) === color; i++) h++;
+    for (let i = r - 1; i >= 0 && colorAt(i, c) === color; i--) v++;
+    for (let i = r + 1; i < N && colorAt(i, c) === color; i++) v++;
+    return h >= 3 || v >= 3;
+  }
+
+  const isCombo = (a, b) => a.special === 'bomb' || b.special === 'bomb' || (a.special && b.special);
+
+  function swapRaw(r1, c1, r2, c2) { const b = game.board; [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]]; }
+
+  function findMove() {
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      for (const [dr, dc] of [[0, 1], [1, 0]]) {
+        const r2 = r + dr, c2 = c + dc;
+        if (!inside(r2, c2)) continue;
+        if (isCombo(game.board[r][c], game.board[r2][c2])) return [[r, c], [r2, c2]];
+        swapRaw(r, c, r2, c2);
+        const ok = matchAt(r, c) || matchAt(r2, c2);
+        swapRaw(r, c, r2, c2);
+        if (ok) return [[r, c], [r2, c2]];
+      }
+    }
+    return null;
+  }
+
+  // --- Turn planning: which cells clear, which specials fire and which new specials appear.
+  function newPlan() { return { cells: new Set(), creates: [], fired: new Set(), fx: [] }; }
+
+  function planFromGroups(groups, moved) {
+    const plan = newPlan();
+    for (const group of groups) {
+      group.cells.forEach(k => plan.cells.add(k));
+      const longest = Math.max(...group.runs.map(run => run.cells.length));
+      const hasH = group.runs.some(run => run.dir === 'h'), hasV = group.runs.some(run => run.dir === 'v');
+      let special = null;
+      if (longest >= 5) special = 'bomb';
+      else if (hasH && hasV) special = 'wrap';
+      else if (longest === 4) special = group.runs[0].dir === 'h' ? 'row' : 'col';
+      if (!special) continue;
+      let at = moved.map(([r, c]) => key(r, c)).find(k => group.cells.has(k));
+      if (at === undefined && special === 'wrap') {
+        const counts = new Map();
+        for (const run of group.runs) for (const [r, c] of run.cells) counts.set(key(r, c), (counts.get(key(r, c)) || 0) + 1);
+        at = [...counts].find(([, n]) => n > 1)?.[0];
+      }
+      if (at === undefined) { const run = group.runs.reduce((a, b) => (b.cells.length > a.cells.length ? b : a)); const [r, c] = run.cells[Math.floor(run.cells.length / 2)]; at = key(r, c); }
+      plan.creates.push({ k: at, special, color: group.color });
+    }
+    return plan;
+  }
+
+  function mostCommonColor(exclude) {
+    const counts = Array(COLORS.length).fill(0);
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (!exclude.has(key(r, c)) && colorAt(r, c) >= 0) counts[colorAt(r, c)]++;
+    return counts.indexOf(Math.max(...counts));
+  }
+
+  function fireSpecial(plan, r, c, candy, queue) {
+    plan.fired.add(candy.id);
+    const add = (rr, cc) => { if (inside(rr, cc) && !plan.cells.has(key(rr, cc))) { plan.cells.add(key(rr, cc)); queue.push(key(rr, cc)); } };
+    if (candy.special === 'row') { plan.fx.push({ kind: 'row', r, c, color: candy.color }); for (let i = 0; i < N; i++) add(r, i); }
+    else if (candy.special === 'col') { plan.fx.push({ kind: 'col', r, c, color: candy.color }); for (let i = 0; i < N; i++) add(i, c); }
+    else if (candy.special === 'wrap') { plan.fx.push({ kind: 'ring', r, c, size: 1.5, color: candy.color }); for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) add(r + dr, c + dc); }
+    else if (candy.special === 'bomb') {
+      const target = mostCommonColor(plan.cells);
+      for (let rr = 0; rr < N; rr++) for (let cc = 0; cc < N; cc++) if (colorAt(rr, cc) === target) { add(rr, cc); plan.fx.push({ kind: 'zap', r, c, tr: rr, tc: cc }); }
+    }
+  }
+
+  // Specials caught in a clear fire too, and whatever they hit can set off more.
+  function expand(plan) {
+    const queue = [...plan.cells];
+    while (queue.length) {
+      const k = queue.shift();
+      const r = Math.floor(k / N), c = k % N;
+      const candy = game.board[r][c];
+      if (!candy || !candy.special || plan.fired.has(candy.id)) continue;
+      fireSpecial(plan, r, c, candy, queue);
+    }
+    return plan;
+  }
+
+  function comboPlan(r1, c1, r2, c2) {
+    // a is the candy that was dragged; after the swap it sits at (r2, c2).
+    const a = game.board[r2][c2], b = game.board[r1][c1];
+    const plan = newPlan();
+    const all = (fn) => { for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (fn(r, c)) plan.cells.add(key(r, c)); };
+    plan.cells.add(key(r1, c1)); plan.cells.add(key(r2, c2));
+    plan.fired.add(a.id); plan.fired.add(b.id);
+    const [bomb, other, br, bc] = a.special === 'bomb' ? [a, b, r2, c2] : b.special === 'bomb' ? [b, a, r1, c1] : [null, null, 0, 0];
+    if (bomb && other.special === 'bomb') { all(() => true); plan.fx.push({ kind: 'ring', r: r2, c: c2, size: 9 }); }
+    else if (bomb) {
+      const color = other.color;
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const candy = game.board[r][c];
+        if (colorAt(r, c) !== color) continue;
+        if (other.special && candy !== other) candy.special = other.special === 'wrap' ? 'wrap' : Math.random() < 0.5 ? 'row' : 'col';
+        plan.cells.add(key(r, c));
+        plan.fx.push({ kind: 'zap', r: br, c: bc, tr: r, tc: c });
+      }
+      if (other.special) plan.fired.delete(other.id);
+    } else {
+      const striped = s => s === 'row' || s === 'col';
+      const reach = striped(a.special) && striped(b.special) ? 0 : a.special === 'wrap' && b.special === 'wrap' ? 2 : 1;
+      if (striped(a.special) || striped(b.special)) {
+        for (let d = -reach; d <= reach; d++) {
+          all((r, c) => r === r2 + d || c === c2 + d);
+          plan.fx.push({ kind: 'row', r: r2 + d, c: c2 }, { kind: 'col', r: r2, c: c2 + d });
+        }
+      } else {
+        all((r, c) => Math.abs(r - r2) <= 2 && Math.abs(c - c2) <= 2);
+        plan.fx.push({ kind: 'ring', r: r2, c: c2, size: 2.5 });
+      }
+    }
+    return plan;
+  }
+
+  // --- Resolving a turn with animation.
+  async function clearPlan(plan, cascade) {
+    expand(plan);
+    const gen = game;
+    const removing = [];
+    let gained = 0;
+    for (const k of plan.cells) {
+      const r = Math.floor(k / N), c = k % N;
+      if (game.jelly[r][c] > 0) { game.jelly[r][c] -= 1; game.jellyLeft -= 1; gained += POINTS.jelly; }
+      const candy = game.board[r][c];
+      if (!candy) continue;
+      if (candy.color >= 0) game.collected[candy.color] += 1;
+      gained += POINTS.candy * cascade;
+      removing.push(candy);
+      game.board[r][c] = null;
+      burst(c, r, candy.color);
+    }
+    for (const fx of plan.fx) game.effects.push({ ...fx, life: 1 });
+    for (const { k, special, color } of plan.creates) {
+      const r = Math.floor(k / N), c = k % N;
+      const candy = makeCandy(color, special, r, c);
+      candy.s = 0.3;
+      game.board[r][c] = candy;
+      gained += POINTS[special];
+      announce(t.made[special]);
+      tween(260, p => { candy.s = 0.3 + 0.7 * p + Math.sin(p * Math.PI) * 0.25; });
+    }
+    if (removing.length) {
+      const sum = removing.reduce((acc, candy) => [acc[0] + candy.x, acc[1] + candy.y], [0, 0]);
+      game.popups.push({ text: `+${gained}`, x: sum[0] / removing.length, y: sum[1] / removing.length, life: 1 });
+    }
+    addScore(gained);
+    if (cascade >= 2) game.praise = { text: t.praise[Math.min(cascade - 2, t.praise.length - 1)], life: 1 };
+    game.removing = removing;
+    await tween(200, p => { for (const candy of removing) { candy.s = 1 - p; candy.a = 1 - p * 0.6; } }, easeIn);
+    if (gen !== game) return;
+    game.removing = [];
+    updateHud();
+  }
+
+  async function gravity() {
+    const falling = [];
+    for (let c = 0; c < N; c++) {
+      let write = N - 1;
+      for (let r = N - 1; r >= 0; r--) {
+        const candy = game.board[r][c];
+        if (!candy) continue;
+        if (r !== write) { game.board[r][c] = null; game.board[write][c] = candy; falling.push(candy); candy.fy = candy.y; }
+        write--;
+      }
+      for (let r = write; r >= 0; r--) {
+        const candy = makeCandy(randomColor(), null, r - write - 1, c);
+        candy.y = r - write - 1;
+        candy.fy = candy.y;
+        game.board[r][c] = candy;
+        falling.push(candy);
+      }
+    }
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const candy = game.board[r][c]; if (candy) candy.ty = r; }
+    if (!falling.length) return;
+    const longest = Math.max(...falling.map(candy => candy.ty - candy.fy));
+    await tween(90 + 55 * longest, p => {
+      for (const candy of falling) { const d = candy.ty - candy.fy; candy.y = candy.fy + d * easeIn(Math.min(1, p * longest / d)); }
+    }, linear);
+    for (const candy of falling) { candy.y = candy.ty; bounce(candy); }
+  }
+
+  function bounce(candy) { tween(150, p => { candy.s = 1 - Math.sin(p * Math.PI) * 0.06; }, linear); }
+
+  async function resolve(plan, moved) {
+    const gen = game;
+    let cascade = 0;
+    while (true) {
+      if (!plan) {
+        const groups = findGroups();
+        if (!groups.length) break;
+        plan = planFromGroups(groups, moved);
+      }
+      cascade += 1;
+      await clearPlan(plan, cascade);
+      if (gen !== game) return false;
+      await gravity();
+      if (gen !== game) return false;
+      plan = null;
+      moved = [];
+    }
+    return true;
+  }
+
+  async function attemptSwap(r1, c1, r2, c2) {
+    if (game.state !== 'play' || game.busy || !inside(r2, c2) || Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return;
+    const gen = game;
+    game.busy = true;
+    game.selected = null;
+    game.idle = 0;
+    game.hint = null;
+    const a = game.board[r1][c1], b = game.board[r2][c2];
+    await animateSwap(a, b, r1, c1, r2, c2);
+    if (gen !== game) return;
+    swapRaw(r1, c1, r2, c2);
+    const combo = isCombo(a, b);
+    if (!combo && !findGroups().length) {
+      swapRaw(r1, c1, r2, c2);
+      await animateSwap(a, b, r2, c2, r1, c1);
+      if (gen !== game) return;
+      game.busy = false;
+      return;
+    }
+    game.moves -= 1;
+    updateHud();
+    if (game.moves > 0 && game.moves <= 3) announce(t.fewMoves(game.moves));
+    const ok = await resolve(combo ? comboPlan(r1, c1, r2, c2) : null, [[r2, c2], [r1, c1]]);
+    if (!ok || gen !== game) return;
+    await endTurn();
+    game.busy = false;
+  }
+
+  async function animateSwap(a, b, r1, c1, r2, c2) {
+    await tween(170, p => { a.x = c1 + (c2 - c1) * p; a.y = r1 + (r2 - r1) * p; b.x = c2 + (c1 - c2) * p; b.y = r2 + (r1 - r2) * p; }, easeOut);
+  }
+
+  async function endTurn() {
+    if (goalsMet()) return win();
+    if (game.moves <= 0) return lose();
+    if (!findMove()) await shuffle();
+  }
+
+  async function shuffle() {
+    announce(t.shuffle);
+    game.praise = { text: t.shuffle, life: 1.4, small: true };
+    const gen = game;
+    const cells = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (!game.board[r][c].special) cells.push(game.board[r][c]);
+    await tween(220, p => cells.forEach(candy => { candy.s = 1 - p * 0.5; }));
+    if (gen !== game) return;
+    let tries = 0;
+    do {
+      const colors = cells.map(candy => candy.color);
+      for (let i = colors.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [colors[i], colors[j]] = [colors[j], colors[i]]; }
+      cells.forEach((candy, i) => { candy.color = tries > 50 ? randomColor() : colors[i]; });
+      tries++;
+    } while ((findGroups().length || !findMove()) && tries < 200);
+    await tween(220, p => cells.forEach(candy => { candy.s = 0.5 + p * 0.5; }));
+  }
+
+  // --- Goals, scoring and level flow.
+  function goalState(goal) {
+    if (goal.type === 'score') return { done: game.score >= goal.n, left: Math.max(0, goal.n - game.score) };
+    if (goal.type === 'jelly') return { done: game.jellyLeft <= 0, left: Math.max(0, game.jellyLeft) };
+    return { done: game.collected[goal.color] >= goal.n, left: Math.max(0, goal.n - game.collected[goal.color]) };
+  }
+  const goalsMet = () => game.level.goals.every(goal => goalState(goal).done);
+
+  function goalChips(target, size) {
+    target.replaceChildren(...game.level.goals.map(goal => {
+      const state = goalState(goal);
+      const chip = document.createElement('span');
+      chip.className = `goal${state.done ? ' done' : ''}`;
+      if (goal.type === 'collect') chip.append(candyIcon(goal.color, size));
+      else if (goal.type === 'jelly') chip.append(document.createElement('i'));
+      const text = document.createElement('b');
+      text.textContent = state.done ? '✓' : goal.type === 'score' ? `${Math.min(game.score, goal.n)}/${goal.n}` : String(state.left);
+      chip.append(text);
+      return chip;
+    }));
+  }
+
+  function updateHud() {
+    els.moves.textContent = String(game.moves);
+    els.moves.classList.toggle('low', game.moves <= 3);
+    goalChips(els.goals, 22);
+    const desc = game.level.goals.map(goal => `${goal.type === 'score' ? t.goalScore(goal.n) : goal.type === 'jelly' ? t.goalJelly : `${t.colors[goal.color]}`}: ${t.goalLeft(goalState(goal).left)}`).join('; ');
+    els.goals.setAttribute('aria-label', desc);
+    els.goals.setAttribute('role', 'img');
+  }
+
+  function addScore(points) {
+    if (!points) return;
+    game.score += points;
+    els.score.firstChild.textContent = String(game.score);
+    els.gain.textContent = `+${points}`;
+    els.gain.className = 'gain';
+    void els.gain.offsetWidth;
+    els.gain.className = 'gain show';
+  }
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function goalSummary(level) {
+    const goal = level.goals[0];
+    return goal.type === 'score' ? t.goalScore(goal.n) : goal.type === 'jelly' ? t.goalJelly : t.goalCollect;
+  }
+
+  function loadLevel(number) {
+    const level = LEVELS[number - 1];
+    tweens.clear();
+    game = { number, level, board: Array.from({ length: N }, () => Array(N).fill(null)), jelly: Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => Number(level.jelly?.[r][c]) || 0)), moves: level.moves, score: 0, collected: Array(COLORS.length).fill(0), state: 'intro', busy: false, selected: null, cursor: [3, 3], keyboard: false, idle: 0, hint: null, particles: [], popups: [], effects: [], removing: [], praise: null };
+    game.jellyLeft = game.jelly.flat().reduce((a, b) => a + b, 0);
+    fillBoard();
+    els.levelPill.textContent = t.levelN(number);
+    els.score.firstChild.textContent = '0';
+    updateHud();
+    for (const overlay of [els.win, els.lose, els.levels]) overlay.hidden = true;
+    els.introTitle.textContent = t.levelN(number);
+    els.introGoal.textContent = goalSummary(level);
+    goalChips(els.introGoals, 30);
+    els.introGoals.hidden = level.goals[0].type === 'score';
+    els.introMoves.textContent = t.movesN(level.moves);
+    els.intro.hidden = false;
+    $('play').focus({ preventScroll: true });
+    describeCursor();
+  }
+
+  function startPlay() {
+    els.intro.hidden = true;
+    game.state = 'play';
+    game.idle = 0;
+    canvas.focus({ preventScroll: true });
+  }
+
+  function win() {
+    game.state = 'won';
+    const left = game.moves;
+    const bonus = left * BONUS_PER_MOVE;
+    addScore(bonus);
+    const stars = 1 + (left >= Math.ceil(game.level.moves * 0.15) ? 1 : 0) + (left >= Math.ceil(game.level.moves * 0.3) ? 1 : 0);
+    const k = String(game.number);
+    const previous = progress.best[k] || 0;
+    const better = game.score > previous;
+    if (better) progress.best[k] = game.score;
+    progress.stars[k] = Math.max(progress.stars[k] || 0, stars);
+    progress.unlocked = Math.min(LEVELS.length, Math.max(progress.unlocked, game.number + 1));
+    saveProgress();
+    const last = game.number === LEVELS.length;
+    els.winTitle.textContent = last ? t.allDone : t.won(game.number);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.score);
+    els.bonus.textContent = left ? t.bonus(left, bonus) : '';
+    els.newBest.hidden = !better || !previous;
+    els.next.hidden = last;
+    announce(`${els.winTitle.textContent} ${t.starsLabel(stars)}. ${t.result(game.score)}`);
+    const gen = game;
+    setTimeout(() => { if (gen !== game) return; els.win.hidden = false; (last ? $('replay') : els.next).focus({ preventScroll: true }); }, reduced ? 0 : 700);
+  }
+
+  function lose() {
+    game.state = 'lost';
+    goalChips(els.loseGoals, 30);
+    announce(`${t.lost}. ${t.lostText}`);
+    const gen = game;
+    setTimeout(() => { if (gen !== game) return; els.lose.hidden = false; $('retry').focus({ preventScroll: true }); }, reduced ? 0 : 600);
+  }
+
+  function openLevels() {
+    els.levelGrid.replaceChildren(...LEVELS.map((level, index) => {
+      const number = index + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-btn${number === game.number ? ' current' : ''}`;
+      const locked = number > progress.unlocked;
+      button.disabled = locked;
+      const stars = progress.stars[number] || 0;
+      button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}</small>`;
+      button.setAttribute('aria-label', `${t.levelN(number)}${locked ? `, ${t.locked}` : `, ${t.starsLabel(stars)}`}`);
+      button.addEventListener('click', () => loadLevel(number));
+      return button;
+    }));
+    for (const overlay of [els.win, els.lose, els.intro]) overlay.hidden = true;
+    els.levels.hidden = false;
+    els.levelGrid.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  // --- Effects.
+  function burst(c, r, color) {
+    if (reduced) return;
+    const fill = color >= 0 ? COLORS[color].fill : '#ffffff';
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3;
+      game.particles.push({ x: c + 0.5, y: r + 0.5, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5, life: 0.55, color: fill, size: 2 + Math.random() * 3 });
+    }
+  }
+
+  // --- Rendering.
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / SIZE, stage.height / SIZE);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = `${SIZE * scale}px`;
+    canvas.style.height = `${SIZE * scale}px`;
+    canvas.width = Math.round(SIZE * scale * dpr);
+    canvas.height = Math.round(SIZE * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    sprites.clear();
+    draw();
+  }
+
+  const cx = c => PAD + c * CELL, cy = r => PAD + r * CELL;
+
+  function drawCandy(candy, extraScale = 1) {
+    const s = candy.s * extraScale;
+    if (s <= 0.01) return;
+    const size = CELL * s;
+    ctx.globalAlpha = candy.a;
+    ctx.drawImage(sprite(candy.color, candy.special), cx(candy.x) + (CELL - size) / 2, cy(candy.y) + (CELL - size) / 2, size, size);
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(now = performance.now()) {
+    if (!game) return;
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.fillStyle = '#5a2266e6';
+    ctx.beginPath(); ctx.roundRect(0, 0, SIZE, SIZE, 22); ctx.fill();
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      ctx.fillStyle = (r + c) % 2 ? '#ffffff1f' : '#ffffff2e';
+      ctx.beginPath(); ctx.roundRect(cx(c) + 1.5, cy(r) + 1.5, CELL - 3, CELL - 3, 10); ctx.fill();
+      const layers = game.jelly[r][c];
+      if (layers) {
+        ctx.fillStyle = layers > 1 ? '#ff4fa3d9' : '#ff9fd0b3';
+        ctx.beginPath(); ctx.roundRect(cx(c) + 2.5, cy(r) + 2.5, CELL - 5, CELL - 5, 11); ctx.fill();
+        ctx.strokeStyle = layers > 1 ? '#ffd1e8' : '#ffe3f1';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    const sel = game.selected;
+    if (sel) {
+      ctx.fillStyle = '#fff6';
+      ctx.beginPath(); ctx.roundRect(cx(sel[1]) + 2, cy(sel[0]) + 2, CELL - 4, CELL - 4, 12); ctx.fill();
+    }
+
+    const hintIds = new Set();
+    if (game.hint) for (const [r, c] of game.hint) { const candy = game.board[r][c]; if (candy) hintIds.add(candy.id); }
+    const wobble = 1 + Math.sin(now / 120) * 0.08;
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(PAD, PAD, N * CELL, N * CELL); ctx.clip();
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const candy = game.board[r][c];
+      if (candy) drawCandy(candy, hintIds.has(candy.id) && !reduced ? wobble : sel && sel[0] === r && sel[1] === c ? 1.08 : 1);
+    }
+    for (const candy of game.removing) drawCandy(candy);
+    ctx.restore();
+
+    if (game.hint) {
+      ctx.strokeStyle = '#fffbe0';
+      ctx.lineWidth = 3;
+      for (const [r, c] of game.hint) { ctx.beginPath(); ctx.roundRect(cx(c) + 3, cy(r) + 3, CELL - 6, CELL - 6, 12); ctx.stroke(); }
+    }
+    if (game.keyboard && game.state === 'play') {
+      const [r, c] = game.cursor;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.roundRect(cx(c) + 2, cy(r) + 2, CELL - 4, CELL - 4, 12); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    for (const fx of game.effects) {
+      ctx.globalAlpha = Math.max(0, fx.life);
+      if (fx.kind === 'row' || fx.kind === 'col') {
+        const thick = CELL * 0.5 * fx.life;
+        ctx.fillStyle = '#fffbe8';
+        if (fx.kind === 'row' && fx.r >= 0 && fx.r < N) ctx.fillRect(PAD, cy(fx.r) + CELL / 2 - thick / 2, N * CELL, thick);
+        if (fx.kind === 'col' && fx.c >= 0 && fx.c < N) ctx.fillRect(cx(fx.c) + CELL / 2 - thick / 2, PAD, thick, N * CELL);
+      } else if (fx.kind === 'ring') {
+        ctx.strokeStyle = '#fffbe8';
+        ctx.lineWidth = 8 * fx.life;
+        ctx.beginPath(); ctx.arc(cx(fx.c) + CELL / 2, cy(fx.r) + CELL / 2, CELL * fx.size * (1.2 - fx.life * 0.6), 0, Math.PI * 2); ctx.stroke();
+      } else if (fx.kind === 'zap') {
+        ctx.strokeStyle = '#fff3a6';
+        ctx.lineWidth = 3 * fx.life;
+        ctx.beginPath(); ctx.moveTo(cx(fx.c) + CELL / 2, cy(fx.r) + CELL / 2); ctx.lineTo(cx(fx.tc) + CELL / 2, cy(fx.tr) + CELL / 2); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (const p of game.particles) {
+      ctx.globalAlpha = Math.max(0, p.life * 1.8);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(cx(p.x), cy(p.y), p.size, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    for (const pop of game.popups) {
+      ctx.globalAlpha = Math.min(1, pop.life * 1.6);
+      ctx.font = `900 20px ${FONT}`;
+      const x = cx(pop.x) + CELL / 2, y = cy(pop.y) + CELL / 2 - (1 - pop.life) * 30;
+      ctx.lineWidth = 5; ctx.strokeStyle = '#5a2266'; ctx.strokeText(pop.text, x, y);
+      ctx.fillStyle = '#fff'; ctx.fillText(pop.text, x, y);
+    }
+    if (game.praise) {
+      const p = game.praise;
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      const size = p.small ? 22 : 44 + (1 - p.life) * 8;
+      ctx.font = `900 ${size}px ${FONT}`;
+      ctx.lineWidth = p.small ? 6 : 9; ctx.strokeStyle = '#5a2266'; ctx.strokeText(p.text, SIZE / 2, SIZE / 2, SIZE - 40);
+      ctx.fillStyle = p.small ? '#fff' : '#ffd23f'; ctx.fillText(p.text, SIZE / 2, SIZE / 2, SIZE - 40);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    // Clamp dt so a hidden or stalled tab never fast-forwards animations or the hint timer.
+    const dt = Math.min(50, now - last);
+    last = now;
+    stepTweens(dt);
+    if (game) {
+      for (const p of game.particles) { p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000; p.vy += 9 * dt / 1000; p.life -= dt / 1000; }
+      game.particles = game.particles.filter(p => p.life > 0);
+      for (const fx of game.effects) fx.life -= dt / 350;
+      game.effects = game.effects.filter(fx => fx.life > 0);
+      for (const pop of game.popups) pop.life -= dt / 900;
+      game.popups = game.popups.filter(pop => pop.life > 0);
+      if (game.praise && (game.praise.life -= dt / 1100) <= 0) game.praise = null;
+      if (game.state === 'play' && !game.busy && !game.hint) {
+        game.idle += dt;
+        if (game.idle > HINT_AFTER) game.hint = findMove();
+      }
+    }
+    draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  // --- Input.
+  function cellFromEvent(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / scale - PAD, y = (event.clientY - rect.top) / scale - PAD;
+    return { r: Math.floor(y / CELL), c: Math.floor(x / CELL), x, y };
+  }
+
+  function touchInput() { game.idle = 0; game.hint = null; }
+
+  let drag = null;
+  canvas.addEventListener('pointerdown', event => {
+    if (game.state !== 'play') return;
+    const cell = cellFromEvent(event);
+    if (!inside(cell.r, cell.c)) return;
+    canvas.setPointerCapture(event.pointerId);
+    touchInput();
+    game.keyboard = false;
+    drag = { ...cell, id: event.pointerId, used: false };
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!drag || drag.id !== event.pointerId || drag.used) return;
+    const cell = cellFromEvent(event);
+    const dx = cell.x - drag.x, dy = cell.y - drag.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < CELL * 0.4) return;
+    drag.used = true;
+    const [dr, dc] = Math.abs(dx) > Math.abs(dy) ? [0, Math.sign(dx)] : [Math.sign(dy), 0];
+    game.selected = null;
+    attemptSwap(drag.r, drag.c, drag.r + dr, drag.c + dc);
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const { r, c, used } = drag;
+    drag = null;
+    if (used || game.busy) return;
+    tapCell(r, c);
+  });
+  canvas.addEventListener('pointercancel', () => { drag = null; });
+
+  function tapCell(r, c) {
+    const sel = game.selected;
+    if (sel && sel[0] === r && sel[1] === c) game.selected = null;
+    else if (sel && Math.abs(sel[0] - r) + Math.abs(sel[1] - c) === 1) attemptSwap(sel[0], sel[1], r, c);
+    else game.selected = [r, c];
+    describeCursor();
+  }
+
+  function describeCursor() {
+    const [r, c] = game.cursor;
+    const candy = game.board[r][c];
+    let desc = candy ? (candy.special === 'bomb' ? t.kinds.bomb : candy.special ? `${t.colors[candy.color]}, ${t.kinds[candy.special]}` : t.colors[candy.color]) : '';
+    if (game.jelly[r][c]) desc += `, ${t.jelly(game.jelly[r][c])}`;
+    if (game.selected && game.selected[0] === r && game.selected[1] === c) desc += `, ${t.selected}`;
+    canvas.setAttribute('aria-label', t.cell(r + 1, c + 1, desc));
+  }
+
+  const DIRS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], w: [-1, 0], s: [1, 0], a: [0, -1], d: [0, 1], W: [-1, 0], S: [1, 0], A: [0, -1], D: [0, 1] };
+  canvas.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || game.state !== 'play') return;
+    const dir = DIRS[event.key];
+    if (dir) {
+      event.preventDefault();
+      touchInput();
+      // The first key press only reveals the cursor.
+      if (!game.keyboard) { game.keyboard = true; describeCursor(); return; }
+      const [r, c] = game.cursor;
+      const sel = game.selected;
+      if (sel && sel[0] === r && sel[1] === c) {
+        if (!game.busy) { game.cursor = [Math.max(0, Math.min(N - 1, r + dir[0])), Math.max(0, Math.min(N - 1, c + dir[1]))]; attemptSwap(r, c, r + dir[0], c + dir[1]); }
+      } else game.cursor = [Math.max(0, Math.min(N - 1, r + dir[0])), Math.max(0, Math.min(N - 1, c + dir[1]))];
+      describeCursor();
+    } else if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      touchInput();
+      game.keyboard = true;
+      if (!game.busy) tapCell(...game.cursor);
+    }
+  });
+  canvas.addEventListener('blur', () => { game.keyboard = false; });
+
+  $('play').addEventListener('click', startPlay);
+  $('restart').addEventListener('click', () => loadLevel(game.number));
+  $('open-levels').addEventListener('click', openLevels);
+  $('intro-levels').addEventListener('click', openLevels);
+  $('win-levels').addEventListener('click', openLevels);
+  $('lose-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; if (game.state === 'intro') { els.intro.hidden = false; $('play').focus({ preventScroll: true }); } else if (game.state === 'won') els.win.hidden = false; else if (game.state === 'lost') els.lose.hidden = false; else canvas.focus({ preventScroll: true }); });
+  els.next.addEventListener('click', () => loadLevel(game.number + 1));
+  $('replay').addEventListener('click', () => loadLevel(game.number));
+  $('retry').addEventListener('click', () => loadLevel(game.number));
+
+  new ResizeObserver(resize).observe($('stage'));
+  loadLevel(Math.min(progress.unlocked, LEVELS.length));
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

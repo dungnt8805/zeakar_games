@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Color Connect</title>
+<style>
+:root {
+  --bg: #12152b;
+  --bg-2: #232a52;
+  --board: #191e3a;
+  --grid: #2c3463;
+  --text: #f3f4ff;
+  --muted: #a3a9d1;
+  --accent: #ffd23f;
+  --accent-dark: #d4a915;
+  --paper: #fbfaff;
+  --ink: #1c2147;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at top, var(--bg-2), transparent 70%), radial-gradient(#ffffff0d 1.5px, transparent 2px);
+  background-size: 100% 100%, 26px 26px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { font-size: clamp(22px, 6.6vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 .c1 { color: #ff4f6d; } h1 .c2 { color: #3fa4ff; } h1 .c3 { color: #39d98a; } h1 .c4 { color: #ffd23f; }
+.chip { padding: 4px 10px; border-radius: 99px; background: #ffffff18; color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.spacer { flex: 1; }
+.new { flex-shrink: 0; padding: 9px 13px; border-radius: 12px; background: var(--accent); color: #2b2205; font-size: 14px; font-weight: 800; box-shadow: 0 3px 0 var(--accent-dark); }
+.new:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+
+.hud { display: flex; gap: 8px; }
+.stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 14px; background: #00000038; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { position: relative; overflow: hidden; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); border-radius: 16px; background: var(--board); box-shadow: 0 0 0 3px #2a3166, 0 18px 40px #0008; touch-action: none; }
+.board:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; }
+.board svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gridline { stroke: var(--grid); stroke-width: .03; }
+.fillcell { opacity: .2; transition: opacity .2s; }
+.pipe { fill: none; stroke-width: .34; stroke-linecap: round; stroke-linejoin: round; }
+.dot { transform-box: fill-box; transform-origin: center; }
+.dot.pulse { animation: pulse .45s ease-out; }
+@keyframes pulse { 40% { transform: scale(1.3); } }
+.ring { fill: none; stroke-width: .07; opacity: .9; }
+.cursor { fill: none; stroke: var(--accent); stroke-width: .07; rx: .12; }
+.board:not(.kb) .cursor { display: none; }
+.board.won .pipe { animation: glow 1s ease-in-out; }
+@keyframes glow { 50% { stroke-width: .5; } }
+.hinted { animation: flash 1s ease-in-out; }
+@keyframes flash { 30%, 70% { opacity: .35; } }
+.toast { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 8px 14px; border-radius: 99px; background: #000000b0; color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .25s; }
+.toast.show { opacity: 1; }
+
+.controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ctl { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 6px; border-radius: 14px; background: #ffffff14; font-size: 14px; font-weight: 800; white-space: nowrap; }
+.ctl .ico { font-size: 17px; }
+.ctl:disabled { opacity: .4; cursor: default; }
+.ctl.hint { background: #ffd23f26; color: var(--accent); }
+.tip { text-align: center; font-size: 12px; line-height: 1.35; color: var(--muted); }
+@media (max-height: 700px) { .tip { display: none; } }
+
+.overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #0a0c1ca6; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: 100%; overflow: auto; background: var(--paper); color: var(--ink); border-radius: 26px; padding: 22px 18px; text-align: center; box-shadow: 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel .emoji { font-size: 42px; line-height: 1.2; }
+.panel p { margin-top: 6px; color: #6a6f94; font-size: 15px; line-height: 1.4; }
+.panel .result { color: var(--ink); font-size: 18px; font-weight: 800; }
+.tabs { margin-top: 14px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: #eceefa; }
+.tabs button { padding: 8px 2px; border-radius: 12px; font-weight: 900; font-size: 14px; color: #6a6f94; font-variant-numeric: tabular-nums; }
+.tabs button small { display: block; font-size: 10px; font-weight: 700; }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.levels { margin-top: 12px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.lv { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #f0f1fb; box-shadow: 0 3px 0 #d9dcf0; font-size: 17px; font-weight: 900; color: var(--ink); }
+.lv small { font-size: 10px; color: #e0a800; letter-spacing: 1px; }
+.lv.done { background: #fff5d1; box-shadow: 0 3px 0 #ecd58a; }
+.lv.current { outline: 3px solid #3fa4ff; outline-offset: 1px; }
+.lv:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: #f2a93b; color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 16px; background: #3fa4ff; color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 #2378c9; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 #2378c9; }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 2px solid #e1e3f3; font-weight: 800; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1><span class="c1">Co</span><span class="c2">lor</span> <span class="c3">Con</span><span class="c4">nect</span></h1>
+    <span class="chip" id="chip"></span>
+    <span class="spacer"></span>
+    <button type="button" class="new" id="open-levels" data-i18n="levels"></button>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="pairs"></small><strong id="pairs">0/0</strong></div>
+    <div class="stat"><small data-i18n="filled"></small><strong id="filled">0%</strong></div>
+  </div>
+  <div class="board-wrap">
+    <div class="board" id="board" tabindex="0" role="application" data-i18n-label="board" aria-describedby="tip">
+      <svg id="svg" aria-hidden="true"></svg>
+      <div class="toast" id="toast" aria-hidden="true"></div>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" class="ctl hint" id="hint"><span class="ico" aria-hidden="true">💡</span><span data-i18n="hint"></span></button>
+    <button type="button" class="ctl" id="undo"><span class="ico" aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" class="ctl" id="restart"><span class="ico" aria-hidden="true">↻</span><span data-i18n="restart"></span></button>
+  </div>
+  <p class="tip" id="tip" data-i18n="tip"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="menu" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <h2 id="menu-title">Color Connect</h2>
+    <p data-i18n="tagline"></p>
+    <div class="tabs" id="tabs" role="group" data-i18n-label="sizeLabel"></div>
+    <div class="levels" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-menu" data-i18n="close"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">✨</p>
+    <h2 id="win-title"></h2>
+    <p class="result" id="result"></p>
+    <p class="badge" id="perfect" data-i18n="perfect" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="to-levels" data-i18n="levels"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Join each pair of matching dots and fill every square — paths can’t cross.', levels: 'Levels', moves: 'Moves', pairs: 'Pairs', filled: 'Filled', board: 'Game board', hint: 'Hint', undo: 'Undo', restart: 'Restart', tip: 'Drag from a dot to draw. Arrow keys move, Space picks up or drops a path.', sizeLabel: 'Board size', close: 'Close', level: n => `Level ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: 'locked', done: 'cleared', won: n => `Level ${n} clear!`, result: (m, h) => `${m} moves${h ? ` · ${h} hint${h > 1 ? 's' : ''}` : ''}`, perfect: 'Perfect!', next: 'Next level', fillAll: 'Now fill every square!', connected: c => `${c} connected.`, started: (size, n, k) => `${size} by ${size}, level ${n}: ${k} pairs.`, cell: (r, c, s) => `Row ${r}, column ${c}: ${s}`, empty: 'empty', dot: c => `${c} dot`, pipe: c => `${c} path`, holding: c => `Drawing ${c}.`, dropped: 'Path placed.', hinted: c => `Hint: ${c} path shown.`, colors: ['red', 'blue', 'green', 'yellow', 'orange', 'cyan', 'pink', 'purple', 'white'] },
+    vi: { tagline: 'Nối từng cặp chấm cùng màu và lấp kín mọi ô — các đường không được cắt nhau.', levels: 'Chọn màn', moves: 'Lượt', pairs: 'Cặp', filled: 'Đã lấp', board: 'Bàn chơi', hint: 'Gợi ý', undo: 'Hoàn tác', restart: 'Chơi lại', tip: 'Kéo từ một chấm để vẽ. Phím mũi tên để di chuyển, Space để cầm hoặc thả đường.', sizeLabel: 'Kích thước bàn', close: 'Đóng', level: n => `Màn ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: 'chưa mở', done: 'đã qua', won: n => `Qua màn ${n}!`, result: (m, h) => `${m} lượt${h ? ` · ${h} gợi ý` : ''}`, perfect: 'Hoàn hảo!', next: 'Màn tiếp theo', fillAll: 'Giờ hãy lấp kín mọi ô!', connected: c => `Đã nối màu ${c}.`, started: (size, n, k) => `Bàn ${size}×${size}, màn ${n}: ${k} cặp.`, cell: (r, c, s) => `Hàng ${r}, cột ${c}: ${s}`, empty: 'trống', dot: c => `chấm ${c}`, pipe: c => `đường ${c}`, holding: c => `Đang vẽ màu ${c}.`, dropped: 'Đã đặt đường.', hinted: c => `Gợi ý: đã hiện đường màu ${c}.`, colors: ['đỏ', 'xanh dương', 'xanh lá', 'vàng', 'cam', 'xanh ngọc', 'hồng', 'tím', 'trắng'] },
+    zh: { tagline: '把相同颜色的圆点两两连起来，并铺满所有格子——线路不能交叉。', levels: '关卡', moves: '步数', pairs: '配对', filled: '填满', board: '游戏棋盘', hint: '提示', undo: '撤销', restart: '重来', tip: '从圆点开始拖动画线。方向键移动，空格键拿起或放下线路。', sizeLabel: '棋盘大小', close: '关闭', level: n => `第 ${n} 关`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: '未解锁', done: '已通过', won: n => `第 ${n} 关通过！`, result: (m, h) => `${m} 步${h ? ` · 提示 ${h} 次` : ''}`, perfect: '完美！', next: '下一关', fillAll: '接下来把所有格子都填满！', connected: c => `${c}已连通。`, started: (size, n, k) => `${size}×${size}，第 ${n} 关：${k} 对。`, cell: (r, c, s) => `第 ${r} 行第 ${c} 列：${s}`, empty: '空', dot: c => `${c}圆点`, pipe: c => `${c}线路`, holding: c => `正在画${c}。`, dropped: '已放下线路。', hinted: c => `提示：已显示${c}线路。`, colors: ['红色', '蓝色', '绿色', '黄色', '橙色', '青色', '粉色', '紫色', '白色'] },
+    fr: { tagline: 'Reliez chaque paire de points de même couleur et remplissez toutes les cases, sans croiser les tracés.', levels: 'Niveaux', moves: 'Coups', pairs: 'Paires', filled: 'Rempli', board: 'Plateau de jeu', hint: 'Indice', undo: 'Annuler', restart: 'Recommencer', tip: 'Glissez depuis un point pour tracer. Flèches pour bouger, Espace pour prendre ou poser un tracé.', sizeLabel: 'Taille du plateau', close: 'Fermer', level: n => `Niveau ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: 'verrouillé', done: 'réussi', won: n => `Niveau ${n} réussi !`, result: (m, h) => `${m} coups${h ? ` · ${h} indice${h > 1 ? 's' : ''}` : ''}`, perfect: 'Parfait !', next: 'Niveau suivant', fillAll: 'Maintenant, remplissez toutes les cases !', connected: c => `${c} relié.`, started: (size, n, k) => `${size}×${size}, niveau ${n} : ${k} paires.`, cell: (r, c, s) => `Ligne ${r}, colonne ${c} : ${s}`, empty: 'vide', dot: c => `point ${c}`, pipe: c => `tracé ${c}`, holding: c => `Tracé ${c} en cours.`, dropped: 'Tracé posé.', hinted: c => `Indice : tracé ${c} affiché.`, colors: ['rouge', 'bleu', 'vert', 'jaune', 'orange', 'cyan', 'rose', 'violet', 'blanc'] },
+    th: { tagline: 'ลากเส้นเชื่อมจุดสีเดียวกันให้ครบทุกคู่และเติมให้เต็มทุกช่อง โดยเส้นห้ามตัดกัน', levels: 'เลือกด่าน', moves: 'ครั้ง', pairs: 'คู่', filled: 'เติมแล้ว', board: 'กระดานเกม', hint: 'คำใบ้', undo: 'ย้อนกลับ', restart: 'เริ่มใหม่', tip: 'ลากจากจุดเพื่อวาดเส้น ใช้ปุ่มลูกศรเพื่อเลื่อน กด Space เพื่อหยิบหรือวางเส้น', sizeLabel: 'ขนาดกระดาน', close: 'ปิด', level: n => `ด่าน ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: 'ยังไม่ปลดล็อก', done: 'ผ่านแล้ว', won: n => `ผ่านด่าน ${n}!`, result: (m, h) => `${m} ครั้ง${h ? ` · ใช้คำใบ้ ${h} ครั้ง` : ''}`, perfect: 'สมบูรณ์แบบ!', next: 'ด่านถัดไป', fillAll: 'เติมให้เต็มทุกช่องด้วยนะ!', connected: c => `เชื่อมสี${c}แล้ว`, started: (size, n, k) => `กระดาน ${size}×${size} ด่าน ${n}: ${k} คู่`, cell: (r, c, s) => `แถว ${r} คอลัมน์ ${c}: ${s}`, empty: 'ว่าง', dot: c => `จุดสี${c}`, pipe: c => `เส้นสี${c}`, holding: c => `กำลังวาดเส้นสี${c}`, dropped: 'วางเส้นแล้ว', hinted: c => `คำใบ้: แสดงเส้นสี${c}แล้ว`, colors: ['แดง', 'น้ำเงิน', 'เขียว', 'เหลือง', 'ส้ม', 'ฟ้า', 'ชมพู', 'ม่วง', 'ขาว'] },
+    ja: { tagline: '同じ色の点をすべてつなぎ、マスを全部うめよう。線は交差できません。', levels: 'レベル', moves: '手数', pairs: 'ペア', filled: '塗り', board: 'ゲーム盤', hint: 'ヒント', undo: '戻す', restart: 'やり直す', tip: '点からドラッグして線を引こう。矢印キーで移動、スペースで線をつかむ・置く。', sizeLabel: '盤のサイズ', close: '閉じる', level: n => `レベル ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: 'ロック中', done: 'クリア済み', won: n => `レベル ${n} クリア！`, result: (m, h) => `${m}手${h ? ` · ヒント ${h}回` : ''}`, perfect: 'パーフェクト！', next: '次のレベル', fillAll: 'あとはマスを全部うめよう！', connected: c => `${c}がつながりました。`, started: (size, n, k) => `${size}×${size}、レベル ${n}：${k}ペア。`, cell: (r, c, s) => `${r}行${c}列：${s}`, empty: '空き', dot: c => `${c}の点`, pipe: c => `${c}の線`, holding: c => `${c}の線を引いています。`, dropped: '線を置きました。', hinted: c => `ヒント：${c}の線を表示しました。`, colors: ['赤', '青', '緑', '黄色', 'オレンジ', '水色', 'ピンク', '紫', '白'] },
+    ko: { tagline: '같은 색 점끼리 모두 잇고 모든 칸을 채우세요. 선은 서로 겹칠 수 없어요.', levels: '레벨', moves: '이동', pairs: '짝', filled: '채움', board: '게임 판', hint: '힌트', undo: '되돌리기', restart: '다시 하기', tip: '점에서 드래그해 선을 그리세요. 방향키로 이동하고 스페이스로 선을 잡거나 놓아요.', sizeLabel: '판 크기', close: '닫기', level: n => `레벨 ${n}`, levelOf: (size, n) => `${size}×${size} · ${n}`, locked: '잠김', done: '클리어', won: n => `레벨 ${n} 클리어!`, result: (m, h) => `${m}번 이동${h ? ` · 힌트 ${h}번` : ''}`, perfect: '퍼펙트!', next: '다음 레벨', fillAll: '이제 모든 칸을 채우세요!', connected: c => `${c} 연결 완료.`, started: (size, n, k) => `${size}×${size}, 레벨 ${n}: ${k}쌍.`, cell: (r, c, s) => `${r}행 ${c}열: ${s}`, empty: '빈칸', dot: c => `${c} 점`, pipe: c => `${c} 선`, holding: c => `${c} 선을 그리는 중.`, dropped: '선을 놓았어요.', hinted: c => `힌트: ${c} 선을 보여 줬어요.`, colors: ['빨강', '파랑', '초록', '노랑', '주황', '하늘색', '분홍', '보라', '흰색'] },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const COLORS = ['#ff4f6d', '#3fa4ff', '#39d98a', '#ffd23f', '#ff8f3a', '#3ce0e6', '#ff6fd0', '#a46bff', '#eef0ff'];
+  const SIZES = [5, 6, 7, 8, 9];
+  const LEVELS_PER_SIZE = 15;
+  const STORE = 'milaan.colorConnect.progress';
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), svg: $('svg'), toast: $('toast'), chip: $('chip'), moves: $('moves'), pairs: $('pairs'), filled: $('filled'), undo: $('undo'), hint: $('hint'), announcer: $('announcer'), menu: $('menu'), tabs: $('tabs'), levelGrid: $('level-grid'), win: $('win'), winTitle: $('win-title'), result: $('result'), perfect: $('perfect'), next: $('next') };
+
+  const readProgress = () => { try { return { best: {}, last: [5, 0], ...JSON.parse(localStorage.getItem(STORE)) }; } catch { return { best: {}, last: [5, 0] }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORE, JSON.stringify(progress)); } catch {} };
+  let progress = readProgress();
+
+  // ---- Level generation -----------------------------------------------------
+  function seeded(seed) {
+    return () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // Random Hamiltonian path via "backbite" moves, starting from a snake through the rows.
+  function randomPath(n, rnd) {
+    let path = [];
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) path.push(r * n + (r % 2 ? n - 1 - k : k));
+    const pos = new Int32Array(n * n);
+    const index = () => path.forEach((cell, i) => { pos[cell] = i; });
+    index();
+    for (let step = 0; step < n * n * 40; step++) {
+      if (rnd() < .5) { path.reverse(); index(); }
+      const end = path[path.length - 1];
+      const nbs = neighbours(end, n);
+      const nb = nbs[Math.floor(rnd() * nbs.length)];
+      const j = pos[nb];
+      if (j === path.length - 2) continue;
+      // Joining the end to nb and reversing the tail after nb keeps it a single path.
+      const tail = path.slice(j + 1).reverse();
+      path = path.slice(0, j + 1).concat(tail);
+      for (let i = j + 1; i < path.length; i++) pos[path[i]] = i;
+    }
+    return path;
+  }
+
+  function neighbours(cell, n) {
+    const r = Math.floor(cell / n), c = cell % n, out = [];
+    if (r > 0) out.push(cell - n);
+    if (r < n - 1) out.push(cell + n);
+    if (c > 0) out.push(cell - 1);
+    if (c < n - 1) out.push(cell + 1);
+    return out;
+  }
+
+  const adjacent = (a, b, n) => (Math.abs(a - b) === n) || (Math.abs(a - b) === 1 && Math.floor(a / n) === Math.floor(b / n));
+
+  function generate(n, index) {
+    const rnd = seeded(n * 7919 + index * 104729 + 17);
+    const pairs = Math.min(9, n - 1 + (rnd() < .5 ? 0 : 1));
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const path = randomPath(n, rnd);
+      const lengths = Array(pairs).fill(3);
+      for (let left = n * n - 3 * pairs; left > 0; left--) lengths[Math.floor(rnd() * pairs)]++;
+      const segments = [];
+      let at = 0;
+      for (const len of lengths) { segments.push(path.slice(at, at + len)); at += len; }
+      // Reject boards where a pair's dots touch, or where a segment folds straight back on itself.
+      if (segments.some(s => adjacent(s[0], s[s.length - 1], n))) continue;
+      return segments;
+    }
+    return null;
+  }
+
+  // ---- Game state ------------------------------------------------------------
+  let game = null;
+  let menuSize = 5;
+
+  function startLevel(size, index) {
+    const solution = generate(size, index);
+    const n = size;
+    const dots = new Map();
+    solution.forEach((seg, color) => { dots.set(seg[0], color); dots.set(seg[seg.length - 1], color); });
+    game = { n, index, solution, dots, paths: solution.map(() => []), moves: 0, lastColor: -1, hints: 0, done: false, history: [], drawing: null, cursor: solution[0][0] };
+    progress.last = [n, index];
+    saveProgress();
+    buildGrid();
+    render();
+    els.chip.textContent = t.levelOf(n, index + 1);
+    els.menu.hidden = true;
+    els.win.hidden = true;
+    els.board.classList.remove('won');
+    els.announcer.textContent = t.started(n, index + 1, solution.length);
+  }
+
+  const endpoints = color => game.solution[color].length && [game.solution[color][0], game.solution[color][game.solution[color].length - 1]];
+  const isConnected = (color, paths = game.paths) => { const p = paths[color]; if (p.length < 2) return false; const [a, b] = endpoints(color); return (p[0] === a && p[p.length - 1] === b) || (p[0] === b && p[p.length - 1] === a); };
+
+  function ownerMap(paths = game.paths) {
+    const owner = new Int8Array(game.n * game.n).fill(-1);
+    paths.forEach((p, color) => { if (p.length > 1) for (const cell of p) owner[cell] = color; });
+    for (const [cell, color] of game.dots) if (owner[cell] < 0) owner[cell] = color;
+    return owner;
+  }
+
+  // ---- Rendering -------------------------------------------------------------
+  function el(tag, attrs) { const node = document.createElementNS(NS, tag); for (const k in attrs) node.setAttribute(k, attrs[k]); return node; }
+
+  function buildGrid() {
+    const { n } = game;
+    els.svg.setAttribute('viewBox', `0 0 ${n} ${n}`);
+    els.svg.replaceChildren();
+    const lines = el('g', {});
+    for (let k = 1; k < n; k++) {
+      lines.append(el('line', { class: 'gridline', x1: k, y1: 0, x2: k, y2: n }));
+      lines.append(el('line', { class: 'gridline', x1: 0, y1: k, x2: n, y2: k }));
+    }
+    game.layers = { fills: el('g', {}), pipes: el('g', {}), dots: el('g', {}), cursor: el('rect', { class: 'cursor', width: .9, height: .9 }) };
+    els.svg.append(game.layers.fills, lines, game.layers.pipes, game.layers.dots, game.layers.cursor);
+  }
+
+  const xy = (cell, n) => [(cell % n) + .5, Math.floor(cell / n) + .5];
+
+  function render() {
+    const { n, paths, layers } = game;
+    layers.fills.replaceChildren();
+    layers.pipes.replaceChildren();
+    layers.dots.replaceChildren();
+    paths.forEach((p, color) => {
+      if (p.length < 2) return;
+      for (const cell of p) {
+        const [x, y] = xy(cell, n);
+        layers.fills.append(el('rect', { class: 'fillcell', x: x - .5, y: y - .5, width: 1, height: 1, fill: COLORS[color] }));
+      }
+      layers.pipes.append(el('polyline', { class: 'pipe', stroke: COLORS[color], points: p.map(cell => xy(cell, n).join(',')).join(' '), 'data-color': color }));
+    });
+    for (const [cell, color] of game.dots) {
+      const [x, y] = xy(cell, n);
+      const dot = el('circle', { class: 'dot', cx: x, cy: y, r: .34, fill: COLORS[color], 'data-cell': cell });
+      layers.dots.append(dot);
+      if (isConnected(color)) layers.dots.append(el('circle', { class: 'ring', cx: x, cy: y, r: .43, stroke: COLORS[color] }));
+    }
+    const [cx, cy] = xy(game.cursor, n);
+    layers.cursor.setAttribute('x', cx - .45);
+    layers.cursor.setAttribute('y', cy - .45);
+    updateHud();
+  }
+
+  function updateHud() {
+    const { n } = game;
+    const owner = ownerMap();
+    const covered = game.paths.reduce((sum, p) => sum + (p.length > 1 ? p.length : 0), 0);
+    const connected = game.solution.filter((_, c) => isConnected(c)).length;
+    els.moves.textContent = String(game.moves);
+    els.pairs.textContent = `${connected}/${game.solution.length}`;
+    els.filled.textContent = `${Math.floor((covered / (n * n)) * 100)}%`;
+    els.undo.disabled = !game.history.length || game.done;
+    els.hint.disabled = game.done || game.solution.every((seg, c) => sameCells(game.paths[c], seg));
+    const cell = game.cursor, color = owner[cell];
+    const state = game.dots.has(cell) ? t.dot(t.colors[color]) : color >= 0 ? t.pipe(t.colors[color]) : t.empty;
+    els.board.setAttribute('aria-label', `${t.board}. ${t.cell(Math.floor(cell / n) + 1, (cell % n) + 1, state)}`);
+  }
+
+  const sameCells = (a, b) => a.length === b.length && (a.every((v, i) => v === b[i]) || a.every((v, i) => v === b[b.length - 1 - i]));
+
+  function pulse(color) {
+    for (const dot of game.layers.dots.querySelectorAll('.dot')) if (game.dots.get(+dot.dataset.cell) === color) dot.classList.add('pulse');
+  }
+
+  let toastTimer = 0;
+  function toast(text) {
+    els.toast.textContent = text;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1600);
+  }
+
+  // ---- Drawing ---------------------------------------------------------------
+  function begin(cell) {
+    const owner = ownerMap();
+    const color = owner[cell];
+    if (color < 0) return false;
+    const snapshot = game.paths.map(p => p.slice());
+    let path;
+    if (game.dots.get(cell) === color) path = [cell];
+    else path = snapshot[color].slice(0, snapshot[color].indexOf(cell) + 1);
+    game.drawing = { color, snapshot, path, connected: isConnected(color, snapshot) && path.length === snapshot[color].length };
+    apply();
+    return true;
+  }
+
+  // Other paths are cut where the drawn path crosses them, and restored if it backs off again.
+  function apply() {
+    const { color, snapshot, path } = game.drawing;
+    const taken = new Set(path);
+    game.paths = snapshot.map((p, c) => {
+      if (c === color) return path.slice();
+      const cut = p.findIndex(cell => taken.has(cell));
+      return cut < 0 ? p.slice() : p.slice(0, cut);
+    });
+  }
+
+  function stepTo(cell) {
+    const d = game.drawing, { n } = game;
+    const head = d.path[d.path.length - 1];
+    if (!adjacent(head, cell, n)) return false;
+    const back = d.path.indexOf(cell);
+    if (back >= 0) { d.path.length = back + 1; apply(); return true; }
+    if (d.path.length > 1 && game.dots.get(head) === d.color) return false;
+    const dot = game.dots.get(cell);
+    if (dot !== undefined && dot !== d.color) return false;
+    d.path.push(cell);
+    apply();
+    return true;
+  }
+
+  function dragTo(cell) {
+    const d = game.drawing, { n } = game;
+    if (!d) return;
+    let guard = 0;
+    // Walk one square at a time so fast swipes still draw a continuous line.
+    while (guard++ < 2 * n) {
+      const head = d.path[d.path.length - 1];
+      if (head === cell) break;
+      const hr = Math.floor(head / n), hc = head % n, tr = Math.floor(cell / n), tc = cell % n;
+      const next = Math.abs(tc - hc) >= Math.abs(tr - hr) ? head + Math.sign(tc - hc) : head + Math.sign(tr - hr) * n;
+      if (!stepTo(next)) {
+        const alt = Math.abs(tc - hc) >= Math.abs(tr - hr) ? (tr !== hr ? head + Math.sign(tr - hr) * n : -1) : (tc !== hc ? head + Math.sign(tc - hc) : -1);
+        if (alt < 0 || !stepTo(alt)) break;
+      }
+    }
+    render();
+    const connected = isConnected(d.color);
+    if (connected && !d.connected) pulse(d.color);
+    d.connected = connected;
+  }
+
+  function finish() {
+    const d = game.drawing;
+    if (!d) return;
+    game.drawing = null;
+    const changed = d.snapshot.some((p, c) => p.length !== game.paths[c].length || p.some((v, i) => v !== game.paths[c][i]));
+    if (!changed) { render(); return; }
+    game.history.push(d.snapshot);
+    if (d.color !== game.lastColor) { game.moves++; game.lastColor = d.color; }
+    render();
+    if (isConnected(d.color)) els.announcer.textContent = t.connected(t.colors[d.color]);
+    checkWin();
+  }
+
+  function checkWin() {
+    const { n } = game;
+    const allConnected = game.solution.every((_, c) => isConnected(c));
+    if (!allConnected) return;
+    const covered = game.paths.reduce((sum, p) => sum + p.length, 0);
+    if (covered < n * n) { toast(t.fillAll); els.announcer.textContent = t.fillAll; return; }
+    win();
+  }
+
+  function win() {
+    game.done = true;
+    const key = `${game.n}-${game.index}`;
+    const prev = progress.best[key];
+    if (!prev || game.moves < prev) progress.best[key] = game.moves;
+    saveProgress();
+    els.board.classList.add('won');
+    updateHud();
+    const perfect = game.moves <= game.solution.length && !game.hints;
+    els.winTitle.textContent = t.won(game.index + 1);
+    els.result.textContent = t.result(game.moves, game.hints);
+    els.perfect.hidden = !perfect;
+    els.next.hidden = game.index + 1 >= LEVELS_PER_SIZE && game.n === SIZES[SIZES.length - 1];
+    els.announcer.textContent = `${els.winTitle.textContent} ${els.result.textContent}${perfect ? ` ${t.perfect}` : ''}`;
+    setTimeout(() => { els.win.hidden = false; (els.next.hidden ? $('to-levels') : els.next).focus({ preventScroll: true }); }, 900);
+  }
+
+  function undo() {
+    if (!game.history.length || game.done) return;
+    game.paths = game.history.pop();
+    render();
+  }
+
+  function restart() {
+    if (game.done) return;
+    if (game.paths.some(p => p.length)) game.history.push(game.paths.map(p => p.slice()));
+    game.paths = game.solution.map(() => []);
+    render();
+  }
+
+  function hint() {
+    if (game.done) return;
+    const wrong = c => !sameCells(game.paths[c], game.solution[c]);
+    let color = game.solution.findIndex((_, c) => wrong(c) && !isConnected(c));
+    if (color < 0) color = game.solution.findIndex((_, c) => wrong(c));
+    if (color < 0) return;
+    game.history.push(game.paths.map(p => p.slice()));
+    game.drawing = { color, snapshot: game.paths.map(p => p.slice()), path: game.solution[color].slice() };
+    apply();
+    game.drawing = null;
+    game.hints++;
+    render();
+    game.layers.pipes.querySelector(`[data-color="${color}"]`)?.classList.add('hinted');
+    pulse(color);
+    els.announcer.textContent = t.hinted(t.colors[color]);
+    checkWin();
+  }
+
+  // ---- Pointer input -----------------------------------------------------------
+  const canPlay = () => game && !game.done && els.menu.hidden && els.win.hidden;
+  let pointer = null;
+
+  function cellAt(event) {
+    const rect = els.svg.getBoundingClientRect();
+    const { n } = game;
+    const c = Math.floor(((event.clientX - rect.left) / rect.width) * n), r = Math.floor(((event.clientY - rect.top) / rect.height) * n);
+    return r < 0 || r >= n || c < 0 || c >= n ? -1 : r * n + c;
+  }
+
+  els.board.addEventListener('pointerdown', event => {
+    if (!canPlay() || pointer !== null) return;
+    const cell = cellAt(event);
+    if (cell < 0) return;
+    els.board.classList.remove('kb');
+    game.cursor = cell;
+    if (!begin(cell)) { render(); return; }
+    event.preventDefault();
+    pointer = event.pointerId;
+    try { els.board.setPointerCapture(event.pointerId); } catch {}
+    render();
+  });
+  els.board.addEventListener('pointermove', event => {
+    if (pointer !== event.pointerId || !game.drawing) return;
+    const cell = cellAt(event);
+    if (cell >= 0) dragTo(cell);
+  });
+  const release = event => { if (pointer !== event.pointerId) return; pointer = null; finish(); };
+  els.board.addEventListener('pointerup', release);
+  els.board.addEventListener('pointercancel', release);
+
+  // ---- Keyboard: arrows move a cursor; Space/Enter picks up or drops a path ----
+  els.board.addEventListener('keydown', event => {
+    if (!canPlay() || event.altKey || event.ctrlKey || event.metaKey) return;
+    const { n } = game;
+    const dir = { ArrowUp: -n, ArrowDown: n, ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    els.board.classList.add('kb');
+    if (dir) {
+      event.preventDefault();
+      const target = game.cursor + dir;
+      if (!adjacent(game.cursor, target, n) || target < 0 || target >= n * n) return;
+      if (game.drawing) {
+        dragTo(target);
+        game.cursor = game.drawing.path[game.drawing.path.length - 1];
+        // Reaching the partner dot drops the path automatically.
+        if (isConnected(game.drawing.color)) finish();
+      } else game.cursor = target;
+      render();
+      return;
+    }
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    if (game.drawing) { finish(); els.announcer.textContent = t.dropped; return; }
+    if (begin(game.cursor)) { render(); els.announcer.textContent = t.holding(t.colors[game.drawing.color]); }
+  });
+  els.board.addEventListener('blur', () => { if (game?.drawing && pointer === null) finish(); });
+
+  // ---- Menu ------------------------------------------------------------------
+  const unlocked = (n, index) => index === 0 || progress.best[`${n}-${index - 1}`] !== undefined || progress.best[`${n}-${index}`] !== undefined;
+
+  function openMenu(size = game?.n ?? 5) {
+    menuSize = size;
+    els.tabs.replaceChildren(...SIZES.map(n => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const done = Array.from({ length: LEVELS_PER_SIZE }, (_, i) => progress.best[`${n}-${i}`] !== undefined).filter(Boolean).length;
+      b.innerHTML = `${n}×${n}<small>${done}/${LEVELS_PER_SIZE}</small>`;
+      b.setAttribute('aria-pressed', String(n === size));
+      b.addEventListener('click', () => openMenu(n));
+      return b;
+    }));
+    els.levelGrid.replaceChildren(...Array.from({ length: LEVELS_PER_SIZE }, (_, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const best = progress.best[`${size}-${i}`];
+      const open = unlocked(size, i);
+      b.className = `lv${best !== undefined ? ' done' : ''}${game && game.n === size && game.index === i ? ' current' : ''}`;
+      b.disabled = !open;
+      b.innerHTML = `<span>${open ? i + 1 : '🔒'}</span><small>${best !== undefined ? '★' : ''}</small>`;
+      b.setAttribute('aria-label', `${t.level(i + 1)}, ${!open ? t.locked : best !== undefined ? t.done : ''}`.replace(/, $/, ''));
+      b.addEventListener('click', () => { startLevel(size, i); els.board.focus({ preventScroll: true }); });
+      return b;
+    }));
+    els.win.hidden = true;
+    els.menu.hidden = false;
+    (els.levelGrid.querySelector('.current') || els.levelGrid.querySelector('button:not(:disabled)')).focus({ preventScroll: true });
+  }
+
+  function nextLevel() {
+    const { n, index } = game;
+    if (index + 1 < LEVELS_PER_SIZE) startLevel(n, index + 1);
+    else startLevel(SIZES[Math.min(SIZES.length - 1, SIZES.indexOf(n) + 1)], 0);
+    els.board.focus({ preventScroll: true });
+  }
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', hint);
+  $('restart').addEventListener('click', restart);
+  $('open-levels').addEventListener('click', () => openMenu());
+  $('to-levels').addEventListener('click', () => openMenu());
+  $('close-menu').addEventListener('click', () => { els.menu.hidden = true; if (game.done) nextLevel(); else els.board.focus({ preventScroll: true }); });
+  els.next.addEventListener('click', nextLevel);
+
+  const [lastSize, lastIndex] = progress.last;
+  startLevel(SIZES.includes(lastSize) ? lastSize : 5, Math.min(LEVELS_PER_SIZE - 1, Math.max(0, lastIndex | 0)));
+  openMenu();
+})();
+</script>
+</body>
+</html>

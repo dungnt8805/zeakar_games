@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Four in a Row</title>
+<style>
+:root {
+  --ink: #1f2d55;
+  --muted: #6a7597;
+  --bg: #eaf1ff;
+  --blue: #4a78ef;
+  --blue-dark: #2f57c4;
+  --hole: #dfe8fd;
+  --red: #ff5d6c;
+  --red-dark: #d93a4c;
+  --yellow: #ffc93d;
+  --yellow-dark: #e3a514;
+  --paper: #fbfcff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(#d7e3fd 2px, transparent 2.5px), linear-gradient(#eef3ff, #f3efff);
+  background-size: 26px 26px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--blue-dark); outline-offset: 3px; }
+svg { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(22px, 6.6vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--blue); }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 #cdd9f6; }
+.icon-btn svg { width: 21px; height: 21px; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #cdd9f6; }
+
+.scores { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+.side { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 16px; background: #ffffffc8; box-shadow: 0 3px 0 #d3def8; transition: box-shadow .2s, transform .2s; }
+.side.p1 { flex-direction: row-reverse; text-align: right; }
+.side .dot { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; }
+.side.p0 .dot { background: radial-gradient(circle at 35% 30%, #ff9aa3, var(--red) 60%, var(--red-dark)); }
+.side.p1 .dot { background: radial-gradient(circle at 35% 30%, #ffe9a6, var(--yellow) 60%, var(--yellow-dark)); }
+.side div { min-width: 0; flex: 1; }
+.side small, .draws small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+.side strong, .draws strong { display: block; font-size: 20px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.side.turn.p0 { box-shadow: 0 0 0 3px var(--red), 0 3px 0 #d3def8; }
+.side.turn.p1 { box-shadow: 0 0 0 3px var(--yellow), 0 3px 0 #d3def8; }
+.draws { align-self: center; min-width: 52px; text-align: center; }
+.status { min-height: 1.3em; text-align: center; font-size: 15px; font-weight: 800; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.game { --cell: min(100cqw / 7.3, 100cqh / 7.3); --pad: calc(var(--cell) * .15); position: relative; width: calc(var(--cell) * 7); height: calc(var(--cell) * 7 + var(--pad) * 2); }
+.preview { position: relative; height: var(--cell); }
+.grid { position: relative; height: calc(var(--cell) * 6); margin-top: var(--pad); background: linear-gradient(#e8efff, #d6e2fc); border-radius: calc(var(--cell) * .2); }
+.discs { position: absolute; inset: 0; }
+.disc { position: absolute; width: var(--cell); height: var(--cell); padding: calc(var(--cell) * .09); }
+.disc b { display: block; width: 100%; height: 100%; border-radius: 50%; box-shadow: inset 0 0 0 calc(var(--cell) * .07) #00000014, inset 0 calc(var(--cell) * -.05) calc(var(--cell) * .08) #0000001f; }
+.disc.p0 b { background: radial-gradient(circle at 35% 30%, #ff9aa3, var(--red) 55%, var(--red-dark)); }
+.disc.p1 b { background: radial-gradient(circle at 35% 30%, #ffe9a6, var(--yellow) 55%, var(--yellow-dark)); }
+.ghost { opacity: .5; top: 0; transition: left .12s ease, opacity .15s; }
+.ghost[hidden] { display: block; opacity: 0; }
+.discs.done .disc:not(.win) { opacity: .45; transition: opacity .4s; }
+.disc.win b { animation: glow .7s ease-in-out infinite alternate; }
+@keyframes glow { to { transform: scale(.88); box-shadow: inset 0 0 0 calc(var(--cell) * .09) #fff, 0 0 0 #0000; } }
+.frame { position: absolute; z-index: 2; inset: calc(var(--pad) * -1); display: grid; grid-template: repeat(6, 1fr) / repeat(7, 1fr); border: var(--pad) solid var(--blue); border-radius: calc(var(--cell) * .28); box-shadow: 0 calc(var(--cell) * .12) 0 var(--blue-dark), 0 18px 40px #2f57c440; pointer-events: none; }
+.frame i { background: radial-gradient(circle at 50% 50%, transparent 0 calc(var(--cell) * .385), #2f57c4 calc(var(--cell) * .39) calc(var(--cell) * .415), var(--blue) calc(var(--cell) * .42)); }
+.cols { position: absolute; z-index: 3; inset: 0; display: grid; grid-template-columns: repeat(7, 1fr); touch-action: manipulation; }
+.cols button { height: 100%; border-radius: calc(var(--cell) * .2); }
+.cols button:focus-visible { outline: 3px solid var(--ink); outline-offset: -2px; }
+.cols.locked button { cursor: default; }
+.foot { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.foot strong { color: var(--ink); }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #1f2d5559; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 24px 20px; text-align: center; box-shadow: 0 20px 50px #1f2d5555; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--blue); }
+.logo { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.logo i { width: 22px; height: 22px; border-radius: 50%; background: var(--red); box-shadow: inset 0 -3px 0 #0002; }
+.logo i:nth-child(even) { background: var(--yellow); }
+.text { margin-top: 6px; font-size: 14px; color: var(--muted); line-height: 1.45; }
+.field { margin-top: 14px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #e6edfc; }
+.seg button { flex: 1; min-width: 0; padding: 9px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #c9d6f5; }
+.emoji { font-size: 44px; line-height: 1.2; }
+.result-score { margin-top: 10px; font-size: 17px; font-weight: 800; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--yellow); color: #4a3500; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--blue); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--blue-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--blue-dark); }
+.ghost-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #e6edfc; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #c9d6f5; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 560px) { .app { gap: 6px; } .foot { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1>Four <span>in a Row</span></h1>
+    <button type="button" class="icon-btn" id="settings" data-i18n-label="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="newRound">↻</button>
+  </header>
+  <div class="scores">
+    <div class="side p0" id="side-0"><i class="dot" aria-hidden="true"></i><div><small id="name-0"></small><strong id="score-0">0</strong></div></div>
+    <div class="draws"><small data-i18n="draws"></small><strong id="score-d">0</strong></div>
+    <div class="side p1" id="side-1"><i class="dot" aria-hidden="true"></i><div><small id="name-1"></small><strong id="score-1">0</strong></div></div>
+  </div>
+  <p class="status" id="status"></p>
+  <div class="board-wrap">
+    <div class="game" id="game">
+      <div class="preview" aria-hidden="true"><span class="disc ghost p0" id="ghost" hidden><b></b></span></div>
+      <div class="grid">
+        <div class="discs" id="discs" aria-hidden="true"></div>
+        <div class="frame" id="frame" aria-hidden="true"></div>
+      </div>
+      <div class="cols" id="cols" role="group" data-i18n-label="board"></div>
+    </div>
+  </div>
+  <p class="foot"><span id="streak"></span><br><span data-i18n="hint"></span></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <h2 id="setup-title">Four <span>in a Row</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="cpu" data-i18n="vsCpu"></button><button type="button" data-value="pvp" data-i18n="twoP"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="medium" data-i18n="medium"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <div class="field"><p class="label" id="first-label" data-i18n="first"></p><div class="seg" role="group" aria-labelledby="first-label" data-key="first"><button type="button" data-value="p0" id="first-p0"></button><button type="button" data-value="p1" id="first-p1"></button><button type="button" data-value="alt" data-i18n="alternate"></button></div></div>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <p class="emoji" id="result-emoji" aria-hidden="true"></p>
+    <h2 id="result-title"></h2>
+    <p class="text" id="result-text"></p>
+    <p class="result-score" id="result-score"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next-round" data-i18n="nextRound"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Drop your discs and connect four in a row — across, up and down, or diagonally.', mode: 'Mode', vsCpu: 'vs Computer', twoP: '2 Players', difficulty: 'Difficulty', easy: 'Easy', medium: 'Medium', hard: 'Hard', first: 'First move', you: 'You', cpu: 'Computer', red: 'Red', yellow: 'Yellow', alternate: 'Take turns', start: 'Start', draws: 'Draws', settings: 'Settings', newRound: 'New round', board: 'Game board', yourTurn: 'Your turn', thinking: 'Computer is thinking…', turnOf: name => `${name} to play`, youWin: 'You win!', cpuWins: 'Computer wins', wins: name => `${name} wins!`, draw: 'It’s a draw!', drawText: 'The board is full — nobody connected four.', winText: 'Four in a row!', loseText: 'The computer connected four. Try again?', nextRound: 'Next round', change: 'Change settings', streak: (c, b) => `Hard streak ${c} · Best ${b}`, bestStreak: b => `Best win streak vs Hard: ${b}`, newBest: 'New best streak!', column: n => `Column ${n}`, full: 'full', dropped: (name, n) => `${name}: column ${n}`, hint: 'Tap a column · ← → and Enter · keys 1–7' },
+    vi: { tagline: 'Thả quân và xếp bốn quân thẳng hàng — ngang, dọc hoặc chéo.', mode: 'Chế độ', vsCpu: 'Đấu với máy', twoP: '2 người', difficulty: 'Độ khó', easy: 'Dễ', medium: 'Vừa', hard: 'Khó', first: 'Đi trước', you: 'Bạn', cpu: 'Máy', red: 'Đỏ', yellow: 'Vàng', alternate: 'Luân phiên', start: 'Bắt đầu', draws: 'Hòa', settings: 'Cài đặt', newRound: 'Ván mới', board: 'Bàn cờ', yourTurn: 'Lượt của bạn', thinking: 'Máy đang suy nghĩ…', turnOf: name => `Lượt của ${name}`, youWin: 'Bạn thắng!', cpuWins: 'Máy thắng', wins: name => `${name} thắng!`, draw: 'Hòa!', drawText: 'Bàn cờ đã đầy — không ai xếp được bốn quân.', winText: 'Bốn quân thẳng hàng!', loseText: 'Máy đã xếp được bốn quân. Thử lại nhé?', nextRound: 'Ván tiếp theo', change: 'Đổi cài đặt', streak: (c, b) => `Chuỗi thắng mức Khó ${c} · Kỷ lục ${b}`, bestStreak: b => `Chuỗi thắng dài nhất ở mức Khó: ${b}`, newBest: 'Kỷ lục chuỗi thắng mới!', column: n => `Cột ${n}`, full: 'đã đầy', dropped: (name, n) => `${name}: cột ${n}`, hint: 'Chạm vào cột · ← → và Enter · phím 1–7' },
+    zh: { tagline: '投下棋子，横、竖或斜向连成四子即可获胜。', mode: '模式', vsCpu: '人机对战', twoP: '双人对战', difficulty: '难度', easy: '简单', medium: '中等', hard: '困难', first: '先手', you: '你', cpu: '电脑', red: '红方', yellow: '黄方', alternate: '轮流先手', start: '开始', draws: '平局', settings: '设置', newRound: '新一局', board: '棋盘', yourTurn: '轮到你了', thinking: '电脑思考中…', turnOf: name => `轮到${name}`, youWin: '你赢了！', cpuWins: '电脑获胜', wins: name => `${name}获胜！`, draw: '平局！', drawText: '棋盘已满，双方都没有连成四子。', winText: '四子连珠！', loseText: '电脑连成了四子。再来一局？', nextRound: '下一局', change: '更改设置', streak: (c, b) => `困难连胜 ${c} · 最佳 ${b}`, bestStreak: b => `困难模式最佳连胜：${b}`, newBest: '刷新连胜纪录！', column: n => `第 ${n} 列`, full: '已满', dropped: (name, n) => `${name}：第 ${n} 列`, hint: '点击列 · ← → 和 Enter · 数字键 1–7' },
+    fr: { tagline: 'Lâchez vos jetons et alignez-en quatre : à l’horizontale, à la verticale ou en diagonale.', mode: 'Mode', vsCpu: 'Contre l’ordi', twoP: '2 joueurs', difficulty: 'Difficulté', easy: 'Facile', medium: 'Moyen', hard: 'Difficile', first: 'Qui commence', you: 'Vous', cpu: 'Ordinateur', red: 'Rouge', yellow: 'Jaune', alternate: 'Chacun son tour', start: 'Commencer', draws: 'Nuls', settings: 'Réglages', newRound: 'Nouvelle manche', board: 'Plateau de jeu', yourTurn: 'À vous de jouer', thinking: 'L’ordinateur réfléchit…', turnOf: name => `Au tour de ${name}`, youWin: 'Vous gagnez !', cpuWins: 'L’ordinateur gagne', wins: name => `${name} gagne !`, draw: 'Match nul !', drawText: 'La grille est pleine : personne n’a aligné quatre jetons.', winText: 'Quatre à la suite !', loseText: 'L’ordinateur a aligné quatre jetons. On réessaie ?', nextRound: 'Manche suivante', change: 'Modifier les réglages', streak: (c, b) => `Série en Difficile ${c} · Record ${b}`, bestStreak: b => `Meilleure série en Difficile : ${b}`, newBest: 'Nouvelle meilleure série !', column: n => `Colonne ${n}`, full: 'pleine', dropped: (name, n) => `${name} : colonne ${n}`, hint: 'Touchez une colonne · ← → et Entrée · touches 1–7' },
+    th: { tagline: 'หยอดเหรียญให้เรียงกันสี่อัน ทั้งแนวนอน แนวตั้ง หรือแนวทแยง', mode: 'โหมด', vsCpu: 'เล่นกับคอม', twoP: '2 ผู้เล่น', difficulty: 'ระดับความยาก', easy: 'ง่าย', medium: 'ปานกลาง', hard: 'ยาก', first: 'ใครเริ่มก่อน', you: 'คุณ', cpu: 'คอมพิวเตอร์', red: 'ฝ่ายแดง', yellow: 'ฝ่ายเหลือง', alternate: 'สลับกัน', start: 'เริ่ม', draws: 'เสมอ', settings: 'ตั้งค่า', newRound: 'ตาใหม่', board: 'กระดานเกม', yourTurn: 'ตาของคุณ', thinking: 'คอมพิวเตอร์กำลังคิด…', turnOf: name => `ตาของ${name}`, youWin: 'คุณชนะ!', cpuWins: 'คอมพิวเตอร์ชนะ', wins: name => `${name}ชนะ!`, draw: 'เสมอ!', drawText: 'กระดานเต็มแล้ว ไม่มีใครเรียงได้สี่อัน', winText: 'เรียงได้สี่อันแล้ว!', loseText: 'คอมพิวเตอร์เรียงได้สี่อัน ลองอีกครั้งไหม?', nextRound: 'ตาถัดไป', change: 'เปลี่ยนการตั้งค่า', streak: (c, b) => `ชนะติดกันระดับยาก ${c} · ดีที่สุด ${b}`, bestStreak: b => `ชนะติดกันสูงสุดในระดับยาก: ${b}`, newBest: 'สถิติชนะติดกันใหม่!', column: n => `คอลัมน์ ${n}`, full: 'เต็มแล้ว', dropped: (name, n) => `${name}: คอลัมน์ ${n}`, hint: 'แตะคอลัมน์ · ← → และ Enter · ปุ่ม 1–7' },
+    ja: { tagline: 'ディスクを落として、縦・横・ななめのどれかに4つ並べよう。', mode: 'モード', vsCpu: 'CPU対戦', twoP: '2人対戦', difficulty: '難易度', easy: 'かんたん', medium: 'ふつう', hard: 'むずかしい', first: '先攻', you: 'あなた', cpu: 'CPU', red: '赤', yellow: '黄', alternate: '交互', start: 'スタート', draws: '引き分け', settings: '設定', newRound: '新しいラウンド', board: 'ゲーム盤', yourTurn: 'あなたの番', thinking: 'CPUが考え中…', turnOf: name => `${name}の番`, youWin: 'あなたの勝ち！', cpuWins: 'CPUの勝ち', wins: name => `${name}の勝ち！`, draw: '引き分け！', drawText: '盤面がいっぱいです。どちらも4つ並びませんでした。', winText: '4つ並んだ！', loseText: 'CPUに4つ並べられました。もう一度挑戦する？', nextRound: '次のラウンド', change: '設定を変える', streak: (c, b) => `むずかしい連勝 ${c} · 最高 ${b}`, bestStreak: b => `むずかしいの最高連勝：${b}`, newBest: '連勝記録を更新！', column: n => `${n}列目`, full: '満杯', dropped: (name, n) => `${name}：${n}列目`, hint: '列をタップ · ← → と Enter · 1〜7キー' },
+    ko: { tagline: '디스크를 떨어뜨려 가로, 세로, 대각선 중 한 방향으로 네 개를 이으세요.', mode: '모드', vsCpu: '컴퓨터 대전', twoP: '2인 플레이', difficulty: '난이도', easy: '쉬움', medium: '보통', hard: '어려움', first: '선공', you: '나', cpu: '컴퓨터', red: '빨강', yellow: '노랑', alternate: '번갈아', start: '시작', draws: '무승부', settings: '설정', newRound: '새 라운드', board: '게임판', yourTurn: '내 차례', thinking: '컴퓨터가 생각 중…', turnOf: name => `${name} 차례`, youWin: '승리!', cpuWins: '컴퓨터 승리', wins: name => `${name} 승리!`, draw: '무승부!', drawText: '판이 가득 찼어요. 아무도 네 개를 잇지 못했어요.', winText: '네 개 연결!', loseText: '컴퓨터가 네 개를 이었어요. 다시 도전할까요?', nextRound: '다음 라운드', change: '설정 변경', streak: (c, b) => `어려움 연승 ${c} · 최고 ${b}`, bestStreak: b => `어려움 최고 연승: ${b}`, newBest: '최고 연승 기록!', column: n => `${n}열`, full: '가득 참', dropped: (name, n) => `${name}: ${n}열`, hint: '열을 탭 · ← → 와 Enter · 숫자 1–7' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const COLS = 7, ROWS = 6, EMPTY = -1;
+  const ORDER = [3, 2, 4, 1, 5, 0, 6];
+  const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
+  const WIN_SCORE = 1e6;
+  const AI = { easy: { depth: 0 }, medium: { depth: 4, slip: 0.25 }, hard: { depth: 7, budget: 900 } };
+  const STORE = { settings: 'milaan.fourInARow.settings', streak: 'milaan.fourInARow.bestStreak' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const $ = id => document.getElementById(id);
+  const els = { cols: $('cols'), discs: $('discs'), frame: $('frame'), ghost: $('ghost'), status: $('status'), streak: $('streak'), announcer: $('announcer'), setup: $('setup'), result: $('result'), resultEmoji: $('result-emoji'), resultTitle: $('result-title'), resultText: $('result-text'), resultScore: $('result-score'), newBest: $('new-best'), nextRound: $('next-round'), start: $('start'), levelField: $('level-field') };
+
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+
+  const settings = { mode: 'cpu', level: 'medium', first: 'p0', ...read(STORE.settings, {}) };
+  let bestStreak = Number(read(STORE.streak, 0)) || 0;
+  let streak = 0;
+  let tally = { 0: 0, 1: 0, d: 0 };
+  let starter = 0, cursor = 3, round = 0;
+  let game = null;
+
+  // Row 0 is the bottom of the board; cells are indexed row * COLS + col.
+  const idx = (c, r) => r * COLS + c;
+  const isCpu = player => settings.mode === 'cpu' && player === 1;
+  const nameOf = player => settings.mode === 'cpu' ? (player === 0 ? t.you : t.cpu) : (player === 0 ? t.red : t.yellow);
+
+  const WINDOWS = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) for (const [dc, dr] of DIRS) {
+    const ec = c + dc * 3, er = r + dr * 3;
+    if (ec < 0 || ec >= COLS || er < 0 || er >= ROWS) continue;
+    WINDOWS.push([0, 1, 2, 3].map(k => idx(c + dc * k, r + dr * k)));
+  }
+
+  function run(cells, c, r, dc, dr, p) {
+    let n = 0;
+    for (c += dc, r += dr; c >= 0 && c < COLS && r >= 0 && r < ROWS && cells[idx(c, r)] === p; c += dc, r += dr) n++;
+    return n;
+  }
+
+  // True if player p placing at (c, r) makes four; the cell itself does not need to be filled yet.
+  function makesFour(cells, c, r, p) {
+    for (const [dc, dr] of DIRS) if (1 + run(cells, c, r, dc, dr, p) + run(cells, c, r, -dc, -dr, p) >= 4) return true;
+    return false;
+  }
+
+  function winningLine(cells, c, r, p) {
+    for (const [dc, dr] of DIRS) {
+      const line = [idx(c, r)];
+      for (const s of [1, -1]) for (let k = 1, x = c + dc * s, y = r + dr * s; x >= 0 && x < COLS && y >= 0 && y < ROWS && cells[idx(x, y)] === p; k++, x += dc * s, y += dr * s) line.push(idx(x, y));
+      if (line.length >= 4) return line;
+    }
+    return null;
+  }
+
+  // ---- Computer player -------------------------------------------------------------------
+  function evaluate(cells, p) {
+    let score = 0;
+    for (let r = 0; r < ROWS; r++) {
+      const v = cells[idx(3, r)];
+      if (v === p) score += 3; else if (v !== EMPTY) score -= 3;
+    }
+    for (const w of WINDOWS) {
+      let mine = 0, theirs = 0;
+      for (const i of w) { const v = cells[i]; if (v === p) mine++; else if (v !== EMPTY) theirs++; }
+      if (mine && theirs) continue;
+      if (mine === 3) score += 8; else if (mine === 2) score += 2;
+      else if (theirs === 3) score -= 8; else if (theirs === 2) score -= 2;
+    }
+    return score;
+  }
+
+  const TIMEOUT = Symbol('timeout');
+
+  function negamax(s, depth, alpha, beta, p) {
+    if ((++s.nodes & 1023) === 0 && performance.now() > s.deadline) throw TIMEOUT;
+    if (s.moves === COLS * ROWS) return 0;
+    for (const c of ORDER) if (s.heights[c] < ROWS && makesFour(s.cells, c, s.heights[c], p)) return WIN_SCORE - s.moves;
+    if (depth === 0) return evaluate(s.cells, p);
+    let best = -Infinity;
+    for (const c of ORDER) {
+      const r = s.heights[c];
+      if (r >= ROWS) continue;
+      s.cells[idx(c, r)] = p; s.heights[c]++; s.moves++;
+      const v = -negamax(s, depth - 1, -beta, -alpha, 1 - p);
+      s.cells[idx(c, r)] = EMPTY; s.heights[c]--; s.moves--;
+      if (v > best) best = v;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  // Iterative deepening keeps the last fully searched depth if the time budget runs out.
+  function rankMoves(p, maxDepth, budget = 1500) {
+    const s = { cells: Int8Array.from(game.cells), heights: Int8Array.from(game.heights), moves: game.moves, nodes: 0, deadline: performance.now() + budget };
+    let order = ORDER.filter(c => s.heights[c] < ROWS);
+    let ranked = order.map(c => ({ c, score: 0 }));
+    for (let depth = 1; depth <= maxDepth; depth++) {
+      const scored = [];
+      try {
+        let best = -Infinity;
+        for (const c of order) {
+          const r = s.heights[c];
+          let v;
+          if (makesFour(s.cells, c, r, p)) v = WIN_SCORE - s.moves;
+          else {
+            s.cells[idx(c, r)] = p; s.heights[c]++; s.moves++;
+            // A window just below the best keeps equal moves exact so ties can be broken at random.
+            v = -negamax(s, depth - 1, -Infinity, -(best - 1), 1 - p);
+            s.cells[idx(c, r)] = EMPTY; s.heights[c]--; s.moves--;
+          }
+          scored.push({ c, score: v });
+          if (v > best) best = v;
+        }
+      } catch (error) {
+        if (error !== TIMEOUT) throw error;
+        break;
+      }
+      ranked = scored.sort((a, b) => b.score - a.score);
+      order = ranked.map(m => m.c);
+      if (Math.abs(ranked[0].score) > WIN_SCORE / 2) break;
+    }
+    return ranked;
+  }
+
+  function easyMove(p) {
+    const legal = ORDER.filter(c => game.heights[c] < ROWS);
+    const win = legal.find(c => makesFour(game.cells, c, game.heights[c], p));
+    if (win !== undefined && Math.random() < 0.9) return win;
+    const block = legal.find(c => makesFour(game.cells, c, game.heights[c], 1 - p));
+    if (block !== undefined && Math.random() < 0.55) return block;
+    const weights = legal.map(c => 4 - Math.abs(3 - c));
+    let roll = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < legal.length; i++) if ((roll -= weights[i]) < 0) return legal[i];
+    return legal[0];
+  }
+
+  function chooseMove(p) {
+    const ai = AI[settings.level];
+    if (!ai.depth) return easyMove(p);
+    const ranked = rankMoves(p, ai.depth, ai.budget);
+    const top = ranked.filter(m => m.score === ranked[0].score);
+    const second = ranked[top.length];
+    // Medium sometimes settles for its second choice, unless that throws away a win or walks into a loss.
+    if (ai.slip && second && Math.random() < ai.slip && Math.abs(ranked[0].score) < WIN_SCORE / 2 && second.score > -WIN_SCORE / 2) return second.c;
+    return top[Math.floor(Math.random() * top.length)].c;
+  }
+
+  // ---- Round flow ----------------------------------------------------------------------------
+  function buildBoard() {
+    els.frame.replaceChildren(...Array.from({ length: COLS * ROWS }, () => document.createElement('i')));
+    els.cols.replaceChildren(...Array.from({ length: COLS }, (_, c) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.tabIndex = c === cursor ? 0 : -1;
+      btn.addEventListener('click', () => humanMove(c));
+      btn.addEventListener('pointerenter', () => setCursor(c));
+      btn.addEventListener('focus', () => setCursor(c));
+      return btn;
+    }));
+  }
+
+  function newRound(nextStarter = starter) {
+    clearTimeout(game?.timer);
+    starter = nextStarter;
+    round += 1;
+    game = { cells: new Int8Array(COLS * ROWS).fill(EMPTY), heights: new Int8Array(COLS), moves: 0, turn: starter, busy: false, over: false, timer: 0, round };
+    els.discs.replaceChildren();
+    els.discs.classList.remove('done');
+    els.result.hidden = true;
+    els.setup.hidden = true;
+    renderAll();
+    nextTurn();
+  }
+
+  function nextTurn() {
+    renderAll();
+    if (isCpu(game.turn)) {
+      const at = game.round;
+      game.timer = setTimeout(() => {
+        if (game.round !== at || game.over) return;
+        drop(chooseMove(1));
+      }, 380 + Math.random() * 260);
+    }
+  }
+
+  function humanMove(c) {
+    if (!game || game.busy || game.over || isCpu(game.turn) || game.heights[c] >= ROWS) return;
+    drop(c);
+  }
+
+  function drop(c) {
+    const p = game.turn, r = game.heights[c];
+    game.cells[idx(c, r)] = p;
+    game.heights[c]++;
+    game.moves++;
+    game.busy = true;
+    const el = document.createElement('span');
+    el.className = `disc p${p}`;
+    el.dataset.cell = idx(c, r);
+    el.innerHTML = '<b></b>';
+    const fromTop = ROWS - 1 - r;
+    el.style.left = `calc(var(--cell) * ${c})`;
+    el.style.top = `calc(var(--cell) * ${fromTop})`;
+    els.discs.append(el);
+    els.announcer.textContent = t.dropped(nameOf(p), c + 1);
+    renderAll();
+    let duration = 0;
+    if (!reducedMotion.matches) {
+      // Fall from the preview row with a gravity-style ease, then two small bounces.
+      const fall = (fromTop + 1) * 100 + 15, bounce = Math.min(16, 5 + fromTop * 2.2);
+      duration = 300 + fromTop * 55;
+      el.animate([
+        { transform: `translateY(-${fall}%)`, easing: 'cubic-bezier(.5, 0, .9, .5)' },
+        { transform: 'translateY(0)', offset: 0.6, easing: 'cubic-bezier(.2, .6, .4, 1)' },
+        { transform: `translateY(-${bounce}%)`, offset: 0.78, easing: 'cubic-bezier(.6, 0, .9, .5)' },
+        { transform: 'translateY(0)', offset: 0.9, easing: 'ease-out' },
+        { transform: `translateY(-${bounce / 4}%)`, offset: 0.95, easing: 'ease-in' },
+        { transform: 'translateY(0)' },
+      ], { duration });
+    }
+    const at = game.round;
+    setTimeout(() => { if (game.round === at) settle(c, r, p); }, duration);
+  }
+
+  function settle(c, r, p) {
+    game.busy = false;
+    const line = winningLine(game.cells, c, r, p);
+    if (line) return endRound(p, line);
+    if (game.moves === COLS * ROWS) return endRound(null, []);
+    game.turn = 1 - p;
+    nextTurn();
+  }
+
+  function endRound(winner, line) {
+    game.over = true;
+    tally[winner ?? 'd'] += 1;
+    for (const el of els.discs.children) if (line.includes(Number(el.dataset.cell))) el.classList.add('win');
+    if (winner !== null) els.discs.classList.add('done');
+    let newBest = false;
+    if (settings.mode === 'cpu' && settings.level === 'hard' && winner !== null) {
+      streak = winner === 0 ? streak + 1 : 0;
+      if (streak > bestStreak) { bestStreak = streak; newBest = true; write(STORE.streak, bestStreak); }
+    }
+    let title, text, emoji;
+    if (winner === null) { title = t.draw; text = t.drawText; emoji = '🤝'; }
+    else if (settings.mode === 'cpu') { title = winner === 0 ? t.youWin : t.cpuWins; text = winner === 0 ? t.winText : t.loseText; emoji = winner === 0 ? '🏆' : '🤖'; }
+    else { title = t.wins(nameOf(winner)); text = t.winText; emoji = winner === 0 ? '🔴' : '🟡'; }
+    els.resultEmoji.textContent = emoji;
+    els.resultTitle.textContent = title;
+    els.resultText.textContent = text;
+    els.resultScore.textContent = `${nameOf(0)} ${tally[0]} – ${tally[1]} ${nameOf(1)} · ${t.draws} ${tally.d}`;
+    els.newBest.hidden = !newBest;
+    renderAll();
+    els.announcer.textContent = `${title} ${els.resultScore.textContent}`;
+    const at = game.round;
+    game.timer = setTimeout(() => {
+      if (game.round !== at) return;
+      els.result.hidden = false;
+      els.nextRound.focus({ preventScroll: true });
+    }, reducedMotion.matches ? 600 : 1300);
+  }
+
+  function nextStarterFor() {
+    if (settings.first === 'alt') return 1 - starter;
+    return settings.first === 'p1' ? 1 : 0;
+  }
+
+  // ---- Rendering -----------------------------------------------------------------------------
+  function setCursor(c) {
+    cursor = Math.max(0, Math.min(COLS - 1, c));
+    renderGhost();
+    [...els.cols.children].forEach((btn, i) => { btn.tabIndex = i === cursor ? 0 : -1; });
+  }
+
+  function renderGhost() {
+    const show = game && !game.over && !game.busy && !isCpu(game.turn) && game.heights[cursor] < ROWS;
+    els.ghost.hidden = !show;
+    els.ghost.className = `disc ghost p${game ? game.turn : 0}`;
+    els.ghost.style.left = `calc(var(--cell) * ${cursor})`;
+  }
+
+  function renderAll() {
+    for (const p of [0, 1]) {
+      $(`name-${p}`).textContent = nameOf(p);
+      $(`score-${p}`).textContent = String(tally[p]);
+      $(`side-${p}`).classList.toggle('turn', !game.over && game.turn === p);
+    }
+    $('score-d').textContent = String(tally.d);
+    if (game.over) els.status.textContent = els.resultTitle.textContent;
+    else if (isCpu(game.turn)) els.status.textContent = t.thinking;
+    else els.status.textContent = settings.mode === 'cpu' ? t.yourTurn : t.turnOf(nameOf(game.turn));
+    els.status.style.color = game.over ? '' : game.turn === 0 ? 'var(--red-dark)' : '#b07e00';
+    els.cols.classList.toggle('locked', game.over || isCpu(game.turn));
+    [...els.cols.children].forEach((btn, c) => btn.setAttribute('aria-label', game.heights[c] >= ROWS ? `${t.column(c + 1)}, ${t.full}` : t.column(c + 1)));
+    const hard = settings.mode === 'cpu' && settings.level === 'hard';
+    els.streak.innerHTML = '';
+    const strong = document.createElement('strong');
+    strong.textContent = hard ? t.streak(streak, bestStreak) : t.bestStreak(bestStreak);
+    els.streak.append(strong);
+    renderGhost();
+  }
+
+  function renderSetup() {
+    for (const group of document.querySelectorAll('.seg')) {
+      for (const btn of group.children) btn.setAttribute('aria-pressed', String(settings[group.dataset.key] === btn.dataset.value));
+    }
+    els.levelField.hidden = settings.mode !== 'cpu';
+    $('first-p0').textContent = settings.mode === 'cpu' ? t.you : t.red;
+    $('first-p1').textContent = settings.mode === 'cpu' ? t.cpu : t.yellow;
+  }
+
+  function openSetup() {
+    clearTimeout(game?.timer);
+    renderSetup();
+    els.result.hidden = true;
+    els.setup.hidden = false;
+    els.start.focus({ preventScroll: true });
+  }
+
+  for (const group of document.querySelectorAll('.seg')) {
+    group.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      settings[group.dataset.key] = btn.dataset.value;
+      renderSetup();
+    });
+  }
+
+  els.start.addEventListener('click', () => {
+    const key = `${settings.mode}/${settings.level}`;
+    if (key !== els.start.dataset.key) { tally = { 0: 0, 1: 0, d: 0 }; streak = 0; }
+    els.start.dataset.key = key;
+    write(STORE.settings, settings);
+    newRound(settings.first === 'p1' ? 1 : 0);
+  });
+  els.nextRound.addEventListener('click', () => newRound(nextStarterFor()));
+  $('change').addEventListener('click', openSetup);
+  $('settings').addEventListener('click', openSetup);
+  $('restart').addEventListener('click', () => newRound(starter));
+  els.cols.addEventListener('pointerleave', () => { if (document.activeElement?.parentElement !== els.cols) renderGhost(); });
+
+  const overlayOpen = () => !els.setup.hidden || !els.result.hidden;
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !game || overlayOpen()) return;
+    const inCols = document.activeElement?.parentElement === els.cols;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      setCursor(cursor + (event.key === 'ArrowLeft' ? -1 : 1));
+      if (inCols) els.cols.children[cursor].focus({ preventScroll: true });
+    } else if (/^[1-7]$/.test(event.key)) {
+      event.preventDefault();
+      setCursor(Number(event.key) - 1);
+      humanMove(cursor);
+    } else if ((event.key === 'Enter' || event.key === ' ') && !(document.activeElement instanceof HTMLButtonElement)) {
+      // Focused column buttons activate natively; this covers play with nothing focused.
+      event.preventDefault();
+      humanMove(cursor);
+    }
+  });
+
+  buildBoard();
+  renderSetup();
+  els.start.dataset.key = `${settings.mode}/${settings.level}`;
+  game = { cells: new Int8Array(COLS * ROWS).fill(EMPTY), heights: new Int8Array(COLS), moves: 0, turn: 0, busy: false, over: false, timer: 0, round };
+  renderAll();
+  els.start.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

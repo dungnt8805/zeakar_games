@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Helix Drop</title>
+<style>
+:root {
+  --bg: #1b1433;
+  --ink: #2a1f4a;
+  --text: #ffffff;
+  --muted: #6d6490;
+  --accent: #ff8a3d;
+  --accent-dark: #d9621a;
+  --paper: #fffaf4;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #3a2a66, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff1c, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas:active { cursor: grabbing; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ff8a3d88; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 7cqh 6cqw 6cqh; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.title { font-size: min(14cqw, 8cqh); font-weight: 900; letter-spacing: -.02em; line-height: 1; color: #fff; text-shadow: 0 4px 0 var(--ink), 0 8px 24px #2a1f4a88; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.title span { color: var(--accent); }
+.tagline { margin-top: 1.8cqh; max-width: 28em; font-size: max(13px, min(4cqw, 2.4cqh)); font-weight: 700; line-height: 1.4; color: var(--ink); background: #ffffffd9; padding: 6px 12px; border-radius: 12px; }
+.spacer { flex: 1; }
+.cta { padding: 14px 30px; border-radius: 99px; background: var(--accent); color: #fff; font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark), 0 10px 24px #0004; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; max-width: 30em; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #ffffffc4; padding: 4px 10px; border-radius: 99px; }
+.small:empty { display: none; }
+
+.center { justify-content: center; background: #1b143340; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 20px 18px; border-radius: 22px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #dccfe0, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.sub { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.sub:empty { display: none; }
+.meter { height: 10px; margin-top: 12px; border-radius: 99px; background: #ece4f3; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); }
+.scores { display: flex; justify-content: center; gap: 28px; margin-top: 14px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: #ff4d6d; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title">Helix <span>Drop</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title"></h2>
+          <p class="sub" id="over-sub"></p>
+          <div class="meter" id="meter" aria-hidden="true"><i id="meter-fill"></i></div>
+          <div class="scores">
+            <div><small data-i18n="score"></small><strong id="final-score">0</strong></div>
+            <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+          </div>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Spin the tower, drop the ball through the gaps, and never touch red!', controls: 'Drag sideways or use ← → to spin the tower', play: n => `Play level ${n}`, best: n => `Best score: ${n}`, canvas: 'Helix Drop — drag sideways or use the arrow keys to spin the tower', paused: 'Paused', resume: 'Resume', over: 'Game over', progress: p => `${p}% of the level cleared`, score: 'Score', bestLabel: 'Best', newBest: 'New best!', retry: 'Try again', won: n => `Level ${n} complete!`, wonSub: 'Every ring cleared. Nice drop!', next: 'Next level', restartHint: 'or press Space', fire: 'Fireball!', levelStart: n => `Level ${n}`, lost: p => `Hit a red block at ${p}%.` },
+    vi: { tagline: 'Xoay tòa tháp, thả bóng rơi qua khe hở và đừng bao giờ chạm vào ô đỏ!', controls: 'Kéo ngang hoặc dùng ← → để xoay tháp', play: n => `Chơi màn ${n}`, best: n => `Điểm cao nhất: ${n}`, canvas: 'Helix Drop — kéo ngang hoặc dùng phím mũi tên để xoay tháp', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', progress: p => `Đã vượt ${p}% màn chơi`, score: 'Điểm', bestLabel: 'Kỷ lục', newBest: 'Kỷ lục mới!', retry: 'Thử lại', won: n => `Hoàn thành màn ${n}!`, wonSub: 'Đã vượt qua mọi tầng. Rơi đẹp lắm!', next: 'Màn tiếp theo', restartHint: 'hoặc bấm Space', fire: 'Cầu lửa!', levelStart: n => `Màn ${n}`, lost: p => `Chạm ô đỏ ở ${p}%.` },
+    zh: { tagline: '旋转高塔，让小球从缺口落下，千万别碰到红色！', controls: '左右拖动或用 ← → 键旋转高塔', play: n => `开始第 ${n} 关`, best: n => `最高分：${n}`, canvas: 'Helix Drop——左右拖动或用方向键旋转高塔', paused: '已暂停', resume: '继续', over: '游戏结束', progress: p => `本关已完成 ${p}%`, score: '得分', bestLabel: '最高', newBest: '新纪录！', retry: '再试一次', won: n => `第 ${n} 关完成！`, wonSub: '所有圆环全部通过，漂亮！', next: '下一关', restartHint: '也可以按空格键', fire: '火球！', levelStart: n => `第 ${n} 关`, lost: p => `在 ${p}% 处碰到了红块。` },
+    fr: { tagline: 'Faites tourner la tour, laissez tomber la balle dans les trous et ne touchez jamais le rouge !', controls: 'Glissez sur le côté ou utilisez ← → pour tourner la tour', play: n => `Jouer le niveau ${n}`, best: n => `Meilleur score : ${n}`, canvas: 'Helix Drop — glissez sur le côté ou utilisez les flèches pour tourner la tour', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', progress: p => `${p} % du niveau franchi`, score: 'Score', bestLabel: 'Record', newBest: 'Nouveau record !', retry: 'Réessayer', won: n => `Niveau ${n} terminé !`, wonSub: 'Tous les anneaux sont passés. Belle descente !', next: 'Niveau suivant', restartHint: 'ou appuyez sur Espace', fire: 'Boule de feu !', levelStart: n => `Niveau ${n}`, lost: p => `Bloc rouge touché à ${p} %.` },
+    th: { tagline: 'หมุนหอคอย ปล่อยลูกบอลให้ตกผ่านช่องว่าง และห้ามแตะสีแดงเด็ดขาด!', controls: 'ลากไปด้านข้างหรือใช้ปุ่ม ← → เพื่อหมุนหอคอย', play: n => `เล่นด่าน ${n}`, best: n => `คะแนนสูงสุด: ${n}`, canvas: 'Helix Drop — ลากไปด้านข้างหรือใช้ปุ่มลูกศรเพื่อหมุนหอคอย', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', progress: p => `ผ่านด่านไปแล้ว ${p}%`, score: 'คะแนน', bestLabel: 'สูงสุด', newBest: 'สถิติใหม่!', retry: 'ลองอีกครั้ง', won: n => `ผ่านด่าน ${n} แล้ว!`, wonSub: 'ผ่านครบทุกวงแหวน เยี่ยมมาก!', next: 'ด่านถัดไป', restartHint: 'หรือกด Space', fire: 'ลูกไฟ!', levelStart: n => `ด่าน ${n}`, lost: p => `ชนบล็อกสีแดงที่ ${p}%` },
+    ja: { tagline: 'タワーを回してボールをすき間に落とそう。赤には絶対さわらないで！', controls: '左右にドラッグ、または ← → キーでタワーを回転', play: n => `レベル ${n} をプレイ`, best: n => `ベストスコア：${n}`, canvas: 'Helix Drop — 左右にドラッグするか矢印キーでタワーを回転', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', progress: p => `レベルの ${p}% をクリア`, score: 'スコア', bestLabel: 'ベスト', newBest: '自己ベスト更新！', retry: 'もう一度', won: n => `レベル ${n} クリア！`, wonSub: 'すべてのリングを突破。ナイス！', next: '次のレベル', restartHint: 'スペースキーでも進めます', fire: 'ファイアボール！', levelStart: n => `レベル ${n}`, lost: p => `${p}% 地点で赤いブロックに当たった。` },
+    ko: { tagline: '탑을 돌려 공을 틈새로 떨어뜨리고, 빨간 칸은 절대 밟지 마세요!', controls: '좌우로 드래그하거나 ← → 키로 탑 회전', play: n => `레벨 ${n} 플레이`, best: n => `최고 점수: ${n}`, canvas: 'Helix Drop — 좌우로 드래그하거나 방향키로 탑을 회전하세요', paused: '일시 정지', resume: '계속하기', over: '게임 오버', progress: p => `레벨 ${p}% 진행`, score: '점수', bestLabel: '최고', newBest: '최고 기록!', retry: '다시 도전', won: n => `레벨 ${n} 클리어!`, wonSub: '모든 링을 통과했어요. 멋져요!', next: '다음 레벨', restartHint: '또는 Space를 누르세요', fire: '불덩이!', levelStart: n => `레벨 ${n}`, lost: p => `${p}% 지점에서 빨간 칸에 닿았어요.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait view. World y grows downward; each ring is a flat disc seen from slightly above.
+  const W = 360, H = 640, CX = W / 2, STEP = 1 / 120;
+  const SEGS = 12, SEG_A = Math.PI * 2 / SEGS;
+  const R_OUT = 128, R_IN = 46, POLE_R = 38, TILT = 0.36, SLAB = 18, SPACING = 150, FIRST_Y = 300;
+  const BALL_R = 11, BALL_RING = 92, GRAVITY = 1700, BOUNCE = Math.sqrt(2 * GRAVITY * 88);
+  const FIRE_STREAK = 3, DRAG_SPEED = 0.016, KEY_SPEED = 3.6;
+  const STORAGE = { level: 'milaan.helixDrop.level', best: 'milaan.helixDrop.best' };
+  const THEMES = [
+    { bg: ['#ffe3ec', '#ffbfd2'], hue: 265, ball: '#ff8a3d' },
+    { bg: ['#dff3ff', '#a9dbff'], hue: 160, ball: '#ff6fae' },
+    { bg: ['#fff3d1', '#ffd38c'], hue: 205, ball: '#8a5cff' },
+    { bg: ['#e6fff0', '#aeeecb'], hue: 285, ball: '#ffb000' },
+    { bg: ['#efe8ff', '#c7b6ff'], hue: 48, ball: '#2fc6c0' },
+  ];
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), overTitle: $('over-title'), overSub: $('over-sub'), meter: $('meter'), meterFill: $('meter-fill'), finalScore: $('final-score'), finalBest: $('final-best'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readNum = key => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
+  const writeNum = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const norm = a => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+  // Seeded generator so retrying a level gives the same tower.
+  function mulberry32(seed) {
+    return () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let game, scale = 1, acc = 0, last = performance.now();
+  const saved = { level: Math.max(1, readNum(STORAGE.level)), best: readNum(STORAGE.best) };
+  const input = { left: false, right: false, dragId: null, dragX: 0 };
+
+  function buildLevel(level) {
+    const rng = mulberry32(level * 7919 + 13);
+    const count = Math.min(9 + level * 2, 42);
+    const rings = [];
+    for (let i = 0; i < count; i++) {
+      const segs = new Array(SEGS).fill(1);
+      const spin = level >= 4 && i > 0 && rng() < Math.min(0.45, 0.12 + (level - 4) * 0.05) ? (rng() < 0.5 ? -1 : 1) * (0.45 + rng() * 0.5 + level * 0.02) : 0;
+      const gapLen = Math.max(1, 3 - Math.floor(level / 4)) + (rng() < 0.25 ? 1 : 0);
+      // Ring 0 keeps the segment under the starting ball solid.
+      const gapStart = i === 0 ? 6 : Math.floor(rng() * SEGS);
+      for (let k = 0; k < gapLen; k++) segs[(gapStart + k) % SEGS] = 0;
+      if (level >= 3 && i > 0 && rng() < 0.3) segs[(gapStart + 4 + Math.floor(rng() * 5)) % SEGS] = 0;
+      if (i > 0) {
+        // Red never sits straight under the previous ring's gap, so a clean drop is always survivable.
+        const prev = rings[i - 1];
+        const shielded = s => !prev.spin && !prev.segs[s];
+        const dangers = Math.min(spin || prev.spin ? 2 : 7, Math.floor(level * 0.55 + rng() * 2));
+        for (let k = 0; k < dangers; k++) {
+          const s = Math.floor(rng() * SEGS);
+          if (segs[s] === 1 && !shielded(s) && segs.filter(v => v === 1).length > 3) segs[s] = 2;
+        }
+      }
+      rings.push({ y: FIRST_Y + i * SPACING, segs, spin, rot: 0, passed: false, passT: 0, smashed: false, splats: [], goal: false });
+    }
+    rings.push({ y: FIRST_Y + count * SPACING, segs: new Array(SEGS).fill(1), spin: 0, rot: 0, passed: false, passT: 0, smashed: false, splats: [], goal: true });
+    return rings;
+  }
+
+  function startLevel(level, keepScore) {
+    const theme = THEMES[(level - 1) % THEMES.length];
+    game = {
+      state: 'ready', level, theme, rings: buildLevel(level), angle: 0, spinVel: 0, time: 0,
+      ball: { y: FIRST_Y, vy: -BOUNCE, squash: 0, fire: false }, next: 0, streak: 0,
+      score: keepScore ? game.score : 0, levelStartScore: keepScore ? game.score : 0, cam: FIRST_Y - H * 0.42,
+      particles: [], popups: [], banner: null, deadT: 0, overAt: 0, shake: 0, cleared: 0,
+    };
+    els.play.textContent = t.play(level);
+    els.startBest.textContent = saved.best ? t.best(saved.best) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+  }
+
+  function begin() {
+    if (game.state !== 'ready') return;
+    game.state = 'play';
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(t.levelStart(game.level));
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+    els.resume.focus({ preventScroll: true });
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+  }
+
+  const progress = () => Math.round(100 * game.cleared / (game.rings.length - 1));
+
+  // Which segment of a ring sits under the ball (the ball always hangs at the front of the tower).
+  function segmentUnderBall(ring) {
+    const a = norm(Math.PI / 2 - game.angle - ring.rot);
+    return { index: Math.floor(a / SEG_A) % SEGS, a };
+  }
+
+  function burst(y, color, count, speed) {
+    if (reducedMotion) count = Math.ceil(count / 3);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random() * 0.8);
+      game.particles.push({ x: CX + (Math.random() - 0.5) * 30, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6 - 120, life: 0.7, r: 3 + Math.random() * 4, color });
+    }
+  }
+
+  function smash(ring) {
+    ring.smashed = true;
+    game.score += 5;
+    game.popups.push({ text: '+5', y: ring.y, t: 0 });
+    // The whole ring bursts into shards of its own colors.
+    if (!reducedMotion) {
+      for (let s = 0; s < SEGS; s++) {
+        if (!ring.segs[s]) continue;
+        const psi = (s + 0.5) * SEG_A + game.angle + ring.rot;
+        const color = ring.segs[s] === 2 ? '#ff3b5c' : `hsl(${game.theme.hue} 70% 60%)`;
+        for (let k = 0; k < 2; k++) {
+          game.particles.push({ x: CX + Math.cos(psi) * (R_IN + 40 * (k + 1)), y: ring.y + Math.sin(psi) * TILT * 80, vx: Math.cos(psi) * (180 + Math.random() * 140), vy: -100 - Math.random() * 160, life: 0.9, r: 6 + Math.random() * 4, color, shard: true });
+        }
+      }
+    }
+    game.shake = reducedMotion ? 0 : 0.25;
+  }
+
+  function passRing(ring) {
+    ring.passed = true;
+    game.cleared++;
+    game.streak++;
+    game.score += game.streak;
+    game.popups.push({ text: `+${game.streak}`, y: ring.y, t: 0 });
+    if (game.streak >= FIRE_STREAK && !game.ball.fire) {
+      game.ball.fire = true;
+      game.banner = { text: t.fire, t: 0 };
+      announce(t.fire);
+    }
+  }
+
+  function land(ring) {
+    const b = game.ball;
+    const { index, a } = segmentUnderBall(ring);
+    const kind = ring.segs[index];
+    if (!kind) { passRing(ring); game.next++; return; }
+    if (ring.goal) { b.y = ring.y; return win(); }
+    if (b.fire) {
+      smash(ring);
+      passRing(ring);
+      game.next++;
+      b.fire = false;
+      game.streak = 0;
+      b.vy = -BOUNCE;
+      b.squash = 1;
+      return;
+    }
+    b.y = ring.y;
+    if (kind === 2) return die();
+    b.vy = -BOUNCE;
+    b.squash = 1;
+    game.streak = 0;
+    ring.splats.push({ a, s: 0.7 + Math.random() * 0.4 });
+    if (ring.splats.length > 4) ring.splats.shift();
+    burst(ring.y, game.theme.ball, 5, 90);
+  }
+
+  function die() {
+    game.state = 'dying';
+    game.deadT = 0;
+    game.shake = reducedMotion ? 0 : 0.35;
+    burst(game.ball.y, game.theme.ball, 14, 200);
+  }
+
+  function win() {
+    game.state = 'won';
+    game.deadT = 0;
+    game.cleared = game.rings.length - 1;
+    game.ball.vy = -BOUNCE;
+    saved.level = game.level + 1;
+    writeNum(STORAGE.level, saved.level);
+    for (let i = 0; i < (reducedMotion ? 12 : 40); i++) {
+      const colors = ['#ff8a3d', '#ff4d6d', '#ffd23f', '#4ecdc4', '#8a5cff'];
+      game.particles.push({ x: CX + (Math.random() - 0.5) * 200, y: game.ball.y - 40, vx: (Math.random() - 0.5) * 360, vy: -200 - Math.random() * 300, life: 1.4, r: 3 + Math.random() * 3, color: colors[i % colors.length], confetti: true });
+    }
+  }
+
+  function showPanel(won) {
+    const isBest = game.score > saved.best;
+    if (isBest) { saved.best = game.score; writeNum(STORAGE.best, saved.best); }
+    const pct = progress();
+    els.overTitle.textContent = won ? t.won(game.level) : t.over;
+    els.overSub.textContent = won ? t.wonSub : t.progress(pct);
+    els.meterFill.style.width = `${pct}%`;
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(saved.best);
+    els.newBest.hidden = !isBest;
+    els.again.textContent = won ? t.next : t.retry;
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    announce(won ? `${t.won(game.level)} ${t.score}: ${game.score}.${isBest ? ` ${t.newBest}` : ''}` : `${t.over}. ${t.lost(pct)} ${t.score}: ${game.score}.${isBest ? ` ${t.newBest}` : ''}`);
+    els.again.focus({ preventScroll: true });
+  }
+
+  function proceed() {
+    if (game.state !== 'over' && game.state !== 'cleared') return;
+    if (performance.now() - game.overAt < 350) return;
+    const won = game.state === 'cleared';
+    startLevel(won ? game.level + 1 : game.level, won);
+    els.start.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+    announce(t.levelStart(game.level));
+  }
+
+  function step(dt) {
+    game.time += dt;
+    game.shake = Math.max(0, game.shake - dt);
+    if (game.banner && (game.banner.t += dt) > 1.4) game.banner = null;
+    for (const p of game.popups) p.t += dt;
+    game.popups = game.popups.filter(p => p.t < 0.8);
+    for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.confetti ? 500 : 900) * dt; p.life -= dt; }
+    game.particles = game.particles.filter(p => p.life > 0);
+    for (const ring of game.rings) {
+      ring.rot += ring.spin * dt;
+      if (ring.passed) ring.passT += dt;
+    }
+    const b = game.ball;
+    b.squash = Math.max(0, b.squash - dt * 6);
+    if (game.state === 'play') {
+      const keys = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      game.angle -= keys * KEY_SPEED * dt;
+    }
+    if (game.state === 'play' || game.state === 'ready') {
+      const prevY = b.y;
+      b.vy = Math.min(b.vy + GRAVITY * dt, 1100);
+      b.y += b.vy * dt;
+      const ring = game.rings[game.next];
+      if (ring && b.vy > 0 && prevY < ring.y && b.y >= ring.y) {
+        if (game.state === 'ready') { b.y = ring.y; b.vy = -BOUNCE; b.squash = 1; }
+        else land(ring);
+      }
+      if (b.fire && !reducedMotion && Math.random() < 0.6) game.particles.push({ x: CX + (Math.random() - 0.5) * 10, y: b.y - BALL_R, vx: (Math.random() - 0.5) * 40, vy: -260, life: 0.35, r: 4 + Math.random() * 4, color: Math.random() < 0.5 ? '#ffb000' : '#ff5a1f', flame: true });
+      const target = b.y - H * 0.42;
+      if (target > game.cam) game.cam += (target - game.cam) * Math.min(1, dt * 8);
+      return;
+    }
+    if (game.state === 'dying') {
+      game.deadT += dt;
+      if (game.deadT > 0.8) { game.state = 'over'; showPanel(false); }
+      return;
+    }
+    if (game.state === 'won') {
+      game.deadT += dt;
+      b.vy += GRAVITY * dt;
+      b.y += b.vy * dt;
+      const goal = game.rings[game.rings.length - 1];
+      if (b.y >= goal.y && b.vy > 0) { b.y = goal.y; b.vy = -BOUNCE * 0.8; b.squash = 1; }
+      if (game.deadT > 1) { game.state = 'cleared'; showPanel(true); }
+    }
+  }
+
+  // ---------- drawing ----------
+  const sy = y => y - game.cam;
+  const pt = (r, psi, y) => [CX + Math.cos(psi) * r, y + Math.sin(psi) * r * TILT];
+
+  // Split a segment's screen-angle range into front (facing the viewer) and back pieces.
+  function piecesOf(ring) {
+    const pieces = [];
+    const off = game.angle + ring.rot;
+    for (let s = 0; s < SEGS; s++) {
+      const kind = ring.segs[s];
+      if (!kind) continue;
+      const p0 = norm(s * SEG_A + off), p1 = p0 + SEG_A;
+      const startCap = !ring.segs[(s + SEGS - 1) % SEGS], endCap = !ring.segs[(s + 1) % SEGS];
+      for (const [a, b, front] of [[0, Math.PI, true], [Math.PI, Math.PI * 2, false], [Math.PI * 2, Math.PI * 3, true]]) {
+        const lo = Math.max(p0, a), hi = Math.min(p1, b);
+        if (hi - lo < 1e-4) continue;
+        pieces.push({ lo, hi, front, kind, capLo: lo === p0 && startCap, capHi: hi === p1 && endCap, depth: Math.sin((lo + hi) / 2) });
+      }
+    }
+    return pieces;
+  }
+
+  function colorsFor(ring, kind, mid) {
+    const light = -Math.cos(mid) * 7;
+    if (ring.goal) return { top: `hsl(45 95% ${62 + light}%)`, side: `hsl(38 85% ${46 + light}%)` };
+    if (kind === 2) return { top: `hsl(350 88% ${58 + light}%)`, side: `hsl(348 75% ${40 + light}%)` };
+    const h = game.theme.hue;
+    return { top: `hsl(${h} 68% ${64 + light}%)`, side: `hsl(${h} 55% ${46 + light}%)` };
+  }
+
+  function topPath(lo, hi, y, k) {
+    ctx.beginPath();
+    ctx.ellipse(CX, y, R_OUT * k, R_OUT * k * TILT, 0, lo, hi);
+    ctx.ellipse(CX, y, R_IN * k, R_IN * k * TILT, 0, hi, lo, true);
+    ctx.closePath();
+  }
+
+  function drawCap(psi, y, k, color) {
+    const [x1, y1] = pt(R_IN * k, psi, y), [x2, y2] = pt(R_OUT * k, psi, y);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 + SLAB); ctx.lineTo(x1, y1 + SLAB);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawPiece(ring, p, y, k) {
+    const mid = (p.lo + p.hi) / 2;
+    const c = colorsFor(ring, p.kind, mid);
+    // End faces next to a gap, only when they turn toward the viewer.
+    if (p.capLo && Math.cos(p.lo) < 0) drawCap(p.lo, y, k, c.side);
+    if (p.capHi && Math.cos(p.hi) > 0) drawCap(p.hi, y, k, c.side);
+    if (p.front) {
+      ctx.fillStyle = c.side;
+      ctx.beginPath();
+      ctx.ellipse(CX, y, R_OUT * k, R_OUT * k * TILT, 0, p.lo, p.hi);
+      ctx.ellipse(CX, y + SLAB, R_OUT * k, R_OUT * k * TILT, 0, p.hi, p.lo, true);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = c.top;
+    topPath(p.lo, p.hi, y, k);
+    ctx.fill();
+    if (p.kind === 2 && !ring.goal) {
+      ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(CX, y, (R_OUT - 14) * k, (R_OUT - 14) * k * TILT, 0, p.lo + 0.04, p.hi - 0.04); ctx.stroke();
+    }
+  }
+
+  function drawSplats(ring, y, k, front) {
+    const off = game.angle + ring.rot;
+    ctx.fillStyle = game.theme.ball;
+    for (const s of ring.splats) {
+      const psi = norm(s.a + off);
+      if ((Math.sin(psi) > 0) !== front) continue;
+      const [x, py] = pt(BALL_RING * k, psi, y);
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath(); ctx.ellipse(x, py, 11 * s.s, 11 * s.s * TILT * 1.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + 10 * s.s, py + 2, 3, 2, 0, 0, Math.PI * 2); ctx.ellipse(x - 9 * s.s, py - 2, 2.5, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawGoalStripes(y) {
+    ctx.save();
+    topPath(0, Math.PI * 2, y, 1);
+    ctx.clip();
+    ctx.fillStyle = '#ffffff88';
+    for (let i = 0; i < 24; i += 2) {
+      const a0 = i * Math.PI / 12 + game.angle, a1 = a0 + Math.PI / 12;
+      ctx.beginPath(); ctx.moveTo(CX, y); ctx.ellipse(CX, y, R_OUT, R_OUT * TILT, 0, a0, a1); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function visibleRings() {
+    return game.rings.filter(r => !r.smashed && sy(r.y) > -80 && sy(r.y) < H + 80 && r.passT < 0.6);
+  }
+
+  function ringStyle(ring) {
+    // Rings that have been passed swell and fade away above the ball.
+    const k = 1 + ring.passT * 0.7;
+    return { k, alpha: Math.max(0, 1 - ring.passT / 0.6) };
+  }
+
+  function drawPole() {
+    const g = ctx.createLinearGradient(CX - POLE_R, 0, CX + POLE_R, 0);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.55, '#f1ecf8'); g.addColorStop(1, '#c9bfdc');
+    ctx.fillStyle = g;
+    ctx.fillRect(CX - POLE_R, 0, POLE_R * 2, H);
+  }
+
+  function drawBall() {
+    const b = game.ball;
+    const y = sy(b.y) + BALL_RING * TILT;
+    const sq = b.squash;
+    // Shadow on the ring below.
+    const ring = game.rings[game.next];
+    if (ring && (game.state === 'play' || game.state === 'ready') && !ring.smashed) {
+      const { index } = segmentUnderBall(ring);
+      if (ring.segs[index]) {
+        const gy = sy(ring.y) + BALL_RING * TILT;
+        const k = clamp(1 - (ring.y - b.y) / 260, 0.3, 1);
+        ctx.fillStyle = `rgba(30, 20, 60, ${0.22 * k})`;
+        ctx.beginPath(); ctx.ellipse(CX, gy, 13 * k, 5 * k, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    if (game.state === 'dying' || game.state === 'over') {
+      ctx.fillStyle = game.theme.ball;
+      ctx.beginPath(); ctx.ellipse(CX, y - 2, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    const sx = 1 + sq * 0.3, syy = 1 - sq * 0.3;
+    ctx.save();
+    ctx.translate(CX, y - BALL_R * syy);
+    ctx.scale(sx, syy);
+    const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, BALL_R);
+    if (b.fire) { g.addColorStop(0, '#fff6c2'); g.addColorStop(0.5, '#ffb000'); g.addColorStop(1, '#ff4d1f'); }
+    else { g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, game.theme.ball); g.addColorStop(1, game.theme.ball); }
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.fill();
+    if (b.fire) { ctx.strokeStyle = '#ff5a1f88'; ctx.lineWidth = 4; ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function outlinedText(text, x, y, size, fill, stroke = '#2a1f4a') {
+    ctx.font = `900 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.2;
+    ctx.strokeStyle = stroke;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function drawHud() {
+    if (game.state === 'ready') return;
+    const pct = game.cleared / (game.rings.length - 1);
+    const barX = 70, barW = W - 140, barY = 34;
+    ctx.fillStyle = '#ffffffaa';
+    ctx.beginPath(); ctx.roundRect(barX, barY - 7, barW, 14, 7); ctx.fill();
+    ctx.fillStyle = game.theme.ball;
+    ctx.beginPath(); ctx.roundRect(barX, barY - 7, Math.max(14, barW * pct), 14, 7); ctx.fill();
+    for (const [x, n, filled] of [[barX - 20, game.level, true], [barX + barW + 20, game.level + 1, pct >= 1]]) {
+      ctx.fillStyle = filled ? game.theme.ball : '#ffffff';
+      ctx.beginPath(); ctx.arc(x, barY, 17, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#2a1f4a22'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.font = '900 15px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = filled ? '#ffffff' : '#2a1f4a';
+      ctx.fillText(String(n), x, barY + 1);
+    }
+    outlinedText(String(game.score), CX, 82, 38, '#ffffff');
+    if (game.banner && game.state === 'play') {
+      ctx.globalAlpha = Math.min(1, (1.4 - game.banner.t) * 2);
+      outlinedText(game.banner.text, CX, 128, 26, '#ffb000');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, game.theme.bg[0]); bg.addColorStop(1, game.theme.bg[1]);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    if (game.shake) ctx.translate((Math.random() - 0.5) * 10 * game.shake, (Math.random() - 0.5) * 10 * game.shake);
+    const rings = visibleRings();
+    const pieces = new Map(rings.map(r => [r, piecesOf(r)]));
+    // Back halves first, then the pole through the middle, then the front halves nearest the viewer.
+    for (const ring of rings) {
+      const { k, alpha } = ringStyle(ring);
+      ctx.globalAlpha = alpha;
+      for (const p of pieces.get(ring)) if (!p.front) drawPiece(ring, p, sy(ring.y), k);
+      drawSplats(ring, sy(ring.y), k, false);
+    }
+    ctx.globalAlpha = 1;
+    drawPole();
+    for (const ring of rings) {
+      const { k, alpha } = ringStyle(ring);
+      ctx.globalAlpha = alpha;
+      const front = pieces.get(ring).filter(p => p.front).sort((a, b) => a.depth - b.depth);
+      for (const p of front) drawPiece(ring, p, sy(ring.y), k);
+      if (ring.goal) drawGoalStripes(sy(ring.y));
+      drawSplats(ring, sy(ring.y), k, true);
+    }
+    ctx.globalAlpha = 1;
+    for (const p of game.particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * (p.flame ? 3 : 2)));
+      ctx.fillStyle = p.color;
+      if (p.shard || p.confetti) ctx.fillRect(p.x - p.r, sy(p.y) - p.r * 0.6, p.r * 2, p.r * 1.2);
+      else { ctx.beginPath(); ctx.arc(p.x, sy(p.y) + BALL_RING * TILT, p.r, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+    drawBall();
+    for (const p of game.popups) {
+      ctx.globalAlpha = 1 - p.t / 0.8;
+      outlinedText(p.text, CX + 40, Math.max(130, sy(game.ball.y) + 10) - p.t * 40, 20, '#ffffff');
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    drawHud();
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never lets the ball skip through a ring.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      if (game.state !== 'paused' && game.state !== 'over' && game.state !== 'cleared') {
+        acc += dt;
+        while (acc >= STEP) { step(STEP); acc -= STEP; }
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (game.state === 'paused') { resume(); return; }
+    if (game.state === 'ready') begin();
+    if (game.state !== 'play') return;
+    canvas.setPointerCapture(event.pointerId);
+    input.dragId = event.pointerId;
+    input.dragX = event.clientX;
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (event.pointerId !== input.dragId) return;
+    const dx = (event.clientX - input.dragX) / scale;
+    input.dragX = event.clientX;
+    if (game.state === 'play') game.angle -= dx * DRAG_SPEED;
+  });
+  const endDrag = event => { if (event.pointerId === input.dragId) input.dragId = null; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  const KEY_DIRS = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (KEY_DIRS[event.key]) {
+      event.preventDefault();
+      input[KEY_DIRS[event.key]] = true;
+      if (game.state === 'ready') begin();
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest('button')) return;
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (game.state === 'over' || game.state === 'cleared') proceed();
+    else if (game.state === 'ready') begin();
+    else if (game.state === 'paused') resume();
+  });
+  document.addEventListener('keyup', event => { if (KEY_DIRS[event.key]) input[KEY_DIRS[event.key]] = false; });
+  window.addEventListener('blur', () => { input.left = input.right = false; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', begin);
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', proceed);
+
+  startLevel(saved.level, false);
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solitaire</title>
+<style>
+:root {
+  --felt: #0c5a50;
+  --felt-dark: #06352f;
+  --text: #f2f8f5;
+  --muted: #a6d3c8;
+  --gold: #ffd166;
+  --gold-dark: #c99a2e;
+  --red: #d7263d;
+  --black: #1c2230;
+  --paper: #fffdf7;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--felt);
+  background-image: radial-gradient(#ffffff09 1px, transparent 1.5px), radial-gradient(120% 85% at 50% 0%, #178a78, var(--felt) 50%, var(--felt-dark));
+  background-size: 5px 5px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 600px; margin: auto; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+@media (min-aspect-ratio: 5/4) { .app { max-width: 760px; } }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: var(--gold); text-shadow: 0 2px 0 #0004; }
+.modes { display: flex; padding: 3px; border-radius: 12px; background: #00000038; }
+.modes button { padding: 6px 10px; border-radius: 9px; font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.modes button[aria-pressed="true"] { background: var(--gold); color: #2b1f04; }
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: #0000002e; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+
+.table { flex: 1; min-height: 0; position: relative; isolation: isolate; touch-action: none; border-radius: 10px; }
+.table:focus { outline: none; }
+.table.kb:focus-visible { outline: 2px solid #ffd16644; outline-offset: 4px; }
+.slot, .card, .cursor { position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); border-radius: var(--r); }
+.slot { display: grid; place-items: center; background: #00000022; box-shadow: inset 0 0 0 2px #ffffff24; color: #ffffff38; font-size: calc(var(--cw) * .42); font-weight: 900; }
+.slot.stock { cursor: pointer; font-size: calc(var(--cw) * .5); }
+.slot.waste { background: none; box-shadow: inset 0 0 0 1.5px #ffffff12; }
+.card { background: #fff; color: var(--black); box-shadow: 0 1px 2px #00000066, 0 0 0 .5px #0000002e; transition: transform .22s cubic-bezier(.25, .8, .35, 1); cursor: grab; will-change: transform; }
+.card.red { color: var(--red); }
+.idx { position: absolute; left: 7%; right: 6%; top: 2%; display: flex; align-items: center; justify-content: space-between; font-size: calc(var(--cw) * .34); font-weight: 900; line-height: 1.1; letter-spacing: -.07em; }
+.idx svg { width: calc(var(--cw) * .27); height: calc(var(--cw) * .27); flex-shrink: 0; }
+.pip { position: absolute; left: 22%; bottom: 9%; width: 56%; height: auto; }
+.art { position: absolute; left: 11%; right: 11%; top: 33%; bottom: 7%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: calc(var(--r) * .7); background: #e9eef8; font-family: Georgia, "Times New Roman", serif; font-size: calc(var(--cw) * .44); font-weight: 700; line-height: 1; }
+.red .art { background: #fde7e7; }
+.art svg { width: 38%; height: auto; margin-top: 4%; }
+.card.down { cursor: default; background: repeating-linear-gradient(45deg, #ffffff22 0 2px, transparent 2px 7px), repeating-linear-gradient(-45deg, #ffffff22 0 2px, transparent 2px 7px), linear-gradient(160deg, #f27a5e, #c33f37); box-shadow: inset 0 0 0 calc(var(--cw) * .06) #fff, 0 1px 2px #00000066; }
+.card.down > * { display: none; }
+.card.dragging { transition: none; cursor: grabbing; box-shadow: 0 12px 24px #00000059, 0 0 0 .5px #0000002e; }
+.card.hint, .slot.hint { box-shadow: 0 0 0 3px var(--gold), 0 0 18px var(--gold); }
+.card.held { box-shadow: 0 0 0 3px #7fe3ff, 0 6px 16px #0007; }
+.card.shake { animation: shake .3s; }
+.card.flip { animation: flip .26s ease-out; }
+@keyframes shake { 20%, 60% { translate: -4px 0; } 40%, 80% { translate: 4px 0; } }
+@keyframes flip { from { scale: 0 1; } }
+.table.instant .card { transition: none; }
+.cursor { display: none; z-index: 3000; pointer-events: none; box-shadow: 0 0 0 3px var(--gold), 0 0 0 6px #00000080; transition: transform .12s, height .12s; }
+.table.kb:focus .cursor { display: block; }
+.toast { position: absolute; left: 50%; bottom: 10px; z-index: 3100; translate: -50% 0; max-width: 90%; padding: 8px 14px; border-radius: 99px; background: #000000b3; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+
+.tools { display: flex; gap: 6px; }
+.tools button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 4px 6px; border-radius: 12px; background: #00000038; font-size: 11.5px; font-weight: 800; }
+.tools button > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tools .icon { font-size: 18px; line-height: 1.15; }
+.tools button:disabled { opacity: .4; cursor: default; }
+.tools button[hidden] { display: none; }
+.tools .auto { background: var(--gold); color: #2b1f04; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px #ffd16655; } }
+
+.fx { position: fixed; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+.fx[hidden] { display: none; }
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: #021c18b3; }
+.overlay.light { background: #021c1866; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 350px); max-height: 100%; overflow: auto; background: var(--paper); color: #1d2b28; border-radius: 26px; padding: 24px 20px; text-align: center; box-shadow: 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel p { margin-top: 8px; color: #4f625d; font-size: 15px; line-height: 1.45; }
+.panel .emoji { margin: 0 0 4px; font-size: 44px; line-height: 1.1; }
+.suits { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.suits svg { width: 26px; height: 26px; }
+.panel .pick { margin-top: 16px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #7a8a86; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.choice { padding: 14px 8px; border-radius: 18px; background: var(--felt); color: #fff; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 var(--felt-dark); }
+.choice small { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: #bfe8dd; }
+.choice:active, .cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--felt-dark); }
+.panel .fine { margin-top: 14px; font-size: 12px; color: #7a8a86; }
+.panel .result { font-size: 18px; font-weight: 800; color: #1d2b28; }
+.panel .record { font-size: 13px; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #2b1f04; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.cta { width: 100%; padding: 15px; border-radius: 18px; background: var(--felt); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--felt-dark); }
+.ghost { width: 100%; padding: 11px; border-radius: 16px; color: #1d2b28; font-size: 15px; font-weight: 800; box-shadow: inset 0 0 0 2px #1d2b2826; }
+.panel :focus-visible { outline-color: var(--felt); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="suit-defs"></defs></svg>
+<main class="app">
+  <div class="top">
+    <h1>Solitaire</h1>
+    <div class="modes" role="group" data-i18n-label="modes">
+      <button type="button" data-mode="1" data-i18n="draw1" aria-pressed="true"></button>
+      <button type="button" data-mode="3" data-i18n="draw3" aria-pressed="false"></button>
+    </div>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">—</strong></div>
+  </div>
+  <div class="table" id="table" tabindex="0" role="application" data-i18n-label="board">
+    <div class="cursor" id="cursor"></div>
+    <p class="toast" id="toast" aria-hidden="true"></p>
+  </div>
+  <div class="tools">
+    <button type="button" id="undo" disabled><span class="icon" aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" id="hint"><span class="icon" aria-hidden="true">✦</span><span data-i18n="hint"></span></button>
+    <button type="button" class="auto" id="auto" hidden><span class="icon" aria-hidden="true">»</span><span data-i18n="auto"></span></button>
+    <button type="button" id="new"><span class="icon" aria-hidden="true">＋</span><span data-i18n="newGame"></span></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+<canvas class="fx" id="fx" hidden aria-hidden="true"></canvas>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <div class="suits" id="start-suits" aria-hidden="true"></div>
+    <h2 id="start-title">Solitaire</h2>
+    <p data-i18n="intro"></p>
+    <p class="pick" data-i18n="pick"></p>
+    <div class="choices">
+      <button type="button" class="choice" data-start="1"><span data-i18n="draw1"></span><small data-i18n="easy"></small></button>
+      <button type="button" class="choice" data-start="3"><span data-i18n="draw3"></span><small data-i18n="classic"></small></button>
+    </div>
+    <p class="fine" data-i18n="controls"></p>
+  </div>
+</div>
+
+<div class="overlay light" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🏆</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="result" id="win-result"></p>
+    <p id="win-points"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="record" id="win-record"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+      <button type="button" class="ghost" id="change-mode" data-i18n="changeMode"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🃏</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p data-i18n="stuckText"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="redeal" data-i18n="newDeal"></button>
+      <button type="button" class="ghost" id="stuck-undo" data-i18n="undo"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NUMBERS = ['2', '3', '4', '5', '6', '7', '8', '9', '10'];
+  const I18N = {
+    en: {
+      draw1: 'Draw 1', draw3: 'Draw 3', modes: 'Draw mode', score: 'Score', moves: 'Moves', time: 'Time', best: 'Best',
+      undo: 'Undo', hint: 'Hint', auto: 'Finish', newGame: 'New game',
+      board: 'Card table. Arrow keys choose a pile, Enter picks up or drops cards, H shows a hint, U undoes.',
+      intro: 'Build each suit from Ace to King on the four foundations. Drag cards, or tap one to send it to the best spot.',
+      pick: 'Choose a mode', easy: 'Relaxed', classic: 'Classic', controls: 'Keyboard: arrows to choose, Enter to pick up and drop.',
+      won: 'You won!', result: (time, m) => `${time} · ${m} moves`, points: (s, b) => b ? `${s} points (time bonus +${b})` : `${s} points`,
+      record: (w, b) => `Wins: ${w} · Best time: ${b}`, newBest: 'New best time!', again: 'Play again', changeMode: 'Change mode',
+      stuck: 'No more moves', stuckText: 'Undo a few moves or try a fresh deal.', newDeal: 'New deal',
+      stock: 'Stock', waste: 'Waste pile', foundation: n => `Foundation ${n}`, column: n => `Column ${n}`, empty: 'empty', left: n => `${n} cards left`,
+      ranks: ['Ace', ...NUMBERS, 'Jack', 'Queen', 'King'], suits: ['spades', 'hearts', 'diamonds', 'clubs'], card: (r, s) => `${r} of ${s}`,
+      moved: (c, p) => `${c} to ${p}`, drew: c => `Drew ${c}`, recycled: 'Waste turned over into the stock',
+      picked: (c, n) => n > 1 ? `Picked up ${c} and ${n - 1} more` : `Picked up ${c}`, illegal: 'That move isn’t allowed', undone: 'Move undone',
+      noHint: 'No useful moves', hintMove: (c, p) => `Hint: ${c} to ${p}`, hintDraw: 'Hint: draw from the stock', autoStart: 'Finishing automatically',
+      dealt: m => `New deal, draw ${m}`,
+    },
+    vi: {
+      draw1: 'Rút 1', draw3: 'Rút 3', modes: 'Chế độ rút bài', score: 'Điểm', moves: 'Nước đi', time: 'Thời gian', best: 'Kỷ lục',
+      undo: 'Hoàn tác', hint: 'Gợi ý', auto: 'Tự xếp', newGame: 'Ván mới',
+      board: 'Bàn bài. Dùng phím mũi tên để chọn chồng bài, Enter để nhấc hoặc đặt bài, H để xem gợi ý, U để hoàn tác.',
+      intro: 'Xếp mỗi chất từ Át đến Già lên bốn ô đích. Kéo thả lá bài, hoặc chạm vào một lá để nó tự tới chỗ phù hợp nhất.',
+      pick: 'Chọn chế độ', easy: 'Thư giãn', classic: 'Cổ điển', controls: 'Bàn phím: phím mũi tên để chọn, Enter để nhấc và đặt bài.',
+      won: 'Bạn đã thắng!', result: (time, m) => `${time} · ${m} nước đi`, points: (s, b) => b ? `${s} điểm (thưởng thời gian +${b})` : `${s} điểm`,
+      record: (w, b) => `Số ván thắng: ${w} · Nhanh nhất: ${b}`, newBest: 'Kỷ lục thời gian mới!', again: 'Chơi lại', changeMode: 'Đổi chế độ',
+      stuck: 'Hết nước đi', stuckText: 'Hãy hoàn tác vài nước hoặc chia ván mới.', newDeal: 'Chia ván mới',
+      stock: 'Chồng bài úp', waste: 'Chồng bài lật', foundation: n => `Ô đích ${n}`, column: n => `Cột ${n}`, empty: 'trống', left: n => `còn ${n} lá`,
+      ranks: ['Át', ...NUMBERS, 'Bồi', 'Đầm', 'Già'], suits: ['bích', 'cơ', 'rô', 'nhép'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `${c} tới ${p}`, drew: c => `Rút được ${c}`, recycled: 'Đã úp lại chồng bài',
+      picked: (c, n) => n > 1 ? `Đã nhấc ${c} cùng ${n - 1} lá` : `Đã nhấc ${c}`, illegal: 'Không thể đi nước này', undone: 'Đã hoàn tác',
+      noHint: 'Không có nước đi hữu ích', hintMove: (c, p) => `Gợi ý: ${c} tới ${p}`, hintDraw: 'Gợi ý: rút bài từ chồng úp', autoStart: 'Đang tự động xếp nốt',
+      dealt: m => `Ván mới, rút ${m} lá`,
+    },
+    zh: {
+      draw1: '翻 1 张', draw3: '翻 3 张', modes: '翻牌模式', score: '得分', moves: '步数', time: '时间', best: '最快',
+      undo: '撤销', hint: '提示', auto: '自动完成', newGame: '新游戏',
+      board: '牌桌。用方向键选择牌堆，按 Enter 拿起或放下纸牌，按 H 查看提示，按 U 撤销。',
+      intro: '在四个收牌区按花色从 A 排到 K。拖动纸牌，或点按纸牌让它自动移到最合适的位置。',
+      pick: '选择模式', easy: '轻松', classic: '经典', controls: '键盘：方向键选择，Enter 拿起和放下。',
+      won: '你赢了！', result: (time, m) => `${time} · ${m} 步`, points: (s, b) => b ? `${s} 分（时间奖励 +${b}）` : `${s} 分`,
+      record: (w, b) => `胜局：${w} · 最快：${b}`, newBest: '刷新最快纪录！', again: '再玩一次', changeMode: '切换模式',
+      stuck: '无路可走', stuckText: '撤销几步，或者重新发一局。', newDeal: '重新发牌',
+      stock: '牌堆', waste: '翻牌堆', foundation: n => `收牌区 ${n}`, column: n => `第 ${n} 列`, empty: '空', left: n => `剩 ${n} 张`,
+      ranks: ['A', ...NUMBERS, 'J', 'Q', 'K'], suits: ['黑桃', '红心', '方块', '梅花'], card: (r, s) => `${s}${r}`,
+      moved: (c, p) => `${c} 移到${p}`, drew: c => `翻出${c}`, recycled: '翻牌堆已放回牌堆',
+      picked: (c, n) => n > 1 ? `拿起${c}及另外 ${n - 1} 张` : `拿起${c}`, illegal: '不能这样移动', undone: '已撤销',
+      noHint: '没有有用的走法', hintMove: (c, p) => `提示：把${c}移到${p}`, hintDraw: '提示：从牌堆翻牌', autoStart: '正在自动完成',
+      dealt: m => `新的一局，每次翻 ${m} 张`,
+    },
+    fr: {
+      draw1: 'Pioche 1', draw3: 'Pioche 3', modes: 'Mode de pioche', score: 'Score', moves: 'Coups', time: 'Temps', best: 'Record',
+      undo: 'Annuler', hint: 'Indice', auto: 'Terminer', newGame: 'Nouveau',
+      board: 'Table de jeu. Flèches pour choisir une pile, Entrée pour prendre ou poser des cartes, H pour un indice, U pour annuler.',
+      intro: 'Montez chaque couleur de l’As au Roi sur les quatre fondations. Glissez les cartes, ou touchez-en une pour l’envoyer au meilleur endroit.',
+      pick: 'Choisissez un mode', easy: 'Détente', classic: 'Classique', controls: 'Clavier : flèches pour choisir, Entrée pour prendre et poser.',
+      won: 'Gagné !', result: (time, m) => `${time} · ${m} coups`, points: (s, b) => b ? `${s} points (bonus de temps +${b})` : `${s} points`,
+      record: (w, b) => `Victoires : ${w} · Meilleur temps : ${b}`, newBest: 'Nouveau record de temps !', again: 'Rejouer', changeMode: 'Changer de mode',
+      stuck: 'Plus de coups possibles', stuckText: 'Annulez quelques coups ou lancez une nouvelle donne.', newDeal: 'Nouvelle donne',
+      stock: 'Talon', waste: 'Défausse', foundation: n => `Fondation ${n}`, column: n => `Colonne ${n}`, empty: 'vide', left: n => `${n} cartes restantes`,
+      ranks: ['As', ...NUMBERS, 'Valet', 'Dame', 'Roi'], suits: ['pique', 'cœur', 'carreau', 'trèfle'], card: (r, s) => `${r} de ${s}`,
+      moved: (c, p) => `${c} vers ${p}`, drew: c => `Pioché : ${c}`, recycled: 'La défausse est retournée sur le talon',
+      picked: (c, n) => n > 1 ? `Vous prenez ${c} et ${n - 1} ${n > 2 ? 'autres cartes' : 'autre carte'}` : `Vous prenez ${c}`, illegal: 'Ce coup n’est pas permis', undone: 'Coup annulé',
+      noHint: 'Aucun coup utile', hintMove: (c, p) => `Indice : ${c} vers ${p}`, hintDraw: 'Indice : piochez dans le talon', autoStart: 'Fin de partie automatique',
+      dealt: m => `Nouvelle donne, pioche ${m}`,
+    },
+    th: {
+      draw1: 'จั่ว 1', draw3: 'จั่ว 3', modes: 'โหมดการจั่ว', score: 'คะแนน', moves: 'ครั้ง', time: 'เวลา', best: 'ดีที่สุด',
+      undo: 'ย้อนกลับ', hint: 'คำใบ้', auto: 'อัตโนมัติ', newGame: 'เกมใหม่',
+      board: 'โต๊ะไพ่ ใช้ปุ่มลูกศรเลือกกองไพ่ กด Enter เพื่อหยิบหรือวางไพ่ กด H เพื่อดูคำใบ้ กด U เพื่อย้อนกลับ',
+      intro: 'เรียงไพ่แต่ละดอกจากเอซถึงคิงบนกองเก็บทั้งสี่กอง ลากไพ่ หรือแตะไพ่เพื่อให้ไพ่ไปยังตำแหน่งที่ดีที่สุด',
+      pick: 'เลือกโหมด', easy: 'สบาย ๆ', classic: 'คลาสสิก', controls: 'คีย์บอร์ด: ใช้ลูกศรเพื่อเลือก กด Enter เพื่อหยิบและวาง',
+      won: 'คุณชนะแล้ว!', result: (time, m) => `${time} · ${m} ครั้ง`, points: (s, b) => b ? `${s} คะแนน (โบนัสเวลา +${b})` : `${s} คะแนน`,
+      record: (w, b) => `ชนะ ${w} เกม · เวลาดีที่สุด ${b}`, newBest: 'สถิติเวลาใหม่!', again: 'เล่นอีกครั้ง', changeMode: 'เปลี่ยนโหมด',
+      stuck: 'ไม่มีทางเดินแล้ว', stuckText: 'ลองย้อนกลับสักสองสามตา หรือแจกไพ่ใหม่', newDeal: 'แจกไพ่ใหม่',
+      stock: 'กองจั่ว', waste: 'กองไพ่เปิด', foundation: n => `กองเก็บ ${n}`, column: n => `แถว ${n}`, empty: 'ว่าง', left: n => `เหลือ ${n} ใบ`,
+      ranks: ['เอซ', ...NUMBERS, 'แจ็ค', 'ควีน', 'คิง'], suits: ['โพดำ', 'โพแดง', 'ข้าวหลามตัด', 'ดอกจิก'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `ย้าย ${c} ไป${p}`, drew: c => `จั่วได้ ${c}`, recycled: 'นำกองไพ่เปิดกลับไปเป็นกองจั่วแล้ว',
+      picked: (c, n) => n > 1 ? `หยิบ ${c} และอีก ${n - 1} ใบ` : `หยิบ ${c}`, illegal: 'ย้ายแบบนี้ไม่ได้', undone: 'ย้อนกลับแล้ว',
+      noHint: 'ไม่มีตาที่เป็นประโยชน์', hintMove: (c, p) => `คำใบ้: ย้าย ${c} ไป${p}`, hintDraw: 'คำใบ้: จั่วไพ่จากกองจั่ว', autoStart: 'กำลังเก็บไพ่อัตโนมัติ',
+      dealt: m => `แจกไพ่ใหม่ จั่วครั้งละ ${m} ใบ`,
+    },
+    ja: {
+      draw1: '1枚めくり', draw3: '3枚めくり', modes: 'めくる枚数', score: 'スコア', moves: '手数', time: 'タイム', best: 'ベスト',
+      undo: '戻す', hint: 'ヒント', auto: '自動完成', newGame: '新規ゲーム',
+      board: 'カードテーブル。矢印キーで場所を選び、Enter でカードを持ち上げる・置く。H でヒント、U で一手戻す。',
+      intro: '4つの組札に、スートごとにAからKまで積み上げよう。カードはドラッグで動かすか、タップすると最適な場所へ移動します。',
+      pick: 'モードを選択', easy: 'のんびり', classic: 'クラシック', controls: 'キーボード：矢印キーで選択、Enter で持ち上げて置く。',
+      won: 'クリア！', result: (time, m) => `${time} · ${m}手`, points: (s, b) => b ? `${s}点（タイムボーナス +${b}）` : `${s}点`,
+      record: (w, b) => `勝利数 ${w} · 最速 ${b}`, newBest: '最速タイム更新！', again: 'もう一度', changeMode: 'モード変更',
+      stuck: 'もう動かせません', stuckText: '何手か戻すか、新しく配り直しましょう。', newDeal: '配り直す',
+      stock: '山札', waste: 'めくり札', foundation: n => `組札 ${n}`, column: n => `${n}列目`, empty: '空', left: n => `残り${n}枚`,
+      ranks: ['エース', ...NUMBERS, 'ジャック', 'クイーン', 'キング'], suits: ['スペード', 'ハート', 'ダイヤ', 'クラブ'], card: (r, s) => `${s}の${r}`,
+      moved: (c, p) => `${c}を${p}へ`, drew: c => `${c}をめくりました`, recycled: 'めくり札を山札に戻しました',
+      picked: (c, n) => n > 1 ? `${c}とほか${n - 1}枚を持ち上げました` : `${c}を持ち上げました`, illegal: 'そこには置けません', undone: '一手戻しました',
+      noHint: '有効な手がありません', hintMove: (c, p) => `ヒント：${c}を${p}へ`, hintDraw: 'ヒント：山札をめくりましょう', autoStart: '自動で完成させています',
+      dealt: m => `新しいゲーム、${m}枚めくり`,
+    },
+    ko: {
+      draw1: '1장 뽑기', draw3: '3장 뽑기', modes: '뽑기 모드', score: '점수', moves: '이동', time: '시간', best: '최고',
+      undo: '되돌리기', hint: '힌트', auto: '자동 완성', newGame: '새 게임',
+      board: '카드 테이블. 방향키로 더미를 고르고 Enter로 카드를 집거나 놓으세요. H는 힌트, U는 되돌리기입니다.',
+      intro: '네 개의 파운데이션에 무늬별로 A부터 K까지 쌓으세요. 카드를 드래그하거나, 탭하면 가장 알맞은 곳으로 이동해요.',
+      pick: '모드 선택', easy: '느긋하게', classic: '클래식', controls: '키보드: 방향키로 고르고 Enter로 집고 놓기.',
+      won: '승리했어요!', result: (time, m) => `${time} · ${m}회 이동`, points: (s, b) => b ? `${s}점 (시간 보너스 +${b})` : `${s}점`,
+      record: (w, b) => `승리 ${w}회 · 최단 시간 ${b}`, newBest: '최단 시간 기록!', again: '다시 하기', changeMode: '모드 변경',
+      stuck: '더 이상 둘 곳이 없어요', stuckText: '몇 수 되돌리거나 카드를 새로 나눠 보세요.', newDeal: '새로 나누기',
+      stock: '덱', waste: '펼친 카드', foundation: n => `파운데이션 ${n}`, column: n => `${n}열`, empty: '비어 있음', left: n => `${n}장 남음`,
+      ranks: ['에이스', ...NUMBERS, '잭', '퀸', '킹'], suits: ['스페이드', '하트', '다이아몬드', '클로버'], card: (r, s) => `${s} ${r}`,
+      moved: (c, p) => `${c} → ${p}`, drew: c => `${c} 뽑음`, recycled: '펼친 카드를 덱으로 되돌렸어요',
+      picked: (c, n) => n > 1 ? `${c} 외 ${n - 1}장 집음` : `${c} 집음`, illegal: '그곳에는 놓을 수 없어요', undone: '되돌렸어요',
+      noHint: '쓸 만한 수가 없어요', hintMove: (c, p) => `힌트: ${c} → ${p}`, hintDraw: '힌트: 덱에서 카드를 뽑으세요', autoStart: '자동으로 완성하는 중',
+      dealt: m => `새 게임, ${m}장 뽑기`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Suit outlines on a 100×100 grid, shared by the DOM cards (as <symbol>s) and the win-celebration canvas.
+  const SUIT_PATHS = [
+    ['M50 4C38 22 6 38 6 60C6 74 16 82 28 82C38 82 45 77 48 70C47 82 42 90 32 96H68C58 90 53 82 52 70C55 77 62 82 72 82C84 82 94 74 94 60C94 38 62 22 50 4Z'],
+    ['M50 92C44 84 4 62 4 32C4 16 16 6 29 6C39 6 46 12 50 21C54 12 61 6 71 6C84 6 96 16 96 32C96 62 56 84 50 92Z'],
+    ['M50 3C61 21 74 36 89 50C74 64 61 79 50 97C39 79 26 64 11 50C26 36 39 21 50 3Z'],
+    ['M31 30a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M9 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M53 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M44 40H56V62C56 80 60 88 70 96H30C40 88 44 80 44 62Z'],
+  ];
+  const RANKS = ['A', ...NUMBERS, 'J', 'Q', 'K'];
+  const STOCK = 0, WASTE = 1, FOUND = 2, TAB = 6, PILES = 13;
+  const TOP_ROW = [STOCK, WASTE, FOUND, FOUND + 1, FOUND + 2, FOUND + 3];
+  const TOP_COLS = [0, 1, 3, 4, 5, 6];
+  const AUTO_SOURCES = [WASTE, 6, 7, 8, 9, 10, 11, 12];
+  const STATS_KEY = 'milaan.solitaire.stats';
+  const MODE_KEY = 'milaan.solitaire.drawMode';
+  const RECYCLE_PENALTY = { 1: 100, 3: 20 };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const isFoundation = p => p >= FOUND && p < TAB;
+  const isTableau = p => p >= TAB;
+
+  const $ = id => document.getElementById(id);
+  const table = $('table');
+  const els = { score: $('score'), moves: $('moves'), time: $('time'), best: $('best'), undo: $('undo'), hint: $('hint'), auto: $('auto'), cursor: $('cursor'), toast: $('toast'), announcer: $('announcer'), start: $('start'), win: $('win'), stuck: $('stuck'), winResult: $('win-result'), winPoints: $('win-points'), winRecord: $('win-record'), newBest: $('new-best'), again: $('again'), fx: $('fx') };
+  const fctx = els.fx.getContext('2d');
+  const FONT = getComputedStyle(document.body).fontFamily;
+
+  $('suit-defs').innerHTML = SUIT_PATHS.map((paths, s) => `<symbol id="suit${s}" viewBox="0 0 100 100">${paths.map(d => `<path d="${d}" fill="currentColor"/>`).join('')}</symbol>`).join('');
+  const suitSvg = (s, cls = '') => `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit${s}"/></svg>`;
+  $('start-suits').innerHTML = [0, 1, 3, 2].map(s => `<span style="color:${s === 1 || s === 2 ? 'var(--red)' : 'var(--black)'}">${suitSvg(s)}</span>`).join('');
+
+  const readStats = () => { try { return JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch { return {}; } };
+  const writeStats = value => { try { localStorage.setItem(STATS_KEY, JSON.stringify(value)); } catch {} };
+  const readMode = () => { try { return localStorage.getItem(MODE_KEY) === '3' ? 3 : 1; } catch { return 1; } };
+  const writeMode = value => { try { localStorage.setItem(MODE_KEY, String(value)); } catch {} };
+  const modeStats = (all = readStats()) => ({ played: 0, won: 0, bestTime: 0, bestScore: 0, ...all[draw] });
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+
+  const cards = [];
+  const slots = [];
+  let m = null;
+  let piles = Array.from({ length: PILES }, () => []);
+  let draw = readMode();
+  let state = 'idle';
+  let score = 0, moves = 0, elapsed = 0, running = false, started = false, recycles = 0;
+  let undoStack = [], cycle = null, held = null, hintIndex = 0;
+  let hintTimer = 0, zTimer = 0, autoTimer = 0, toastTimer = 0, panelTimer = 0;
+  const cursor = { p: TAB, depth: 0 };
+
+  function buildTable() {
+    for (let p = 0; p < PILES; p++) {
+      const el = document.createElement('div');
+      el.className = `slot${p === STOCK ? ' stock' : p === WASTE ? ' waste' : ''}`;
+      el.dataset.pile = p;
+      el.setAttribute('aria-hidden', 'true');
+      el.textContent = p === STOCK ? '↻' : isFoundation(p) ? 'A' : isTableau(p) ? 'K' : '';
+      table.append(el);
+      slots.push(el);
+    }
+    for (let id = 0; id < 52; id++) {
+      const suit = Math.floor(id / 13), rank = id % 13 + 1, red = suit === 1 || suit === 2;
+      const el = document.createElement('div');
+      el.className = `card down${red ? ' red' : ''}`;
+      el.dataset.id = id;
+      el.setAttribute('aria-hidden', 'true');
+      const center = rank > 10 ? `<span class="art">${RANKS[rank - 1]}${suitSvg(suit)}</span>` : suitSvg(suit, 'pip');
+      el.innerHTML = `<span class="idx"><b>${RANKS[rank - 1]}</b>${suitSvg(suit)}</span>${center}`;
+      table.append(el);
+      cards.push({ id, suit, rank, red, up: false, el, pile: -1, index: 0, x: 0, y: 0, z: 0 });
+    }
+  }
+
+  const cardName = card => t.card(t.ranks[card.rank - 1], t.suits[card.suit]);
+  const pileName = p => p === STOCK ? t.stock : p === WASTE ? t.waste : isFoundation(p) ? t.foundation(p - FOUND + 1) : t.column(p - TAB + 1);
+  const top = p => piles[p][piles[p].length - 1];
+  const colX = c => m.x0 + c * (m.cw + m.gap);
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function toast(text) {
+    els.toast.textContent = text;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1600);
+  }
+
+  // ---------- Layout ----------
+
+  function measure() {
+    const W = table.clientWidth, H = table.clientHeight;
+    if (!W || !H) return false;
+    const gap = Math.round(Math.max(3, Math.min(12, W * .014)));
+    const cw = Math.floor(Math.min((W - gap * 6) / 7, H / 5.2 / 1.4, 120));
+    const ch = Math.round(cw * 1.4);
+    m = { W, H, gap, cw, ch, x0: (W - cw * 7 - gap * 6) / 2, tabY: ch + Math.round(gap * 2.5), spread: Math.round(cw * .3) };
+    table.style.setProperty('--cw', `${cw}px`);
+    table.style.setProperty('--ch', `${ch}px`);
+    table.style.setProperty('--r', `${Math.round(cw * .09)}px`);
+    slots.forEach((el, p) => { const [x, y] = slotPos(p); el.style.transform = `translate(${x}px, ${y}px)`; });
+    return true;
+  }
+
+  function slotPos(p) {
+    if (p === STOCK) return [colX(0), 0];
+    if (p === WASTE) return [colX(1), 0];
+    if (isFoundation(p)) return [colX(p - FOUND + 3), 0];
+    return [colX(p - TAB), m.tabY];
+  }
+
+  // Tall columns squeeze their fan so the last card always stays on the table.
+  function fanFor(pile) {
+    let down = m.ch * .12, up = m.ch * .3, need = 0;
+    for (let i = 0; i < pile.length - 1; i++) need += pile[i].up ? up : down;
+    const room = Math.max(0, m.H - m.tabY - m.ch);
+    if (need > room) { const k = room / need; down *= k; up *= k; }
+    return { down, up };
+  }
+
+  function zBase(p) { return p === STOCK ? 0 : p === WASTE ? 100 : isFoundation(p) ? 200 : 300; }
+
+  function layout(lifted = []) {
+    if (!m) return;
+    for (let p = 0; p < PILES; p++) {
+      const pile = piles[p];
+      const [sx, sy] = slotPos(p);
+      const fan = isTableau(p) ? fanFor(pile) : null;
+      const fanFrom = p === WASTE && draw === 3 ? Math.max(0, pile.length - 3) : pile.length;
+      let y = sy;
+      pile.forEach((card, i) => {
+        const flying = lifted.includes(card) || (card.pile >= 0 && card.pile !== p);
+        const x = sx + Math.max(0, i - fanFrom) * m.spread;
+        place(card, p, i, x, y, flying);
+        if (fan) y += card.up ? fan.up : fan.down;
+      });
+    }
+    clearTimeout(zTimer);
+    zTimer = setTimeout(() => cards.forEach(card => { if (!card.el.classList.contains('dragging')) card.el.style.zIndex = card.z; }), 320);
+    renderCursor();
+  }
+
+  function place(card, p, i, x, y, flying) {
+    Object.assign(card, { pile: p, index: i, x, y, z: zBase(p) + i });
+    card.el.style.transform = `translate(${x}px, ${y}px)`;
+    // Cards in flight ride above everything until they land.
+    card.el.style.zIndex = flying ? 1000 + card.z : card.z;
+    card.el.classList.toggle('down', !card.up);
+    card.el.dataset.pile = p;
+  }
+
+  function dealAnimation(order) {
+    if (reduceMotion.matches || !m) return layout();
+    const [sx, sy] = slotPos(STOCK);
+    for (const card of cards) {
+      card.el.style.transition = 'none';
+      card.el.style.transform = `translate(${sx}px, ${sy}px)`;
+      card.el.classList.add('down');
+    }
+    void table.offsetWidth;
+    for (const card of cards) card.el.style.transition = '';
+    order.forEach((card, i) => { card.el.style.transitionDelay = `${i * 28}ms`; });
+    layout();
+    setTimeout(() => order.forEach(card => { card.el.style.transitionDelay = ''; }), order.length * 28 + 300);
+  }
+
+  function flipAnim(card) {
+    card.el.classList.remove('flip');
+    void card.el.offsetWidth;
+    card.el.classList.add('flip');
+  }
+
+  function shake(card) {
+    if (!card) return;
+    card.el.classList.remove('shake');
+    void card.el.offsetWidth;
+    card.el.classList.add('shake');
+  }
+
+  // ---------- Game flow ----------
+
+  function newGame(mode = draw) {
+    stopAuto();
+    stopFx();
+    clearTimeout(panelTimer);
+    clearHint();
+    releaseHeld();
+    draw = mode;
+    writeMode(mode);
+    for (const btn of document.querySelectorAll('[data-mode]')) btn.setAttribute('aria-pressed', String(+btn.dataset.mode === draw));
+    const deck = shuffle(cards.slice());
+    piles = Array.from({ length: PILES }, () => []);
+    const order = [];
+    for (let row = 0; row < 7; row++) for (let col = row; col < 7; col++) {
+      const card = deck.pop();
+      card.up = col === row;
+      piles[TAB + col].push(card);
+      order.push(card);
+    }
+    deck.forEach(card => { card.up = false; });
+    piles[STOCK] = deck;
+    score = 0; moves = 0; elapsed = 0; recycles = 0;
+    running = false; started = false;
+    undoStack = []; cycle = null; hintIndex = 0;
+    state = 'play';
+    cursor.p = TAB; cursor.depth = 0;
+    for (const id of ['start', 'win', 'stuck']) els[id].hidden = true;
+    dealAnimation(order);
+    updateHud();
+    announce(t.dealt(draw));
+  }
+
+  function startClock() {
+    if (!started) {
+      started = true;
+      const all = readStats();
+      const stats = modeStats(all);
+      stats.played += 1;
+      writeStats({ ...all, [draw]: stats });
+    }
+    running = true;
+  }
+
+  function addScore(n) { score = Math.max(0, score + n); }
+
+  function canMove(from, count, to) {
+    const src = piles[from];
+    const card = src[src.length - count];
+    if (!card || !card.up || from === to || to < FOUND) return false;
+    if ((from === WASTE || isFoundation(from)) && count !== 1) return false;
+    const dest = top(to);
+    if (isFoundation(to)) {
+      if (count !== 1 || isFoundation(from)) return false;
+      return dest ? dest.suit === card.suit && dest.rank === card.rank - 1 : card.rank === 1;
+    }
+    return dest ? dest.up && dest.red !== card.red && dest.rank === card.rank + 1 : card.rank === 13;
+  }
+
+  function foundationFor(card) {
+    for (let f = FOUND; f < TAB; f++) {
+      const dest = top(f);
+      if (dest ? dest.suit === card.suit && dest.rank === card.rank - 1 : card.rank === 1) return f;
+    }
+    return -1;
+  }
+
+  function pushUndo() {
+    undoStack.push({ piles: piles.map(pile => pile.map(card => card.id)), up: cards.map(card => card.up), score, moves, recycles });
+    if (undoStack.length > 2000) undoStack.shift();
+  }
+
+  // Mutates the table for one legal move; callers handle the after-move checks.
+  function applyMove(from, count, to, lifted = []) {
+    pushUndo();
+    const moved = piles[from].splice(-count);
+    piles[to].push(...moved);
+    if (isFoundation(to)) addScore(10);
+    else if (from === WASTE) addScore(5);
+    else if (isFoundation(from)) addScore(-15);
+    const revealed = top(from);
+    if (isTableau(from) && revealed && !revealed.up) {
+      revealed.up = true;
+      addScore(5);
+      flipAnim(revealed);
+    }
+    moves += 1;
+    cycle = null;
+    startClock();
+    layout([...moved, ...lifted]);
+    return moved;
+  }
+
+  function tryMove(from, count, to, lifted = []) {
+    if (state !== 'play' || !canMove(from, count, to)) return false;
+    const moved = applyMove(from, count, to, lifted);
+    announce(t.moved(cardName(moved[0]), pileName(to)));
+    afterAction();
+    return true;
+  }
+
+  function applyDraw() {
+    const stock = piles[STOCK], waste = piles[WASTE];
+    if (!stock.length && !waste.length) return false;
+    pushUndo();
+    if (!stock.length) {
+      piles[STOCK] = waste.reverse();
+      piles[WASTE] = [];
+      piles[STOCK].forEach(card => { card.up = false; });
+      recycles += 1;
+      addScore(-RECYCLE_PENALTY[draw]);
+      announce(t.recycled);
+    } else {
+      for (let i = 0; i < draw && stock.length; i++) {
+        const card = stock.pop();
+        card.up = true;
+        waste.push(card);
+      }
+      announce(t.drew(cardName(top(WASTE))));
+    }
+    moves += 1;
+    cycle = null;
+    startClock();
+    layout();
+    return true;
+  }
+
+  function drawCard() {
+    if (state !== 'play') return;
+    releaseHeld();
+    if (applyDraw()) afterAction();
+  }
+
+  function undo() {
+    if ((state !== 'play' && state !== 'stuck') || !undoStack.length) return;
+    const snap = undoStack.pop();
+    piles = snap.piles.map(ids => ids.map(id => cards[id]));
+    cards.forEach((card, i) => { card.up = snap.up[i]; });
+    ({ score, moves, recycles } = snap);
+    if (state === 'stuck') { state = 'play'; running = true; els.stuck.hidden = true; clearTimeout(panelTimer); }
+    cycle = null;
+    releaseHeld();
+    clearHint();
+    layout();
+    updateHud();
+    announce(t.undone);
+  }
+
+  const isWon = () => piles.slice(FOUND, TAB).every(pile => pile.length === 13);
+  const allFaceUp = () => piles.slice(TAB).every(pile => pile.every(card => card.up));
+
+  function afterAction() {
+    clearHint();
+    hintIndex = 0;
+    if (isWon()) return win();
+    updateHud();
+    if (allFaceUp() && !piles[STOCK].length && !piles[WASTE].length) return autoFinish();
+    if (isStuck()) {
+      state = 'stuck';
+      running = false;
+      updateHud();
+      announce(`${t.stuck}. ${t.stuckText}`);
+      panelTimer = setTimeout(() => { els.stuck.hidden = false; $('redeal').focus({ preventScroll: true }); }, 450);
+    }
+  }
+
+  // ---------- Hints & dead-end detection ----------
+
+  // Moves that make real progress, best first. Shuffling a run between columns is left out on purpose.
+  function usefulMoves() {
+    const list = [];
+    const sources = [];
+    if (piles[WASTE].length) sources.push([WASTE, 1]);
+    for (let p = TAB; p < PILES; p++) piles[p].forEach((card, i) => { if (card.up) sources.push([p, piles[p].length - i]); });
+    for (const [from, count] of sources) {
+      const pile = piles[from];
+      const card = pile[pile.length - count], under = pile[pile.length - count - 1];
+      if (count === 1) {
+        const f = foundationFor(card);
+        if (f >= 0) list.push({ from, count, to: f, rank: 0 });
+      }
+      let usedEmpty = false;
+      for (let to = TAB; to < PILES; to++) {
+        if (!canMove(from, count, to)) continue;
+        const empty = !piles[to].length;
+        if (empty && usedEmpty) continue;
+        let rank = -1;
+        if (from === WASTE) rank = 2;
+        else if (under && !under.up) rank = 1;
+        else if (!under && card.rank !== 13) rank = 3;
+        else if (under && foundationFor(under) >= 0) rank = 4;
+        if (rank < 0) continue;
+        if (empty) usedEmpty = true;
+        list.push({ from, count, to, rank });
+      }
+    }
+    return list.sort((a, b) => a.rank - b.rank);
+  }
+
+  // Cards that cycling the stock can bring to the top of the waste without any other move.
+  function reachableCards() {
+    const current = top(WASTE);
+    if (draw === 1) return [...piles[STOCK], ...piles[WASTE]].filter(card => card !== current);
+    const seen = new Set();
+    let stock = piles[STOCK].slice(), waste = piles[WASTE].slice(), redeals = 0;
+    for (let guard = 0; guard < 120; guard++) {
+      if (!stock.length) {
+        if (!waste.length || redeals) break;
+        stock = waste.reverse();
+        waste = [];
+        redeals = 1;
+        continue;
+      }
+      for (let i = 0; i < 3 && stock.length; i++) waste.push(stock.pop());
+      seen.add(waste[waste.length - 1]);
+    }
+    seen.delete(current);
+    return [...seen];
+  }
+
+  function hasHome(card) {
+    if (foundationFor(card) >= 0) return true;
+    for (let p = TAB; p < PILES; p++) {
+      const dest = top(p);
+      if (dest ? dest.up && dest.red !== card.red && dest.rank === card.rank + 1 : card.rank === 13) return true;
+    }
+    return false;
+  }
+
+  const stockHelps = () => reachableCards().some(hasHome);
+  const isStuck = () => !allFaceUp() && !usefulMoves().length && !stockHelps();
+
+  function clearHint() {
+    clearTimeout(hintTimer);
+    for (const el of table.querySelectorAll('.hint')) el.classList.remove('hint', 'hint-to');
+  }
+
+  function showHint() {
+    if (state !== 'play') return;
+    clearHint();
+    releaseHeld();
+    const options = usefulMoves();
+    if (stockHelps()) options.push({ draw: true });
+    if (!options.length) { toast(t.noHint); announce(t.noHint); return; }
+    const move = options[hintIndex % options.length];
+    hintIndex += 1;
+    if (move.draw) {
+      (top(STOCK)?.el || slots[STOCK]).classList.add('hint');
+      announce(t.hintDraw);
+    } else {
+      piles[move.from].slice(-move.count).forEach(card => card.el.classList.add('hint'));
+      (top(move.to)?.el || slots[move.to]).classList.add('hint', 'hint-to');
+      announce(t.hintMove(cardName(piles[move.from][piles[move.from].length - move.count]), pileName(move.to)));
+    }
+    hintTimer = setTimeout(clearHint, 2200);
+  }
+
+  // ---------- Auto-finish, win ----------
+
+  function autoFinish() {
+    if (state !== 'play') return;
+    state = 'auto';
+    releaseHeld();
+    clearHint();
+    updateHud();
+    announce(t.autoStart);
+    let idle = 0;
+    const step = () => {
+      if (state !== 'auto') return;
+      let best = null;
+      for (const p of AUTO_SOURCES) {
+        const card = top(p);
+        if (card && card.up && foundationFor(card) >= 0 && (!best || card.rank < best.rank)) best = card;
+      }
+      if (best) {
+        idle = 0;
+        applyMove(best.pile, 1, foundationFor(best));
+      } else if (idle++ < 2 + (piles[STOCK].length + piles[WASTE].length) * 2) {
+        applyDraw();
+      } else {
+        state = 'play';
+        updateHud();
+        return;
+      }
+      if (isWon()) return win();
+      updateHud();
+      autoTimer = setTimeout(step, reduceMotion.matches ? 40 : 120);
+    };
+    step();
+  }
+
+  function stopAuto() {
+    clearTimeout(autoTimer);
+    if (state === 'auto') state = 'play';
+  }
+
+  function win() {
+    state = 'won';
+    running = false;
+    const secs = Math.round(elapsed / 1000);
+    const bonus = secs >= 30 ? Math.round(700000 / secs) : 0;
+    addScore(bonus);
+    const all = readStats();
+    const stats = modeStats(all);
+    stats.won += 1;
+    const newBest = !stats.bestTime || elapsed < stats.bestTime;
+    if (newBest) stats.bestTime = Math.round(elapsed);
+    stats.bestScore = Math.max(stats.bestScore, score);
+    writeStats({ ...all, [draw]: stats });
+    updateHud();
+    els.winResult.textContent = t.result(formatTime(elapsed), moves);
+    els.winPoints.textContent = t.points(score, bonus);
+    els.winRecord.textContent = `${draw === 3 ? t.draw3 : t.draw1} · ${t.record(stats.won, formatTime(stats.bestTime))}`;
+    els.newBest.hidden = !newBest;
+    announce(`${t.won} ${els.winResult.textContent}. ${els.winPoints.textContent}`);
+    celebrate();
+    panelTimer = setTimeout(() => { els.win.hidden = false; els.again.focus({ preventScroll: true }); }, reduceMotion.matches ? 300 : 2400);
+  }
+
+  // Classic bouncing-card cascade: cards leave the foundations and leave trails on a canvas.
+  const SUIT_SHAPES = SUIT_PATHS.map(list => list.map(d => new Path2D(d)));
+  const fx = { on: false, queue: [], live: [], spawnIn: 0 };
+
+  function paintSuit(ctx, suit, x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 100, size / 100);
+    for (const shape of SUIT_SHAPES[suit]) ctx.fill(shape);
+    ctx.restore();
+  }
+
+  function paintCard(ctx, card, x, y, w, h) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, w * .09); else ctx.rect(x, y, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.28)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = card.red ? '#d7263d' : '#1c2230';
+    ctx.font = `900 ${Math.round(w * .34)}px ${FONT}`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(RANKS[card.rank - 1], x + w * .08, y + h * .05);
+    paintSuit(ctx, card.suit, x + w * .66, y + h * .05, w * .26);
+    paintSuit(ctx, card.suit, x + w * .22, y + h * .38, w * .56);
+  }
+
+  function celebrate() {
+    if (reduceMotion.matches || !m) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.fx.width = Math.round(innerWidth * dpr);
+    els.fx.height = Math.round(innerHeight * dpr);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    els.fx.hidden = false;
+    const rect = table.getBoundingClientRect();
+    fx.queue = [];
+    for (let r = 12; r >= 0; r--) for (let f = FOUND; f < TAB; f++) {
+      const card = piles[f][r];
+      if (card) fx.queue.push({ card, x: rect.left + card.x, y: rect.top + card.y, vx: 0, vy: 0 });
+    }
+    fx.live = [];
+    fx.spawnIn = 0;
+    fx.on = true;
+  }
+
+  function stepFx(dt) {
+    fx.spawnIn -= dt;
+    if (fx.spawnIn <= 0 && fx.queue.length) {
+      const b = fx.queue.shift();
+      b.vx = (Math.random() < .5 ? -1 : 1) * (.1 + Math.random() * .22);
+      b.vy = -Math.random() * .45;
+      b.card.el.style.visibility = 'hidden';
+      fx.live.push(b);
+      fx.spawnIn = 200;
+    }
+    const floor = innerHeight - m.ch;
+    for (const b of fx.live) {
+      b.vy += .0017 * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.y > floor) { b.y = floor; b.vy *= -.72; }
+      paintCard(fctx, b.card, b.x, b.y, m.cw, m.ch);
+    }
+    fx.live = fx.live.filter(b => b.x > -m.cw && b.x < innerWidth);
+    if (!fx.queue.length && !fx.live.length) fx.on = false;
+  }
+
+  function stopFx() {
+    fx.on = false;
+    fx.queue = [];
+    fx.live = [];
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.clearRect(0, 0, els.fx.width, els.fx.height);
+    els.fx.hidden = true;
+    cards.forEach(card => { card.el.style.visibility = ''; });
+  }
+
+  // ---------- HUD & loop ----------
+
+  function updateHud() {
+    els.score.textContent = String(score);
+    els.moves.textContent = String(moves);
+    els.time.textContent = formatTime(elapsed);
+    const best = modeStats().bestTime;
+    els.best.textContent = best ? formatTime(best) : '—';
+    els.undo.disabled = !undoStack.length || (state !== 'play' && state !== 'stuck');
+    els.hint.disabled = state !== 'play';
+    els.auto.hidden = !(state === 'play' && allFaceUp());
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    // Clamp dt so a stalled tab never teleports the celebration; the clock only drops long stalls,
+    // so it still keeps real time on slow devices.
+    const dt = Math.min(50, now - last);
+    const clockDt = Math.min(1000, now - last);
+    last = now;
+    if (running && state === 'play' && !document.hidden) {
+      const before = Math.floor(elapsed / 1000);
+      elapsed += clockDt;
+      const after = Math.floor(elapsed / 1000);
+      if (after !== before) {
+        if (after % 10 === 0) { addScore(-2); els.score.textContent = String(score); }
+        els.time.textContent = formatTime(elapsed);
+      }
+    }
+    if (fx.on) stepFx(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Pointer: drag & tap ----------
+
+  let press = null;
+
+  function destinationRing(p) {
+    const cols = [];
+    const startCol = isTableau(p) ? p - TAB + 1 : 0;
+    for (let i = 0; i < 7; i++) cols.push(TAB + (startCol + i) % 7);
+    return [p, FOUND, FOUND + 1, FOUND + 2, FOUND + 3, ...cols].filter((d, i, list) => list.indexOf(d) === i);
+  }
+
+  // Tap sends a card to its best spot; tapping the same card again walks on to the next legal spot.
+  function tapCard(card) {
+    const p = card.pile, count = piles[p].length - card.index;
+    const again = cycle && cycle.id === card.id && cycle.at === p;
+    const ring = again ? cycle.ring : destinationRing(p);
+    const start = ring.indexOf(p);
+    for (let k = 1; k < ring.length; k++) {
+      const to = ring[(start + k) % ring.length];
+      if (canMove(p, count, to)) {
+        tryMove(p, count, to);
+        if (state === 'play') cycle = { id: card.id, ring, at: to };
+        return;
+      }
+    }
+    shake(card);
+    announce(t.illegal);
+  }
+
+  function dropRect(p) {
+    const [x, y] = slotPos(p);
+    if (!isTableau(p)) return { x, y, w: m.cw, h: m.ch };
+    const last = top(p);
+    return { x, y, w: m.cw, h: (last ? last.y - y : 0) + m.ch };
+  }
+
+  function dropTarget(stack, from) {
+    const lead = stack[0];
+    let best = -1, bestArea = 0;
+    for (let p = FOUND; p < PILES; p++) {
+      if (!canMove(from, stack.length, p)) continue;
+      const r = dropRect(p);
+      const w = Math.min(lead.dragX + m.cw, r.x + r.w) - Math.max(lead.dragX, r.x);
+      const h = Math.min(lead.dragY + m.ch, r.y + r.h) - Math.max(lead.dragY, r.y);
+      if (w > 0 && h > 0 && w * h > bestArea) { bestArea = w * h; best = p; }
+    }
+    return best;
+  }
+
+  // Hit-test against where cards are going, not where they are drawn, so rapid taps ignore cards still in flight.
+  function hitTest(event) {
+    const rect = table.getBoundingClientRect();
+    const x = event.clientX - rect.left, y = event.clientY - rect.top;
+    const inside = (cx, cy) => x >= cx && x < cx + m.cw && y >= cy && y < cy + m.ch;
+    let card = null;
+    for (const c of cards) if (c.pile >= 0 && inside(c.x, c.y) && (!card || c.z > card.z)) card = c;
+    if (card) return { card, p: card.pile };
+    for (let p = 0; p < PILES; p++) if (inside(...slotPos(p))) return { card: null, p };
+    return { card: null, p: -1 };
+  }
+
+  table.addEventListener('pointerdown', event => {
+    if (state !== 'play' || event.button > 0 || press) return;
+    setKb(false);
+    releaseHeld();
+    table.focus({ preventScroll: true });
+    const { card, p } = hitTest(event);
+    if (p < 0) return;
+    event.preventDefault();
+    if (p === STOCK) { press = { stock: true, id: event.pointerId }; return; }
+    if (!card || !card.up || (!isTableau(p) && card !== top(p))) return;
+    press = { id: event.pointerId, x: event.clientX, y: event.clientY, card, from: p, stack: piles[p].slice(card.index), dragging: false };
+    table.setPointerCapture(event.pointerId);
+  });
+
+  table.addEventListener('pointermove', event => {
+    if (!press || press.stock || event.pointerId !== press.id) return;
+    const dx = event.clientX - press.x, dy = event.clientY - press.y;
+    if (!press.dragging) {
+      if (Math.hypot(dx, dy) < 6) return;
+      press.dragging = true;
+      clearHint();
+      press.stack.forEach((card, i) => { card.el.classList.add('dragging'); card.el.style.zIndex = 2000 + i; });
+    }
+    for (const card of press.stack) {
+      card.dragX = card.x + dx;
+      card.dragY = card.y + dy;
+      card.el.style.transform = `translate(${card.dragX}px, ${card.dragY}px)`;
+    }
+  });
+
+  table.addEventListener('pointerup', event => {
+    if (!press || event.pointerId !== press.id) return;
+    const done = press;
+    press = null;
+    if (done.stock) return drawCard();
+    if (!done.dragging) return tapCard(done.card);
+    done.stack.forEach(card => card.el.classList.remove('dragging'));
+    const to = dropTarget(done.stack, done.from);
+    if (to < 0 || !tryMove(done.from, done.stack.length, to, done.stack)) layout(done.stack);
+  });
+
+  table.addEventListener('pointercancel', () => {
+    if (press?.dragging) { press.stack.forEach(card => card.el.classList.remove('dragging')); layout(press.stack); }
+    press = null;
+  });
+
+  // ---------- Keyboard cursor ----------
+
+  function setKb(on) { table.classList.toggle('kb', on); }
+
+  function clampDepth(p, depth) {
+    const pile = piles[p];
+    if (!isTableau(p) || !pile.length) return Math.max(0, pile.length - 1);
+    const firstUp = Math.max(0, pile.findIndex(card => card.up));
+    return Math.min(Math.max(depth, firstUp), pile.length - 1);
+  }
+
+  function renderCursor() {
+    if (!m) return;
+    const p = cursor.p, pile = piles[p];
+    let [x, y] = slotPos(p), h = m.ch;
+    if (pile.length) {
+      cursor.depth = clampDepth(p, cursor.depth);
+      const last = pile[pile.length - 1], card = isTableau(p) ? pile[cursor.depth] : last;
+      x = card.x; y = card.y; h = last.y - card.y + m.ch;
+    }
+    els.cursor.style.transform = `translate(${x}px, ${y}px)`;
+    els.cursor.style.height = `${h}px`;
+  }
+
+  function describe(p) {
+    const pile = piles[p];
+    if (!pile.length) return `${pileName(p)}: ${t.empty}`;
+    if (p === STOCK) return `${pileName(p)}: ${t.left(pile.length)}`;
+    const card = isTableau(p) ? pile[cursor.depth] : pile[pile.length - 1];
+    return `${pileName(p)}: ${cardName(card)}`;
+  }
+
+  function moveCursor(key) {
+    let { p, depth } = cursor;
+    if (isTableau(p)) {
+      const col = p - TAB, firstUp = piles[p].findIndex(card => card.up);
+      if (key === 'ArrowLeft' || key === 'ArrowRight') { p = TAB + (col + (key === 'ArrowLeft' ? 6 : 1)) % 7; depth = Infinity; }
+      else if (key === 'ArrowUp') {
+        if (firstUp >= 0 && depth > firstUp) depth -= 1;
+        else p = col === 0 ? STOCK : TOP_ROW[Math.max(1, TOP_COLS.indexOf(col))];
+      } else depth += 1;
+    } else {
+      const i = TOP_ROW.indexOf(p);
+      if (key === 'ArrowLeft' || key === 'ArrowRight') p = TOP_ROW[(i + (key === 'ArrowLeft' ? 5 : 1)) % 6];
+      else if (key === 'ArrowDown') { p = TAB + TOP_COLS[i]; depth = Infinity; }
+    }
+    cursor.p = p;
+    cursor.depth = clampDepth(p, depth);
+    renderCursor();
+    announce(describe(p));
+  }
+
+  function markHeld(on) {
+    if (!held) return;
+    piles[held.p].slice(-held.count).forEach(card => card.el.classList.toggle('held', on));
+  }
+
+  function releaseHeld() {
+    markHeld(false);
+    held = null;
+  }
+
+  function activate() {
+    if (state !== 'play') return;
+    const p = cursor.p;
+    if (!held) {
+      if (p === STOCK) return drawCard();
+      const pile = piles[p];
+      if (!pile.length) return;
+      const i = isTableau(p) ? clampDepth(p, cursor.depth) : pile.length - 1;
+      if (!pile[i].up || p === WASTE && i !== pile.length - 1) return;
+      held = { p, count: pile.length - i };
+      markHeld(true);
+      announce(t.picked(cardName(pile[i]), held.count));
+      return;
+    }
+    const { p: from, count } = held;
+    const card = piles[from][piles[from].length - count];
+    releaseHeld();
+    // Pressing Enter twice on the same pile works like a tap: the best destination is chosen.
+    if (from === p) return tapCard(card);
+    if (!tryMove(from, count, p)) { shake(card); announce(t.illegal); return; }
+    cursor.depth = Infinity;
+    renderCursor();
+  }
+
+  const overlayOpen = () => !els.start.hidden || !els.win.hidden || !els.stuck.hidden;
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' || overlayOpen() || state === 'idle') return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const key = event.key;
+    if (key.startsWith('Arrow')) {
+      event.preventDefault();
+      setKb(true);
+      if (document.activeElement !== table) table.focus({ preventScroll: true });
+      moveCursor(key);
+    } else if ((key === 'Enter' || key === ' ') && (document.activeElement === table || document.activeElement === document.body)) {
+      event.preventDefault();
+      setKb(true);
+      activate();
+    } else if (key === 'h' || key === 'H') { event.preventDefault(); showHint(); }
+    else if (key === 'u' || key === 'U') { event.preventDefault(); undo(); }
+    else if (key === 'd' || key === 'D') { event.preventDefault(); drawCard(); }
+  });
+
+  // ---------- Buttons ----------
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', showHint);
+  els.auto.addEventListener('click', autoFinish);
+  $('new').addEventListener('click', () => { newGame(draw); table.focus({ preventScroll: true }); });
+  for (const btn of document.querySelectorAll('[data-mode]')) {
+    btn.addEventListener('click', () => { if (+btn.dataset.mode !== draw || state === 'won' || state === 'stuck') newGame(+btn.dataset.mode); });
+  }
+  for (const btn of document.querySelectorAll('[data-start]')) {
+    btn.addEventListener('click', () => { newGame(+btn.dataset.start); table.focus({ preventScroll: true }); });
+  }
+  els.again.addEventListener('click', () => { newGame(draw); table.focus({ preventScroll: true }); });
+  $('change-mode').addEventListener('click', () => { stopFx(); els.win.hidden = true; els.start.hidden = false; document.querySelector(`[data-start="${draw}"]`).focus({ preventScroll: true }); });
+  $('redeal').addEventListener('click', () => { newGame(draw); table.focus({ preventScroll: true }); });
+  $('stuck-undo').addEventListener('click', () => { undo(); table.focus({ preventScroll: true }); });
+
+  new ResizeObserver(() => {
+    table.classList.add('instant');
+    if (measure()) layout();
+    requestAnimationFrame(() => requestAnimationFrame(() => table.classList.remove('instant')));
+  }).observe(table);
+
+  buildTable();
+  // Before the first deal the whole deck waits face down on the stock.
+  piles[STOCK] = cards.slice();
+  for (const btn of document.querySelectorAll('[data-mode]')) btn.setAttribute('aria-pressed', String(+btn.dataset.mode === draw));
+  if (measure()) layout();
+  updateHud();
+  document.querySelector(`[data-start="${draw}"]`).focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

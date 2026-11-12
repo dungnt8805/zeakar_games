@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jumpy Climb</title>
+<style>
+:root {
+  --bg: #e9e2cf;
+  --paper: #fdfaf0;
+  --ink: #2d3047;
+  --muted: #6b6f86;
+  --marker: #7bd389;
+  --marker-dark: #3f9c56;
+  --pink: #ff7a9a;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: repeating-linear-gradient(135deg, #e4dcc6 0 2px, transparent 2px 9px), var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--pink); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 14px; overflow: hidden; background: var(--paper); box-shadow: 0 0 0 2px var(--ink), 6px 8px 0 #2d304733, 0 18px 40px #0003; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ff7a9a99; outline-offset: 4px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 7cqh 6cqw 6cqh; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.title { font-size: min(14cqw, 8.4cqh); font-weight: 900; letter-spacing: -.02em; line-height: .95; color: var(--ink); transform: rotate(-4deg); }
+.title span { display: inline-block; padding: 0 .12em; background: linear-gradient(transparent 52%, #ffe066 52% 88%, transparent 88%); }
+.tagline { margin-top: 2.4cqh; max-width: 26em; font-size: max(13px, min(4.2cqw, 2.5cqh)); font-weight: 700; line-height: 1.45; color: var(--ink); background: #fffef8e6; padding: 6px 12px; border-radius: 10px; border: 2px dashed #2d304740; }
+.spacer { flex: 1; }
+.cta { padding: 14px 30px; border-radius: 16px; background: var(--marker); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; border: 2.5px solid var(--ink); box-shadow: 4px 5px 0 var(--ink); animation: wobble 1.6s ease-in-out infinite; }
+.cta:active { transform: translate(3px, 4px); box-shadow: 1px 1px 0 var(--ink); }
+@keyframes wobble { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) scale(1.04); } }
+.small { margin-top: 1.4cqh; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #fffef8d9; padding: 4px 10px; border-radius: 99px; max-width: 30em; }
+.small:empty { display: none; }
+
+.center { justify-content: center; background: #2d304722; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 20px 18px; border-radius: 18px; background: var(--paper); color: var(--ink); border: 2.5px solid var(--ink); box-shadow: 6px 7px 0 var(--ink); animation: rise .3s ease-out; background-image: linear-gradient(#cfe0f366 1px, transparent 1px); background-size: 100% 22px; }
+@keyframes rise { from { transform: translateY(20px) rotate(-3deg); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.cause { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.cause:empty { display: none; }
+.scores { display: flex; justify-content: center; gap: 28px; margin-top: 14px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: var(--pink); color: #fff; font-size: 14px; font-weight: 800; transform: rotate(-3deg); }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 13px; border-radius: 14px; background: var(--marker); color: var(--ink); font-size: 19px; font-weight: 900; border: 2.5px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+.panel .again:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title">Jumpy<br><span>Climb</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="over"></h2>
+          <p class="cause" id="cause"></p>
+          <div class="scores">
+            <div><small data-i18n="height"></small><strong id="final-score">0</strong></div>
+            <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+          </div>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Bounce up the notebook page. How high can you climb?', controls: 'Hold the left or right side, drag, or use ← → to steer', start: 'Start climbing', best: n => `Best: ${n}`, canvas: 'Jumpy Climb — hold left or right, drag, or use the arrow keys to steer', paused: 'Paused', resume: 'Resume', over: 'Game over', height: 'Height', bestLabel: 'Best', newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', causes: { fell: 'You fell off the page!', monster: 'Bumped into a monster!', hole: 'Swallowed by an ink hole!' }, milestone: n => `Height ${n}!`, go: 'Climb!', final: s => `Height ${s}.` },
+    vi: { tagline: 'Bật nhảy lên trang vở. Bạn leo được cao đến đâu?', controls: 'Giữ bên trái hoặc phải màn hình, kéo, hoặc dùng ← → để điều khiển', start: 'Bắt đầu leo', best: n => `Kỷ lục: ${n}`, canvas: 'Jumpy Climb — giữ bên trái hoặc phải, kéo, hoặc dùng phím mũi tên để di chuyển', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', height: 'Độ cao', bestLabel: 'Kỷ lục', newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', causes: { fell: 'Bạn rơi khỏi trang vở rồi!', monster: 'Đụng phải quái vật!', hole: 'Bị hố mực nuốt mất!' }, milestone: n => `Độ cao ${n}!`, go: 'Leo nào!', final: s => `Độ cao ${s}.` },
+    zh: { tagline: '在笔记本上一路弹跳向上，你能爬多高？', controls: '按住屏幕左侧或右侧、拖动，或用 ← → 键控制方向', start: '开始攀登', best: n => `最高：${n}`, canvas: 'Jumpy Climb——按住左侧或右侧、拖动，或用方向键移动', paused: '已暂停', resume: '继续', over: '游戏结束', height: '高度', bestLabel: '最高', newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', causes: { fell: '你从纸上掉下去了！', monster: '撞上了小怪兽！', hole: '被墨水洞吞掉了！' }, milestone: n => `高度 ${n}！`, go: '出发！', final: s => `高度 ${s}。` },
+    fr: { tagline: 'Rebondissez le long de la page du cahier. Jusqu’où grimperez-vous ?', controls: 'Maintenez le côté gauche ou droit, glissez ou utilisez ← → pour vous diriger', start: 'Commencer', best: n => `Record : ${n}`, canvas: 'Jumpy Climb — maintenez à gauche ou à droite, glissez ou utilisez les flèches pour bouger', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', height: 'Hauteur', bestLabel: 'Record', newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', causes: { fell: 'Vous êtes tombé de la page !', monster: 'Percuté par un monstre !', hole: 'Avalé par un trou d’encre !' }, milestone: n => `Hauteur ${n} !`, go: 'On grimpe !', final: s => `Hauteur ${s}.` },
+    th: { tagline: 'เด้งขึ้นไปบนหน้าสมุด จะปีนได้สูงแค่ไหน?', controls: 'แตะค้างฝั่งซ้ายหรือขวา ลาก หรือใช้ปุ่ม ← → เพื่อบังคับ', start: 'เริ่มปีน', best: n => `สูงสุด: ${n}`, canvas: 'Jumpy Climb — แตะค้างฝั่งซ้ายหรือขวา ลาก หรือใช้ปุ่มลูกศรเพื่อเคลื่อนที่', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', height: 'ความสูง', bestLabel: 'สูงสุด', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', causes: { fell: 'ตกจากหน้ากระดาษแล้ว!', monster: 'ชนเข้ากับเจ้าสัตว์ประหลาด!', hole: 'ถูกหลุมหมึกดูดหายไป!' }, milestone: n => `ความสูง ${n}!`, go: 'ปีนเลย!', final: s => `ความสูง ${s}` },
+    ja: { tagline: 'ノートのページをぴょんぴょん登ろう。どこまで高く行けるかな？', controls: '画面の左右を長押し、ドラッグ、または ← → キーで移動', start: 'スタート', best: n => `ベスト：${n}`, canvas: 'Jumpy Climb — 左右を長押し、ドラッグ、または矢印キーで移動', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', height: '高さ', bestLabel: 'ベスト', newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', causes: { fell: 'ページから落ちちゃった！', monster: 'モンスターにぶつかった！', hole: 'インクの穴に吸い込まれた！' }, milestone: n => `高さ ${n} 達成！`, go: 'のぼれ！', final: s => `高さ ${s}。` },
+    ko: { tagline: '공책 페이지를 통통 튀어 올라가세요. 얼마나 높이 오를 수 있을까요?', controls: '화면 왼쪽이나 오른쪽을 누르고 있거나, 드래그하거나, ← → 키로 이동', start: '오르기 시작', best: n => `최고: ${n}`, canvas: 'Jumpy Climb — 왼쪽이나 오른쪽을 누르거나, 드래그하거나, 방향키로 이동', paused: '일시 정지', resume: '계속하기', over: '게임 오버', height: '높이', bestLabel: '최고', newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', causes: { fell: '페이지 밖으로 떨어졌어요!', monster: '괴물과 부딪혔어요!', hole: '잉크 구멍에 빨려 들어갔어요!' }, milestone: n => `높이 ${n} 돌파!`, go: '올라가자!', final: s => `높이 ${s}.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait page. World y is height (up = positive); fixed 1/120 s physics steps.
+  const W = 360, H = 640, STEP = 1 / 120;
+  const GRAVITY = 1400, JUMP = 760, SPRING = 1180, TRAMPOLINE = 1560;
+  const MAX_RUN = 300, RUN_ACCEL = 2400, RUN_DRAG = 1800;
+  const FOOT = 11, BODY_R = 15, PLAT_H = 12, START_Y = 60;
+  const MILESTONE = 500;
+  const STORAGE_KEY = 'milaan.jumpyClimb.best';
+  const INK = '#2d3047';
+  const COLORS = { normal: '#7bd389', moving: '#6cb4ff', breaking: '#d3a26f', vanish: '#fffef8' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), cause: $('cause'), finalScore: $('final-score'), finalBest: $('final-best'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  // Signed horizontal distance on a page that wraps around at the sides.
+  const wrapDx = dx => ((dx % W) + W * 1.5) % W - W / 2;
+  const noise = (seed, i) => { const s = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return s - Math.floor(s) - 0.5; };
+
+  let game, scale = 1, acc = 0, last = performance.now();
+  const best = { value: readBest() };
+  const input = { left: false, right: false, hold: 0, dragId: null, dragX: 0, downX: 0, dragging: false };
+
+  function reset() {
+    game = {
+      state: 'ready', time: 0, camY: 0, maxY: START_Y, score: 0, nextMilestone: MILESTONE,
+      player: { x: W / 2, y: START_Y, vx: 0, vy: 0, face: 1, squash: 0, spin: 0, shrink: 1 },
+      platforms: [], enemies: [], holes: [], particles: [], topY: START_Y, banner: null, overAt: 0, cause: 'fell', deadT: 0, sinceEnemy: 0, sinceHole: 0,
+    };
+    game.platforms.push(makePlatform(W / 2, START_Y, 'normal', 70));
+    while (game.topY < H + 200) addRow();
+    els.startBest.textContent = best.value ? t.best(best.value) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+  }
+
+  function makePlatform(x, y, type, w) {
+    return { x, y, type, w, vx: 0, spring: null, broken: false, gone: false, fall: 0, seed: Math.random() * 1000 };
+  }
+
+  // Difficulty ramps from 0 to 1 over the first 12 000 px of climbing.
+  const difficulty = () => clamp((game.topY - START_Y) / 12000, 0, 1);
+
+  function addRow() {
+    const d = difficulty();
+    const h = game.topY - START_Y;
+    const gap = rand(24 + 50 * d, 70 + 105 * d);
+    const y = game.topY + gap;
+    const w = Math.round(64 - 12 * d);
+    const roll = Math.random();
+    let type = 'normal';
+    if (h > 800 && roll < 0.08 + 0.3 * d) type = 'moving';
+    else if (h > 3000 && roll > 1 - 0.22 * d) type = 'vanish';
+    const p = makePlatform(rand(w / 2 + 4, W - w / 2 - 4), y, type, w);
+    // Keep the main path away from an ink hole sitting just below.
+    const hole = game.holes[game.holes.length - 1];
+    if (hole && y - hole.y < 260 && Math.abs(wrapDx(p.x - hole.x)) < 110) p.x = clamp(((hole.x + W / 2) % W), w / 2 + 4, W - w / 2 - 4);
+    if (type === 'moving') p.vx = (Math.random() < 0.5 ? -1 : 1) * rand(40 + 70 * d, 70 + 110 * d);
+    if (type !== 'vanish') {
+      const s = Math.random();
+      if (h > 1500 && s < 0.025) p.spring = { kind: 'tramp', off: 0, used: 0 };
+      else if (s < 0.09) p.spring = { kind: 'spring', off: rand(-w / 2 + 10, w / 2 - 10), used: 0 };
+    }
+    game.platforms.push(p);
+    // Fake platforms that crumble underfoot fill some of the bigger gaps.
+    if (h > 500 && gap > 55 && Math.random() < 0.18 + 0.3 * d) {
+      const bw = 60;
+      game.platforms.push(makePlatform(rand(bw / 2 + 4, W - bw / 2 - 4), y - gap * rand(0.35, 0.65), 'breaking', bw));
+    }
+    game.sinceEnemy += gap;
+    game.sinceHole += gap;
+    if (h > 4000 && game.sinceEnemy > rand(1100, 1900) - 600 * d && Math.random() < 0.5) {
+      game.sinceEnemy = 0;
+      game.enemies.push({ x: rand(30, W - 30), y: y + gap * 0.5 + 40, baseY: y + gap * 0.5 + 40, vx: (Math.random() < 0.5 ? -1 : 1) * rand(30, 60 + 50 * d), r: 19, dead: false, vy: 0, phase: Math.random() * 6, seed: Math.random() * 100 });
+    } else if (h > 7000 && game.sinceHole > rand(1600, 2600) - 700 * d && Math.random() < 0.5) {
+      game.sinceHole = 0;
+      game.holes.push({ x: rand(50, W - 50), y: y + gap * 0.5 + 60, r: 26, seed: Math.random() * 100 });
+    }
+    game.topY = y;
+  }
+
+  function begin() {
+    if (game.state !== 'ready') return;
+    game.state = 'play';
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(t.go);
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+    els.resume.focus({ preventScroll: true });
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+  }
+
+  function puff(x, y, color, count, speed = 120) {
+    if (reducedMotion) count = Math.ceil(count / 3);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random() * 0.8);
+      game.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, r: 2 + Math.random() * 3, color });
+    }
+  }
+
+  function bounce(v) {
+    const p = game.player;
+    p.vy = v;
+    p.squash = 1;
+  }
+
+  function die(cause) {
+    if (game.state !== 'play') return;
+    game.cause = cause;
+    game.deadT = 0;
+    if (cause === 'hole') game.state = 'sucked';
+    else {
+      game.state = 'falling';
+      if (cause === 'monster') { game.player.vy = Math.min(game.player.vy, 0); game.player.spin = 1; puff(game.player.x, game.player.y + BODY_R, INK, 10); }
+    }
+  }
+
+  function finish() {
+    game.state = 'over';
+    const isBest = game.score > best.value;
+    if (isBest) { best.value = game.score; writeBest(best.value); }
+    els.cause.textContent = t.causes[game.cause];
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(best.value);
+    els.newBest.hidden = !isBest;
+    announce(`${t.over}. ${t.causes[game.cause]} ${t.final(game.score)}${isBest ? ` ${t.newBest}` : ''}`);
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    els.again.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    // Ignore restarts in the first moments after the panel appears so frantic tapping can't skip the result.
+    if (game.state !== 'over' || performance.now() - game.overAt < 350) return;
+    reset();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function steerDir() {
+    if (input.dragging) return 0;
+    const keys = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    return keys || input.hold;
+  }
+
+  function landOn(plat) {
+    const p = game.player;
+    if (plat.type === 'breaking') {
+      plat.broken = true;
+      puff(plat.x, plat.y, COLORS.breaking, 8, 80);
+      return false;
+    }
+    if (plat.spring && Math.abs(wrapDx(p.x - (plat.x + plat.spring.off))) < (plat.spring.kind === 'tramp' ? 20 : 12)) {
+      plat.spring.used = 1;
+      bounce(plat.spring.kind === 'tramp' ? TRAMPOLINE : SPRING);
+      p.spin = plat.spring.kind === 'tramp' ? 1 : 0;
+    } else bounce(JUMP);
+    if (plat.type === 'vanish') { plat.gone = true; puff(plat.x, plat.y, '#9fc5e8', 10, 90); }
+    return true;
+  }
+
+  function stepPlayer(dt) {
+    const p = game.player;
+    const dir = game.state === 'play' ? steerDir() : 0;
+    if (dir) { p.vx = clamp(p.vx + dir * RUN_ACCEL * dt, -MAX_RUN, MAX_RUN); p.face = dir; }
+    else p.vx -= Math.sign(p.vx) * Math.min(Math.abs(p.vx), RUN_DRAG * dt);
+    p.x = ((p.x + p.vx * dt) % W + W) % W;
+    const prevY = p.y;
+    p.vy -= GRAVITY * dt;
+    p.y += p.vy * dt;
+    p.squash = Math.max(0, p.squash - dt * 5);
+    if (p.spin) p.spin = Math.max(0, p.spin - dt * 1.4);
+    if (p.vy >= 0 || game.state === 'falling') return;
+    for (const plat of game.platforms) {
+      if (plat.broken || plat.gone) continue;
+      if (prevY < plat.y || p.y > plat.y) continue;
+      if (Math.abs(wrapDx(p.x - plat.x)) > plat.w / 2 + FOOT) continue;
+      if (landOn(plat)) { p.y = plat.y; break; }
+    }
+  }
+
+  function stepWorld(dt) {
+    for (const plat of game.platforms) {
+      if (plat.type === 'moving') {
+        plat.x += plat.vx * dt;
+        if (plat.x < plat.w / 2 + 2) { plat.x = plat.w / 2 + 2; plat.vx = Math.abs(plat.vx); }
+        if (plat.x > W - plat.w / 2 - 2) { plat.x = W - plat.w / 2 - 2; plat.vx = -Math.abs(plat.vx); }
+      }
+      if (plat.broken) plat.fall += dt;
+      if (plat.spring && plat.spring.used) plat.spring.used = Math.max(0, plat.spring.used - dt * 4);
+    }
+    for (const e of game.enemies) {
+      e.phase += dt;
+      if (e.dead) { e.vy -= GRAVITY * dt; e.y += e.vy * dt; continue; }
+      e.x += e.vx * dt;
+      if (e.x < e.r + 4 || e.x > W - e.r - 4) { e.vx = -e.vx; e.x = clamp(e.x, e.r + 4, W - e.r - 4); }
+      e.y = e.baseY + Math.sin(e.phase * 2.4) * 8;
+    }
+    for (const q of game.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 300 * dt; q.life -= dt; }
+    game.particles = game.particles.filter(q => q.life > 0);
+  }
+
+  function checkHazards() {
+    const p = game.player;
+    const cy = p.y + BODY_R + 2;
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const dx = wrapDx(p.x - e.x), dy = cy - e.y;
+      if (dx * dx + dy * dy > (e.r + BODY_R - 3) ** 2) continue;
+      // Landing on a monster from above squashes it; any other touch ends the run.
+      if (p.vy < 0 && p.y > e.y - 4) {
+        e.dead = true; e.vy = 0;
+        bounce(JUMP);
+        puff(e.x, e.y, '#8e6bd8', 10);
+      } else die('monster');
+      return;
+    }
+    for (const hole of game.holes) {
+      const dx = wrapDx(p.x - hole.x), dy = cy - hole.y;
+      if (dx * dx + dy * dy < (hole.r * 0.85) ** 2) { game.hole = hole; die('hole'); return; }
+    }
+  }
+
+  function step(dt) {
+    game.time += dt;
+    if (game.banner && (game.banner.t += dt) > 1.6) game.banner = null;
+    const p = game.player;
+    if (game.state === 'ready') {
+      stepPlayer(dt);
+      stepWorld(dt);
+      return;
+    }
+    if (game.state === 'play') {
+      stepWorld(dt);
+      stepPlayer(dt);
+      checkHazards();
+      game.camY = Math.max(game.camY, p.y - H * 0.55);
+      if (p.y > game.maxY) {
+        game.maxY = p.y;
+        game.score = Math.floor((game.maxY - START_Y) / 10);
+        if (game.score >= game.nextMilestone) {
+          const text = t.milestone(game.nextMilestone);
+          game.banner = { text, t: 0 };
+          announce(text);
+          game.nextMilestone += MILESTONE;
+        }
+      }
+      while (game.topY < game.camY + H + 200) addRow();
+      const bottom = game.camY - 80;
+      game.platforms = game.platforms.filter(q => q.y > bottom && !(q.broken && q.fall > 1.2) && !(q.gone && q.y < game.camY));
+      game.enemies = game.enemies.filter(e => e.y > bottom - 200);
+      game.holes = game.holes.filter(o => o.y > bottom);
+      if (p.y + BODY_R * 2 < game.camY) die('fell');
+      return;
+    }
+    if (game.state === 'falling') {
+      game.deadT += dt;
+      stepWorld(dt);
+      stepPlayer(dt);
+      // The page scrolls down after the falling doodle so it visibly drops out of sight.
+      const target = p.y - H * 0.25;
+      if (target < game.camY) game.camY += (target - game.camY) * Math.min(1, dt * 3);
+      if (game.deadT > 1.1) finish();
+      return;
+    }
+    if (game.state === 'sucked') {
+      game.deadT += dt;
+      stepWorld(dt);
+      const k = Math.min(1, dt * 6);
+      p.x += wrapDx(game.hole.x - p.x) * k;
+      p.y += (game.hole.y - BODY_R - p.y) * k;
+      p.shrink = Math.max(0, 1 - game.deadT / 0.7);
+      p.spin += dt * 8;
+      if (game.deadT > 0.9) finish();
+    }
+  }
+
+  // ---------- drawing ----------
+  const sy = y => H - (y - game.camY);
+  const boil = () => (reducedMotion ? 0 : Math.floor(game.time * 6) % 3);
+
+  function wobblyRect(x, y, w, h, seed) {
+    const b = boil();
+    const j = i => noise(seed + b * 7, i) * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(x + j(1), y + j(2));
+    ctx.quadraticCurveTo(x + w / 2, y - 1 + j(3), x + w + j(4), y + j(5));
+    ctx.quadraticCurveTo(x + w + 1 + j(6), y + h / 2, x + w + j(7), y + h + j(8));
+    ctx.quadraticCurveTo(x + w / 2, y + h + 1 + j(9), x + j(10), y + h + j(11));
+    ctx.quadraticCurveTo(x - 1 + j(12), y + h / 2, x + j(1), y + j(2));
+  }
+
+  function wobblyCircle(x, y, r, seed, wobble = 1.6) {
+    const b = boil();
+    ctx.beginPath();
+    for (let i = 0; i <= 12; i++) {
+      const a = (i % 12) / 12 * Math.PI * 2;
+      const rr = r + noise(seed + b * 5, i % 12) * wobble * 2;
+      i ? ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+
+  function drawPaper() {
+    ctx.fillStyle = '#fdfaf0';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#cfe0f3';
+    ctx.lineWidth = 1;
+    const gridOff = ((game.camY % 24) + 24) % 24;
+    ctx.beginPath();
+    for (let y = H + gridOff; y > -24; y -= 24) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    for (let x = 12; x < W; x += 24) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.strokeStyle = '#f4a9a9';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(30, 0); ctx.lineTo(30, H); ctx.stroke();
+  }
+
+  function drawBestLine() {
+    if (!best.value || game.state === 'ready') return;
+    const y = sy(best.value * 10 + START_Y);
+    if (y < -10 || y > H + 10) return;
+    ctx.save();
+    ctx.strokeStyle = '#ff7a9a';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ff7a9a';
+    ctx.font = '800 13px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    ctx.fillText(`★ ${t.bestLabel} ${best.value}`, W - 8, y - 3);
+    ctx.restore();
+  }
+
+  function drawSpring(x, y, s) {
+    const comp = s.used;
+    if (s.kind === 'tramp') {
+      ctx.strokeStyle = INK; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - 16, y); ctx.lineTo(x - 12, y - 10); ctx.moveTo(x + 16, y); ctx.lineTo(x + 12, y - 10); ctx.stroke();
+      ctx.fillStyle = '#ff7a9a';
+      ctx.beginPath(); ctx.ellipse(x, y - 11 + comp * 4, 20, 5 - comp * 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      return;
+    }
+    const top = y - 16 + comp * 9;
+    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y);
+    for (let i = 1; i <= 4; i++) ctx.lineTo(x + (i % 2 ? 6 : -6), y + (top + 3 - y) * i / 4);
+    ctx.stroke();
+    ctx.fillStyle = '#c9ced8';
+    wobblyRect(x - 9, top - 3, 18, 5, 3 + x);
+    ctx.fill(); ctx.stroke();
+  }
+
+  function drawPlatform(p) {
+    const x = p.x - p.w / 2;
+    let y = sy(p.y);
+    if (y < -30 || y > H + 30) return;
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = INK;
+    if (p.type === 'breaking') {
+      if (p.broken) {
+        // Two halves tumble apart once stepped on.
+        const f = p.fall;
+        ctx.globalAlpha = Math.max(0, 1 - f / 1.2);
+        for (const side of [-1, 1]) {
+          ctx.save();
+          ctx.translate(p.x + side * (p.w / 4 + f * 30), y + PLAT_H / 2 + f * f * 500);
+          ctx.rotate(side * f * 1.5);
+          ctx.fillStyle = COLORS.breaking;
+          wobblyRect(-p.w / 4, -PLAT_H / 2, p.w / 2, PLAT_H, p.seed + side);
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+        return;
+      }
+      ctx.fillStyle = COLORS.breaking;
+      wobblyRect(x, y, p.w, PLAT_H, p.seed);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x - 3, y + 1); ctx.lineTo(p.x + 3, y + 5); ctx.lineTo(p.x - 2, y + 8); ctx.lineTo(p.x + 2, y + PLAT_H - 1);
+      ctx.moveTo(x + 10, y + 4); ctx.lineTo(x + 16, y + 7);
+      ctx.moveTo(x + p.w - 10, y + 3); ctx.lineTo(x + p.w - 15, y + 8);
+      ctx.lineWidth = 1.5; ctx.stroke();
+      return;
+    }
+    if (p.gone) return;
+    if (p.type === 'vanish') {
+      ctx.fillStyle = '#eaf3ff';
+      wobblyRect(x, y, p.w, PLAT_H, p.seed);
+      ctx.fill();
+      ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+      return;
+    }
+    if (p.spring) drawSpring(p.x + p.spring.off, y, p.spring);
+    // Marker fill sits slightly off the pencil outline, like a quick coloring job.
+    ctx.fillStyle = COLORS[p.type];
+    ctx.beginPath(); ctx.roundRect(x + 2, y + 2, p.w - 1, PLAT_H - 1, 5); ctx.fill();
+    wobblyRect(x, y, p.w, PLAT_H, p.seed);
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffffb0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x + 7, y + 4); ctx.lineTo(x + 16, y + 4); ctx.stroke();
+    if (p.type === 'moving') {
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, y + 2); ctx.lineTo(x - 9, y + 6); ctx.lineTo(x - 4, y + 10);
+      ctx.moveTo(x + p.w + 4, y + 2); ctx.lineTo(x + p.w + 9, y + 6); ctx.lineTo(x + p.w + 4, y + 10);
+      ctx.stroke();
+    }
+  }
+
+  function drawEnemy(e) {
+    const y = sy(e.y);
+    if (y < -40 || y > H + 40) return;
+    ctx.save();
+    ctx.translate(e.x, y);
+    if (e.dead) ctx.rotate(Math.PI);
+    // Scribbly wings flap on both sides.
+    const flap = Math.sin(e.phase * 14) * 0.5;
+    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.fillStyle = '#d9c8ff';
+    for (const s of [-1, 1]) {
+      ctx.save(); ctx.scale(s, 1); ctx.rotate(flap);
+      ctx.beginPath(); ctx.moveTo(e.r - 4, -4); ctx.quadraticCurveTo(e.r + 16, -22, e.r + 18, -2); ctx.quadraticCurveTo(e.r + 10, 2, e.r - 2, 4); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#8e6bd8';
+    wobblyCircle(0, 0, e.r, e.seed);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const a = -Math.PI * 0.85 + i * 0.42; ctx.moveTo(Math.cos(a) * e.r, Math.sin(a) * e.r); ctx.lineTo(Math.cos(a) * (e.r + 7), Math.sin(a) * (e.r + 7)); }
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-7, -4, 6, 0, Math.PI * 2); ctx.arc(7, -4, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(-6, -3, 2.4, 0, Math.PI * 2); ctx.arc(8, -3, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-9, 7); ctx.lineTo(-5, 11); ctx.lineTo(-1, 7); ctx.lineTo(3, 11); ctx.lineTo(7, 7); ctx.lineTo(10, 10); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawHole(o) {
+    const y = sy(o.y);
+    if (y < -50 || y > H + 50) return;
+    const g = ctx.createRadialGradient(o.x, y, 2, o.x, y, o.r + 6);
+    g.addColorStop(0, '#05060f'); g.addColorStop(0.7, '#2d3047'); g.addColorStop(1, '#2d304700');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(o.x, y, o.r + 6, 0, Math.PI * 2); ctx.fill();
+    // A scribbled spiral that slowly turns.
+    ctx.save();
+    ctx.translate(o.x, y);
+    ctx.rotate(reducedMotion ? 0 : game.time * 2);
+    ctx.strokeStyle = '#7c80a6'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 6; a += 0.3) { const r = 3 + a * 1.25; a ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(r, 0); }
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    wobblyCircle(o.x, y, o.r, o.seed, 2.4);
+    ctx.stroke();
+  }
+
+  function drawClimber(x, y) {
+    const p = game.player;
+    const sq = p.squash;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(p.shrink, p.shrink);
+    if (p.spin) ctx.rotate((1 - p.spin) * Math.PI * 2 * (p.face || 1));
+    ctx.scale(p.face < 0 ? -1 : 1, 1);
+    // Squash on landing, stretch on the way up.
+    const stretch = clamp(p.vy / 2400, -0.12, 0.12);
+    ctx.scale(1 + sq * 0.16 - stretch * 0.5, 1 - sq * 0.18 + stretch);
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // legs
+    const kick = p.vy > 0 ? 3 : 0;
+    ctx.beginPath();
+    for (const lx of [-8, -2, 4, 10]) { ctx.moveTo(lx, -6); ctx.lineTo(lx - 2, kick); ctx.lineTo(lx + 2, kick); }
+    ctx.stroke();
+    // body
+    ctx.fillStyle = '#c9e956';
+    ctx.beginPath();
+    ctx.moveTo(-14, -6);
+    ctx.quadraticCurveTo(-17, -24, -10, -33);
+    ctx.quadraticCurveTo(0, -40, 9, -32);
+    ctx.quadraticCurveTo(15, -22, 14, -6);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#6fa82b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-13, -11); ctx.lineTo(13, -11); ctx.moveTo(-13, -16); ctx.lineTo(13, -16); ctx.stroke();
+    // snout
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.2;
+    ctx.fillStyle = '#c9e956';
+    ctx.beginPath(); ctx.moveTo(9, -30); ctx.lineTo(22, -29); ctx.lineTo(22, -22); ctx.lineTo(11, -21); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(22, -25.5, 2, 3.5, 0, 0, Math.PI * 2); ctx.fillStyle = '#a8cc3a'; ctx.fill(); ctx.stroke();
+    // eyes
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(2, -29, 2.2, 0, Math.PI * 2); ctx.arc(-5, -29, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9fb2aa';
+    ctx.beginPath(); ctx.arc(-7, -22, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    const p = game.player;
+    const y = sy(p.y);
+    drawClimber(p.x, y);
+    // Draw a second copy while wrapping across a side edge.
+    if (p.x < 26) drawClimber(p.x + W, y);
+    else if (p.x > W - 26) drawClimber(p.x - W, y);
+  }
+
+  function outlinedText(text, x, y, size, fill, align = 'center') {
+    ctx.font = `900 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.22;
+    ctx.strokeStyle = '#fdfaf0';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function drawHud() {
+    if (game.state === 'ready') return;
+    ctx.save();
+    ctx.fillStyle = '#fffef8e6';
+    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    wobblyRect(10, 10, 112, 40, 42);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.font = '800 10px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#6b6f86';
+    ctx.fillText(t.height.toUpperCase(), 20, 21);
+    ctx.font = '900 20px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+    ctx.fillStyle = INK;
+    ctx.fillText(String(game.score), 20, 38);
+    if (best.value) {
+      const text = t.best(Math.max(best.value, game.score));
+      ctx.font = '800 12px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+      const w = ctx.measureText(text).width + 16;
+      ctx.fillStyle = '#fffef8e6';
+      ctx.beginPath(); ctx.roundRect(W - 10 - w, 12, w, 22, 11); ctx.fill();
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#6b6f86';
+      ctx.fillText(text, W - 18, 23.5);
+    }
+    if (game.banner && game.state === 'play') {
+      ctx.globalAlpha = Math.min(1, (1.6 - game.banner.t) * 2);
+      outlinedText(game.banner.text, W / 2, 96 - game.banner.t * 8, 24, '#ff5c84');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    drawPaper();
+    drawBestLine();
+    for (const o of game.holes) drawHole(o);
+    for (const p of game.platforms) drawPlatform(p);
+    for (const e of game.enemies) drawEnemy(e);
+    for (const q of game.particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 2));
+      ctx.fillStyle = q.color;
+      ctx.beginPath(); ctx.arc(q.x, sy(q.y), q.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    drawPlayer();
+    drawHud();
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a slow frame never moves the climber further than ~50 ms of motion.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      if (game.state !== 'paused' && game.state !== 'over') {
+        acc += dt;
+        while (acc >= STEP) { step(STEP); acc -= STEP; }
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Pointer: holding a side steers that way; once the finger travels, it switches to direct dragging.
+  const toWorldX = event => (event.clientX - canvas.getBoundingClientRect().left) / scale;
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (game.state === 'ready') { begin(); }
+    if (game.state === 'paused') { resume(); return; }
+    if (game.state !== 'play') return;
+    canvas.setPointerCapture(event.pointerId);
+    input.dragId = event.pointerId;
+    input.downX = input.dragX = toWorldX(event);
+    input.dragging = false;
+    input.hold = input.downX < W / 2 ? -1 : 1;
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (event.pointerId !== input.dragId || game.state !== 'play') return;
+    const x = toWorldX(event);
+    if (!input.dragging && Math.abs(x - input.downX) > 14) { input.dragging = true; input.hold = 0; }
+    if (input.dragging) {
+      const p = game.player;
+      const dx = x - input.dragX;
+      p.x = ((p.x + dx * 1.1) % W + W) % W;
+      p.vx = 0;
+      if (Math.abs(dx) > 0.5) p.face = Math.sign(dx);
+    }
+    input.dragX = x;
+  });
+  const endPointer = event => {
+    if (event.pointerId !== input.dragId) return;
+    input.dragId = null; input.hold = 0; input.dragging = false;
+  };
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
+  const KEY_DIRS = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (KEY_DIRS[event.key]) {
+      event.preventDefault();
+      input[KEY_DIRS[event.key]] = true;
+      if (game.state === 'ready') begin();
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest('button')) return;
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (game.state === 'over') restart();
+    else if (game.state === 'ready') begin();
+    else if (game.state === 'paused') resume();
+  });
+  document.addEventListener('keyup', event => { if (KEY_DIRS[event.key]) input[KEY_DIRS[event.key]] = false; });
+  window.addEventListener('blur', () => { input.left = input.right = false; input.hold = 0; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', begin);
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

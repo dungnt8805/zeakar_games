@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stack Up</title>
+<style>
+:root {
+  --bg: #171a2c;
+  --ink: #26233f;
+  --text: #ffffff;
+  --muted: #6d6a8a;
+  --accent: #6c5cff;
+  --accent-dark: #4a3bd6;
+  --pink: #ff6fa5;
+  --paper: #fbf9ff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #2e2b52, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid #ffd84d; outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffd84d88; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 9cqh 6cqw 6cqh; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.title { font-size: min(16cqw, 9cqh); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: #fff; text-shadow: 0 4px 0 var(--ink), 0 10px 24px #26233f66; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.title span { color: #ffd84d; }
+.tagline { margin-top: 2cqh; max-width: 30em; font-size: max(13px, min(4cqw, 2.4cqh)); font-weight: 700; line-height: 1.4; color: var(--ink); background: #ffffffd9; padding: 6px 12px; border-radius: 12px; }
+.spacer { flex: 1; }
+.cta { padding: 14px 34px; border-radius: 99px; background: var(--accent); color: #fff; font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark), 0 10px 24px #0004; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #ffffffc4; padding: 4px 10px; border-radius: 99px; }
+.small:empty { display: none; }
+
+.center { justify-content: center; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 22px 18px; border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #d9d2ef, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.results { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.results div { padding: 10px 6px; border-radius: 16px; background: #efeafc; }
+.results small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.results strong { display: block; font-size: 34px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat-line { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: var(--pink); color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title">Stack <span>Up</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="over"></h2>
+          <div class="results">
+            <div><small data-i18n="score"></small><strong id="final-score">0</strong></div>
+            <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+          </div>
+          <p class="stat-line" id="final-perfect"></p>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Drop the sliding slabs to build the tallest tower you can. Whatever hangs over gets sliced off!', controls: 'Tap, click or press Space to drop the slab', start: 'Play', best: n => `Best: ${n}`, canvas: 'Stack Up — tap or press Space to drop the sliding slab', paused: 'Paused', resume: 'Resume', over: 'Game over', score: 'Score', bestLabel: 'Best', newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', combo: n => `Perfect ×${n}`, perfects: n => `Perfect drops: ${n}`, milestone: n => `${n} slabs high!`, final: n => `You stacked ${n} slabs.`, go: 'Stack away!' },
+    vi: { tagline: 'Thả những tấm khối đang trượt để xây tháp cao nhất có thể. Phần thừa ra ngoài sẽ bị cắt mất!', controls: 'Chạm, nhấp chuột hoặc bấm Space để thả khối', start: 'Chơi', best: n => `Kỷ lục: ${n}`, canvas: 'Stack Up — chạm hoặc bấm Space để thả tấm khối đang trượt', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', score: 'Điểm', bestLabel: 'Kỷ lục', newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', combo: n => `Hoàn hảo ×${n}`, perfects: n => `Lần thả hoàn hảo: ${n}`, milestone: n => `Cao ${n} tầng rồi!`, final: n => `Bạn đã chồng được ${n} tấm.`, go: 'Bắt đầu xếp nào!' },
+    zh: { tagline: '放下滑动的方块，叠出最高的塔！超出的部分会被切掉哦。', controls: '点击屏幕或按空格键放下方块', start: '开始', best: n => `最高分：${n}`, canvas: 'Stack Up——点击或按空格键放下滑动的方块', paused: '已暂停', resume: '继续', over: '游戏结束', score: '得分', bestLabel: '最高分', newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', combo: n => `完美 ×${n}`, perfects: n => `完美放置：${n} 次`, milestone: n => `已经叠到 ${n} 层！`, final: n => `你叠了 ${n} 层。`, go: '开始叠吧！' },
+    fr: { tagline: 'Lâchez les dalles qui glissent pour bâtir la tour la plus haute possible. Ce qui dépasse est découpé !', controls: 'Touchez, cliquez ou appuyez sur Espace pour lâcher la dalle', start: 'Jouer', best: n => `Record : ${n}`, canvas: 'Stack Up — touchez ou appuyez sur Espace pour lâcher la dalle qui glisse', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', score: 'Score', bestLabel: 'Record', newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', combo: n => `Parfait ×${n}`, perfects: n => `Poses parfaites : ${n}`, milestone: n => `${n} dalles de haut !`, final: n => `Vous avez empilé ${n} dalles.`, go: 'Empilez !' },
+    th: { tagline: 'ปล่อยแผ่นบล็อกที่เลื่อนไปมาเพื่อสร้างหอคอยให้สูงที่สุด ส่วนที่ยื่นเกินจะถูกตัดทิ้ง!', controls: 'แตะ คลิก หรือกด Space เพื่อปล่อยแผ่นบล็อก', start: 'เล่น', best: n => `สูงสุด: ${n}`, canvas: 'Stack Up — แตะหรือกด Space เพื่อปล่อยแผ่นบล็อกที่กำลังเลื่อน', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', score: 'คะแนน', bestLabel: 'สูงสุด', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', combo: n => `เป๊ะ ×${n}`, perfects: n => `วางเป๊ะ ${n} ครั้ง`, milestone: n => `สูง ${n} ชั้นแล้ว!`, final: n => `คุณซ้อนได้ ${n} แผ่น`, go: 'เริ่มซ้อนเลย!' },
+    ja: { tagline: 'スライドするブロックを落として、できるだけ高く積み上げよう。はみ出た部分は切り落とされるよ！', controls: 'タップ、クリック、スペースキーでブロックを落とす', start: 'スタート', best: n => `ベスト：${n}`, canvas: 'Stack Up — タップかスペースキーでスライド中のブロックを落とす', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', score: 'スコア', bestLabel: 'ベスト', newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', combo: n => `パーフェクト ×${n}`, perfects: n => `パーフェクト：${n}回`, milestone: n => `${n}段に到達！`, final: n => `${n}段積み上げました。`, go: '積み上げよう！' },
+    ko: { tagline: '미끄러지는 블록을 떨어뜨려 최대한 높이 쌓으세요. 삐져나온 부분은 잘려 나가요!', controls: '탭, 클릭 또는 Space로 블록 떨어뜨리기', start: '시작', best: n => `최고: ${n}`, canvas: 'Stack Up — 탭하거나 Space를 눌러 움직이는 블록을 떨어뜨리세요', paused: '일시 정지', resume: '계속하기', over: '게임 오버', score: '점수', bestLabel: '최고', newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', combo: n => `퍼펙트 ×${n}`, perfects: n => `퍼펙트 ${n}회`, milestone: n => `${n}층 달성!`, final: n => `${n}층을 쌓았어요.`, go: '쌓기 시작!' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait view of an isometric world measured in slab units.
+  const W = 360, H = 640, STEP = 1 / 120;
+  const BASE = 100, SLAB = 12, RANGE = 125, S = 1.05;
+  const ISO_X = Math.cos(Math.PI / 6) * S, ISO_Y = 0.5 * S;
+  const PERFECT = 2.5, GROW_AFTER = 4, GROW = 6, GRAVITY = 900;
+  const ANCHOR = 330, MILESTONE = 25;
+  const STORAGE_KEY = 'milaan.stackUp.best';
+  const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const speedFor = n => Math.min(150 + n * 3, 300);
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), finalScore: $('final-score'), finalBest: $('final-best'), finalPerfect: $('final-perfect'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+  const clamp01 = k => Math.max(0, Math.min(1, k));
+  const best = { value: readBest() };
+
+  let game, scale = 1, acc = 0, last = performance.now();
+
+  const hueFor = n => (game.hue0 + n * 6) % 360;
+  const topSlab = () => game.slabs[game.slabs.length - 1];
+  const topY = () => topSlab().y + topSlab().h;
+
+  function reset() {
+    const hue0 = Math.floor(Math.random() * 360);
+    game = {
+      state: 'ready', hue0, score: 0, combo: 0, perfects: 0, time: 0, overAt: 0,
+      slabs: [{ x: 0, z: 0, w: BASE, d: BASE, y: -1200, h: 1200, n: 0 }],
+      cur: null, pieces: [], rings: [], banner: null, pop: 0,
+      view: { x: 0, z: 0, y: 0, zoom: 1, anchor: ANCHOR }, hue: hue0,
+    };
+    els.startBest.textContent = best.value ? t.best(best.value) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+  }
+
+  function spawn() {
+    const top = topSlab(), n = game.slabs.length;
+    const axis = n % 2 ? 'x' : 'z';
+    game.cur = { x: top.x, z: top.z, w: top.w, d: top.d, y: topY(), h: SLAB, n, axis, p: -RANGE, dir: 1 };
+    game.cur[axis] = top[axis] - RANGE;
+  }
+
+  function begin() {
+    game.state = 'play';
+    els.start.hidden = true;
+    spawn();
+    canvas.focus({ preventScroll: true });
+    announce(t.go);
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+  }
+
+  function place() {
+    const c = game.cur, top = topSlab();
+    if (!c) return;
+    const ax = c.axis, size = ax === 'x' ? 'w' : 'd';
+    const delta = c[ax] - top[ax];
+    const abs = Math.abs(delta);
+    if (abs >= top[size]) return miss();
+    if (abs <= PERFECT) {
+      c[ax] = top[ax];
+      game.combo++;
+      game.perfects++;
+      // A long perfect streak earns back a little of the lost width.
+      if (game.combo >= GROW_AFTER) c[size] = Math.min(BASE, c[size] + GROW);
+      game.rings.push({ x: c.x, z: c.z, w: c.w, d: c.d, y: c.y + c.h, t: 0, big: game.combo >= GROW_AFTER });
+      if (game.combo >= 3) announce(t.combo(game.combo));
+    } else {
+      game.combo = 0;
+      const half = top[size] / 2;
+      const lo = Math.max(c[ax] - half, top[ax] - half), hi = Math.min(c[ax] + half, top[ax] + half);
+      const cut = delta > 0 ? [hi, c[ax] + half] : [c[ax] - half, lo];
+      const piece = { ...c, vy: 0, drift: Math.sign(delta) * 30 };
+      piece[ax] = (cut[0] + cut[1]) / 2;
+      piece[size] = cut[1] - cut[0];
+      game.pieces.push(piece);
+      c[ax] = (lo + hi) / 2;
+      c[size] = hi - lo;
+    }
+    game.slabs.push({ x: c.x, z: c.z, w: c.w, d: c.d, y: c.y, h: c.h, n: c.n, glow: 1 });
+    game.score++;
+    game.pop = 1;
+    if (game.score % MILESTONE === 0) { game.banner = { text: t.milestone(game.score), t: 0 }; announce(t.milestone(game.score)); }
+    spawn();
+  }
+
+  function miss() {
+    game.pieces.push({ ...game.cur, vy: 0, drift: 0 });
+    game.cur = null;
+    game.state = 'ending';
+    game.endTimer = 1.3;
+  }
+
+  function finish() {
+    game.state = 'over';
+    const isBest = game.score > best.value;
+    if (isBest) { best.value = game.score; writeBest(best.value); }
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(best.value);
+    els.finalPerfect.textContent = t.perfects(game.perfects);
+    els.newBest.hidden = !isBest;
+    announce(`${t.over}. ${t.final(game.score)}${isBest ? ` ${t.newBest}` : ''}`);
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    els.again.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    if (game.state !== 'over' || performance.now() - game.overAt < 350) return;
+    reset();
+    begin();
+  }
+
+  function act() {
+    if (game.state === 'ready') begin();
+    else if (game.state === 'play') place();
+    else if (game.state === 'paused') resume();
+    else if (game.state === 'over') restart();
+  }
+
+  function step(dt) {
+    game.time += dt;
+    const c = game.cur;
+    if (c && game.state === 'play') {
+      const top = topSlab();
+      c.p += c.dir * speedFor(game.score) * dt;
+      if (c.p > RANGE) { c.p = RANGE; c.dir = -1; }
+      if (c.p < -RANGE) { c.p = -RANGE; c.dir = 1; }
+      c[c.axis] = top[c.axis] + c.p;
+    }
+    for (const p of game.pieces) {
+      p.vy -= GRAVITY * dt;
+      p.y += p.vy * dt;
+      p[p.axis] += p.drift * dt;
+    }
+    const floor = topY() - 520;
+    game.pieces = game.pieces.filter(p => p.y > floor);
+    for (const r of game.rings) r.t += dt;
+    game.rings = game.rings.filter(r => r.t < 0.7);
+    for (const s of game.slabs) if (s.glow) s.glow = Math.max(0, s.glow - dt * 3);
+    game.pop = Math.max(0, game.pop - dt * 5);
+    if (game.banner && (game.banner.t += dt) > 1.8) game.banner = null;
+    game.hue += (((hueFor(game.slabs.length) - game.hue + 540) % 360) - 180) * Math.min(1, dt * 2);
+
+    // Camera follows the tower top; after a miss it pulls back to show the whole tower.
+    const v = game.view, top = topSlab();
+    const ending = game.state === 'ending' || game.state === 'over';
+    const height = topY();
+    const target = ending
+      ? { x: 0, z: 0, y: height / 2, zoom: Math.min(1, 380 / (height * S + 220)), anchor: 300 }
+      : { x: top.x, z: top.z, y: height, zoom: 1, anchor: ANCHOR };
+    const k = Math.min(1, dt * (ending ? 2 : 4));
+    for (const key of Object.keys(target)) v[key] += (target[key] - v[key]) * k;
+    if (game.state === 'ending' && (game.endTimer -= dt) <= 0) finish();
+  }
+
+  // ---------- drawing ----------
+  function proj(x, y, z) {
+    const v = game.view;
+    const dx = x - v.x, dz = z - v.z;
+    return [W / 2 + (dx - dz) * ISO_X * v.zoom, v.anchor + ((dx + dz) * ISO_Y - (y - v.y) * S) * v.zoom];
+  }
+
+  function face(points, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    points.forEach(([x, y, z], i) => { const [sx, sy] = proj(x, y, z); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawBox(b, alpha = 1) {
+    const hue = hueFor(b.n);
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, y0 = b.y, y1 = b.y + b.h;
+    ctx.globalAlpha = alpha;
+    face([[x1, y1, z0], [x1, y1, z1], [x1, y0, z1], [x1, y0, z0]], `hsl(${hue} 58% 56%)`);
+    face([[x0, y1, z1], [x1, y1, z1], [x1, y0, z1], [x0, y0, z1]], `hsl(${hue} 55% 45%)`);
+    face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], `hsl(${hue} 72% ${b.glow ? 70 + b.glow * 16 : 70}%)`);
+    // Bright rim on the two front top edges gives the slab a crisp, glossy edge.
+    ctx.strokeStyle = `hsl(${hue} 90% 88% / .7)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const a = proj(x0, y1, z1), c = proj(x1, y1, z1), d = proj(x1, y1, z0);
+    ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBackground() {
+    const h = game.hue;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, `hsl(${(h + 40) % 360} 70% 86%)`);
+    g.addColorStop(1, `hsl(${(h + 10) % 360} 55% 64%)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // Soft drifting bokeh dots give the flat backdrop some depth as the camera climbs.
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 9; i++) {
+      const y = ((i * 97 + game.view.y * S * 0.25) % (H + 120)) - 60;
+      const x = (i * 71 + Math.sin(game.time * 0.3 + i) * 12) % W;
+      ctx.globalAlpha = 0.1 + (i % 3) * 0.04;
+      ctx.beginPath(); ctx.arc(x, y, 18 + (i % 4) * 9, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRing(r) {
+    const k = r.t / 0.7;
+    const grow = (r.big ? 16 : 10) * k;
+    const x0 = r.x - r.w / 2 - grow, x1 = r.x + r.w / 2 + grow, z0 = r.z - r.d / 2 - grow, z1 = r.z + r.d / 2 + grow;
+    ctx.globalAlpha = 1 - k;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].forEach(([x, z], i) => { const [sx, sy] = proj(x, r.y, z); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function outlinedText(text, x, y, size, fill, stroke = '#26233f') {
+    ctx.font = `900 ${size}px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.16;
+    ctx.strokeStyle = stroke;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function draw() {
+    if (!game) return;
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    drawBackground();
+    const top = topSlab();
+    const depth = b => b.x + b.z;
+    const behind = game.pieces.filter(p => depth(p) < depth(top));
+    const front = game.pieces.filter(p => depth(p) >= depth(top));
+    for (const p of behind) drawBox(p, clamp01((p.y - (topY() - 520)) / 200));
+    const v = game.view;
+    for (const s of game.slabs) {
+      const sy = v.anchor - (s.y - v.y) * S * v.zoom;
+      if (sy < -60 || sy - s.h * S * v.zoom > H + 120) continue;
+      drawBox(s);
+    }
+    for (const r of game.rings) drawRing(r);
+    if (game.cur) drawBox(game.cur);
+    for (const p of front) drawBox(p, clamp01((p.y - (topY() - 520)) / 200));
+
+    if (game.state !== 'ready') {
+      const s = 1 + game.pop * (reducedMotion ? 0 : 0.18);
+      ctx.save(); ctx.translate(W / 2, 78); ctx.scale(s, s);
+      outlinedText(String(game.score), 0, 0, 58, '#ffffff');
+      ctx.restore();
+      if (game.combo >= 2 && game.state === 'play') outlinedText(t.combo(game.combo), W / 2, 124, 18, '#ffe46b');
+    }
+    if (game.banner) {
+      ctx.globalAlpha = 1 - clamp01((game.banner.t - 1.4) / 0.4);
+      outlinedText(game.banner.text, W / 2, 160 - game.banner.t * 6, 22, '#ffffff');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never slides the slab more than 50 ms worth.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      if (game.state !== 'paused') {
+        acc += dt;
+        while (acc >= STEP) { step(STEP); acc -= STEP; }
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    act();
+  });
+  document.addEventListener('keydown', event => {
+    if ((event.target instanceof Element && event.target.closest('button')) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    if (!event.repeat) act();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', () => { if (game.state === 'ready') begin(); });
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

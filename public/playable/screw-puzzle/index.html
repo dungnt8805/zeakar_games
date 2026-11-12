@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Screw Puzzle</title>
+<style>
+:root {
+  --bg: #22304a;
+  --text: #fdf8ef;
+  --muted: #b9c5da;
+  --accent: #ffcf4a;
+  --accent-dark: #d6a21d;
+  --chip: #ffffff17;
+  --panel: #fffaf0;
+  --ink: #2a2f3d;
+  --ink-muted: #6d6a78;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: radial-gradient(ellipse at top, #3b5683, var(--bg) 70%);
+  background-color: var(--bg);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; overflow: clip; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(21px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--accent); }
+.stat { min-width: 62px; padding: 5px 9px; border-radius: 14px; background: var(--chip); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 14px; background: var(--chip); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 #0003; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #0003; }
+
+/* Screw heads: a coloured dome with a cross slot. */
+.head { position: relative; display: block; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #ffffffb0 0 14%, transparent 30%), radial-gradient(circle at 50% 60%, var(--c) 55%, color-mix(in srgb, var(--c) 70%, #000) 100%); box-shadow: 0 0 0 1.5px #0005, 0 2px 3px #0006; }
+.head::before, .head::after { content: ""; position: absolute; left: 50%; top: 50%; width: 52%; height: 12%; border-radius: 99px; background: color-mix(in srgb, var(--c) 45%, #000); transform: translate(-50%, -50%) rotate(45deg); box-shadow: 0 1px 0 #fff5; }
+.head::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+.rack { position: relative; z-index: 3; display: flex; flex-direction: column; gap: 8px; }
+.boxes-row { display: flex; gap: 10px; align-items: center; }
+.boxes { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.box-slot { position: relative; height: 54px; border-radius: 16px; }
+.box-slot.empty { border: 2px dashed #ffffff30; }
+.box { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-evenly; border-radius: 16px; background: linear-gradient(color-mix(in srgb, var(--c) 32%, #fff8ec), color-mix(in srgb, var(--c) 52%, #fff8ec)); border: 3px solid color-mix(in srgb, var(--c) 85%, #000); box-shadow: 0 4px 0 color-mix(in srgb, var(--c) 55%, #000); }
+.box .hole { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #0000002e; box-shadow: inset 0 2px 4px #0005; }
+.box .head, .tray .head { width: 28px; height: 28px; }
+.box.enter { animation: box-in .32s cubic-bezier(.3, 1.3, .5, 1); }
+@keyframes box-in { from { transform: translateX(70%) scale(.8); opacity: 0; } }
+.box.leave { animation: box-out .3s ease-in forwards; }
+@keyframes box-out { 30% { transform: scale(1.08); } to { transform: translateY(-50%) scale(.7); opacity: 0; } }
+.queue { flex: 0 0 auto; min-width: 46px; height: 54px; display: grid; place-content: center; border-radius: 16px; background: var(--chip); text-align: center; font-weight: 900; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.queue small { font-size: 16px; }
+.queue.done { opacity: .35; }
+.tray { display: flex; justify-content: center; gap: 6px; padding: 6px 10px; border-radius: 18px; background: #00000030; box-shadow: inset 0 2px 6px #0004; transition: background .2s, box-shadow .2s; }
+.tray .slot { flex: 0 1 40px; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #ffffff12; box-shadow: inset 0 2px 4px #0005; }
+.tray.warn { background: #ff5a5a33; box-shadow: inset 0 2px 6px #0004, 0 0 0 2px #ff7b7b88; }
+.flying { position: relative; z-index: 50; }
+
+.board-wrap { position: relative; z-index: 1; flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board {
+  --u: calc(min(100cqw, 80cqh) / 100);
+  --r: 4.6;
+  position: relative; width: calc(var(--u) * 100); height: calc(var(--u) * 125);
+  border-radius: calc(var(--u) * 5);
+  background: radial-gradient(circle, #8a5a2c40 14%, transparent 17%) 0 0 / calc(var(--u) * 6.25) calc(var(--u) * 6.25), linear-gradient(160deg, #ecc38e, #d39b5f);
+  box-shadow: inset 0 0 0 calc(var(--u) * 1) #b97f45, inset 0 calc(var(--u) * 1.6) 0 calc(var(--u) * 1) #f6d7ad66, 0 14px 30px #0007;
+}
+.board.won { animation: glow 1s ease-in-out 2; }
+@keyframes glow { 50% { box-shadow: inset 0 0 0 calc(var(--u) * 1) #b97f45, 0 0 40px #ffcf4acc; } }
+.plate {
+  position: absolute; z-index: var(--z);
+  left: calc(var(--x) * var(--u)); top: calc(var(--y) * var(--u)); width: calc(var(--w) * var(--u)); height: calc(var(--h) * var(--u));
+  border-radius: calc(var(--u) * 3.6);
+  background: color-mix(in srgb, var(--tint) 80%, transparent);
+  border: calc(var(--u) * .6) solid color-mix(in srgb, var(--tint) 55%, #1a1020);
+  box-shadow: inset 0 calc(var(--u) * .9) 0 #ffffff70, inset 0 calc(var(--u) * -.8) 0 #0000001c, 0 calc(var(--u) * .8) calc(var(--u) * 1.8) #0005;
+  pointer-events: none;
+}
+.plate.circle { border-radius: 50%; }
+.plate.deal { animation: deal .35s calc(var(--z) * 35ms) both cubic-bezier(.3, 1.3, .5, 1); }
+@keyframes deal { from { transform: translateY(-12%) scale(.85); opacity: 0; } }
+.plate.fall { animation: fall .75s ease-in forwards; }
+@keyframes fall { 18% { transform: translateY(-2%) rotate(var(--rot)); } to { transform: translateY(calc(var(--u) * 90)) rotate(calc(var(--rot) * 5)); opacity: 0; } }
+.plate.gone { display: none; }
+.plate .hole { position: absolute; left: calc((var(--sx) - 3.4) * var(--u)); top: calc((var(--sy) - 3.4) * var(--u)); width: calc(var(--u) * 6.8); height: calc(var(--u) * 6.8); border-radius: 50%; background: #2b1a1066; box-shadow: inset 0 calc(var(--u) * .7) calc(var(--u) * 1) #0008; }
+.screw { position: absolute; left: calc((var(--sx) - var(--r)) * var(--u)); top: calc((var(--sy) - var(--r)) * var(--u)); width: calc(var(--r) * 2 * var(--u)); height: calc(var(--r) * 2 * var(--u)); padding: 0; border-radius: 50%; pointer-events: auto; transition: transform .12s; }
+.screw .head { width: 100%; height: 100%; }
+.screw.gone { visibility: hidden; }
+.screw.blocked { cursor: default; }
+.screw.blocked .head { filter: brightness(.8) saturate(.7); }
+@media (hover: hover) { .screw:not(.blocked):hover { transform: scale(1.1); } }
+.screw:focus-visible { outline-offset: 2px; }
+.screw.nope { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-12%) rotate(-20deg); } 75% { transform: translateX(12%) rotate(20deg); } }
+
+.tools { display: flex; align-items: center; gap: 12px; }
+.hint { flex: 1; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.booster { position: relative; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 16px; background: var(--accent); color: #2a210b; font-weight: 800; font-size: 15px; box-shadow: 0 4px 0 var(--accent-dark); }
+.booster:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-dark); }
+.booster:disabled { opacity: .45; cursor: default; transform: none; box-shadow: 0 4px 0 var(--accent-dark); }
+.booster b { min-width: 22px; padding: 1px 6px; border-radius: 99px; background: #2a210b; color: var(--accent); font-size: 13px; text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #0d142299; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--panel); color: var(--ink); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.panel h2 span { color: var(--accent-dark); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--ink-muted); line-height: 1.45; }
+.demo { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.demo .head { width: 30px; height: 30px; }
+.stars { margin-top: 6px; font-size: 38px; letter-spacing: 4px; color: #e5dcc3; }
+.stars b { color: #f2a93b; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--accent); color: #2a210b; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.cta[hidden], .secondary[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #e6dcc0; font-weight: 800; }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #fff1c9; box-shadow: 0 3px 0 #e6c66a; font-size: 17px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: #f2a93b; min-height: 11px; }
+.level-btn.current { background: #3b5683; color: #fff; box-shadow: 0 3px 0 #22304a; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 600px) { .box-slot, .queue { height: 46px; } .box .hole { width: 28px; height: 28px; } .box .head, .tray .head { width: 24px; height: 24px; } .tray .slot { flex-basis: 34px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Screw <span>Puzzle</span></h1>
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <section class="rack">
+    <div class="boxes-row">
+      <div class="boxes" id="boxes" role="group" data-i18n-label="boxes"></div>
+      <div class="queue" id="queue" role="img"></div>
+    </div>
+    <div class="tray" id="tray" role="img"></div>
+  </section>
+  <div class="board-wrap"><div class="board" id="board" role="group" data-i18n-label="board"></div></div>
+  <div class="tools">
+    <p class="hint" data-i18n="hint"></p>
+    <button type="button" class="booster" id="undo"><span aria-hidden="true">↶</span><span data-i18n="undo"></span><b id="undo-count" aria-hidden="true">3</b></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <h2 id="start-title">Screw <span>Puzzle</span></h2>
+    <div class="demo" aria-hidden="true"><i class="head" style="--c:#ef4444"></i><i class="head" style="--c:#3b82f6"></i><i class="head" style="--c:#fbbf24"></i><i class="head" style="--c:#22c55e"></i></div>
+    <p class="text" data-i18n="howTo"></p>
+    <button type="button" class="cta" id="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="text" id="result"></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">🔩</p>
+    <h2 id="lose-title" data-i18n="lost"></h2>
+    <p class="text" data-i18n="lostText"></p>
+    <button type="button" class="cta" id="rescue"></button>
+    <button type="button" class="secondary" id="retry" data-i18n="retry"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { level: 'Level', levels: 'Levels', restart: 'Restart level', undo: 'Undo', undoLabel: n => `Undo, ${n} left`, hint: 'Tap screws that no other plate covers', boxes: 'Screw boxes', board: 'Plates and screws', play: n => `Play level ${n}`, howTo: 'Tap a free screw to drop it into the box of its colour. Screws without a matching box wait in the 5-slot tray — if it fills up, the level is lost.', won: n => `Level ${n} cleared!`, allDone: 'You cleared every level!', next: 'Next level', replay: 'Replay level', result: n => (n ? `Undos used: ${n}` : 'Cleared without undo!'), lost: 'Tray full!', lostText: 'No free screw fits an open box. Undo a move or try again.', rescue: n => `Undo move (${n} left)`, retry: 'Try again', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, colors: ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink'], screw: (c, free) => `${c} screw, ${free ? 'free' : 'covered'}`, box: (c, n) => `${c} box, ${n} of 3`, noBox: 'No box', queue: n => `${n} more boxes`, tray: n => `Holding tray: ${n} of 5`, boxDone: c => `${c} box full`, plateDrop: 'A plate fell away', trayFull: 'The tray is full — pick a screw that fits a box', covered: 'That screw is covered', undone: 'Move undone' },
+    vi: { level: 'Màn', levels: 'Chọn màn', restart: 'Chơi lại màn', undo: 'Hoàn tác', undoLabel: n => `Hoàn tác, còn ${n} lượt`, hint: 'Chạm vào ốc không bị tấm nào khác che', boxes: 'Hộp đựng ốc', board: 'Các tấm và ốc vít', play: n => `Chơi màn ${n}`, howTo: 'Chạm vào ốc không bị che để thả vào hộp cùng màu. Ốc chưa có hộp phù hợp sẽ chờ trong khay 5 ô — khay đầy là thua.', won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã phá đảo tất cả các màn!', next: 'Màn tiếp theo', replay: 'Chơi lại màn này', result: n => (n ? `Đã hoàn tác ${n} lần` : 'Qua màn không cần hoàn tác!'), lost: 'Khay đầy rồi!', lostText: 'Không còn ốc nào vừa với hộp đang mở. Hãy hoàn tác một bước hoặc thử lại.', rescue: n => `Hoàn tác (còn ${n})`, retry: 'Thử lại', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, colors: ['đỏ', 'cam', 'vàng', 'xanh lá', 'xanh dương', 'tím', 'hồng'], screw: (c, free) => `Ốc ${c}, ${free ? 'có thể tháo' : 'đang bị che'}`, box: (c, n) => `Hộp ${c}, ${n}/3`, noBox: 'Không có hộp', queue: n => `Còn ${n} hộp nữa`, tray: n => `Khay chờ: ${n}/5`, boxDone: c => `Hộp ${c} đã đầy`, plateDrop: 'Một tấm đã rơi xuống', trayFull: 'Khay đã đầy — hãy chọn ốc vừa với hộp', covered: 'Ốc này đang bị che', undone: 'Đã hoàn tác' },
+    zh: { level: '关卡', levels: '选择关卡', restart: '重玩本关', undo: '撤销', undoLabel: n => `撤销，剩余 ${n} 次`, hint: '点击没有被其他板子挡住的螺丝', boxes: '螺丝盒', board: '板子和螺丝', play: n => `开始第 ${n} 关`, howTo: '点击没有被遮挡的螺丝，把它放进同色的盒子。暂时没有对应盒子的螺丝会进入 5 格暂存槽——槽满就失败了。', won: n => `第 ${n} 关完成！`, allDone: '你已通关所有关卡！', next: '下一关', replay: '重玩本关', result: n => (n ? `使用撤销 ${n} 次` : '未使用撤销，完美通关！'), lost: '暂存槽满了！', lostText: '没有能放进当前盒子的螺丝了。撤销一步或重新挑战吧。', rescue: n => `撤销一步（剩 ${n} 次）`, retry: '再试一次', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, colors: ['红色', '橙色', '黄色', '绿色', '蓝色', '紫色', '粉色'], screw: (c, free) => `${c}螺丝，${free ? '可拧下' : '被遮挡'}`, box: (c, n) => `${c}盒子，${n}/3`, noBox: '没有盒子', queue: n => `还有 ${n} 个盒子`, tray: n => `暂存槽：${n}/5`, boxDone: c => `${c}盒子装满了`, plateDrop: '一块板子掉落了', trayFull: '暂存槽已满——请选能放进盒子的螺丝', covered: '这颗螺丝被挡住了', undone: '已撤销一步' },
+    fr: { level: 'Niveau', levels: 'Niveaux', restart: 'Recommencer le niveau', undo: 'Annuler', undoLabel: n => `Annuler, ${n} restant${n > 1 ? 's' : ''}`, hint: 'Touchez les vis qu’aucune plaque ne recouvre', boxes: 'Boîtes à vis', board: 'Plaques et vis', play: n => `Jouer le niveau ${n}`, howTo: 'Touchez une vis dégagée pour la ranger dans la boîte de sa couleur. Les vis sans boîte assortie attendent dans la réserve de 5 places — si elle est pleine, c’est perdu.', won: n => `Niveau ${n} terminé !`, allDone: 'Vous avez terminé tous les niveaux !', next: 'Niveau suivant', replay: 'Rejouer le niveau', result: n => (n ? `Annulations utilisées : ${n}` : 'Réussi sans annuler !'), lost: 'Réserve pleine !', lostText: 'Aucune vis libre ne va dans une boîte ouverte. Annulez un coup ou réessayez.', rescue: n => `Annuler le coup (${n} restant${n > 1 ? 's' : ''})`, retry: 'Réessayer', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, colors: ['rouge', 'orange', 'jaune', 'verte', 'bleue', 'violette', 'rose'], screw: (c, free) => `Vis ${c}, ${free ? 'libre' : 'recouverte'}`, box: (c, n) => `Boîte ${c}, ${n} sur 3`, noBox: 'Pas de boîte', queue: n => `Encore ${n} boîte${n > 1 ? 's' : ''}`, tray: n => `Réserve : ${n} sur 5`, boxDone: c => `Boîte ${c} remplie`, plateDrop: 'Une plaque est tombée', trayFull: 'La réserve est pleine — choisissez une vis qui va dans une boîte', covered: 'Cette vis est recouverte', undone: 'Coup annulé' },
+    th: { level: 'ด่าน', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', undo: 'ย้อนกลับ', undoLabel: n => `ย้อนกลับ เหลือ ${n} ครั้ง`, hint: 'แตะน็อตที่ไม่มีแผ่นอื่นทับอยู่', boxes: 'กล่องใส่น็อต', board: 'แผ่นและน็อต', play: n => `เล่นด่าน ${n}`, howTo: 'แตะน็อตที่ไม่ถูกทับเพื่อใส่ลงกล่องสีเดียวกัน น็อตที่ยังไม่มีกล่องตรงสีจะไปรอในถาดพัก 5 ช่อง ถ้าถาดเต็มจะแพ้ด่านนั้น', won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณผ่านครบทุกด่านแล้ว!', next: 'ด่านถัดไป', replay: 'เล่นด่านนี้อีกครั้ง', result: n => (n ? `ใช้ย้อนกลับ ${n} ครั้ง` : 'ผ่านโดยไม่ใช้ย้อนกลับเลย!'), lost: 'ถาดเต็มแล้ว!', lostText: 'ไม่มีน็อตที่ใส่ลงกล่องที่เปิดอยู่ได้ ลองย้อนกลับหนึ่งตาหรือเล่นใหม่', rescue: n => `ย้อนกลับ (เหลือ ${n})`, retry: 'ลองอีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, colors: ['แดง', 'ส้ม', 'เหลือง', 'เขียว', 'น้ำเงิน', 'ม่วง', 'ชมพู'], screw: (c, free) => `น็อตสี${c} ${free ? 'แตะได้' : 'ถูกทับอยู่'}`, box: (c, n) => `กล่องสี${c} ${n}/3`, noBox: 'ไม่มีกล่อง', queue: n => `เหลืออีก ${n} กล่อง`, tray: n => `ถาดพัก: ${n}/5`, boxDone: c => `กล่องสี${c}เต็มแล้ว`, plateDrop: 'แผ่นหนึ่งร่วงลงไปแล้ว', trayFull: 'ถาดเต็มแล้ว เลือกน็อตที่ตรงกับกล่อง', covered: 'น็อตนี้ถูกทับอยู่', undone: 'ย้อนกลับแล้ว' },
+    ja: { level: 'レベル', levels: 'レベル選択', restart: 'レベルをやり直す', undo: '戻す', undoLabel: n => `戻す、残り${n}回`, hint: 'ほかの板に隠れていないネジをタップ', boxes: 'ネジの箱', board: '板とネジ', play: n => `レベル ${n} をプレイ`, howTo: '隠れていないネジをタップすると、同じ色の箱に入ります。合う箱がないネジは5マスの待機トレイへ。トレイがいっぱいになるとゲームオーバーです。', won: n => `レベル ${n} クリア！`, allDone: '全レベルクリア！', next: '次のレベル', replay: 'もう一度プレイ', result: n => (n ? `戻した回数：${n}回` : '戻さずにクリア！'), lost: 'トレイがいっぱい！', lostText: '開いている箱に入るネジがありません。1手戻すか、やり直しましょう。', rescue: n => `1手戻す（残り${n}回）`, retry: 'もう一度', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, colors: ['赤', 'オレンジ', '黄色', '緑', '青', '紫', 'ピンク'], screw: (c, free) => `${c}のネジ、${free ? '外せる' : '隠れている'}`, box: (c, n) => `${c}の箱、${n}/3`, noBox: '箱なし', queue: n => `残り${n}箱`, tray: n => `待機トレイ：${n}/5`, boxDone: c => `${c}の箱がいっぱい`, plateDrop: '板が1枚落ちました', trayFull: 'トレイがいっぱいです。箱に合うネジを選びましょう', covered: 'このネジは隠れています', undone: '1手戻しました' },
+    ko: { level: '레벨', levels: '레벨 선택', restart: '레벨 다시 하기', undo: '되돌리기', undoLabel: n => `되돌리기, ${n}회 남음`, hint: '다른 판에 가려지지 않은 나사를 탭하세요', boxes: '나사 상자', board: '판과 나사', play: n => `레벨 ${n} 시작`, howTo: '가려지지 않은 나사를 탭하면 같은 색 상자에 들어가요. 맞는 상자가 없는 나사는 5칸 보관함에서 기다려요. 보관함이 가득 차면 실패예요.', won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨을 클리어했어요!', next: '다음 레벨', replay: '이 레벨 다시 하기', result: n => (n ? `되돌리기 ${n}회 사용` : '되돌리기 없이 클리어!'), lost: '보관함이 가득 찼어요!', lostText: '열린 상자에 넣을 수 있는 나사가 없어요. 한 수 되돌리거나 다시 도전하세요.', rescue: n => `한 수 되돌리기 (${n}회 남음)`, retry: '다시 하기', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, colors: ['빨간색', '주황색', '노란색', '초록색', '파란색', '보라색', '분홍색'], screw: (c, free) => `${c} 나사, ${free ? '풀 수 있음' : '가려짐'}`, box: (c, n) => `${c} 상자, ${n}/3`, noBox: '상자 없음', queue: n => `상자 ${n}개 남음`, tray: n => `보관함: ${n}/5`, boxDone: c => `${c} 상자 완성`, plateDrop: '판 하나가 떨어졌어요', trayFull: '보관함이 가득 찼어요. 상자에 맞는 나사를 고르세요', covered: '이 나사는 가려져 있어요', undone: '한 수 되돌렸어요' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // The board is a 100×125 unit field; every position below is in those units.
+  const W = 100, H = 125, R = 4.6, GAP = 2 * R + 1.4, INSET = 7;
+  const TRAY = 5, BOX = 3, UNDOS = 3, LEVEL_COUNT = 30;
+  const COLORS = ['#ef4444', '#f97316', '#fbbf24', '#22c55e', '#3b82f6', '#a855f7', '#f472b6'];
+  const TINTS = ['#9fd8ff', '#ffb8cc', '#bff19a', '#ffe39a', '#cfbfff', '#ffcaa0', '#a6f0de', '#e8e2f5'];
+  const STORAGE_KEY = 'milaan.screwPuzzle.progress';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = ms => (reduced ? Math.min(ms, 40) : ms);
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), boxes: $('boxes'), queue: $('queue'), tray: $('tray'), level: $('level'), undo: $('undo'), undoCount: $('undo-count'), announcer: $('announcer'), start: $('start'), play: $('play'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), next: $('next'), lose: $('lose'), rescue: $('rescue'), levels: $('levels'), levelGrid: $('level-grid') };
+
+  const readProgress = () => { try { return { unlocked: 1, level: 1, stars: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { unlocked: 1, level: 1, stars: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const announce = text => { els.announcer.textContent = text; };
+
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const shuffle = (list, rand) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const between = (rand, a, b) => a + rand() * (b - a);
+
+  /* ---------- Rules (shared by the game and the level checker) ---------- */
+
+  const isFree = (lv, st, i) => !st.taken[i] && lv.screws[i].covers.every(p => st.left[p] === 0);
+  const boxFor = (st, color) => st.boxes.findIndex(b => b && b.c === color && b.n < BOX);
+  const fullSlot = st => st.boxes.findIndex(b => b && b.n === BOX);
+  const cloneState = st => ({ taken: st.taken.slice(), left: st.left.slice(), boxes: st.boxes.map(b => b && { ...b }), q: st.q, tray: st.tray.slice() });
+
+  function freshState(lv) {
+    const left = lv.plates.map(() => 0);
+    for (const s of lv.screws) left[s.plate] += 1;
+    return { taken: lv.screws.map(() => false), left, boxes: [0, 1].map(k => (k < lv.queue.length ? { c: lv.queue[k], n: 0 } : null)), q: Math.min(2, lv.queue.length), tray: [] };
+  }
+
+  function take(lv, st, i) {
+    const s = lv.screws[i];
+    st.taken[i] = true;
+    st.left[s.plate] -= 1;
+    const slot = boxFor(st, s.c);
+    if (slot >= 0) { st.boxes[slot].n += 1; return { kind: 'box', slot, index: st.boxes[slot].n - 1 }; }
+    st.tray.push(s.c);
+    return { kind: 'tray', index: st.tray.length - 1 };
+  }
+
+  // Swap a full box for the next one in the queue; it immediately collects matching tray screws.
+  function advance(lv, st, slot) {
+    const c = lv.queue[st.q];
+    if (c === undefined) { st.boxes[slot] = null; return []; }
+    st.q += 1;
+    st.boxes[slot] = { c, n: 0 };
+    const pulled = [];
+    st.tray.forEach((color, k) => { if (color === c && pulled.length < BOX) pulled.push(k); });
+    st.tray = st.tray.filter((_, k) => !pulled.includes(k));
+    st.boxes[slot].n = pulled.length;
+    return pulled;
+  }
+
+  function settle(lv, st) { let slot; while ((slot = fullSlot(st)) >= 0) advance(lv, st, slot); }
+
+  const freeScrews = (lv, st) => lv.screws.map((_, i) => i).filter(i => isFree(lv, st, i));
+  const boxMoves = (lv, st) => freeScrews(lv, st).filter(i => boxFor(st, lv.screws[i].c) >= 0);
+
+  // Depth-first search over game states. Box-bound moves never hurt, so they are played first without branching.
+  function solvable(lv, cap = 8000) {
+    const seen = new Set();
+    let nodes = 0;
+    const upcoming = st => lv.queue.slice(st.q, st.q + 3);
+    function dfs(st, remaining) {
+      if (remaining === 0) return true;
+      if (++nodes > cap) return false;
+      const key = `${st.taken.map(Number).join('')}|${st.q}|${st.boxes.map(b => (b ? `${b.c}${b.n}` : '-')).join()}|${st.tray.slice().sort().join()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      const forced = boxMoves(lv, st)[0];
+      let options;
+      if (forced !== undefined) options = [forced];
+      else if (st.tray.length < TRAY) {
+        const soon = upcoming(st);
+        const score = i => (st.left[lv.screws[i].plate] === 1 ? 4 : 0) + (soon.includes(lv.screws[i].c) ? 3 - soon.indexOf(lv.screws[i].c) : 0);
+        options = freeScrews(lv, st).sort((a, b) => score(b) - score(a));
+      } else options = [];
+      for (const i of options) {
+        const next = cloneState(st);
+        take(lv, next, i);
+        settle(lv, next);
+        if (dfs(next, remaining - 1)) return true;
+      }
+      return false;
+    }
+    return dfs(freshState(lv), lv.screws.length);
+  }
+
+  // How often a careless player (box moves first, otherwise a random free screw) still wins.
+  function easiness(lv, rand, trials = 8) {
+    let wins = 0;
+    for (let k = 0; k < trials; k++) {
+      const st = freshState(lv);
+      let remaining = lv.screws.length;
+      while (remaining > 0) {
+        let pick = boxMoves(lv, st)[0];
+        if (pick === undefined) {
+          if (st.tray.length >= TRAY) break;
+          const free = freeScrews(lv, st);
+          pick = free[Math.floor(rand() * free.length)];
+        }
+        take(lv, st, pick);
+        settle(lv, st);
+        remaining -= 1;
+      }
+      if (remaining === 0) wins += 1;
+    }
+    return wins / trials;
+  }
+
+  /* ---------- Level generation ---------- */
+
+  function levelConfig(n) {
+    const colors = Math.min(7, 2 + Math.floor((n + 2) / 4));
+    const boxes = Math.max(colors, Math.min(13, 2 + Math.floor(n * 0.75)));
+    const target = n <= 3 ? 1 : n <= 8 ? 0.65 : n <= 16 ? 0.4 : n <= 24 ? 0.25 : 0.1;
+    return { colors, boxes, target };
+  }
+
+  function randomShape(rand) {
+    const r = rand();
+    if (r < 0.3) {
+      const w = between(rand, 34, 66);
+      const spots = [[INSET, 7], [w - INSET, 7]];
+      if (w > 52 && rand() < 0.4) spots.push([w / 2, 7]);
+      return { shape: 'rect', w, h: 14, spots };
+    }
+    if (r < 0.52) {
+      const h = between(rand, 34, 62);
+      const spots = [[7, INSET], [7, h - INSET]];
+      if (h > 52 && rand() < 0.4) spots.push([7, h / 2]);
+      return { shape: 'rect', w: 14, h, spots };
+    }
+    if (r < 0.8) {
+      const w = between(rand, 26, 42), h = between(rand, 24, 38);
+      const corners = [[INSET, INSET], [w - INSET, h - INSET], [w - INSET, INSET], [INSET, h - INSET]];
+      const count = rand() < 0.45 ? 2 : rand() < 0.4 ? 3 : 4;
+      return { shape: 'rect', w, h, spots: count === 3 ? [corners[0], corners[1], corners[2]] : corners.slice(0, count) };
+    }
+    const d = between(rand, 18, 32);
+    const spots = d >= 28 && rand() < 0.6 ? [[INSET, d / 2], [d - INSET, d / 2]] : [[d / 2, d / 2]];
+    return { shape: 'circle', w: d, h: d, spots };
+  }
+
+  function overlaps(plate, x, y, r) {
+    if (plate.shape === 'circle') return Math.hypot(x - (plate.x + plate.w / 2), y - (plate.y + plate.h / 2)) < plate.w / 2 + r;
+    const nx = Math.max(plate.x, Math.min(x, plate.x + plate.w)), ny = Math.max(plate.y, Math.min(y, plate.y + plate.h));
+    return Math.hypot(x - nx, y - ny) < r;
+  }
+
+  function buildLevel(rand, cfg) {
+    const total = cfg.boxes * BOX;
+    let plates = [], screws = [];
+    for (let fails = 0; screws.length < total && fails < 600;) {
+      const shape = randomShape(rand);
+      // Early plates cluster towards the middle so they stack up; later ones fill the gaps.
+      const spread = () => (screws.length < total * 0.6 ? (rand() + rand()) / 2 : rand());
+      const x = 2 + spread() * (W - 4 - shape.w), y = 2 + spread() * (H - 4 - shape.h);
+      const spots = shape.spots.map(([sx, sy]) => ({ x: x + sx, y: y + sy })).filter(s => screws.every(o => Math.hypot(o.x - s.x, o.y - s.y) >= GAP));
+      if (!spots.length || spots.length * 2 < shape.spots.length) { fails += 1; continue; }
+      const index = plates.length;
+      const prevTint = plates[index - 1]?.tint;
+      const tints = TINTS.filter(c => c !== prevTint);
+      plates.push({ ...shape, x, y, tint: tints[Math.floor(rand() * tints.length)], rot: Math.round(between(rand, -6, 6)) });
+      for (const s of spots) screws.push({ x: s.x, y: s.y, plate: index });
+    }
+    if (screws.length < total) return null;
+    // Trim surplus screws, never leaving a plate with none.
+    while (screws.length > total) {
+      const counts = plates.map((_, p) => screws.filter(s => s.plate === p).length);
+      const many = counts.map((c, p) => (c > 1 ? p : -1)).filter(p => p >= 0);
+      if (!many.length) return null;
+      const p = many[Math.floor(rand() * many.length)];
+      const last = screws.map(s => s.plate).lastIndexOf(p);
+      screws.splice(last, 1);
+    }
+    const colorOrder = shuffle([...Array(COLORS.length).keys()], rand).slice(0, cfg.colors);
+    const queue = shuffle(Array.from({ length: cfg.boxes }, (_, k) => colorOrder[k % cfg.colors]), rand);
+    const screwColors = shuffle(queue.flatMap(c => [c, c, c]), rand);
+    screws.forEach((s, i) => {
+      s.c = screwColors[i];
+      s.covers = [];
+      for (let q = s.plate + 1; q < plates.length; q++) if (overlaps(plates[q], s.x, s.y, R * 0.8)) s.covers.push(q);
+    });
+    return { plates, screws, queue };
+  }
+
+  const levelCache = {};
+  function generate(n) {
+    if (levelCache[n]) return levelCache[n];
+    let cfg = levelConfig(n), best = null;
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const rand = seeded(n * 7919 + attempt * 104729 + 17);
+      const lv = buildLevel(rand, cfg);
+      if (!lv || !solvable(lv)) continue;
+      // Aim for a target win rate of careless play, so later levels need real planning without becoming brutal.
+      const miss = Math.abs(easiness(lv, rand, 10) - cfg.target);
+      if (!best || miss < best.miss) best = { lv, miss };
+      if (miss <= 0.1 || attempt > 24) break;
+      // Very crowded layouts can fail to place; relax the box count rather than loop forever.
+      if (attempt % 100 === 99) cfg = { ...cfg, boxes: Math.max(cfg.colors, cfg.boxes - 1) };
+    }
+    levelCache[n] = best.lv;
+    return best.lv;
+  }
+
+  /* ---------- Game ---------- */
+
+  let progress = readProgress();
+  let game = null, plateEls = [], screwEls = [];
+
+  function screwLabel(i) {
+    const free = isFree(game.lv, game.st, i);
+    return t.screw(t.colors[game.lv.screws[i].c], free);
+  }
+
+  function buildBoard() {
+    const { lv } = game;
+    plateEls = lv.plates.map((p, index) => {
+      const el = document.createElement('div');
+      el.className = `plate ${p.shape} deal`;
+      el.style.cssText = `--x:${p.x};--y:${p.y};--w:${p.w};--h:${p.h};--z:${index + 1};--tint:${p.tint};--rot:${p.rot}deg`;
+      return el;
+    });
+    screwEls = lv.screws.map((s, i) => {
+      const p = lv.plates[s.plate];
+      // Children sit inside the plate's border, so offset by its width (0.6 units).
+      const pos = `--sx:${s.x - p.x - 0.6};--sy:${s.y - p.y - 0.6}`;
+      const hole = document.createElement('i');
+      hole.className = 'hole';
+      hole.style.cssText = pos;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'screw';
+      btn.style.cssText = `${pos};--c:${COLORS[s.c]}`;
+      btn.innerHTML = '<i class="head" aria-hidden="true"></i>';
+      btn.addEventListener('click', () => tap(i));
+      plateEls[s.plate].append(hole, btn);
+      return btn;
+    });
+    els.board.replaceChildren(...plateEls);
+    setTimeout(() => plateEls.forEach(el => el.classList.remove('deal')), 1200);
+  }
+
+  function syncBoard() {
+    const { lv, st } = game;
+    plateEls.forEach((el, p) => {
+      if (st.left[p] > 0) el.classList.remove('gone', 'fall');
+      else if (!el.classList.contains('fall')) el.classList.add('gone');
+    });
+    screwEls.forEach((el, i) => {
+      const free = isFree(lv, st, i);
+      el.classList.toggle('gone', st.taken[i]);
+      el.classList.toggle('blocked', !free);
+      el.tabIndex = free ? 0 : -1;
+      el.setAttribute('aria-disabled', String(!free));
+      if (!st.taken[i]) el.setAttribute('aria-label', screwLabel(i));
+    });
+  }
+
+  function head(color) {
+    const el = document.createElement('i');
+    el.className = 'head';
+    el.style.setProperty('--c', COLORS[color]);
+    return el;
+  }
+
+  function renderRack(enterSlot = -1) {
+    const { lv, st } = game;
+    els.boxes.replaceChildren(...st.boxes.map((b, slot) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'box-slot';
+      if (!b) { wrap.classList.add('empty'); wrap.setAttribute('role', 'img'); wrap.setAttribute('aria-label', t.noBox); return wrap; }
+      const box = document.createElement('div');
+      box.className = `box${slot === enterSlot ? ' enter' : ''}`;
+      box.style.setProperty('--c', COLORS[b.c]);
+      box.setAttribute('role', 'img');
+      box.setAttribute('aria-label', t.box(t.colors[b.c], b.n));
+      for (let k = 0; k < BOX; k++) {
+        const hole = document.createElement('span');
+        hole.className = 'hole';
+        if (k < b.n) hole.append(head(b.c));
+        box.append(hole);
+      }
+      wrap.append(box);
+      return wrap;
+    }));
+    const left = lv.queue.length - st.q;
+    els.queue.innerHTML = `<small aria-hidden="true">📦</small>+${left}`;
+    els.queue.classList.toggle('done', left === 0);
+    els.queue.setAttribute('aria-label', t.queue(left));
+    els.tray.replaceChildren(...Array.from({ length: TRAY }, (_, k) => {
+      const slot = document.createElement('span');
+      slot.className = 'slot';
+      if (k < st.tray.length) slot.append(head(st.tray[k]));
+      return slot;
+    }));
+    els.tray.classList.toggle('warn', st.tray.length >= TRAY - 1);
+    els.tray.setAttribute('aria-label', t.tray(st.tray.length));
+    els.undo.disabled = !game.history.length || game.undos <= 0;
+    els.undoCount.textContent = String(game.undos);
+    els.undo.setAttribute('aria-label', t.undoLabel(game.undos));
+  }
+
+  // Animate an element from where something used to be on screen to where it now sits.
+  function fly(el, from) {
+    if (!el || !from || reduced) return;
+    const to = el.getBoundingClientRect();
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    el.classList.add('flying');
+    const anim = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.25, .8, .35, 1)' });
+    anim.onfinish = () => el.classList.remove('flying');
+  }
+
+  function startLevel(number) {
+    const lv = generate(number);
+    game = { level: number, lv, st: freshState(lv), history: [], undos: UNDOS, used: 0, busy: false, over: false };
+    progress.level = number;
+    saveProgress();
+    els.level.textContent = `${number}/${LEVEL_COUNT}`;
+    els.board.classList.remove('won');
+    buildBoard();
+    syncBoard();
+    renderRack();
+    for (const overlay of [els.win, els.lose, els.levels]) overlay.hidden = true;
+    // Build the next level while the player is busy so moving on is instant.
+    if (number < LEVEL_COUNT) setTimeout(() => generate(number + 1), 1500);
+  }
+
+  function focusNear(x, y) {
+    let best = -1, bestD = Infinity;
+    game.lv.screws.forEach((s, i) => {
+      if (!isFree(game.lv, game.st, i)) return;
+      const d = Math.hypot(s.x - x, s.y - y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    if (best >= 0) screwEls[best].focus({ preventScroll: true });
+  }
+
+  function nope(i, message) {
+    const el = screwEls[i];
+    el.classList.remove('nope');
+    void el.offsetWidth;
+    el.classList.add('nope');
+    announce(message);
+  }
+
+  function tap(i) {
+    if (!game || game.busy || game.over) return;
+    const { lv, st } = game;
+    if (!isFree(lv, st, i)) return nope(i, t.covered);
+    const s = lv.screws[i];
+    if (boxFor(st, s.c) < 0 && st.tray.length >= TRAY) return nope(i, t.trayFull);
+    const hadFocus = document.activeElement === screwEls[i];
+    const from = screwEls[i].getBoundingClientRect();
+    game.history.push(cloneState(st));
+    const dest = take(lv, st, i);
+    if (st.left[s.plate] === 0) { plateEls[s.plate].classList.add('fall'); announce(t.plateDrop); }
+    renderRack();
+    syncBoard();
+    const target = dest.kind === 'box' ? els.boxes.children[dest.slot].querySelectorAll('.hole')[dest.index].firstChild : els.tray.children[dest.index].firstChild;
+    fly(target, from);
+    if (hadFocus) focusNear(s.x, s.y);
+    if (fullSlot(st) < 0) return checkEnd();
+    game.busy = true;
+    els.undo.disabled = true;
+    const current = game;
+    resolveBoxes(current, () => { current.busy = false; renderRack(); checkEnd(); });
+  }
+
+  // Full boxes slide away one at a time; each new box pulls matching screws out of the tray.
+  function resolveBoxes(current, done) {
+    const slot = fullSlot(current.st);
+    if (slot < 0) return done();
+    setTimeout(() => {
+      if (game !== current) return;
+      els.boxes.children[slot].firstChild.classList.add('leave');
+      announce(t.boxDone(t.colors[current.st.boxes[slot].c]));
+      setTimeout(() => {
+        if (game !== current) return;
+        const trayRects = [...els.tray.children].map(el => el.getBoundingClientRect());
+        const pulled = advance(current.lv, current.st, slot);
+        renderRack(slot);
+        els.undo.disabled = true;
+        const holes = els.boxes.children[slot].querySelectorAll('.hole');
+        pulled.forEach((from, k) => fly(holes[k].firstChild, trayRects[from]));
+        setTimeout(() => { if (game === current) resolveBoxes(current, done); }, wait(pulled.length ? 340 : 120));
+      }, wait(290));
+    }, wait(300));
+  }
+
+  function checkEnd() {
+    const { lv, st } = game;
+    if (st.taken.every(Boolean)) return win();
+    if (st.tray.length >= TRAY && !boxMoves(lv, st).length) lose();
+  }
+
+  function win() {
+    game.over = true;
+    const stars = game.used === 0 ? 3 : game.used === 1 ? 2 : 1;
+    const key = String(game.level);
+    progress.stars[key] = Math.max(progress.stars[key] ?? 0, stars);
+    progress.unlocked = Math.min(LEVEL_COUNT, Math.max(progress.unlocked, game.level + 1));
+    if (game.level < LEVEL_COUNT) progress.level = game.level + 1;
+    saveProgress();
+    const last = game.level === LEVEL_COUNT;
+    els.winTitle.textContent = last ? t.allDone : t.won(game.level);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.used);
+    els.next.hidden = last;
+    announce(`${els.winTitle.textContent} ${t.starsLabel(stars)}`);
+    els.board.classList.add('won');
+    const current = game;
+    setTimeout(() => { if (game !== current) return; els.win.hidden = false; (last ? $('replay') : els.next).focus({ preventScroll: true }); }, wait(900));
+  }
+
+  function lose() {
+    game.over = true;
+    els.rescue.hidden = game.undos <= 0;
+    els.rescue.textContent = t.rescue(game.undos);
+    announce(`${t.lost} ${t.lostText}`);
+    const current = game;
+    setTimeout(() => { if (game !== current) return; els.lose.hidden = false; (game.undos > 0 ? els.rescue : $('retry')).focus({ preventScroll: true }); }, wait(450));
+  }
+
+  function undo() {
+    if (!game || game.busy || !game.history.length || game.undos <= 0) return;
+    game.st = game.history.pop();
+    game.undos -= 1;
+    game.used += 1;
+    game.over = false;
+    els.lose.hidden = true;
+    syncBoard();
+    renderRack();
+    announce(t.undone);
+    if (!screwEls.includes(document.activeElement)) focusNear(W / 2, H / 2);
+  }
+
+  function openLevels() {
+    els.levelGrid.replaceChildren(...Array.from({ length: LEVEL_COUNT }, (_, index) => {
+      const number = index + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-btn${number === game.level ? ' current' : ''}`;
+      const locked = number > progress.unlocked;
+      button.disabled = locked;
+      const stars = progress.stars[number] ?? 0;
+      button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}</small>`;
+      button.setAttribute('aria-label', `${t.level} ${number}${locked ? `, ${t.locked}` : `, ${t.starsLabel(stars)}`}`);
+      button.addEventListener('click', () => { startLevel(number); focusNear(W / 2, H / 2); });
+      return button;
+    }));
+    els.levels.hidden = false;
+    els.levelGrid.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  const overlayOpen = () => [els.start, els.win, els.lose, els.levels].some(el => !el.hidden);
+  const DIRS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+  // Arrow keys hop between free screws in the pressed direction.
+  els.board.addEventListener('keydown', event => {
+    const dir = DIRS[event.key];
+    if (!dir || !game) return;
+    event.preventDefault();
+    const current = screwEls.indexOf(document.activeElement);
+    if (current < 0) return focusNear(W / 2, H / 2);
+    const from = game.lv.screws[current];
+    let best = -1, bestScore = Infinity;
+    game.lv.screws.forEach((s, i) => {
+      if (i === current || !isFree(game.lv, game.st, i)) return;
+      const dx = s.x - from.x, dy = s.y - from.y;
+      const along = dx * dir[0] + dy * dir[1], across = Math.abs(dx * dir[1] - dy * dir[0]);
+      if (along <= 1) return;
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = i; }
+    });
+    if (best >= 0) screwEls[best].focus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || (event.key !== 'u' && event.key !== 'U')) return;
+    if (overlayOpen() && els.lose.hidden) return;
+    event.preventDefault();
+    undo();
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.rescue.addEventListener('click', undo);
+  $('restart').addEventListener('click', () => { startLevel(game.level); focusNear(W / 2, H / 2); });
+  $('retry').addEventListener('click', () => { startLevel(game.level); focusNear(W / 2, H / 2); });
+  $('replay').addEventListener('click', () => { startLevel(game.level); focusNear(W / 2, H / 2); });
+  els.next.addEventListener('click', () => { startLevel(game.level + 1); focusNear(W / 2, H / 2); });
+  $('open-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; });
+  els.play.addEventListener('click', () => { els.start.hidden = true; focusNear(W / 2, H / 2); });
+
+  const first = Math.min(Math.max(1, progress.level || 1), progress.unlocked, LEVEL_COUNT);
+  els.play.textContent = t.play(first);
+  startLevel(first);
+  els.play.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

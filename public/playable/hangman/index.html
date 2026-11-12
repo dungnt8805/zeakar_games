@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hangman</title>
+<style>
+:root {
+  --paper: #fbf7ee;
+  --line: #d9e3f0;
+  --ink: #23324a;
+  --muted: #6c7890;
+  --red: #e2574c;
+  --green: #2f9e6e;
+  --blue: #3866d6;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--paper) repeating-linear-gradient(transparent 0 31px, var(--line) 31px 32px);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+body::before { content: ''; position: fixed; top: 0; bottom: 0; left: 22px; width: 2px; background: #f2b8b2; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.app { position: relative; height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom)) 34px; }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; font-size: clamp(26px, 8vw, 34px); font-weight: 900; letter-spacing: -.03em; }
+.stat { min-width: 62px; padding: 4px 10px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; text-align: center; }
+.stat small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tagline { font-size: 13px; color: var(--muted); }
+
+.stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.drawing { height: 100%; max-height: 240px; aspect-ratio: 200 / 220; }
+.drawing svg { width: 100%; height: 100%; overflow: visible; }
+.drawing path, .drawing circle, .drawing line { fill: none; stroke: var(--ink); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.drawing .frame { stroke: #9a7b55; }
+.drawing .part { stroke-dasharray: 200; stroke-dashoffset: 200; transition: stroke-dashoffset .45s ease-out; }
+.drawing .part.on { stroke-dashoffset: 0; }
+.drawing .face { opacity: 0; transition: opacity .3s; stroke-width: 3; }
+.lost .drawing .face { opacity: 1; }
+.lost .drawing .part { stroke: var(--red); }
+.side { display: flex; flex-direction: column; gap: 10px; min-width: 112px; }
+.category { padding: 8px 10px; border-radius: 12px; background: #fff; border: 2px dashed #c9d3e3; text-align: center; }
+.category small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.category strong { display: block; margin-top: 2px; font-size: 16px; color: var(--blue); }
+.hearts { text-align: center; font-size: 18px; letter-spacing: 1px; color: var(--red); }
+.hearts .lost-heart { color: #d4d9e2; }
+.hint { padding: 9px 10px; border-radius: 12px; background: #fff3c4; border: 2px solid #e6c65a; font-size: 13px; font-weight: 800; }
+.hint:disabled { opacity: .4; cursor: default; }
+
+.word { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 52px; padding: 4px 0; }
+.slot { width: clamp(24px, 7.6vw, 36px); height: clamp(38px, 10vw, 48px); display: grid; place-items: center; border-bottom: 4px solid var(--ink); font-size: clamp(22px, 7vw, 30px); font-weight: 900; }
+.slot.show { animation: drop .25s ease-out; }
+.slot.missed { color: var(--red); }
+.slot.hinted { color: var(--blue); }
+@keyframes drop { from { transform: translateY(-10px); opacity: 0; } }
+.status { min-height: 1.4em; text-align: center; font-size: 14px; font-weight: 700; color: var(--muted); }
+
+.keyboard { display: grid; gap: 6px; }
+.row { display: flex; justify-content: center; gap: 5px; }
+.key { flex: 1; max-width: 42px; height: clamp(40px, 6.5vh, 50px); border-radius: 9px; background: #fff; border: 2px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font-size: 17px; font-weight: 900; transition: transform .06s, box-shadow .06s; }
+.key:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.key.good { background: var(--green); border-color: var(--green); color: #fff; box-shadow: none; }
+.key.bad { background: #e6e9ef; border-color: #c4cad6; color: #a2aabb; box-shadow: none; }
+.key:disabled { cursor: default; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: #23324a55; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 340px); padding: 26px 22px; border: 3px solid var(--ink); border-radius: 22px; background: #fff; text-align: center; box-shadow: 8px 8px 0 var(--ink); animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; }
+.panel p { margin-top: 8px; color: var(--muted); }
+.panel .answer { margin-top: 6px; font-size: 26px; font-weight: 900; letter-spacing: .08em; color: var(--ink); }
+.panel button { margin-top: 18px; width: 100%; padding: 14px; border-radius: 14px; background: var(--blue); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 #2549a6; }
+.panel button:active { transform: translateY(3px); box-shadow: 0 2px 0 #2549a6; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 560px) { .drawing { max-height: 150px; } .tagline { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <div class="top">
+    <h1>Hangman</h1>
+    <div class="stat"><small data-i18n="streak"></small><strong id="streak">0</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">0</strong></div>
+  </div>
+  <p class="tagline" data-i18n="tagline"></p>
+  <div class="stage">
+    <div class="drawing" aria-hidden="true">
+      <svg viewBox="0 0 200 220">
+        <path class="frame" d="M20 210 H120 M50 210 V14 H140 V36" />
+        <circle class="part" cx="140" cy="58" r="22" />
+        <line class="part" x1="140" y1="80" x2="140" y2="142" />
+        <line class="part" x1="140" y1="96" x2="112" y2="124" />
+        <line class="part" x1="140" y1="96" x2="168" y2="124" />
+        <line class="part" x1="140" y1="142" x2="116" y2="186" />
+        <line class="part" x1="140" y1="142" x2="164" y2="186" />
+        <path class="face" d="M128 50 l8 8 m0 -8 l-8 8 M144 50 l8 8 m0 -8 l-8 8 M131 70 q9 -6 18 0" />
+      </svg>
+    </div>
+    <div class="side">
+      <div class="category"><small data-i18n="category"></small><strong id="category"></strong></div>
+      <div class="hearts" id="hearts" aria-live="polite"></div>
+      <button type="button" class="hint" id="hint"></button>
+    </div>
+  </div>
+  <div class="word" id="word" aria-live="polite"></div>
+  <p class="status" id="status"></p>
+  <div class="keyboard" id="keyboard"></div>
+</main>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <h2 id="result-title"></h2>
+    <p id="result-text"></p>
+    <p class="answer" id="result-word"></p>
+    <button type="button" id="next"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Guess the English word before the drawing is finished!', streak: 'Streak', best: 'Best', category: 'Category', hint: 'Hint (−1 ♥)', left: n => `${n} wrong guesses left`, good: l => `Yes, ${l} is in the word`, bad: l => `No ${l}`, won: 'You got it!', wonText: n => `Streak: ${n}`, lost: 'Out of guesses', lostText: 'The word was', next: 'Next word', again: 'Try again', cats: { animals: 'Animals', fruits: 'Fruits', countries: 'Countries', sports: 'Sports', jobs: 'Jobs', space: 'Space', food: 'Food', music: 'Instruments' } },
+    vi: { tagline: 'Đoán từ tiếng Anh trước khi hình vẽ hoàn thành!', streak: 'Chuỗi', best: 'Kỷ lục', category: 'Chủ đề', hint: 'Gợi ý (−1 ♥)', left: n => `Còn ${n} lần đoán sai`, good: l => `Đúng, có chữ ${l}`, bad: l => `Không có chữ ${l}`, won: 'Chính xác!', wonText: n => `Chuỗi thắng: ${n}`, lost: 'Hết lượt đoán', lostText: 'Đáp án là', next: 'Từ tiếp theo', again: 'Thử lại', cats: { animals: 'Động vật', fruits: 'Trái cây', countries: 'Quốc gia', sports: 'Thể thao', jobs: 'Nghề nghiệp', space: 'Vũ trụ', food: 'Món ăn', music: 'Nhạc cụ' } },
+    zh: { tagline: '在图画完成前猜出这个英文单词！', streak: '连胜', best: '最佳', category: '类别', hint: '提示 (−1 ♥)', left: n => `还能猜错 ${n} 次`, good: l => `对，单词里有 ${l}`, bad: l => `没有 ${l}`, won: '猜对了！', wonText: n => `连胜：${n}`, lost: '机会用完了', lostText: '答案是', next: '下一个单词', again: '再试一次', cats: { animals: '动物', fruits: '水果', countries: '国家', sports: '运动', jobs: '职业', space: '太空', food: '食物', music: '乐器' } },
+    fr: { tagline: 'Devinez le mot anglais avant que le dessin soit terminé !', streak: 'Série', best: 'Record', category: 'Thème', hint: 'Indice (−1 ♥)', left: n => `${n} erreurs restantes`, good: l => `Oui, il y a un ${l}`, bad: l => `Pas de ${l}`, won: 'Bravo !', wonText: n => `Série : ${n}`, lost: 'Plus d’essais', lostText: 'Le mot était', next: 'Mot suivant', again: 'Réessayer', cats: { animals: 'Animaux', fruits: 'Fruits', countries: 'Pays', sports: 'Sports', jobs: 'Métiers', space: 'Espace', food: 'Cuisine', music: 'Instruments' } },
+    th: { tagline: 'ทายคำภาษาอังกฤษให้ได้ก่อนภาพวาดจะเสร็จ!', streak: 'ต่อเนื่อง', best: 'ดีที่สุด', category: 'หมวด', hint: 'คำใบ้ (−1 ♥)', left: n => `ทายผิดได้อีก ${n} ครั้ง`, good: l => `ใช่ มีตัว ${l}`, bad: l => `ไม่มีตัว ${l}`, won: 'ถูกต้อง!', wonText: n => `ชนะต่อเนื่อง: ${n}`, lost: 'หมดโอกาสทาย', lostText: 'คำตอบคือ', next: 'คำถัดไป', again: 'ลองอีกครั้ง', cats: { animals: 'สัตว์', fruits: 'ผลไม้', countries: 'ประเทศ', sports: 'กีฬา', jobs: 'อาชีพ', space: 'อวกาศ', food: 'อาหาร', music: 'เครื่องดนตรี' } },
+    ja: { tagline: '絵が完成する前に英単語を当てよう！', streak: '連勝', best: 'ベスト', category: 'カテゴリー', hint: 'ヒント (−1 ♥)', left: n => `あと ${n} 回ミスできます`, good: l => `正解、${l} が入っています`, bad: l => `${l} はありません`, won: '正解！', wonText: n => `連勝：${n}`, lost: 'ゲームオーバー', lostText: '正解は', next: '次の単語', again: 'もう一度', cats: { animals: '動物', fruits: 'フルーツ', countries: '国', sports: 'スポーツ', jobs: '職業', space: '宇宙', food: '食べ物', music: '楽器' } },
+    ko: { tagline: '그림이 완성되기 전에 영어 단어를 맞혀 보세요!', streak: '연승', best: '최고', category: '주제', hint: '힌트 (−1 ♥)', left: n => `틀릴 수 있는 횟수 ${n}번`, good: l => `맞아요, ${l}가 있어요`, bad: l => `${l}는 없어요`, won: '정답!', wonText: n => `연승: ${n}`, lost: '기회를 다 썼어요', lostText: '정답은', next: '다음 단어', again: '다시 하기', cats: { animals: '동물', fruits: '과일', countries: '나라', sports: '스포츠', jobs: '직업', space: '우주', food: '음식', music: '악기' } },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+
+  const WORDS = {
+    animals: 'ELEPHANT GIRAFFE PENGUIN DOLPHIN KANGAROO TIGER ZEBRA OCTOPUS CHEETAH RABBIT TURTLE PARROT SQUIRREL HEDGEHOG BUTTERFLY',
+    fruits: 'BANANA MANGO PINEAPPLE STRAWBERRY CHERRY ORANGE PAPAYA COCONUT LYCHEE APRICOT BLUEBERRY WATERMELON GRAPE LEMON DURIAN',
+    countries: 'VIETNAM JAPAN FRANCE THAILAND KOREA BRAZIL CANADA EGYPT MEXICO NORWAY GERMANY ITALY INDIA KENYA PORTUGAL',
+    sports: 'FOOTBALL TENNIS BASKETBALL VOLLEYBALL BADMINTON SWIMMING CYCLING KARATE SURFING HOCKEY BASEBALL GOLF ARCHERY SKIING BOXING',
+    jobs: 'DOCTOR TEACHER ENGINEER PILOT FARMER CHEF DENTIST LAWYER ARTIST NURSE FIREFIGHTER PLUMBER SCIENTIST BAKER JOURNALIST',
+    space: 'PLANET GALAXY COMET ASTEROID ROCKET NEBULA ORBIT SATURN JUPITER METEOR ASTRONAUT TELESCOPE ECLIPSE MERCURY UNIVERSE',
+    food: 'PIZZA NOODLES SANDWICH PANCAKE SUSHI BURGER DUMPLING SPAGHETTI CHOCOLATE YOGURT OMELETTE PRETZEL CUPCAKE WAFFLE BURRITO',
+    music: 'GUITAR PIANO VIOLIN TRUMPET FLUTE DRUMS SAXOPHONE HARP CELLO UKULELE CLARINET TROMBONE ACCORDION BANJO XYLOPHONE',
+  };
+  const POOL = Object.entries(WORDS).flatMap(([cat, list]) => list.split(' ').map(word => ({ cat, word })));
+  const MAX_WRONG = 6;
+  const STORAGE_KEY = 'milaan.hangman.best';
+  const ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+
+  const $ = id => document.getElementById(id);
+  const parts = [...document.querySelectorAll('.drawing .part')];
+  const els = { app: $('app'), streak: $('streak'), best: $('best'), category: $('category'), hearts: $('hearts'), hint: $('hint'), word: $('word'), status: $('status'), keyboard: $('keyboard'), result: $('result'), title: $('result-title'), text: $('result-text'), answer: $('result-word'), next: $('next') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+
+  const keys = {};
+  for (const row of ROWS) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'row';
+    for (const letter of row) {
+      const key = document.createElement('button');
+      key.type = 'button';
+      key.className = 'key';
+      key.textContent = letter;
+      key.addEventListener('click', () => guess(letter));
+      keys[letter] = key;
+      rowEl.append(key);
+    }
+    els.keyboard.append(rowEl);
+  }
+
+  let round, streak = 0, best = readBest();
+  const recent = [];
+
+  function pickWord() {
+    let choice;
+    do { choice = POOL[Math.floor(Math.random() * POOL.length)]; } while (recent.includes(choice.word));
+    recent.push(choice.word);
+    if (recent.length > 30) recent.shift();
+    return choice;
+  }
+
+  function newRound() {
+    const { cat, word } = pickWord();
+    round = { word, cat, guessed: new Set(), hinted: new Set(), wrong: 0, over: false };
+    els.app.classList.remove('lost');
+    els.category.textContent = t.cats[cat];
+    els.word.replaceChildren(...[...word].map(() => { const slot = document.createElement('span'); slot.className = 'slot'; return slot; }));
+    for (const key of Object.values(keys)) { key.className = 'key'; key.disabled = false; }
+    parts.forEach(part => part.classList.remove('on'));
+    els.status.textContent = '';
+    els.result.hidden = true;
+    render();
+  }
+
+  function render() {
+    els.streak.textContent = String(streak);
+    els.best.textContent = String(best);
+    const left = MAX_WRONG - round.wrong;
+    els.hearts.innerHTML = '♥'.repeat(left) + `<span class="lost-heart">${'♥'.repeat(round.wrong)}</span>`;
+    els.hearts.setAttribute('aria-label', t.left(left));
+    els.hint.textContent = t.hint;
+    els.hint.disabled = round.over || left <= 1;
+    [...round.word].forEach((letter, index) => {
+      const slot = els.word.children[index];
+      const known = round.guessed.has(letter);
+      if ((known || round.over) && !slot.textContent) {
+        slot.textContent = letter;
+        slot.classList.add('show');
+        if (!known) slot.classList.add('missed');
+      }
+      slot.classList.toggle('hinted', round.hinted.has(letter));
+    });
+    els.word.setAttribute('aria-label', [...round.word].map(letter => round.guessed.has(letter) ? letter : '_').join(' '));
+  }
+
+  function guess(letter, viaHint = false) {
+    if (!round || round.over || round.guessed.has(letter)) return;
+    round.guessed.add(letter);
+    const key = keys[letter];
+    key.disabled = true;
+    if (round.word.includes(letter)) {
+      key.classList.add('good');
+      if (viaHint) round.hinted.add(letter);
+      els.status.textContent = viaHint ? '' : t.good(letter);
+    } else {
+      key.classList.add('bad');
+      parts[round.wrong].classList.add('on');
+      round.wrong += 1;
+      els.status.textContent = t.bad(letter);
+    }
+    const solved = [...round.word].every(l => round.guessed.has(l));
+    if (solved) finish(true);
+    else if (round.wrong >= MAX_WRONG) finish(false);
+    render();
+  }
+
+  // A hint reveals one missing letter at the price of one life (one body part).
+  function hint() {
+    if (round.over || MAX_WRONG - round.wrong <= 1) return;
+    const missing = [...new Set(round.word)].filter(l => !round.guessed.has(l));
+    if (!missing.length) return;
+    parts[round.wrong].classList.add('on');
+    round.wrong += 1;
+    guess(missing[Math.floor(Math.random() * missing.length)], true);
+  }
+
+  function finish(won) {
+    round.over = true;
+    streak = won ? streak + 1 : 0;
+    if (streak > best) { best = streak; writeBest(best); }
+    if (!won) els.app.classList.add('lost');
+    for (const key of Object.values(keys)) key.disabled = true;
+    els.title.textContent = won ? t.won : t.lost;
+    els.text.textContent = won ? t.wonText(streak) : t.lostText;
+    els.answer.textContent = round.word;
+    els.next.textContent = won ? t.next : t.again;
+    setTimeout(() => { els.result.hidden = false; els.next.focus({ preventScroll: true }); }, won ? 500 : 900);
+  }
+
+  els.hint.addEventListener('click', hint);
+  els.next.addEventListener('click', newRound);
+  document.addEventListener('keydown', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!els.result.hidden && event.key === 'Enter') return;
+    const letter = event.key.toUpperCase();
+    if (/^[A-Z]$/.test(letter) && els.result.hidden) { event.preventDefault(); guess(letter); }
+  });
+
+  newRound();
+})();
+</script>
+</body>
+</html>

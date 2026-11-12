@@ -1,10 +1,13 @@
 import type { APIRoute } from 'astro';
 import { GAMES } from '../data/games';
-import { LOCALES, localizedGamePath, localizedPath } from '../i18n/ui';
+import { ARCADE_GAMES } from '../data/arcade';
+import { LOCALES, localizedArcadePath, localizedGamePath, localizedPath } from '../i18n/ui';
 
 export const GET: APIRoute = ({ site }) => {
   const paths = LOCALES.flatMap(lang => [
     localizedPath(lang),
+    localizedArcadePath(lang),
+    ...ARCADE_GAMES.map(game => localizedArcadePath(lang, game.id)),
     ...GAMES.map(game => localizedGamePath(lang, game.id)),
   ]);
   const entries = paths.map(path => `  <url><loc>${new URL(path, site).href}</loc></url>`);

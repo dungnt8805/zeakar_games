@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini Crossword</title>
+<style>
+:root {
+  --bg: #f3f1ea;
+  --ink: #1f2430;
+  --muted: #6d7384;
+  --cell: #ffffff;
+  --word: #cfe3ff;
+  --active: #ffd25e;
+  --blue: #2f6fe0;
+  --red: #e0483e;
+  --green: #2f9e6e;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1.1; }
+h1 small { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+.timer { padding: 6px 12px; border-radius: 10px; background: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tools { display: flex; gap: 6px; }
+.tool { flex: 1; padding: 9px 6px; border-radius: 10px; background: #fff; border: 1.5px solid #d9d6cc; font-size: 13px; font-weight: 800; }
+.tool:active { background: #ece9df; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --cell: min(calc(100cqw / var(--cols)), calc(100cqh / var(--rows)), 52px); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-template-rows: repeat(var(--rows), var(--cell)); }
+.cell { position: relative; margin: -1px 0 0 -1px; border: 2px solid var(--ink); background: var(--cell); display: grid; place-items: center; font-size: calc(var(--cell) * .55); font-weight: 900; text-transform: uppercase; }
+.cell .num { position: absolute; top: 1px; left: 3px; font-size: calc(var(--cell) * .24); font-weight: 800; line-height: 1; }
+.cell.in-word { background: var(--word); }
+.cell.active { background: var(--active); }
+.cell.wrong .letter { color: var(--red); }
+.cell.revealed .letter { color: var(--blue); }
+.cell.done { transition: background .3s; }
+.solved .cell { background: #c8f0d9; animation: wave .5s calc(var(--i) * 25ms) both; }
+@keyframes wave { 50% { transform: scale(1.12); } }
+
+.clue { display: flex; align-items: center; gap: 6px; min-height: 58px; padding: 6px; border-radius: 14px; background: var(--word); }
+.clue button { width: 40px; height: 44px; flex-shrink: 0; border-radius: 10px; font-size: 20px; font-weight: 900; }
+.clue button:active { background: #b3d2fb; }
+.clue p { flex: 1; text-align: center; font-size: 15px; font-weight: 700; line-height: 1.3; }
+.clue b { margin-right: 6px; color: var(--blue); }
+.status { min-height: 1.2em; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+.status.bad { color: var(--red); }
+.status.good { color: var(--green); }
+
+.keyboard { display: grid; gap: 5px; }
+.row { display: flex; justify-content: center; gap: 4px; }
+.key { flex: 1; max-width: 42px; height: clamp(38px, 6vh, 48px); border-radius: 8px; background: #fff; box-shadow: 0 2px 0 #c9c5b9; font-size: 16px; font-weight: 800; }
+.key:active { transform: translateY(2px); box-shadow: none; }
+.key.wide { max-width: 64px; flex: 1.5; font-size: 18px; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: #1f243055; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 340px); padding: 26px 22px; border-radius: 22px; background: #fff; text-align: center; box-shadow: 0 20px 50px #0004; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.panel .emoji { font-size: 44px; }
+.panel h2 { font-size: 28px; font-weight: 900; }
+.panel p { margin-top: 8px; font-size: 16px; color: var(--muted); }
+.panel button { margin-top: 20px; width: 100%; padding: 14px; border-radius: 14px; background: var(--blue); color: #fff; font-size: 18px; font-weight: 800; }
+.panel .best { font-size: 14px; }
+.levels { display: grid; gap: 10px; margin-top: 18px; }
+.panel .levels button { margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; background: #eef4ff; color: var(--ink); border: 2px solid transparent; }
+.panel .levels button.current { border-color: var(--blue); }
+.levels small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+.levels em { font-style: normal; font-size: 12px; font-weight: 800; color: var(--blue); white-space: nowrap; }
+.panel .ghost { background: none; color: var(--muted); margin-top: 12px; padding: 8px; font-size: 15px; }
+.diff { padding: 6px 10px; border-radius: 10px; background: #e3ecff; color: var(--blue); font-size: 12px; font-weight: 800; white-space: nowrap; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Mini Crossword<small data-i18n="tagline"></small></h1>
+    <button type="button" class="diff" id="diff"></button>
+    <span class="timer" id="timer" aria-hidden="true">0:00</span>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="check" data-i18n="check"></button>
+    <button type="button" class="tool" id="reveal" data-i18n="reveal"></button>
+    <button type="button" class="tool" id="new" data-i18n="newPuzzle"></button>
+  </div>
+  <div class="board-wrap"><div class="board" id="board"></div></div>
+  <div class="clue">
+    <button type="button" id="prev" data-i18n-label="prevClue">‹</button>
+    <p id="clue" aria-live="polite"></p>
+    <button type="button" id="next" data-i18n-label="nextClue">›</button>
+  </div>
+  <p class="status" id="status" aria-live="polite"></p>
+  <div class="keyboard" id="keyboard"></div>
+</main>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🧩</p>
+    <h2 id="win-title" data-i18n="solved"></h2>
+    <p id="win-text"></p>
+    <p class="best" id="win-best"></p>
+    <button type="button" id="again" data-i18n="newPuzzle"></button>
+  </div>
+</div>
+
+<div class="overlay" id="choose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="choose-title">
+    <h2 id="choose-title" data-i18n="chooseLevel"></h2>
+    <div class="levels" id="levels"></div>
+    <button type="button" class="ghost" id="cancel" data-i18n="cancel"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { easy: 'Easy', normal: 'Normal', hard: 'Hard', easyDesc: '6 short words', normalDesc: '8 words', hardDesc: '10+ words, longer ones', chooseLevel: 'New puzzle', cancel: 'Cancel', best: time => `Best: ${time}`, newBest: 'New best time!', tagline: 'A new puzzle every time · English words', check: 'Check', reveal: 'Reveal letter', newPuzzle: 'New puzzle', across: 'Across', down: 'Down', prevClue: 'Previous clue', nextClue: 'Next clue', wrong: n => `${n} letter${n === 1 ? '' : 's'} wrong`, allRight: 'All correct so far!', notYet: 'Not quite — check your letters', solved: 'Solved!', result: (time, hints) => `${time} · ${hints} hint${hints === 1 ? '' : 's'}` },
+    vi: { easy: 'Dễ', normal: 'Thường', hard: 'Khó', easyDesc: '6 từ ngắn', normalDesc: '8 từ', hardDesc: 'Từ 10 từ, có từ dài', chooseLevel: 'Ô chữ mới', cancel: 'Hủy', best: time => `Nhanh nhất: ${time}`, newBest: 'Kỷ lục thời gian mới!', tagline: 'Ô chữ mới mỗi ván · Từ tiếng Anh', check: 'Kiểm tra', reveal: 'Mở 1 chữ', newPuzzle: 'Ô chữ mới', across: 'Ngang', down: 'Dọc', prevClue: 'Gợi ý trước', nextClue: 'Gợi ý sau', wrong: n => `Sai ${n} chữ`, allRight: 'Tới giờ đều đúng!', notYet: 'Chưa đúng — kiểm tra lại các chữ', solved: 'Hoàn thành!', result: (time, hints) => `${time} · ${hints} lần mở chữ` },
+    zh: { easy: '简单', normal: '普通', hard: '困难', easyDesc: '6 个短单词', normalDesc: '8 个单词', hardDesc: '10 个以上，含长单词', chooseLevel: '新谜题', cancel: '取消', best: time => `最快：${time}`, newBest: '新的最快纪录！', tagline: '每局都是新谜题 · 英文单词', check: '检查', reveal: '揭示字母', newPuzzle: '新谜题', across: '横向', down: '纵向', prevClue: '上一条提示', nextClue: '下一条提示', wrong: n => `${n} 个字母有误`, allRight: '目前全部正确！', notYet: '还不对——检查一下字母', solved: '完成！', result: (time, hints) => `${time} · 提示 ${hints} 次` },
+    fr: { easy: 'Facile', normal: 'Normal', hard: 'Difficile', easyDesc: '6 mots courts', normalDesc: '8 mots', hardDesc: '10 mots ou plus, dont des longs', chooseLevel: 'Nouvelle grille', cancel: 'Annuler', best: time => `Meilleur temps : ${time}`, newBest: 'Nouveau meilleur temps !', tagline: 'Une nouvelle grille à chaque partie · Mots anglais', check: 'Vérifier', reveal: 'Révéler une lettre', newPuzzle: 'Nouvelle grille', across: 'Horizontal', down: 'Vertical', prevClue: 'Définition précédente', nextClue: 'Définition suivante', wrong: n => `${n} lettre${n > 1 ? 's' : ''} fausse${n > 1 ? 's' : ''}`, allRight: 'Tout est juste pour l’instant !', notYet: 'Pas encore — vérifiez vos lettres', solved: 'Résolu !', result: (time, hints) => `${time} · ${hints} indice${hints > 1 ? 's' : ''}` },
+    th: { easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก', easyDesc: 'คำสั้น 6 คำ', normalDesc: '8 คำ', hardDesc: '10 คำขึ้นไป มีคำยาว', chooseLevel: 'ปริศนาใหม่', cancel: 'ยกเลิก', best: time => `เร็วที่สุด: ${time}`, newBest: 'ทำเวลาดีที่สุดใหม่!', tagline: 'ปริศนาใหม่ทุกเกม · คำภาษาอังกฤษ', check: 'ตรวจ', reveal: 'เปิด 1 ตัว', newPuzzle: 'ปริศนาใหม่', across: 'แนวนอน', down: 'แนวตั้ง', prevClue: 'คำใบ้ก่อนหน้า', nextClue: 'คำใบ้ถัดไป', wrong: n => `ผิด ${n} ตัว`, allRight: 'ถูกทั้งหมดแล้ว!', notYet: 'ยังไม่ถูก ลองตรวจตัวอักษรอีกครั้ง', solved: 'สำเร็จ!', result: (time, hints) => `${time} · ใช้คำใบ้ ${hints} ครั้ง` },
+    ja: { easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', easyDesc: '短い単語 6 個', normalDesc: '単語 8 個', hardDesc: '10 個以上、長い単語あり', chooseLevel: '新しいパズル', cancel: 'キャンセル', best: time => `ベスト：${time}`, newBest: 'ベストタイム更新！', tagline: '毎回新しいパズル · 英単語', check: 'チェック', reveal: '1文字表示', newPuzzle: '新しいパズル', across: 'ヨコ', down: 'タテ', prevClue: '前のヒント', nextClue: '次のヒント', wrong: n => `${n} 文字が違います`, allRight: 'ここまで全部正解！', notYet: 'まだ違います。文字を確認しよう', solved: 'クリア！', result: (time, hints) => `${time} · ヒント ${hints} 回` },
+    ko: { easy: '쉬움', normal: '보통', hard: '어려움', easyDesc: '짧은 단어 6개', normalDesc: '단어 8개', hardDesc: '10개 이상, 긴 단어 포함', chooseLevel: '새 퍼즐', cancel: '취소', best: time => `최고 기록: ${time}`, newBest: '최고 기록 경신!', tagline: '매번 새로운 퍼즐 · 영어 단어', check: '확인', reveal: '글자 공개', newPuzzle: '새 퍼즐', across: '가로', down: '세로', prevClue: '이전 힌트', nextClue: '다음 힌트', wrong: n => `${n}글자 틀림`, allRight: '지금까지 모두 정답!', notYet: '아직이에요 — 글자를 확인해 보세요', solved: '완성!', result: (time, hints) => `${time} · 힌트 ${hints}회` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const BANK = [
+    ['CAT', 'Pet that purrs'], ['DOG', 'Loyal pet that barks'], ['SUN', 'Star at the center of our solar system'], ['MOON', 'It orbits the Earth'],
+    ['RAIN', 'Water falling from clouds'], ['TREE', 'Tall plant with a trunk'], ['BOOK', 'You read it, page by page'], ['APPLE', 'Red or green fruit that keeps the doctor away'],
+    ['OCEAN', 'Huge body of salt water'], ['RIVER', 'Flowing body of fresh water'], ['BREAD', 'Baked loaf for sandwiches'], ['HOUSE', 'Building where a family lives'],
+    ['CHAIR', 'Seat with legs and a back'], ['CLOCK', 'It tells the time'], ['PIANO', 'Instrument with black and white keys'], ['TIGER', 'Striped big cat'],
+    ['ZEBRA', 'Striped horse-like animal'], ['HONEY', 'Sweet food made by bees'], ['SNOW', 'White flakes in winter'], ['CLOUD', 'White puff in the sky'],
+    ['STAR', 'It twinkles at night'], ['EARTH', 'Our home planet'], ['MUSIC', 'Melody and rhythm'], ['PAPER', 'You write on it'],
+    ['PENCIL', 'Writing tool with an eraser'], ['WINDOW', 'Glass opening in a wall'], ['GARDEN', 'Where flowers grow'], ['BRIDGE', 'It crosses a river'],
+    ['TRAIN', 'It runs on rails'], ['PLANE', 'It flies with wings'], ['SHIP', 'Very large boat'], ['ROBOT', 'Machine that can act on its own'],
+    ['CAMERA', 'It takes photos'], ['PHONE', 'You call people with it'], ['LEMON', 'Sour yellow fruit'], ['ORANGE', 'Citrus fruit, and a color'],
+    ['CHEESE', 'Made from milk, loved by mice'], ['PIZZA', 'Italian dish with toppings'], ['SUGAR', 'Sweet white crystals'], ['SALT', 'Seasoning from the sea'],
+    ['WATER', 'H2O'], ['FIRE', 'Hot, bright flames'], ['ICE', 'Frozen water'], ['WIND', 'Moving air'],
+    ['STORM', 'Weather with thunder and lightning'], ['BEACH', 'Sandy shore'], ['ISLAND', 'Land surrounded by water'], ['DESERT', 'Dry, sandy region'],
+    ['FOREST', 'Many trees together'], ['CASTLE', 'Home of a king'], ['DRAGON', 'Fire-breathing creature'], ['PIRATE', 'Robber at sea'],
+    ['KING', 'Ruler who wears a crown'], ['QUEEN', 'Wife of a king'], ['HORSE', 'Animal you can ride'], ['MOUSE', 'Small rodent, or computer device'],
+    ['EAGLE', 'Large bird of prey'], ['SNAKE', 'Legless reptile'], ['FROG', 'Green jumping amphibian'], ['OWL', 'Night bird that hoots'],
+    ['BEE', 'Insect that makes honey'], ['ANT', 'Tiny hard-working insect'], ['EGG', 'Laid by a hen'], ['MILK', 'White drink from cows'],
+    ['TEA', 'Hot drink made from leaves'], ['COFFEE', 'Morning drink with caffeine'], ['SMILE', 'Happy expression'], ['DREAM', 'Story you see while sleeping'],
+    ['MAGIC', 'Tricks of a wizard'], ['GHOST', 'Spooky spirit'], ['HEART', 'It pumps blood'], ['BRAIN', 'You think with it'],
+    ['TOOTH', 'You brush it twice a day'], ['SCHOOL', 'Place for lessons'], ['FRIEND', 'Someone you like and trust'], ['PARTY', 'Celebration with friends'],
+    ['GIFT', 'Present'], ['CANDLE', 'Wax light'], ['KITE', 'It flies on a string'], ['BALL', 'Round toy you kick or throw'],
+    ['GAME', 'Something you play'], ['RAINBOW', 'Colorful arc after rain'], ['PLANET', 'Mars or Venus, for example'], ['ROCKET', 'It launches into space'],
+    ['ELEPHANT', 'Largest land animal, with a trunk'], ['GIRAFFE', 'Animal with a very long neck'], ['KANGAROO', 'Australian animal that hops'], ['PENGUIN', 'Bird that swims but cannot fly'],
+    ['VOLCANO', 'Mountain that can erupt'], ['DINOSAUR', 'Giant reptile from long ago'], ['UMBRELLA', 'Keeps you dry in the rain'], ['BICYCLE', 'Two wheels and pedals'],
+    ['LIBRARY', 'Place to borrow books'], ['KITCHEN', 'Room where you cook'], ['HOSPITAL', 'Where doctors treat patients'], ['BUTTERFLY', 'Insect with colorful wings'],
+    ['CHOCOLATE', 'Sweet treat made from cocoa'], ['TELESCOPE', 'Tool for looking at distant stars'], ['COMPUTER', 'Machine with a keyboard and screen'], ['BIRTHDAY', 'Day you celebrate getting older'],
+    ['BLANKET', 'Warm cover for a bed'], ['SANDWICH', 'Food between two slices of bread'], ['PYRAMID', 'Ancient Egyptian tomb'], ['TREASURE', 'Pirates bury it'],
+    ['AIRPORT', 'Where planes take off and land'], ['VACATION', 'A holiday trip'], ['MOUNTAIN', 'Very tall landform'], ['SKELETON', 'All the bones of a body'],
+    ['HOMEWORK', 'Schoolwork you do at home'], ['KEYBOARD', 'You type on it'], ['SUNFLOWER', 'Tall yellow flower that faces the sun'], ['PUMPKIN', 'Orange vegetable carved at Halloween'],
+    ['JUNGLE', 'Thick tropical forest'], ['ANCHOR', 'Heavy object that holds a ship in place'], ['HARBOR', 'Safe place for boats'], ['LETTER', 'Message you mail, or A, B or C'],
+    ['MIRROR', 'Glass that shows your reflection'], ['PILLOW', 'Soft thing for your head in bed'], ['BASKET', 'Woven container for carrying things'], ['ORCHESTRA', 'Large group of musicians'],
+  ];
+  // Easy: small grid of short words. Hard: bigger grid that leans on the long words.
+  const DIFFICULTIES = {
+    easy: { size: 7, target: 6, maxLength: 5 },
+    normal: { size: 9, target: 8, maxLength: 7 },
+    hard: { size: 11, target: 11, maxLength: 10 },
+  };
+  const ATTEMPTS = 60;
+  const STORAGE_KEY = 'milaan.crossword.progress';
+  let config = DIFFICULTIES.normal;
+  const ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM⌫'];
+
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const key = (r, c) => `${r},${c}`;
+  const VEC = { across: [0, 1], down: [1, 0] };
+
+  // Greedy generator: each word must cross an existing one without touching any other letters side by side.
+  function build() {
+    const sample = shuffle(BANK.filter(([word]) => word.length <= config.maxLength)).slice(0, 34);
+    // Start from the longest word; it gives the most letters to cross. Duplicates are skipped below.
+    const [first, ...rest] = [sample.reduce((a, b) => (b[0].length > a[0].length ? b : a)), ...sample];
+    const grid = new Map();
+    const words = [];
+    let bounds = { r0: 0, r1: 0, c0: 0, c1: 0 };
+
+    const place = (word, clue, r, c, dir) => {
+      const [dr, dc] = VEC[dir];
+      const index = words.length;
+      words.push({ word, clue, r, c, dir });
+      for (let i = 0; i < word.length; i++) {
+        const k = key(r + dr * i, c + dc * i);
+        const cell = grid.get(k) ?? { letter: word[i] };
+        cell[dir] = index;
+        grid.set(k, cell);
+        bounds = { r0: Math.min(bounds.r0, r + dr * i), r1: Math.max(bounds.r1, r + dr * i), c0: Math.min(bounds.c0, c + dc * i), c1: Math.max(bounds.c1, c + dc * i) };
+      }
+    };
+
+    const fits = (word, r, c, dir) => {
+      const [dr, dc] = VEC[dir];
+      if (grid.has(key(r - dr, c - dc)) || grid.has(key(r + dr * word.length, c + dc * word.length))) return -1;
+      const r1 = Math.max(bounds.r1, r + dr * (word.length - 1)), c1 = Math.max(bounds.c1, c + dc * (word.length - 1));
+      if (r1 - Math.min(bounds.r0, r) + 1 > config.size || c1 - Math.min(bounds.c0, c) + 1 > config.size) return -1;
+      let crossings = 0;
+      for (let i = 0; i < word.length; i++) {
+        const rr = r + dr * i, cc = c + dc * i;
+        const cell = grid.get(key(rr, cc));
+        if (cell) {
+          if (cell.letter !== word[i] || cell[dir] !== undefined) return -1;
+          crossings++;
+        } else if (grid.has(key(rr + dc, cc + dr)) || grid.has(key(rr - dc, cc - dr))) {
+          return -1;
+        }
+      }
+      return crossings;
+    };
+
+    place(first[0], first[1], 0, 0, Math.random() < 0.5 ? 'across' : 'down');
+    for (const [word, clue] of rest) {
+      if (words.length >= config.target) break;
+      if (words.some(w => w.word === word)) continue;
+      let best = null;
+      for (const other of words) {
+        const dir = other.dir === 'across' ? 'down' : 'across';
+        const [odr, odc] = VEC[other.dir];
+        const [dr, dc] = VEC[dir];
+        for (let i = 0; i < other.word.length; i++) for (let j = 0; j < word.length; j++) {
+          if (other.word[i] !== word[j]) continue;
+          const r = other.r + odr * i - dr * j, c = other.c + odc * i - dc * j;
+          const score = fits(word, r, c, dir);
+          if (score > 0 && (!best || score + Math.random() > best.score)) best = { r, c, dir, score: score + Math.random() };
+        }
+      }
+      if (best) place(word, clue, best.r, best.c, best.dir);
+    }
+    const crossings = [...grid.values()].filter(cell => cell.across !== undefined && cell.down !== undefined).length;
+    return { words, grid, bounds, score: words.length * 10 + crossings };
+  }
+
+  function generate() {
+    let best = build();
+    for (let i = 1; i < ATTEMPTS && best.words.length < config.target; i++) {
+      const next = build();
+      if (next.score > best.score) best = next;
+    }
+    const { words, grid, bounds } = best;
+    const rows = bounds.r1 - bounds.r0 + 1, cols = bounds.c1 - bounds.c0 + 1;
+    const cells = new Map();
+    for (const [k, cell] of grid) {
+      const [r, c] = k.split(',').map(Number);
+      cells.set(key(r - bounds.r0, c - bounds.c0), { ...cell, r: r - bounds.r0, c: c - bounds.c0 });
+    }
+    words.forEach(w => { w.r -= bounds.r0; w.c -= bounds.c0; });
+    // Number start cells in reading order, as printed crosswords do.
+    let n = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const cell = cells.get(key(r, c));
+      if (!cell) continue;
+      const starts = words.filter(w => w.r === r && w.c === c);
+      if (starts.length) { n++; cell.num = n; starts.forEach(w => { w.num = n; }); }
+    }
+    const byNum = dir => words.filter(w => w.dir === dir).sort((a, b) => a.num - b.num);
+    const ordered = [...byNum('across'), ...byNum('down')];
+    return { words: ordered, all: words, cells, rows, cols };
+  }
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), clue: $('clue'), status: $('status'), timer: $('timer'), diff: $('diff'), win: $('win'), winText: $('win-text'), winBest: $('win-best'), choose: $('choose'), levels: $('levels'), keyboard: $('keyboard') };
+  const readProgress = () => { try { return { difficulty: 'normal', best: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { difficulty: 'normal', best: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const progress = readProgress();
+  if (!DIFFICULTIES[progress.difficulty]) progress.difficulty = 'normal';
+
+  for (const row of ROWS) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'row';
+    for (const letter of row) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = letter === '⌫' ? 'key wide' : 'key';
+      button.textContent = letter;
+      if (letter === '⌫') button.setAttribute('aria-label', 'Backspace');
+      button.addEventListener('click', () => (letter === '⌫' ? erase() : type(letter)));
+      rowEl.append(button);
+    }
+    els.keyboard.append(rowEl);
+  }
+
+  let puzzle, state;
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+  function newPuzzle(difficulty = progress.difficulty) {
+    clearInterval(state?.timer);
+    progress.difficulty = difficulty;
+    saveProgress();
+    config = DIFFICULTIES[difficulty];
+    els.diff.textContent = t[difficulty];
+    els.diff.setAttribute('aria-label', `${t.chooseLevel}: ${t[difficulty]}`);
+    els.choose.hidden = true;
+    puzzle = generate();
+    state = { entries: new Map(), wrong: new Set(), revealed: new Set(), hints: 0, start: performance.now(), timer: 0, word: puzzle.words[0], cell: null, solved: false };
+    state.cell = key(state.word.r, state.word.c);
+    state.timer = setInterval(() => { els.timer.textContent = formatTime(performance.now() - state.start); }, 500);
+    els.timer.textContent = '0:00';
+    els.board.style.setProperty('--rows', puzzle.rows);
+    els.board.style.setProperty('--cols', puzzle.cols);
+    els.board.classList.remove('solved');
+    els.board.replaceChildren();
+    let i = 0;
+    for (let r = 0; r < puzzle.rows; r++) for (let c = 0; c < puzzle.cols; c++) {
+      const cell = puzzle.cells.get(key(r, c));
+      if (!cell) { els.board.append(document.createElement('span')); continue; }
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'cell';
+      el.style.setProperty('--i', i++);
+      el.innerHTML = `${cell.num ? `<span class="num">${cell.num}</span>` : ''}<span class="letter"></span>`;
+      el.addEventListener('click', () => select(key(r, c), true));
+      cell.el = el;
+      els.board.append(el);
+    }
+    els.win.hidden = true;
+    els.status.textContent = '';
+    render();
+  }
+
+  const cellsOf = word => { const [dr, dc] = VEC[word.dir]; return [...word.word].map((_, i) => key(word.r + dr * i, word.c + dc * i)); };
+
+  function select(cellKey, fromTap = false) {
+    const cell = puzzle.cells.get(cellKey);
+    if (!cell) return;
+    const current = state.word.dir;
+    const other = current === 'across' ? 'down' : 'across';
+    // Tapping the active cell again flips between its across and down words.
+    let dir = current;
+    if (fromTap && cellKey === state.cell && cell[other] !== undefined) dir = other;
+    else if (cell[current] === undefined) dir = other;
+    state.cell = cellKey;
+    state.word = puzzle.all[cell[dir]];
+    render();
+  }
+
+  function render() {
+    const wordCells = new Set(cellsOf(state.word));
+    for (const [k, cell] of puzzle.cells) {
+      cell.el.classList.toggle('in-word', wordCells.has(k));
+      cell.el.classList.toggle('active', k === state.cell);
+      cell.el.classList.toggle('wrong', state.wrong.has(k));
+      cell.el.classList.toggle('revealed', state.revealed.has(k));
+      cell.el.querySelector('.letter').textContent = state.entries.get(k) ?? '';
+      const words = ['across', 'down'].filter(d => cell[d] !== undefined).map(d => `${puzzle.all[cell[d]].num} ${t[d]}`);
+      cell.el.setAttribute('aria-label', `${words.join(', ')}: ${state.entries.get(k) ?? '—'}`);
+    }
+    const label = `${state.word.num} ${t[state.word.dir]}`;
+    els.clue.innerHTML = '';
+    const b = document.createElement('b');
+    b.textContent = label;
+    els.clue.append(b, document.createTextNode(state.word.clue));
+  }
+
+  function step(delta) {
+    const list = cellsOf(state.word);
+    const next = list[list.indexOf(state.cell) + delta];
+    if (next) state.cell = next;
+  }
+
+  function type(letter) {
+    if (state.solved) return;
+    state.entries.set(state.cell, letter);
+    state.wrong.delete(state.cell);
+    state.revealed.delete(state.cell);
+    step(1);
+    els.status.textContent = '';
+    render();
+    checkComplete();
+  }
+
+  function erase() {
+    if (state.solved) return;
+    if (!state.entries.get(state.cell)) step(-1);
+    state.entries.delete(state.cell);
+    state.wrong.delete(state.cell);
+    render();
+  }
+
+  function moveClue(delta) {
+    const index = puzzle.words.indexOf(state.word);
+    state.word = puzzle.words[(index + delta + puzzle.words.length) % puzzle.words.length];
+    const empty = cellsOf(state.word).find(k => !state.entries.get(k));
+    state.cell = empty ?? key(state.word.r, state.word.c);
+    render();
+  }
+
+  function check() {
+    state.wrong.clear();
+    for (const [k, cell] of puzzle.cells) {
+      const entry = state.entries.get(k);
+      if (entry && entry !== cell.letter) state.wrong.add(k);
+    }
+    els.status.className = `status ${state.wrong.size ? 'bad' : 'good'}`;
+    els.status.textContent = state.wrong.size ? t.wrong(state.wrong.size) : t.allRight;
+    render();
+  }
+
+  function reveal() {
+    if (state.solved) return;
+    const cell = puzzle.cells.get(state.cell);
+    if (state.entries.get(state.cell) === cell.letter) { step(1); render(); return; }
+    state.entries.set(state.cell, cell.letter);
+    state.revealed.add(state.cell);
+    state.wrong.delete(state.cell);
+    state.hints++;
+    step(1);
+    render();
+    checkComplete();
+  }
+
+  function checkComplete() {
+    if ([...puzzle.cells.keys()].some(k => !state.entries.get(k))) return;
+    const correct = [...puzzle.cells].every(([k, cell]) => state.entries.get(k) === cell.letter);
+    if (!correct) { els.status.className = 'status bad'; els.status.textContent = t.notYet; return; }
+    state.solved = true;
+    clearInterval(state.timer);
+    els.board.classList.add('solved');
+    const ms = performance.now() - state.start;
+    const previous = progress.best[progress.difficulty];
+    const better = !state.hints && (!previous || ms < previous);
+    if (better) { progress.best[progress.difficulty] = ms; saveProgress(); }
+    els.winText.textContent = `${t[progress.difficulty]} · ${t.result(formatTime(ms), state.hints)}`;
+    els.winBest.textContent = better && previous ? t.newBest : progress.best[progress.difficulty] ? t.best(formatTime(progress.best[progress.difficulty])) : '';
+    setTimeout(() => { els.win.hidden = false; $('again').focus({ preventScroll: true }); }, 700);
+  }
+
+  function chooseDifficulty() {
+    els.levels.replaceChildren(...Object.keys(DIFFICULTIES).map(level => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = level === progress.difficulty ? 'current' : '';
+      const best = progress.best[level];
+      button.innerHTML = '<span><span class="name"></span><small></small></span><em></em>';
+      button.querySelector('.name').textContent = t[level];
+      button.querySelector('small').textContent = t[`${level}Desc`];
+      button.querySelector('em').textContent = best ? t.best(formatTime(best)) : '';
+      button.addEventListener('click', () => newPuzzle(level));
+      return button;
+    }));
+    els.win.hidden = true;
+    els.choose.hidden = false;
+    els.levels.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  function arrow(dir, delta) {
+    const cell = puzzle.cells.get(state.cell);
+    // An arrow across the current direction first turns to that direction, like newspaper apps.
+    if (state.word.dir !== dir && cell[dir] !== undefined) { state.word = puzzle.all[cell[dir]]; render(); return; }
+    const [dr, dc] = VEC[dir];
+    const [r, c] = state.cell.split(',').map(Number);
+    for (let i = 1; i < Math.max(puzzle.rows, puzzle.cols); i++) {
+      const k = key(r + dr * delta * i, c + dc * delta * i);
+      if (puzzle.cells.has(k)) { select(k); return; }
+    }
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey || !els.win.hidden || !els.choose.hidden) return;
+    const letter = event.key.toUpperCase();
+    if (/^[A-Z]$/.test(letter)) { event.preventDefault(); type(letter); }
+    else if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); erase(); }
+    else if (event.key === 'ArrowRight') { event.preventDefault(); arrow('across', 1); }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); arrow('across', -1); }
+    else if (event.key === 'ArrowDown') { event.preventDefault(); arrow('down', 1); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); arrow('down', -1); }
+  });
+  $('prev').addEventListener('click', () => moveClue(-1));
+  $('next').addEventListener('click', () => moveClue(1));
+  $('check').addEventListener('click', check);
+  $('reveal').addEventListener('click', reveal);
+  $('new').addEventListener('click', chooseDifficulty);
+  $('again').addEventListener('click', chooseDifficulty);
+  els.diff.addEventListener('click', chooseDifficulty);
+  $('cancel').addEventListener('click', () => { els.choose.hidden = true; });
+
+  newPuzzle();
+})();
+</script>
+</body>
+</html>

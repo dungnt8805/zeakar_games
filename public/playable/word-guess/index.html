@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Guess</title>
+<style>
+:root {
+  --bg: #1b1730;
+  --panel: #262043;
+  --line: #40386a;
+  --text: #f6f3ff;
+  --muted: #aaa2c9;
+  --accent: #b892ff;
+  --key: #3b3462;
+  --correct: #3db27a;
+  --present: #e3b23c;
+  --absent: #4a4368;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body.hc { --correct: #f5793a; --present: #4fa3e8; }
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #2c2450, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 6px; }
+h1 { flex: 1; display: flex; align-items: center; gap: 8px; font-size: clamp(24px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--accent); }
+.en { padding: 3px 7px; text-decoration: none; border-radius: 8px; background: var(--accent); color: #1b1730; font-size: 11px; font-weight: 900; letter-spacing: .06em; }
+.icon { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #ffffff14; border: 1px solid #ffffff14; font-size: 17px; font-weight: 900; }
+.icon[aria-pressed="true"] { background: var(--accent); color: #1b1730; }
+.icon svg { width: 20px; height: 20px; fill: currentColor; }
+.tagline { font-size: 13px; line-height: 1.35; color: var(--muted); text-align: center; }
+.modes { display: flex; padding: 4px; gap: 4px; border-radius: 14px; background: #ffffff10; border: 1px solid #ffffff12; }
+.modes button { flex: 1; padding: 8px 6px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: #1b1730; }
+
+.board-wrap { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board-wrap:focus { outline: none; }
+.board { --gap: 6px; --t: min(calc((100cqw - 4 * var(--gap)) / 5), calc((100cqh - 5 * var(--gap)) / 6), 64px); display: grid; grid-template-rows: repeat(6, var(--t)); gap: var(--gap); }
+.row { display: grid; grid-template-columns: repeat(5, var(--t)); gap: var(--gap); }
+.row.shake { animation: shake .45s; }
+@keyframes shake { 15%, 55% { transform: translateX(-7px); } 35%, 75% { transform: translateX(7px); } }
+.tile { display: grid; place-items: center; border-radius: calc(var(--t) * .14); border: 2px solid var(--line); font-size: calc(var(--t) * .52); font-weight: 900; text-transform: uppercase; line-height: 1; }
+.tile.filled { border-color: #7d73ad; }
+.tile.pop { animation: pop .1s; }
+@keyframes pop { 50% { transform: scale(1.1); } }
+.tile.correct, .tile.present, .tile.absent { border-color: transparent; color: #fff; }
+.tile.correct { background: var(--correct); }
+.tile.present { background: var(--present); }
+.tile.absent { background: var(--absent); }
+.tile.flip { animation: flip .5s ease-in-out; }
+@keyframes flip { 50% { transform: rotateX(90deg); } }
+.tile.win { animation: hop .5s calc(var(--d) * 90ms) ease-out; }
+@keyframes hop { 40% { transform: translateY(-28%); } 70% { transform: translateY(4%); } }
+.toast { position: absolute; top: 4px; left: 50%; z-index: 3; transform: translateX(-50%); padding: 10px 16px; border-radius: 12px; background: var(--text); color: #1b1730; font-size: 14px; font-weight: 800; white-space: nowrap; box-shadow: 0 8px 24px #0006; pointer-events: none; animation: fade .2s; }
+.toast[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } }
+
+.keyboard { display: grid; gap: 6px; flex: 0 0 auto; touch-action: manipulation; }
+.krow { display: flex; gap: 5px; justify-content: center; }
+.key { flex: 1 1 0; max-width: 46px; height: clamp(42px, 7.2vh, 56px); display: grid; place-items: center; border-radius: 9px; background: var(--key); font-size: 16px; font-weight: 800; text-transform: uppercase; box-shadow: inset 0 -3px 0 #0003; }
+.key:active { transform: translateY(1px); }
+.key.wide { flex: 1.6 1 0; max-width: 74px; font-size: 12px; text-transform: none; }
+.key.wide svg { width: 22px; height: 22px; fill: currentColor; }
+.key.correct { background: var(--correct); color: #fff; }
+.key.present { background: var(--present); color: #fff; }
+.key.absent { background: #2a2447; color: #7d76a0; }
+.spacer { flex: .5 1 0; max-width: 23px; }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #0d0a1ccc; }
+.overlay[hidden], .panel[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: 100%; overflow-y: auto; background: var(--panel); border-radius: 24px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 24px; font-weight: 900; }
+.panel .emoji { font-size: 40px; line-height: 1.2; }
+.answer { margin-top: 6px; color: var(--muted); font-size: 15px; }
+.answer b { color: var(--text); letter-spacing: .08em; }
+.how { margin-top: 14px; display: grid; gap: 10px; text-align: start; font-size: 14px; line-height: 1.4; }
+.how li { display: flex; align-items: center; gap: 10px; list-style: none; }
+.how .tile { --t: 34px; width: 34px; height: 34px; flex: 0 0 auto; font-size: 18px; }
+.how p { color: var(--muted); }
+.how ul { padding: 0; display: grid; gap: 8px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 14px; }
+.stats strong { display: block; font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.stats small { display: block; font-size: 11px; color: var(--muted); line-height: 1.2; }
+.panel h3 { margin-top: 16px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dist { margin-top: 8px; display: grid; gap: 4px; }
+.bar { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; }
+.bar span { flex: 0 0 auto; width: 12px; }
+.bar b { min-width: 24px; padding: 2px 7px; border-radius: 6px; background: var(--absent); text-align: end; font-variant-numeric: tabular-nums; }
+.bar.now b { background: var(--correct); }
+.countdown { margin-top: 14px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.cta { flex: 1 1 140px; padding: 13px 16px; border-radius: 16px; background: var(--accent); color: #1b1730; font-size: 16px; font-weight: 800; box-shadow: 0 5px 0 #7d5bc4; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 #7d5bc4; }
+.cta.share { background: var(--correct); color: #fff; box-shadow: 0 5px 0 #0004; }
+.cta.ghost { background: transparent; color: var(--text); border: 2px solid var(--line); box-shadow: none; }
+.cta[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 600px) { .tagline { display: none; } .app { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Word <span>Guess</span> <abbr class="en" id="en-badge" title="">EN</abbr></h1>
+    <button type="button" class="icon" id="help-btn" data-i18n-label="help">?</button>
+    <button type="button" class="icon" id="stats-btn" data-i18n-label="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h3v7H4zM10.5 4h3v16h-3zM17 9h3v11h-3z"/></svg></button>
+    <button type="button" class="icon" id="hc-btn" aria-pressed="false" data-i18n-label="contrast"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z"/></svg></button>
+  </div>
+  <p class="tagline" data-i18n="tagline"></p>
+  <div class="modes" role="group" data-i18n-label="mode">
+    <button type="button" id="mode-daily" aria-pressed="true"></button>
+    <button type="button" id="mode-unlimited" aria-pressed="false" data-i18n="unlimited"></button>
+  </div>
+  <div class="board-wrap" id="board-wrap" tabindex="-1">
+    <div class="board" id="board" role="group" data-i18n-label="board"></div>
+    <p class="toast" id="toast" role="status" hidden></p>
+  </div>
+  <div class="keyboard" id="keyboard" role="group" data-i18n-label="keyboard"></div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="panel" id="help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <h2 id="help-title" data-i18n="help"></h2>
+    <div class="how">
+      <p data-i18n="how1"></p>
+      <ul>
+        <li><span class="tile correct" aria-hidden="true">L</span><span data-i18n="how2"></span></li>
+        <li><span class="tile present" aria-hidden="true">E</span><span data-i18n="how3"></span></li>
+        <li><span class="tile absent" aria-hidden="true">T</span><span data-i18n="how4"></span></li>
+      </ul>
+      <p data-i18n="how5"></p>
+    </div>
+    <div class="actions"><button type="button" class="cta" id="help-close" data-i18n="start"></button></div>
+  </div>
+  <div class="panel" id="result-panel" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+    <p class="emoji" id="result-emoji" aria-hidden="true"></p>
+    <h2 id="result-title"></h2>
+    <p class="answer" id="result-answer"></p>
+    <div class="stats">
+      <div><strong id="s-played">0</strong><small data-i18n="played"></small></div>
+      <div><strong id="s-pct">0</strong><small data-i18n="winPct"></small></div>
+      <div><strong id="s-streak">0</strong><small data-i18n="streak"></small></div>
+      <div><strong id="s-max">0</strong><small data-i18n="maxStreak"></small></div>
+    </div>
+    <h3 data-i18n="dist"></h3>
+    <div class="dist" id="dist"></div>
+    <p class="countdown" id="countdown" hidden></p>
+    <div class="actions">
+      <button type="button" class="cta share" id="share" data-i18n="share"></button>
+      <button type="button" class="cta" id="next" data-i18n="next"></button>
+      <button type="button" class="cta" id="try-unlimited" data-i18n="tryUnlimited"></button>
+      <button type="button" class="cta ghost" id="close" data-i18n="close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Guess the hidden 5-letter English word in 6 tries.', english: 'English words', daily: 'Daily', unlimited: 'Unlimited', dailyNo: n => `Daily #${n}`, mode: 'Game mode', board: 'Guesses', keyboard: 'Keyboard', help: 'How to play', stats: 'Statistics', contrast: 'High-contrast colours', enter: 'Enter', del: 'Delete', tooShort: 'Not enough letters', notWord: 'Not in the word list', praise: ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'], lost: 'Out of tries', answer: 'The word was', played: 'Played', winPct: 'Win %', streak: 'Streak', maxStreak: 'Best streak', dist: 'Guess distribution', share: 'Share', copied: 'Result copied!', copyFail: 'Couldn’t copy the result', next: 'Next word', nextIn: time => `Next daily word in ${time}`, tryUnlimited: 'Play Unlimited', close: 'Close', how1: 'Type any 5-letter English word and press Enter. You have 6 tries.', how2: 'In the word and in the right spot.', how3: 'In the word, but in a different spot.', how4: 'Not in the word.', how5: 'Daily: one word for everyone, every day. Unlimited: play as many words as you like.', start: 'Let’s play', dailyDone: 'You’ve played today’s word. Come back tomorrow!', row: (n, desc) => `Guess ${n}: ${desc}`, states: { correct: 'right spot', present: 'wrong spot', absent: 'not in word' } },
+    vi: { tagline: 'Đoán từ tiếng Anh bí ẩn gồm 5 chữ cái trong 6 lượt.', english: 'Từ tiếng Anh', daily: 'Hằng ngày', unlimited: 'Không giới hạn', dailyNo: n => `Hằng ngày #${n}`, mode: 'Chế độ chơi', board: 'Các lượt đoán', keyboard: 'Bàn phím', help: 'Cách chơi', stats: 'Thống kê', contrast: 'Màu tương phản cao', enter: 'Nhập', del: 'Xoá', tooShort: 'Chưa đủ 5 chữ cái', notWord: 'Từ không có trong danh sách', praise: ['Thiên tài!', 'Xuất sắc!', 'Ấn tượng!', 'Tuyệt vời!', 'Giỏi lắm!', 'Phù, suýt nữa!'], lost: 'Hết lượt đoán', answer: 'Đáp án là', played: 'Đã chơi', winPct: '% thắng', streak: 'Chuỗi thắng', maxStreak: 'Chuỗi dài nhất', dist: 'Số lượt đoán đúng', share: 'Chia sẻ', copied: 'Đã sao chép kết quả!', copyFail: 'Không sao chép được kết quả', next: 'Từ tiếp theo', nextIn: time => `Từ hằng ngày mới sau ${time}`, tryUnlimited: 'Chơi Không giới hạn', close: 'Đóng', how1: 'Gõ một từ tiếng Anh bất kỳ có 5 chữ cái rồi bấm Nhập. Bạn có 6 lượt.', how2: 'Chữ có trong từ và đúng vị trí.', how3: 'Chữ có trong từ nhưng sai vị trí.', how4: 'Chữ không có trong từ.', how5: 'Hằng ngày: mọi người cùng đoán một từ mỗi ngày. Không giới hạn: chơi bao nhiêu từ tuỳ thích.', start: 'Chơi ngay', dailyDone: 'Bạn đã chơi từ của hôm nay. Hẹn gặp lại ngày mai!', row: (n, desc) => `Lượt ${n}: ${desc}`, states: { correct: 'đúng vị trí', present: 'sai vị trí', absent: 'không có' } },
+    zh: { tagline: '在 6 次之内猜出隐藏的 5 字母英文单词。', english: '英文单词', daily: '每日', unlimited: '无限', dailyNo: n => `每日 #${n}`, mode: '游戏模式', board: '猜词记录', keyboard: '键盘', help: '玩法', stats: '统计', contrast: '高对比度配色', enter: '确认', del: '删除', tooShort: '字母数量不够', notWord: '词库里没有这个单词', praise: ['天才！', '太厉害了！', '令人佩服！', '漂亮！', '不错！', '好险！'], lost: '机会用完了', answer: '答案是', played: '已玩', winPct: '胜率 %', streak: '当前连胜', maxStreak: '最高连胜', dist: '猜中次数分布', share: '分享', copied: '结果已复制！', copyFail: '无法复制结果', next: '下一个单词', nextIn: time => `距离下一个每日单词：${time}`, tryUnlimited: '玩无限模式', close: '关闭', how1: '输入任意 5 个字母的英文单词并按“确认”，共有 6 次机会。', how2: '字母在单词中，且位置正确。', how3: '字母在单词中，但位置不对。', how4: '单词中没有这个字母。', how5: '每日：所有人每天猜同一个单词。无限：想玩多少个单词都可以。', start: '开始游戏', dailyDone: '今天的单词已经玩过了，明天再来吧！', row: (n, desc) => `第 ${n} 次：${desc}`, states: { correct: '位置正确', present: '位置不对', absent: '不在单词中' } },
+    fr: { tagline: 'Devinez le mot anglais caché de 5 lettres en 6 essais.', english: 'Mots anglais', daily: 'Du jour', unlimited: 'Illimité', dailyNo: n => `Du jour n° ${n}`, mode: 'Mode de jeu', board: 'Essais', keyboard: 'Clavier', help: 'Comment jouer', stats: 'Statistiques', contrast: 'Couleurs à contraste élevé', enter: 'Entrée', del: 'Effacer', tooShort: 'Pas assez de lettres', notWord: 'Mot absent de la liste', praise: ['Génial !', 'Magnifique !', 'Impressionnant !', 'Splendide !', 'Bien joué !', 'Ouf !'], lost: 'Plus d’essais', answer: 'Le mot était', played: 'Parties', winPct: '% victoires', streak: 'Série', maxStreak: 'Meilleure série', dist: 'Répartition des essais', share: 'Partager', copied: 'Résultat copié !', copyFail: 'Impossible de copier le résultat', next: 'Mot suivant', nextIn: time => `Prochain mot du jour dans ${time}`, tryUnlimited: 'Jouer en illimité', close: 'Fermer', how1: 'Tapez un mot anglais de 5 lettres puis appuyez sur Entrée. Vous avez 6 essais.', how2: 'Dans le mot et à la bonne place.', how3: 'Dans le mot, mais à une autre place.', how4: 'Absente du mot.', how5: 'Du jour : le même mot pour tout le monde, chaque jour. Illimité : enchaînez autant de mots que vous voulez.', start: 'C’est parti', dailyDone: 'Vous avez déjà joué le mot du jour. Revenez demain !', row: (n, desc) => `Essai ${n} : ${desc}`, states: { correct: 'bien placée', present: 'mal placée', absent: 'absente' } },
+    th: { tagline: 'ทายคำภาษาอังกฤษ 5 ตัวอักษรที่ซ่อนอยู่ให้ได้ภายใน 6 ครั้ง', english: 'คำภาษาอังกฤษ', daily: 'รายวัน', unlimited: 'ไม่จำกัด', dailyNo: n => `รายวัน #${n}`, mode: 'โหมดเกม', board: 'คำที่ทาย', keyboard: 'แป้นพิมพ์', help: 'วิธีเล่น', stats: 'สถิติ', contrast: 'สีคอนทราสต์สูง', enter: 'ตกลง', del: 'ลบ', tooShort: 'ตัวอักษรยังไม่ครบ', notWord: 'ไม่มีคำนี้ในรายการคำ', praise: ['อัจฉริยะ!', 'ยอดเยี่ยม!', 'น่าประทับใจ!', 'เยี่ยมมาก!', 'เก่งมาก!', 'เฉียดฉิว!'], lost: 'หมดโอกาสทายแล้ว', answer: 'คำตอบคือ', played: 'เล่นแล้ว', winPct: '% ชนะ', streak: 'ชนะติดกัน', maxStreak: 'ติดกันสูงสุด', dist: 'จำนวนครั้งที่ทายถูก', share: 'แชร์', copied: 'คัดลอกผลลัพธ์แล้ว!', copyFail: 'คัดลอกผลลัพธ์ไม่ได้', next: 'คำถัดไป', nextIn: time => `คำรายวันถัดไปในอีก ${time}`, tryUnlimited: 'เล่นโหมดไม่จำกัด', close: 'ปิด', how1: 'พิมพ์คำภาษาอังกฤษ 5 ตัวอักษรแล้วกดตกลง คุณมีโอกาส 6 ครั้ง', how2: 'มีตัวอักษรนี้ในคำ และอยู่ถูกตำแหน่ง', how3: 'มีตัวอักษรนี้ในคำ แต่อยู่ผิดตำแหน่ง', how4: 'ไม่มีตัวอักษรนี้ในคำ', how5: 'รายวัน: ทุกคนทายคำเดียวกันในแต่ละวัน ไม่จำกัด: เล่นได้มากเท่าที่ต้องการ', start: 'เริ่มเล่น', dailyDone: 'คุณเล่นคำของวันนี้แล้ว พรุ่งนี้มาเล่นใหม่นะ!', row: (n, desc) => `ครั้งที่ ${n}: ${desc}`, states: { correct: 'ถูกตำแหน่ง', present: 'ผิดตำแหน่ง', absent: 'ไม่มีในคำ' } },
+    ja: { tagline: '隠れた5文字の英単語を6回以内に当てよう。', english: '英単語', daily: 'デイリー', unlimited: 'フリープレイ', dailyNo: n => `デイリー #${n}`, mode: 'ゲームモード', board: '回答', keyboard: 'キーボード', help: '遊び方', stats: '統計', contrast: 'ハイコントラスト配色', enter: '決定', del: '削除', tooShort: '文字が足りません', notWord: '単語リストにありません', praise: ['天才！', 'お見事！', 'すごい！', '素晴らしい！', 'いいね！', 'ギリギリセーフ！'], lost: '残念！', answer: '正解は', played: 'プレイ数', winPct: '勝率 %', streak: '連勝', maxStreak: '最高連勝', dist: '正解までの回数', share: 'シェア', copied: '結果をコピーしました！', copyFail: '結果をコピーできませんでした', next: '次の単語', nextIn: time => `次のデイリーまで ${time}`, tryUnlimited: 'フリープレイで遊ぶ', close: '閉じる', how1: '5文字の英単語を入力して「決定」を押そう。チャンスは6回。', how2: '単語に含まれていて、位置も正しい文字。', how3: '単語に含まれているが、位置が違う文字。', how4: '単語に含まれていない文字。', how5: 'デイリー：毎日みんな同じ単語に挑戦。フリープレイ：好きなだけ遊べます。', start: 'はじめる', dailyDone: '今日の単語はプレイ済みです。また明日！', row: (n, desc) => `${n}回目：${desc}`, states: { correct: '位置も正解', present: '位置違い', absent: '含まれない' } },
+    ko: { tagline: '숨겨진 다섯 글자 영어 단어를 6번 안에 맞혀 보세요.', english: '영어 단어', daily: '데일리', unlimited: '무제한', dailyNo: n => `데일리 #${n}`, mode: '게임 모드', board: '추측 기록', keyboard: '키보드', help: '게임 방법', stats: '통계', contrast: '고대비 색상', enter: '입력', del: '지우기', tooShort: '글자 수가 부족해요', notWord: '단어 목록에 없는 단어예요', praise: ['천재!', '훌륭해요!', '대단해요!', '멋져요!', '잘했어요!', '휴, 아슬아슬!'], lost: '기회를 모두 썼어요', answer: '정답은', played: '플레이', winPct: '승률 %', streak: '연승', maxStreak: '최고 연승', dist: '시도 횟수 분포', share: '공유', copied: '결과를 복사했어요!', copyFail: '결과를 복사하지 못했어요', next: '다음 단어', nextIn: time => `다음 데일리 단어까지 ${time}`, tryUnlimited: '무제한 모드 하기', close: '닫기', how1: '다섯 글자 영어 단어를 입력하고 ‘입력’을 누르세요. 기회는 6번이에요.', how2: '단어에 있고 위치도 맞는 글자.', how3: '단어에 있지만 위치가 다른 글자.', how4: '단어에 없는 글자.', how5: '데일리: 매일 모두가 같은 단어에 도전해요. 무제한: 원하는 만큼 플레이하세요.', start: '시작하기', dailyDone: '오늘의 단어는 이미 플레이했어요. 내일 또 만나요!', row: (n, desc) => `${n}번째 시도: ${desc}`, states: { correct: '위치 맞음', present: '위치 다름', absent: '없음' } },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Answers are common, family-friendly words; EXTRA widens what is accepted as a guess.
+  const ANSWERS = 'about above actor acute adapt adopt adore adult after again agent agree ahead alarm album alert alien alike alive allow alone along alter amaze amber amuse angel anger angle angry ankle apple apply apron arena argue arise armor arrow aside asset audio avoid awake award aware bacon badge baker basic basil basin batch beach beard beast began begin being bench berry birth black blade blame blank blast blaze blend bless blind blink block bloom blush board boast bonus boost booth brain brake brand brave bread break brick bride brief bring brisk broad brook brown brush build built bunch burst cabin cable camel candy canoe cargo carry catch cause cedar chain chair chalk charm chart chase cheap check cheek cheer chess chest chief child chill choir chord cider civic claim clamp class clean clear clerk click cliff climb clock close cloth cloud clown coach coast cocoa color comet coral couch count court cover craft crane crash crawl cream crisp cross crowd crown crumb crust curve cycle daily dairy daisy dance delay depth diary dough dream dress drift drill drink drive dwarf eager eagle early earth easel eight elbow elder ember empty enjoy enter entry equal error event exact extra fable faint fairy faith false fancy feast fence ferry fever fiber field fifty final flame flash fleet float flock flood floor flour fluid flute focus force forge forth forty forum found frame fresh front frost frown fruit fudge funny gauge gecko ghost giant glass gleam globe glove gnome goose grace grade grain grand grant grape graph grass gravy great green greet grill grind group grove guard guess guest guide habit happy heart heavy hedge hello hobby honey honor horse hotel hound house human humor hurry ideal igloo image index inner input irony issue ivory jelly jewel joint jolly judge juice jumbo kayak knife knock koala label large laser later laugh layer learn lemon level lever light lilac limit linen liver llama lodge logic loyal lucky lunar lunch lyric magic major mango maple march marsh match mayor medal melon mercy merry metal meter minor mocha model money month moose motor mount mouse mouth movie music naval nerve never noble noise north novel nurse oasis ocean offer often olive onion opera orbit order organ otter ounce outer owner paint panda panel paper party pasta patch pause peace peach pearl pecan pedal penny perch petal piano piece pilot pinch pizza place plain plane plant plate plaza plush point polar polka porch pouch power press price pride prime print prize proof proud pupil puppy purse quail queen quest quick quiet quilt quite quota radar radio raise rally ranch range rapid raven reach ready realm relax reply rhyme ridge right rival river roast robin robot rocky round route royal rugby ruler rural salad sauce scale scarf scene scent scoop scout shade shake shape share shark sharp sheep shelf shell shine shiny shirt shore short shout shrub sight silly since skate skill skirt skunk slate sleep slice slide slope sloth smart smile smoke snack snail snake snowy solar solid solve sound south space spade spare spark speak spell spend spice spine spoon sport spray squid stack staff stage stair stamp stand stare start state steam steel stick still stone stool stork storm story stove straw strip study sugar suite sunny super swamp sweet swift swing swirl syrup table taste teach teeth thank theme thick thing think thorn three throw thumb tiger toast today topic torch total touch tower track trade trail train treat trend trial tribe trick trout truck truly trunk trust truth tulip tunic twice uncle under unity until upper urban usual valid value video visit vital vivid vocal voice vowel wagon waltz waste watch water whale wheat wheel where white whole width witty woman world worry worth would write yacht yeast young youth zebra zesty'.split(' ');
+  const VALID = new Set([...ANSWERS, ...'aback abbey abbot abhor abide abode abort abuse abyss ached aches acids acorn acres acted actin adage added adept adieu admit adobe adorn aegis affix afire afoot agape agate agile aging aglow agony aided aider aides aimed aired aisle alder algae alias alibi align allay alley allot alloy aloha aloof aloud alpha altar altos amend amine amino amiss among amped ample amply amuck angst anime anion anise annex annoy annul anode ansar anvil aorta apart apnea aptly arbor ardor areas argon arias armed aroma arose arras array arson ascot ashes asked aspen assay aster atlas atoll atoms atone attic audit aught aunts auras autos avail avert avian await awash aways awful awoke axial axiom axles azure backs badly bagel baggy bails baits baked bakes balls balmy banal bands bangs banjo banks barbs bared barge barks barns baron basal based baser bases basis baste bathe baths baton batty bayou beads beady beaks beams beans bears beats beaux beech beefs beefy begat begum begun beige belie belle bells belly below belts bends bendy beret berth beset bests betas bicep bidet bight bigot bijou biker bikes bilge bills binds binge bingo biome birch birds birdy bison biter bites bitty blabs bland blare blase bleak bleat bleed blimp blips bliss blitz bloat blocs bloke blond blood blown blows bluer blues bluey bluff blunt blurb blurt boats bodes bodhi bogus boils bolts bombs bonds boned bones bonny books booms boots booze bored bores borne boron bosom bossy botch bound bouts bowed bowel bowls boxer boxes brace brags braid brash brass brats brawl brawn brays breed brews briar bribe brine brink broil broke brood broom broth brunt brute bucko bucks buddy budge buffs buggy bugle bulbs bulge bulky bully bumps bumpy bunks bunny burly burns burnt burps burro bursa buses bushy busts butte buyer byway cacao cache cacti caddy cadet cadre caged cages cagey cairn cakes calls calms cameo camps canal canes canny caped caper capes cappy carat cards cared cares carob carol carts carve cased cases caste casts cater catty caved caves cease ceded cello cells cents chafe chaff champ chant chaos chaps chard chasm chats cheat cheep chefs chews chewy chick chili chime chimp chins chips chirp chive chock choke chomp chops chore chose chuck chump chums chunk churn chute cigar cinch circa cited cites civil clack clams clang clank clans clash clasp clave claws cleat cleft cling clips cloak clods clogs clone clots clout clove clubs cluck clued clues clump clung clunk coals coats cobra cocky coded codes codex coeds coils coins cokes colds colic colon colts comas combs comes comfy comic comma conch condo cones conga cools coops cords cores corgi corks corns corny corps costs cough could coupe coves covet cowed cower crabs crack cramp crank crate crave craze crazy creak creed creek creep crepe crept cress crest crews cribs cried crier cries crime crimp croak crock croft crone crook croon crops crore crows crude cruel crush crypt cubed cubes cubic cuffs cults cumin curbs cured cures curie curls curly curry curse cushy cuter cutie cynic daddy dames dandy dared dares darks darts dated dater dates dazed deals dealt dears death debit debts debut decaf decal decay decks decor decoy deeds defer degas deity delta delve demon demos denim dense dents depot derby desks deter deuce devil diced diets digit dilly dimes dimly dined diner dingo dings dingy dinks dinky diode dirty disco discs disks ditch ditto ditty divas diver dives divvy dizzy docks dodge dodgy doers doggy dogma doily doing dolls dolly domed domes donor dooms doors doped dopes dopey dorms dosed doses dotes doubt doves dowdy dowel downs downy dowry dozed dozen dozer draft drags drain drake drama drang drank drape drawl drawn draws dread dregs dried drier dries drips droll drone drool droop drops drove drown drugs druid drums drunk dryer ducal ducat duchy ducks ducts dudes duels duets dummy dumps dumpy dunes dunks duped duper dusky dusts dusty duvet dwell dying eared earns eased eases eaten eater ebony eclat edema edged edges edict edits eerie egret eider eject eking elect elfin elite elope elude elves embed emcee emits enact ended enemy ennui ensue envoy epics epoch equip erase erect erode erred erupt essay ether ethic ethos evade every evict evils evoke exalt exams excel exert exile exist exits expel extol exult faced faces facet facts faded fades fails fairs faked faker fakes falls famed famer fangs farce fared fares farms fatal fated fates fault favor fears feats feces feeds feels feign fella felon femur feral ferns fests fetal fetch fetus feuds fewer fiend fiery fifth fight filch filed files filet fills filly films filmy filth finch finds fined finer fines fired fires firms first fishy fists fiver fives fixed fixer fixes fjord flags flail flair flake flaky flank flaps flare flask flats flaws fleas flees flesh flick flier flies fling flint flips flirt flops flora floss flout flown flows fluff fluke flung flunk flush flyer foams foamy focal foggy folds folio folks folly fonts foods fools foray forgo forks forms forts fours foxes foyer frail fraud freak freed frees friar fried fries frill frisk frizz frock frogs froth froze frump fuels fugue fully fumes funds fungi funky furor furry fused fuses fussy fuzzy gabby gable gaffe gaily gains galls gamer games gamma gammy gamut gangs gases gassy gated gates gaudy gauss gauze gavel gawky gazed gears geeks geese genes genie genre gents genus germs getup ghoul giddy gifts girls girly girth given giver gives gizmo glade gland glare glaze glean glebe glide glint gloat gloom glory gloss glows glued glues glyph gnash gnats goals goats godly going golds golly goner goods goody gooey goofy goons gorge gouge gourd gowns grabs grads graft grail grams grasp grate grave grays graze greed grids grief grift grime grimy grins gripe grips grits groan groin groom grope gross grout growl grown grows grubs gruel gruff grump grunt guava guild guilt guise gulch gulfs gulls gully gumbo gummy guppy gurus gushy gusto gusts hacks hacky hades haiku hails hairs hairy halls halts halve hands handy hanky hansa hardy harem harms harpy harsh harts haste hasty hatch hated hater hates hauls haunt haven havoc hawks hazel heads heady heals heaps hears heath heats heave heels hefty heigh heirs heist helix helps hence henny herbs herds heron hexes hides highs hiked hiker hikes hills hilly hinge hints hippo hippy hired hires hitch hives hoard hocks hocus hoist hokey holds holed holes holly homer homes homey honed honks hoods hooey hooks hooky hoops hoots hoped hopes horde horns hosed hoses hosts hotly hours hovel hover howdy hubby huffy hulls humid humph humps humus hunch hunks hunky hunts hurts husks husky hutch hyena hymns hyped hyper icily icing icons ideas idiom idiot idols idyll imams imbue impel imply inane incur inept inert infer infix infra ingot inlay inlet inter ionic irate irked irons isles islet itchy items jabot jacks jaded jails jaunt jawed jazzy jeans jeeps jerks jerky jests jetty jiffy jimmy jocks joins joked joker jokes joust juicy julep jumps jumpy junks junky junta juror kaput karma kazoo kebab keeps ketch keyed khaki kicks kills kilns kilos kinds kings kinks kiosk kites kitty knack knave knead kneed kneel knees knelt knobs knoll knots known knows kudos labor laced laces lacks laden ladle lager laity lakes lambs lamps lance lands lanes lanky lapel lapse larch larva lasts latch lathe latte lavas lawns leads leafs leafy leaks leaky leans leaps leapt lease leash least leave ledge leech leery lefts lefty legal leggy legit lemma lemur lends leper letch levee liars libel licks liege lifer lifts liked likes limbo limbs limes limos limps lined liner lines lingo links lions lippy lists liter lithe lived liven lives livid loads loafs loamy loans loath lobby lobed lobes lobos local lochs locks locus lofts lofty logos loins loner longs looks looms loons loony loops loopy loose lords lordy lorry loser loses lotto lotus louse lousy loved lover loves lower lowly lucid lucks luger lumps lumpy lunge lungs lupin lupus lurch lured lures lurid lurks lusts lying lymph macaw macho macro madam madly mafia magma maids mails mains maize maker makes males malls mambo mamma manga mange mangy mania manic manly manny manor manse manta mares marks marry marts masks mason masts mated mater mates matey maths matte mauve maxim maybe meads meals mealy means meant meats meaty media medic meets melee melts memos mends menus merge merit messy metis metro mezzo micro midge midst might miles milks milky mills mimes mimic mince minds mined mines mints minty minus mirth miser misty mites mitre mixed mixer mixes moans mocks modal modes moist molar molds moldy moles mommy monks mooch moods moons moors moped mopes moral moray mores moron morph mosey mossy motel moths motif motto mould moult mound mourn mousy moved mover moves mowed mucky mucus muddy mufti muggy mulch mules muley mummy mumps munch mural murky muses mushy musky musty muted myths nacho nadir nails naive named names nanny nappy nasal nasty natal natty navel nawab neath necks needs needy neigh nerdy nests newer newly nicer niche niece nifty night niner nines ninja ninny ninth nippy nitro nitty nixed nodes noisy nomad noons noose norms nosed noses nosey notch noted notes nouns nudge nuked nukes nutty nylon nymph oaken oaths obeah obese obeys obits occur octal octet oddly odeon offal offed ogres oiled olden older oldie ombre omega omens onset oozes opens opium opted optic orate orbed oriel other ought outdo outed ovals ovary ovate ovens overs overt ovoid owing owned oxide ozone paced pacer paces packs pacts paddy padre pagan paged pager pages pains pairs paler pales pally palms palsy panes pangs panic pansy pants papal parka parks parry parts pasha paste pasts pasty paths patio patsy patty paved pawns payee peaks peaky pears pecks peeks peels peeps peers peeve pelts penal penne peony peppy peril perks perky pesky pesos pests petty phase phone phony photo picks picky piers piety piggy pilaf piled piles pills pines pinks pinky pints pious piper pipes pitch pithy pivot pixel pixie plaid plait plank plans plays plead pleas pleat plots pluck plugs plumb plume plump plums plunk poach poems poesy poets poise poked poker pokes pokey poles polio polls polyp ponds pooch pools poops popes poppa poppy pores ports posed poser poses posse posts potty pound pours pouty prank prawn prays preen preps preys pried prior prism priss privy probe prone prong props prose proto prove prowl proxy prude prune psalm psych pudge pudgy puffs puffy puked pulls pulpy pulse pumps punch punks punts puree purer purge pushy putty pygmy quack quake qualm quark quart quash quasi quell query queue quill quips quirk quits quote quoth rabbi rabid raced racer races racks radii radon rafts raged rages raids rails rains rainy rajah raked rakes ramen ramps ramus ranks rants rarer raspy rated rates ratio ratty raved ravel raves rayed rayon razed razor react reads rears rebel rebus recap recur redid reeds reedy reefs reeks reels refer refit regal rehab reign reins relay relic remit remix renal renew rents repay repel rerun reset resin rests reuse revel revue rhino rider rides riffs rifle rigid rigor riled rinds rings rinse riots risen riser rises risks risky rites ritzy rivet roach roads roars robes rocks rodeo rogue roles rolls roofs roofy rooms roomy roost roots roped ropes roses rotor rouge rough roust rover rowdy rowed rower rubes ruddy ruins ruled rules rumba rummy rumor runes runic runny rupee rusty saber sable sabre sacks sadly safer safes sagas sages sahib sails saint sakes sales salon salsa salts salty salve salvo sands sandy sappy sassy satin satyr saucy sauna saute saved saver saves savin savor savvy sawed scabs scald scalp scaly scamp scams scans scant scare scars scary scion scoff scold scone scoot scope score scorn scour scowl scram scrap scree screw scrub scrum scuba scuff seals seams seats sects sedan sedge seeds seedy seeks seems seeps seers segue seine seize semis sends sense sepia septa serif serum serve setup seven sever sewed sewer sexes shack shady shaft shaky shale shall shalt shame shams shard shave shawl shear sheds sheen sheer sheet sheik shied shift shins ships shire shirk shish shoal shock shoes shone shoot shops shots shove shown shows showy shred shrew shrug shuck shunt shush shuts sided sides sidle siege sieve sighs sigma signs silks silky silty sinew singe sings sinks sinus sired siren sited sites sixed sixes sixth sixty sized sizes skids skied skier skies skimp skink skins skips skits skulk skull slabs slack slain slams slang slant slaps slash slays sleds sleek sleet slept slick slime slimy sling slink slips slits slobs sloop slosh slots slows slugs slump slums slung slunk slurp slush slyly smack small smash smear smell smelt smirk smite smith smock smoky smush snags snaps snare snarl sneak sneer snide sniff snipe snobs snoop snore snort snout snows snuck snuff soaks soaps soapy soars sober socks sodas sofas softy soggy soils soles solos sonar songs sonic sonny sooth sooty sores sorry sorts souls soups soupy sours souse spans spasm spate spawn spear speck specs speed spelt spent spews spicy spied spiel spies spike spiky spill spilt spins spiny spire spite spits splat split spoil spoke spoof spook spool spore spots spout spree sprig spuds spunk spurs spurt squab squad squat stabs stain stake stale stalk stall stark stars stary stash stave stays steak steal steed steep steer stele stems steno steps stern stews stiff sting stink stint stirs stock stoic stoke stole stomp stony stood stoop stops store stout strap stray strut stubs stuck studs stuff stump stung stunk stunt style suave sucks suede suing suits sulfa sulky sully sumac sunup surge surly sushi sutra swabs swami swans swarm swash swath swear sweat sweep swell swept swill swims swine swipe swish swoon swoop sword swore sworn swung synch synod tabby taboo tacit tacks tacky tacos taffy tails taint taken taker takes tales talks talky tally talon tamed tamer tango tangy tanks tapas taped taper tapes tapir tardy tarot tarts tasks tasty taunt tawny taxed taxes taxis taxon teams tears teary tease techs teddy teeny tells tempo temps tempt tends tenet tenor tense tenth tents tepid terms terns terse tests testy texts thane theft their there these theta thief thigh thine thins third thong those threw thugs thump thyme tiara tibia ticks tidal tides tiers tight tiled tiles timed timer times timid tipsy tired tires titan tithe title tizzy toads toddy togas token tolls tombs tomes tonal toned tones tongs tonic tools tooth toots topaz topes torso torus totem tough tours towed towel towns toxic toxin toyed trace tract trait tramp trams traps trash trawl trays tread trees tress triad trice tried trier tries trill trims trios tripe trips trite troll troop trope trove truce truer truss tryst tubby tubes tufts tulle tummy tumor tunas tuned tuner tunes turbo turfs turns tutor tuxes twain twang tweak tweed tween tweet twerp twigs twine twins twirl twist twits tying tykes typed types tyres udder ulcer ultra umbra uncut undue unfit unify union unite units unlit untie unwed unzip upset urged urges urine usage users usher usurp utter vague vales valet valor valve vamps vapid vapor vases vault vegan veils veins venom vents venue verbs verge verse verve vests vials vicar vices views vigil vigor villa vines vinyl viola viper viral virus visas visor vista vixen vodka vogue voids voila volts vomit voted voter votes vouch vowed vying wacky wafer waged wager wages waist waits waive waken wakes wales walks walls wands waned wants wards wares warms warns warts washy wasps waved waves waxed waxes wears weary weave wedge weeds weeks weeny weeps weepy weigh weird wells welts wench whack wharf whelp which whiff while whims whine whiny whips whirl whisk whist whoop whorl whose wicks widen wider widow wield wiggy wilds wimps wince winch winds windy wines wings winks wiped wiper wipes wired wires wised wiser witch wives woken wonky woods woody wooed wooly woozy words wordy works worms wormy worse worst wound woven wowed wraps wrath wreak wreck wring wrist wrong wrote wrung xenon yahoo yards yarns yawns yearn years yells yield yodel yokel yours youse yucky yummy zeros zippy zonal zoned zones'.split(' ')]);
+  const WORD = 5, TRIES = 6;
+  const EPOCH = Date.UTC(2026, 0, 1);
+  const KEY = name => `milaan.wordGuess.${name}`;
+  const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const RANK = { absent: 1, present: 2, correct: 3 };
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), wrap: $('board-wrap'), keyboard: $('keyboard'), toast: $('toast'), announcer: $('announcer'), daily: $('mode-daily'), unlimited: $('mode-unlimited'), overlay: $('overlay'), help: $('help-panel'), result: $('result-panel'), emoji: $('result-emoji'), title: $('result-title'), answer: $('result-answer'), dist: $('dist'), countdown: $('countdown'), share: $('share'), next: $('next'), tryUnlimited: $('try-unlimited'), close: $('close'), hc: $('hc-btn') };
+
+  const read = (name, fallback) => { try { return JSON.parse(localStorage.getItem(KEY(name))) ?? fallback; } catch { return fallback; } };
+  const write = (name, value) => { try { localStorage.setItem(KEY(name), JSON.stringify(value)); } catch {} };
+
+  function mulberry32(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // A fixed shuffle so every player sees the same word on the same local date.
+  const DAILY_ORDER = (() => {
+    const list = [...ANSWERS], rand = mulberry32(20261112);
+    for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+    return list;
+  })();
+  const today = () => { const d = new Date(); return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - EPOCH) / 864e5); };
+  const dailyWord = day => DAILY_ORDER[((day % DAILY_ORDER.length) + DAILY_ORDER.length) % DAILY_ORDER.length];
+  const randomWord = avoid => { let w; do { w = ANSWERS[Math.floor(Math.random() * ANSWERS.length)]; } while (w === avoid); return w; };
+
+  function score(guess, answer) {
+    const result = Array(WORD).fill('absent');
+    const left = {};
+    for (let i = 0; i < WORD; i++) {
+      if (guess[i] === answer[i]) result[i] = 'correct';
+      else left[answer[i]] = (left[answer[i]] || 0) + 1;
+    }
+    for (let i = 0; i < WORD; i++) {
+      if (result[i] !== 'correct' && left[guess[i]] > 0) { result[i] = 'present'; left[guess[i]] -= 1; }
+    }
+    return result;
+  }
+
+  function loadDaily() {
+    const day = today();
+    const saved = read('daily', null);
+    const guesses = saved && saved.day === day && Array.isArray(saved.guesses) ? saved.guesses.filter(g => VALID.has(g)).slice(0, TRIES) : [];
+    return finishState({ mode: 'daily', day, answer: dailyWord(day), guesses, current: '' });
+  }
+  function loadUnlimited(fresh) {
+    const saved = fresh ? null : read('unlimited', null);
+    if (saved && ANSWERS.includes(saved.answer) && Array.isArray(saved.guesses)) {
+      const game = finishState({ mode: 'unlimited', answer: saved.answer, guesses: saved.guesses.filter(g => VALID.has(g)).slice(0, TRIES), current: '' });
+      if (!game.over) return game;
+    }
+    const game = { mode: 'unlimited', answer: randomWord(saved?.answer), guesses: [], current: '', over: false, won: false };
+    saveGame(game);
+    return game;
+  }
+  function finishState(game) {
+    game.won = game.guesses.includes(game.answer);
+    game.over = game.won || game.guesses.length >= TRIES;
+    return game;
+  }
+  function saveGame(game) {
+    if (game.mode === 'daily') write('daily', { day: game.day, guesses: game.guesses });
+    else write('unlimited', { answer: game.answer, guesses: game.guesses });
+  }
+
+  const emptyStats = () => ({ played: 0, wins: 0, streak: 0, max: 0, dist: [0, 0, 0, 0, 0, 0], lastWin: null });
+  const readStats = mode => ({ ...emptyStats(), ...read(`stats.${mode}`, {}) });
+  function currentStreak(mode, stats) {
+    // A daily streak only survives if yesterday's (or today's) word was solved.
+    if (mode === 'daily' && (stats.lastWin === null || stats.lastWin < today() - 1)) return 0;
+    return stats.streak;
+  }
+  function recordResult(game) {
+    const stats = readStats(game.mode);
+    stats.played += 1;
+    if (game.won) {
+      stats.wins += 1;
+      stats.dist[game.guesses.length - 1] += 1;
+      stats.streak = currentStreak(game.mode, stats) + 1;
+      stats.lastWin = game.mode === 'daily' ? game.day : null;
+    } else {
+      stats.streak = 0;
+    }
+    stats.max = Math.max(stats.max, stats.streak);
+    write(`stats.${game.mode}`, stats);
+  }
+
+  let games, game, revealing = false, toastTimer = 0, countdownTimer = 0;
+  const tiles = [], rows = [], keys = {};
+
+  function buildBoard() {
+    for (let r = 0; r < TRIES; r++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.setAttribute('role', 'img');
+      const list = [];
+      for (let c = 0; c < WORD; c++) {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.setAttribute('aria-hidden', 'true');
+        tile.style.setProperty('--d', c);
+        row.append(tile);
+        list.push(tile);
+      }
+      row.addEventListener('animationend', event => { if (event.target === row) row.classList.remove('shake'); });
+      els.board.append(row);
+      rows.push(row);
+      tiles.push(list);
+    }
+  }
+
+  function buildKeyboard() {
+    const backIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 5H8.4L2 12l6.4 7H22V5zm-3.6 10.6-1.4 1.4-3-3-3 3-1.4-1.4 3-3-3-3L11 7.2l3 3 3-3 1.4 1.4-3 3 3 3z"/></svg>';
+    ROWS.forEach((letters, i) => {
+      const row = document.createElement('div');
+      row.className = 'krow';
+      if (i === 1) row.append(Object.assign(document.createElement('span'), { className: 'spacer' }));
+      if (i === 2) row.append(makeKey('enter', t.enter, true));
+      for (const l of letters) row.append(makeKey(l, l));
+      if (i === 1) row.append(Object.assign(document.createElement('span'), { className: 'spacer' }));
+      if (i === 2) { const back = makeKey('back', '', true); back.innerHTML = backIcon; back.setAttribute('aria-label', t.del); row.append(back); }
+      els.keyboard.append(row);
+    });
+    // Keep focus off the on-screen keys so a physical Enter never re-presses the last tapped key.
+    els.keyboard.addEventListener('mousedown', event => event.preventDefault());
+  }
+
+  function makeKey(id, label, wide = false) {
+    const key = document.createElement('button');
+    key.type = 'button';
+    key.className = `key${wide ? ' wide' : ''}`;
+    key.textContent = label;
+    key.addEventListener('click', () => press(id));
+    keys[id] = key;
+    return key;
+  }
+
+  function paintRow(r, word = '', states = null) {
+    tiles[r].forEach((tile, c) => {
+      tile.textContent = word[c] || '';
+      tile.className = `tile${word[c] ? ' filled' : ''}${states ? ` ${states[c]}` : ''}`;
+    });
+    rows[r].setAttribute('aria-label', word && states ? t.row(r + 1, describe(word, states)) : `${r + 1}: ${word.toUpperCase().split('').join(' ')}`);
+  }
+
+  const describe = (word, states) => word.toUpperCase().split('').map((l, i) => `${l} ${t.states[states[i]]}`).join(', ');
+
+  function render() {
+    for (let r = 0; r < TRIES; r++) {
+      if (r < game.guesses.length) paintRow(r, game.guesses[r], score(game.guesses[r], game.answer));
+      else paintRow(r, r === game.guesses.length && !game.over ? game.current : '');
+    }
+    paintKeys();
+    els.daily.textContent = t.dailyNo(games.daily.day + 1);
+    els.daily.setAttribute('aria-pressed', String(game.mode === 'daily'));
+    els.unlimited.setAttribute('aria-pressed', String(game.mode === 'unlimited'));
+  }
+
+  function paintKeys() {
+    const best = {};
+    for (const guess of game.guesses) {
+      score(guess, game.answer).forEach((state, i) => {
+        const l = guess[i];
+        if (!best[l] || RANK[state] > RANK[best[l]]) best[l] = state;
+      });
+    }
+    for (const l of ROWS.join('')) {
+      keys[l].className = `key${best[l] ? ` ${best[l]}` : ''}`;
+      keys[l].setAttribute('aria-label', best[l] ? `${l.toUpperCase()}, ${t.states[best[l]]}` : l.toUpperCase());
+    }
+  }
+
+  function toast(message, ms = 1600) {
+    clearTimeout(toastTimer);
+    els.toast.textContent = message;
+    els.toast.hidden = false;
+    toastTimer = setTimeout(() => { els.toast.hidden = true; }, ms);
+  }
+
+  const blocked = () => revealing || !els.overlay.hidden;
+
+  function press(id) {
+    if (blocked()) return;
+    if (game.over) { if (game.mode === 'daily') toast(t.dailyDone, 2400); return; }
+    if (id === 'enter') return submit();
+    const r = game.guesses.length;
+    if (id === 'back') {
+      if (!game.current) return;
+      game.current = game.current.slice(0, -1);
+      paintRow(r, game.current);
+      return;
+    }
+    if (game.current.length >= WORD) return;
+    game.current += id;
+    paintRow(r, game.current);
+    const tile = tiles[r][game.current.length - 1];
+    tile.classList.add('pop');
+    tile.addEventListener('animationend', () => tile.classList.remove('pop'), { once: true });
+  }
+
+  function reject(message) {
+    const row = rows[game.guesses.length];
+    row.classList.remove('shake');
+    void row.offsetWidth;
+    row.classList.add('shake');
+    toast(message);
+    els.announcer.textContent = message;
+  }
+
+  function submit() {
+    const guess = game.current;
+    if (guess.length < WORD) return reject(t.tooShort);
+    if (!VALID.has(guess)) return reject(t.notWord);
+    const r = game.guesses.length;
+    const states = score(guess, game.answer);
+    game.guesses.push(guess);
+    game.current = '';
+    finishState(game);
+    saveGame(game);
+    if (game.over) recordResult(game);
+    reveal(r, guess, states);
+  }
+
+  function reveal(r, guess, states) {
+    const step = reduced.matches ? 0 : 280;
+    const half = reduced.matches ? 0 : 250;
+    const current = game;
+    revealing = true;
+    tiles[r].forEach((tile, c) => {
+      setTimeout(() => {
+        tile.classList.add('flip');
+        setTimeout(() => { tile.classList.add(states[c]); }, half);
+        tile.addEventListener('animationend', () => tile.classList.remove('flip'), { once: true });
+      }, c * step);
+    });
+    setTimeout(() => {
+      revealing = false;
+      if (current !== game) return;
+      paintRow(r, guess, states);
+      paintKeys();
+      els.announcer.textContent = t.row(r + 1, describe(guess, states));
+      if (game.over) afterGame(r);
+    }, (WORD - 1) * step + half * 2 + 30);
+  }
+
+  function afterGame(r) {
+    if (game.won) {
+      toast(t.praise[r], 1800);
+      tiles[r].forEach(tile => tile.classList.add('win'));
+      els.announcer.textContent = `${t.praise[r]} ${t.answer} ${game.answer.toUpperCase()}`;
+    } else {
+      toast(game.answer.toUpperCase(), 2200);
+      els.announcer.textContent = `${t.lost}. ${t.answer} ${game.answer.toUpperCase()}`;
+    }
+    setTimeout(() => { if (game.over) openResult(); }, reduced.matches ? 600 : 1500);
+  }
+
+  function openOverlay(panel, focus) {
+    els.help.hidden = panel !== els.help;
+    els.result.hidden = panel !== els.result;
+    els.overlay.hidden = false;
+    focus.focus({ preventScroll: true });
+  }
+  function closeOverlay() {
+    els.overlay.hidden = true;
+    clearInterval(countdownTimer);
+    els.wrap.focus({ preventScroll: true });
+  }
+
+  function openResult() {
+    const stats = readStats(game.mode);
+    if (game.over) {
+      els.emoji.textContent = game.won ? '🎉' : '🫣';
+      els.title.textContent = game.won ? t.praise[game.guesses.length - 1] : t.lost;
+      els.answer.innerHTML = '';
+      els.answer.append(`${t.answer} `, Object.assign(document.createElement('b'), { textContent: game.answer.toUpperCase() }));
+    } else {
+      els.emoji.textContent = '📊';
+      els.title.textContent = t.stats;
+      els.answer.textContent = game.mode === 'daily' ? t.dailyNo(game.day + 1) : t.unlimited;
+    }
+    $('s-played').textContent = stats.played;
+    $('s-pct').textContent = stats.played ? Math.round((stats.wins / stats.played) * 100) : 0;
+    $('s-streak').textContent = currentStreak(game.mode, stats);
+    $('s-max').textContent = stats.max;
+    const top = Math.max(1, ...stats.dist);
+    els.dist.replaceChildren(...stats.dist.map((count, i) => {
+      const bar = document.createElement('div');
+      bar.className = `bar${game.over && game.won && game.guesses.length === i + 1 ? ' now' : ''}`;
+      bar.innerHTML = `<span>${i + 1}</span><b style="width:calc(24px + ${(count / top) * 80}%)">${count}</b>`;
+      return bar;
+    }));
+    els.share.hidden = !game.over;
+    els.next.hidden = !(game.over && game.mode === 'unlimited');
+    els.tryUnlimited.hidden = !(game.over && game.mode === 'daily');
+    els.countdown.hidden = !(game.over && game.mode === 'daily');
+    clearInterval(countdownTimer);
+    if (game.mode === 'daily' && game.over) {
+      tickCountdown();
+      countdownTimer = setInterval(tickCountdown, 1000);
+    }
+    const focus = [els.next, els.tryUnlimited].find(el => !el.hidden) || els.close;
+    openOverlay(els.result, focus);
+  }
+
+  function tickCountdown() {
+    if (document.hidden) return;
+    if (today() !== games.daily.day) return rollover();
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const s = Math.max(0, Math.floor((next - now) / 1000));
+    const hms = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map(n => String(n).padStart(2, '0')).join(':');
+    els.countdown.textContent = t.nextIn(hms);
+  }
+
+  function rollover() {
+    if (today() === games.daily.day || revealing) return;
+    games.daily = loadDaily();
+    if (game.mode !== 'daily') return render();
+    game = games.daily;
+    if (!els.overlay.hidden && !els.result.hidden) closeOverlay();
+    render();
+  }
+
+  function shareText() {
+    const marks = document.body.classList.contains('hc') ? { correct: '🟧', present: '🟦', absent: '⬛' } : { correct: '🟩', present: '🟨', absent: '⬛' };
+    const label = game.mode === 'daily' ? `#${game.day + 1}` : '∞';
+    const grid = game.guesses.map(g => score(g, game.answer).map(s => marks[s]).join('')).join('\n');
+    return `Word Guess ${label} ${game.won ? game.guesses.length : 'X'}/${TRIES}\n\n${grid}`;
+  }
+
+  async function share() {
+    const text = shareText();
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {
+      try {
+        const area = Object.assign(document.createElement('textarea'), { value: text });
+        area.style.cssText = 'position:fixed;opacity:0';
+        document.body.append(area);
+        area.select();
+        ok = document.execCommand('copy');
+        area.remove();
+      } catch {}
+    }
+    closeOverlay();
+    toast(ok ? t.copied : t.copyFail, 2000);
+    els.announcer.textContent = ok ? t.copied : t.copyFail;
+  }
+
+  function setMode(mode) {
+    if (revealing || game.mode === mode) return;
+    write('mode', mode);
+    game = games[mode];
+    render();
+  }
+
+  function setContrast(on) {
+    document.body.classList.toggle('hc', on);
+    els.hc.setAttribute('aria-pressed', String(on));
+    write('contrast', on);
+  }
+
+  // Return focus to the board after mouse clicks so physical Enter keeps submitting guesses.
+  const refocus = event => { if (event.detail) els.wrap.focus({ preventScroll: true }); };
+  els.daily.addEventListener('click', event => { setMode('daily'); refocus(event); });
+  els.unlimited.addEventListener('click', event => { setMode('unlimited'); refocus(event); });
+  els.hc.addEventListener('click', event => { setContrast(!document.body.classList.contains('hc')); refocus(event); });
+  $('help-btn').addEventListener('click', () => openOverlay(els.help, $('help-close')));
+  $('stats-btn').addEventListener('click', openResult);
+  $('help-close').addEventListener('click', () => { write('seenHelp', true); closeOverlay(); });
+  els.close.addEventListener('click', closeOverlay);
+  els.share.addEventListener('click', share);
+  els.next.addEventListener('click', () => { games.unlimited = loadUnlimited(true); game = games.unlimited; closeOverlay(); render(); });
+  els.tryUnlimited.addEventListener('click', () => { closeOverlay(); setMode('unlimited'); });
+  els.overlay.addEventListener('click', event => { if (event.target === els.overlay) closeOverlay(); });
+
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !els.overlay.hidden) return;
+    const key = event.key;
+    const onButton = event.target instanceof HTMLButtonElement && !els.keyboard.contains(event.target);
+    if (/^[a-z]$/i.test(key)) { event.preventDefault(); press(key.toLowerCase()); }
+    else if (key === 'Enter' && !onButton) { event.preventDefault(); press('enter'); }
+    else if (key === 'Backspace') { event.preventDefault(); press('back'); }
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) rollover(); });
+
+  buildBoard();
+  buildKeyboard();
+  els.daily.textContent = t.dailyNo(1);
+  $('en-badge').title = t.english;
+  $('en-badge').setAttribute('aria-label', t.english);
+  setContrast(read('contrast', false) === true);
+  games = { daily: loadDaily(), unlimited: loadUnlimited(false) };
+  game = games[read('mode', 'daily') === 'unlimited' ? 'unlimited' : 'daily'];
+  render();
+  if (!read('seenHelp', false)) openOverlay(els.help, $('help-close'));
+  else els.wrap.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

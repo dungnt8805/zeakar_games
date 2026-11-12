@@ -46,6 +46,7 @@ for (const asset of mediaManifest.assets) {
 }
 for (const route of ['index.html', 'en/index.html', 'policies/index.html', 'en/policies/index.html']) await access(resolve(root, 'dist', route));
 await access(resolve(root, 'dist/.nojekyll'));
+for (const id of Object.keys(JSON.parse(await read('src/i18n/messages.json')).en.arcade.games)) await access(resolve(root, 'dist/playable', id, 'index.html'));
 assert.equal((await read('dist/CNAME')).toString().trim(), 'game.lamian.dev');
 const messages = JSON.parse(await read('src/i18n/messages.json'));
 const translatedPolicies = JSON.parse(await read('src/data/privacy-translations.json'));
@@ -54,7 +55,9 @@ const langTags = { en:'en', vi:'vi', zh:'zh-Hans', fr:'fr', th:'th', ja:'ja', ko
 const site = `https://${(await read('dist/CNAME')).toString().trim()}`;
 const localizedRoute = (locale, route) => `${locale === 'en' ? '' : `/${locale}`}${route}`;
 const gameRoutes = Object.keys(appPolicies).map(id => `/games/${id}/`);
-const searchRoutes = ['/', ...gameRoutes];
+const arcadeIds = Object.keys(JSON.parse(await read('src/i18n/messages.json')).en.arcade.games);
+const arcadeRoutes = arcadeIds.map(id => `/play/${id}/`);
+const searchRoutes = ['/', '/play/', ...arcadeRoutes, ...gameRoutes];
 const sitemap = (await read('dist/sitemap.xml')).toString();
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
 const expectedUrls = locales.flatMap(locale => searchRoutes.map(route => site + localizedRoute(locale, route)));
@@ -94,6 +97,22 @@ for (const locale of locales) {
     assert(/<h1\b/.test(html) && html.includes('https://play.google.com/store/apps/details?id='), `Incomplete game page: ${path}`);
     verifySeo(html, locale, route);
   }
+  const arcade = (await read(`dist/${prefix}play/index.html`)).toString();
+  assert(arcade.includes(`<html lang="${langTags[locale]}"`) && arcade.includes(messages[locale].arcade.title), `Wrong arcade page: ${locale}`);
+  verifySeo(arcade, locale, '/play/');
+  const arcadeContent = JSON.parse(await read('src/i18n/arcade-games.json'));
+  for (const id of arcadeIds) {
+    const route = localizedRoute(locale, `/play/${id}/`);
+    assert(arcade.includes(`href="${route}"`), `Arcade game not linked: ${route}`);
+    const page = (await read(`dist${route}index.html`)).toString();
+    const content = arcadeContent[locale]?.[id];
+    assert(content?.howTo.length === 3 && content.features.length === 3, `Missing arcade content: ${locale}/${id}`);
+    assert(page.includes(`<html lang="${langTags[locale]}"`) && /<h1\b/.test(page), `Incomplete arcade game page: ${route}`);
+    assert(page.includes(`/playable/${id}/index.html?lang=`), `Game not embedded: ${route}`);
+    assert(page.includes('"@type":"VideoGame"'), `Missing VideoGame structured data: ${route}`);
+    await access(resolve(root, `dist/media/arcade/${id}.jpg`));
+    verifySeo(page, locale, `/play/${id}/`);
+  }
   const directory = (await read(`dist/${prefix}policies/index.html`)).toString();
   for (const [id, policy] of Object.entries(translatedPolicies)) {
     assert.equal(policy.originalUrl, appPolicies[id], `Original policy URL changed: ${id}`);
@@ -119,4 +138,4 @@ for (const locale of locales) {
   }
 }
 console.log(`Verified ${policies.files.length} policy/support files against approved hashes, archived revisions, 7 app URLs, ${mediaManifest.assets.length} store images, 7 site languages and 49 complete privacy documents.`);
-console.log(`Verified sitemap and SEO metadata for ${expectedUrls.length} canonical URLs, including ${gameRoutes.length * locales.length} game pages.`);
+console.log(`Verified sitemap and SEO metadata for ${expectedUrls.length} canonical URLs, including ${gameRoutes.length * locales.length} game pages and ${arcadeRoutes.length * locales.length} web game pages.`);

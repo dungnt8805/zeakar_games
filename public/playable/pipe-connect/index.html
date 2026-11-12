@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipe Connect</title>
+<style>
+:root {
+  --ink: #17383a;
+  --muted: #4d6b69;
+  --sky: #d6f0ea;
+  --board: #2c6460;
+  --tile: #3b7c76;
+  --tile-hi: #468a83;
+  --casing: #1d4643;
+  --dry: #c9d6cc;
+  --water: #44bdf7;
+  --accent: #ff8a5b;
+  --accent-dark: #d9663a;
+  --paper: #fffdf7;
+  --star: #f2a93b;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--sky);
+  background-image: radial-gradient(#c3e7df 2px, transparent 2.5px);
+  background-size: 26px 26px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+header { text-align: center; }
+h1 { font-size: clamp(24px, 7.5vw, 32px); font-weight: 900; letter-spacing: -.03em; line-height: 1.1; }
+h1 span { color: #1f8fc9; }
+.tagline { margin-top: 3px; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.35; }
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 7px 4px; border-radius: 14px; background: #ffffffb8; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.icon-btn { flex: 0 0 auto; width: 46px; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 #a9d3c9; }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #a9d3c9; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board {
+  --size: min(100cqw, 100cqh);
+  position: relative; width: var(--size); height: var(--size);
+  display: grid; grid-template-columns: repeat(var(--n), 1fr); grid-template-rows: repeat(var(--n), 1fr);
+  padding: calc(var(--size) * .025); border-radius: calc(var(--size) * .05);
+  background: var(--board); box-shadow: inset 0 -6px 0 #0002, 0 14px 30px #1d46433d;
+}
+.tile { position: relative; min-width: 0; min-height: 0; border-radius: 20%; }
+.tile::before { content: ""; position: absolute; inset: 4%; border-radius: 20%; background: var(--tile); box-shadow: inset 0 -3px 0 #0002; transition: background .2s; }
+.tile:hover::before { background: var(--tile-hi); }
+.tile:focus-visible { z-index: 2; outline: 3px solid #ffd166; outline-offset: -2px; }
+.tile svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(calc(var(--turns) * 90deg)); transition: transform .18s cubic-bezier(.3, 1.3, .6, 1); }
+.casing { stroke: var(--casing); stroke-width: 32; fill: var(--casing); }
+.dry { stroke: var(--dry); stroke-width: 17; fill: var(--dry); }
+.water, .hub { stroke: var(--water); stroke-width: 17; fill: var(--water); opacity: 0; transition: opacity .2s; }
+.tile.wet .water, .tile.wet .hub { opacity: 1; }
+.tile.wet::before { background: #3f8580; }
+
+.icon { position: absolute; left: 50%; top: 50%; width: 56%; height: 56%; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; font-size: calc(var(--size) / var(--n) * .32); line-height: 1; pointer-events: none; }
+.icon.source { background: #fff; box-shadow: 0 0 0 calc(var(--size) / var(--n) * .05) var(--water), 0 3px 0 #0003; }
+.icon.pot { background: #d9774e; box-shadow: inset 0 -4px 0 #0002, 0 2px 0 #0003; }
+.icon.pot i { grid-area: 1 / 1; font-style: normal; transition: transform .25s, opacity .25s; }
+.icon.pot .bloom { opacity: 0; transform: scale(.3); }
+.tile.wet .pot .bloom { opacity: 1; transform: scale(1.15); }
+.tile.wet .pot .sprout { opacity: 0; transform: scale(.3); }
+
+/* Win: the water drains out and pours back in from the tap, segment by segment. */
+.board.won .tile { pointer-events: none; }
+.board.won .water { opacity: 1; stroke-dasharray: 1 1; stroke-dashoffset: 1; animation: pour var(--seg) linear var(--delay) forwards; }
+.board.won .hub { opacity: 0; animation: show .01s linear var(--delay) forwards; }
+.board.won .tile .pot .bloom { opacity: 0; transform: scale(.3); animation: bloom .45s cubic-bezier(.3, 1.6, .5, 1) var(--arrive) forwards; }
+.board.won .tile .pot .sprout { opacity: 1; transform: none; animation: hide .01s linear var(--arrive) forwards; }
+@keyframes pour { to { stroke-dashoffset: 0; } }
+@keyframes show { to { opacity: 1; } }
+@keyframes hide { to { opacity: 0; } }
+@keyframes bloom { to { opacity: 1; transform: scale(1.25); } }
+
+.hint { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: #17383a66; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #0005; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; line-height: 1.2; }
+.panel .emoji { font-size: 44px; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .small { font-size: 13px; }
+.panel .logo { font-size: 34px; font-weight: 900; letter-spacing: -.03em; color: var(--ink); }
+.panel .logo span { color: #1f8fc9; }
+.stars { margin-top: 6px; font-size: 38px; letter-spacing: 4px; color: #e3dcc4; }
+.stars b { color: var(--star); }
+.result { font-size: 18px; font-weight: 700; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #cfe3dc; font-weight: 800; }
+.level-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-top: 16px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 12px; background: #e3f4ef; box-shadow: 0 3px 0 #b5dbd0; font-size: 16px; font-weight: 900; }
+.level-btn small { font-size: 8px; letter-spacing: 1px; color: var(--star); min-height: 9px; }
+.level-btn.current { background: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-dark); }
+.level-btn.current small { color: #fff3c4; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+.size-note { margin-top: 10px; font-size: 12px; }
+
+@media (max-height: 560px) { .tagline, .hint { display: none; } }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .board.won .water { stroke-dashoffset: 0; }
+  .board.won .hub { opacity: 1; }
+  .board.won .tile .pot .bloom { opacity: 1; transform: scale(1.15); }
+  .board.won .tile .pot .sprout { opacity: 0; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Pipe <span>Connect</span></h1>
+    <p class="tagline" id="tagline"></p>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="target"></small><strong id="target">0</strong></div>
+    <div class="stat"><small data-i18n="flowers"></small><strong id="flowers">0/0</strong></div>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="board-wrap"><div class="board" id="board" role="group"></div></div>
+  <p class="hint" data-i18n="controls"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🚰🌷</p>
+    <h2 class="logo" id="start-title">Pipe <span>Connect</span></h2>
+    <p data-i18n="intro"></p>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" class="cta" id="play"></button>
+    <button type="button" class="secondary" id="start-levels" data-i18n="chooseLevel"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🌷</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { goal: n => `Fill every pipe and water ${n === 1 ? 'the flower' : `all ${n} flowers`}`, level: 'Level', moves: 'Moves', target: 'Target', flowers: 'Flowers', levels: 'Levels', restart: 'Restart level', play: 'Play', resume: n => `Continue level ${n}`, intro: 'Turn the pipes so water from the tap runs through every pipe and makes all the flowers bloom.', controls: 'Tap a pipe to turn it · Arrow keys + Space', board: 'Pipe board', won: n => `Level ${n} complete!`, allDone: 'You finished every level!', result: (m, p) => `${m} moves · target ${p}`, newBest: 'New best!', next: 'Next level', replay: 'Replay level', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, watered: (a, b) => `${a} of ${b} flowers watered`, kinds: { straight: 'Straight pipe', bend: 'Bend', tee: 'T-junction', end: 'Pipe end', source: 'Water tap', flower: 'Flower' }, dirs: ['up', 'right', 'down', 'left'], join: ', ', cell: (r, c, kind, open, wet) => `Row ${r}, column ${c}: ${kind}, open ${open}, ${wet ? 'has water' : 'dry'}` },
+    vi: { goal: n => `Nối mọi đường ống và tưới ${n === 1 ? 'bông hoa' : `cả ${n} bông hoa`}`, level: 'Màn', moves: 'Lượt', target: 'Mục tiêu', flowers: 'Hoa', levels: 'Chọn màn', restart: 'Chơi lại màn', play: 'Chơi', resume: n => `Chơi tiếp màn ${n}`, intro: 'Xoay các ống để nước từ vòi chảy qua mọi đoạn ống và làm tất cả bông hoa nở rộ.', controls: 'Chạm vào ống để xoay · Phím mũi tên + Space', board: 'Bảng ống nước', won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã phá đảo tất cả các màn!', result: (m, p) => `${m} lượt · mục tiêu ${p}`, newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại màn này', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, watered: (a, b) => `Đã tưới ${a}/${b} bông hoa`, kinds: { straight: 'Ống thẳng', bend: 'Ống cong', tee: 'Ống chữ T', end: 'Đầu ống', source: 'Vòi nước', flower: 'Bông hoa' }, dirs: ['lên trên', 'sang phải', 'xuống dưới', 'sang trái'], join: ', ', cell: (r, c, kind, open, wet) => `Hàng ${r}, cột ${c}: ${kind}, mở ${open}, ${wet ? 'có nước' : 'khô'}` },
+    zh: { goal: n => `让水流过每一根水管，浇灌全部 ${n} 朵花`, level: '关卡', moves: '步数', target: '目标', flowers: '花朵', levels: '选择关卡', restart: '重玩本关', play: '开始游戏', resume: n => `继续第 ${n} 关`, intro: '旋转水管，让水龙头的水流过每一根管道，让所有的花都绽放。', controls: '点击水管即可旋转 · 方向键 + 空格', board: '水管棋盘', won: n => `第 ${n} 关完成！`, allDone: '你已通关所有关卡！', result: (m, p) => `${m} 步 · 目标 ${p} 步`, newBest: '新纪录！', next: '下一关', replay: '重玩本关', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, watered: (a, b) => `已浇灌 ${a}/${b} 朵花`, kinds: { straight: '直管', bend: '弯管', tee: '三通管', end: '管道末端', source: '水龙头', flower: '花' }, dirs: ['上', '右', '下', '左'], join: '、', cell: (r, c, kind, open, wet) => `第 ${r} 行第 ${c} 列：${kind}，开口朝${open}，${wet ? '有水' : '无水'}` },
+    fr: { goal: n => `Remplissez chaque tuyau et arrosez ${n === 1 ? 'la fleur' : `les ${n} fleurs`}`, level: 'Niveau', moves: 'Coups', target: 'Objectif', flowers: 'Fleurs', levels: 'Niveaux', restart: 'Recommencer le niveau', play: 'Jouer', resume: n => `Reprendre le niveau ${n}`, intro: 'Tournez les tuyaux pour que l’eau du robinet traverse chaque tuyau et fasse éclore toutes les fleurs.', controls: 'Touchez un tuyau pour le tourner · Flèches + Espace', board: 'Plateau de tuyaux', won: n => `Niveau ${n} terminé !`, allDone: 'Vous avez terminé tous les niveaux !', result: (m, p) => `${m} coups · objectif ${p}`, newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer le niveau', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, watered: (a, b) => `${a} fleur${a > 1 ? 's' : ''} arrosée${a > 1 ? 's' : ''} sur ${b}`, kinds: { straight: 'Tuyau droit', bend: 'Coude', tee: 'Raccord en T', end: 'Embout', source: 'Robinet', flower: 'Fleur' }, dirs: ['le haut', 'la droite', 'le bas', 'la gauche'], join: ', ', cell: (r, c, kind, open, wet) => `Ligne ${r}, colonne ${c} : ${kind}, ouvert vers ${open}, ${wet ? 'avec de l’eau' : 'à sec'}` },
+    th: { goal: n => `ต่อท่อให้น้ำไหลผ่านทุกท่อและรดน้ำดอกไม้ทั้ง ${n} ดอก`, level: 'ด่าน', moves: 'ครั้ง', target: 'เป้าหมาย', flowers: 'ดอกไม้', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', play: 'เล่นเลย', resume: n => `เล่นต่อด่าน ${n}`, intro: 'หมุนท่อให้น้ำจากก๊อกไหลผ่านทุกท่อ แล้วดอกไม้ทุกดอกจะเบ่งบาน', controls: 'แตะท่อเพื่อหมุน · ปุ่มลูกศร + Space', board: 'กระดานท่อน้ำ', won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณผ่านครบทุกด่านแล้ว!', result: (m, p) => `${m} ครั้ง · เป้าหมาย ${p}`, newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นด่านนี้อีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, watered: (a, b) => `รดน้ำแล้ว ${a} จาก ${b} ดอก`, kinds: { straight: 'ท่อตรง', bend: 'ท่อโค้ง', tee: 'ท่อสามทาง', end: 'ปลายท่อ', source: 'ก๊อกน้ำ', flower: 'ดอกไม้' }, dirs: ['บน', 'ขวา', 'ล่าง', 'ซ้าย'], join: ' ', cell: (r, c, kind, open, wet) => `แถว ${r} คอลัมน์ ${c}: ${kind} เปิดด้าน${open} ${wet ? 'มีน้ำไหล' : 'แห้ง'}` },
+    ja: { goal: n => `すべてのパイプに水を通して、${n}輪の花を咲かせよう`, level: 'レベル', moves: '手数', target: '目標', flowers: '花', levels: 'レベル選択', restart: 'レベルをやり直す', play: 'プレイ', resume: n => `レベル ${n} から続ける`, intro: 'パイプを回して、蛇口の水をすべてのパイプに通し、花を全部咲かせましょう。', controls: 'パイプをタップで回転 · 矢印キー + スペース', board: 'パイプの盤面', won: n => `レベル ${n} クリア！`, allDone: '全レベルクリア！', result: (m, p) => `${m}手 · 目標 ${p}手`, newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度プレイ', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, watered: (a, b) => `${b}輪中 ${a}輪に水が届きました`, kinds: { straight: 'まっすぐなパイプ', bend: '曲がったパイプ', tee: 'T字パイプ', end: 'パイプの端', source: '蛇口', flower: '花' }, dirs: ['上', '右', '下', '左'], join: '・', cell: (r, c, kind, open, wet) => `${r}行${c}列：${kind}、${open}が開いている、${wet ? '水あり' : '水なし'}` },
+    ko: { goal: n => `모든 파이프에 물을 채워 꽃 ${n}송이를 피우세요`, level: '레벨', moves: '횟수', target: '목표', flowers: '꽃', levels: '레벨 선택', restart: '레벨 다시 하기', play: '플레이', resume: n => `레벨 ${n} 이어하기`, intro: '파이프를 돌려 수도꼭지의 물이 모든 파이프를 지나가게 하고 꽃을 모두 피워 보세요.', controls: '파이프를 탭해서 돌리기 · 방향키 + 스페이스', board: '파이프 판', won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨을 클리어했어요!', result: (m, p) => `${m}회 · 목표 ${p}회`, newBest: '최고 기록!', next: '다음 레벨', replay: '이 레벨 다시 하기', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, watered: (a, b) => `꽃 ${b}송이 중 ${a}송이에 물이 닿았어요`, kinds: { straight: '직선 파이프', bend: '굽은 파이프', tee: 'T자 파이프', end: '파이프 끝', source: '수도꼭지', flower: '꽃' }, dirs: ['위', '오른쪽', '아래', '왼쪽'], join: ', ', cell: (r, c, kind, open, wet) => `${r}행 ${c}열: ${kind}, ${open} 방향으로 열림, ${wet ? '물이 흐름' : '마름'}` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Grids grow from 4×4 to 8×8; `branch` makes the pipe tree bushier (more flowers) as levels rise.
+  const LEVELS = [
+    [4, .1], [4, .3], [4, .5],
+    [5, .1], [5, .25], [5, .4], [5, .55],
+    [6, .15], [6, .3], [6, .4], [6, .5], [6, .6],
+    [7, .2], [7, .3], [7, .4], [7, .5], [7, .55], [7, .65],
+    [8, .25], [8, .35], [8, .45], [8, .55], [8, .6], [8, .7],
+  ].map(([size, branch]) => ({ size, branch }));
+  const STORAGE_KEY = 'milaan.pipeConnect.progress';
+  // Bits for the four openings, clockwise from the top: up, right, down, left.
+  const DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+  const ARM_END = [[50, 0], [100, 50], [50, 100], [0, 50]];
+  const ARROWS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };
+
+  const $ = id => document.getElementById(id);
+  const board = $('board');
+  const els = { tagline: $('tagline'), level: $('level'), moves: $('moves'), target: $('target'), flowers: $('flowers'), announcer: $('announcer'), start: $('start'), play: $('play'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), newBest: $('new-best'), next: $('next'), levels: $('levels'), levelGrid: $('level-grid') };
+  board.setAttribute('aria-label', t.board);
+
+  const defaults = () => ({ unlocked: 1, current: 1, stars: {}, best: {}, resume: null });
+  const readProgress = () => { try { return { ...defaults(), ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return defaults(); } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+
+  const rotateMask = (mask, turns) => { const k = ((turns % 4) + 4) % 4; return ((mask << k) | (mask >> (4 - k))) & 15; };
+  const bitCount = mask => (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1);
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const starsFor = (moves, par) => (moves <= par ? 3 : moves <= Math.ceil(par * 1.5) + 2 ? 2 : 1);
+
+  function mulberry32(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Grow a random spanning tree over the grid from the tap ("growing tree": newest cell vs random cell).
+  // Every edge of the tree becomes a pipe joint, so the solved board is always reachable.
+  function buildTree(size, branch, rng) {
+    while (true) {
+      const masks = new Array(size * size).fill(0);
+      const seen = new Array(size * size).fill(false);
+      const source = (1 + Math.floor(rng() * (size - 2))) * size + 1 + Math.floor(rng() * (size - 2));
+      const active = [source];
+      seen[source] = true;
+      let count = 1;
+      while (active.length) {
+        const index = rng() < branch ? Math.floor(rng() * active.length) : active.length - 1;
+        const cell = active[index];
+        const r = Math.floor(cell / size), c = cell % size;
+        const options = [];
+        for (let d = 0; d < 4; d++) {
+          const nr = r + DIRS[d][0], nc = c + DIRS[d][1];
+          if (nr >= 0 && nr < size && nc >= 0 && nc < size && !seen[nr * size + nc]) options.push(d);
+        }
+        // Cap junctions at three openings so every tile changes shape when turned.
+        if (!options.length || bitCount(masks[cell]) >= 3) { active.splice(index, 1); continue; }
+        const d = options[Math.floor(rng() * options.length)];
+        const next = (r + DIRS[d][0]) * size + c + DIRS[d][1];
+        masks[cell] |= 1 << d;
+        masks[next] |= 1 << ((d + 2) % 4);
+        seen[next] = true;
+        count += 1;
+        active.push(next);
+      }
+      if (count === size * size) return { masks, source };
+    }
+  }
+
+  function kindOf(mask, index) {
+    if (index === game.source) return 'source';
+    const n = bitCount(mask);
+    if (n === 1) return 'flower';
+    if (n === 3) return 'tee';
+    return mask === 5 || mask === 10 ? 'straight' : 'bend';
+  }
+
+  // Clockwise taps still needed for a tile to reach its solved orientation (straights repeat every 2).
+  const tapsLeft = tile => { const period = tile.mask === 5 || tile.mask === 10 ? 2 : 4; return ((-tile.turns % period) + period) % period; };
+
+  let progress = readProgress();
+  let game = null;
+  let winTimer = 0;
+
+  function makeTile(mask, index) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'tile';
+    const arms = [0, 1, 2, 3].filter(d => mask & (1 << d));
+    const line = (cls, d) => `<line class="${cls}" data-arm="${d}" pathLength="1" x1="50" y1="50" x2="${ARM_END[d][0]}" y2="${ARM_END[d][1]}"/>`;
+    el.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true">${arms.map(d => line('casing', d)).join('')}<circle class="casing" cx="50" cy="50" r="16"/>${arms.map(d => line('dry', d)).join('')}<circle class="dry" cx="50" cy="50" r="8.5"/>${arms.map(d => line('water', d)).join('')}<circle class="hub" cx="50" cy="50" r="8.5"/></svg>`;
+    const kind = kindOf(mask, index);
+    if (kind === 'source') el.insertAdjacentHTML('beforeend', '<span class="icon source" aria-hidden="true">💧</span>');
+    if (kind === 'flower') el.insertAdjacentHTML('beforeend', '<span class="icon pot" aria-hidden="true"><i class="sprout">🌱</i><i class="bloom">🌷</i></span>');
+    const tile = { el, mask, kind, index, turns: 0 };
+    el.addEventListener('click', () => rotate(tile));
+    el.addEventListener('focus', () => { game.cursor = index; });
+    return tile;
+  }
+
+  function startLevel(number, { fresh = false } = {}) {
+    clearTimeout(winTimer);
+    const { size, branch } = LEVELS[number - 1];
+    const rng = mulberry32(number * 7919 + 2024);
+    const { masks, source } = buildTree(size, branch, rng);
+    game = { level: number, size, source, tiles: [], moves: 0, par: 0, over: false, cursor: source, depth: [], from: [], wetFlowers: -1 };
+    game.tiles = masks.map((mask, index) => makeTile(mask, index));
+    // Scramble with the same seed so a level always starts from the same layout.
+    for (const tile of game.tiles) tile.turns = Math.floor(rng() * 4);
+    const saved = progress.resume;
+    if (!fresh && saved && saved.level === number && saved.turns?.length === masks.length) {
+      game.tiles.forEach((tile, i) => { tile.turns = saved.turns[i] | 0; });
+      game.moves = saved.moves | 0;
+    }
+    game.par = game.tiles.reduce((sum, tile) => sum + tapsLeft(tile), 0);
+    if (!game.par || isSolved()) { game.tiles[source].turns += 1; game.par = game.tiles.reduce((sum, tile) => sum + tapsLeft(tile), 0); }
+    // Par is measured from the level's original scramble, even when resuming a saved board.
+    if (game.moves) game.par = progress.resume.par || game.par;
+
+    board.classList.remove('won');
+    board.style.setProperty('--n', size);
+    board.replaceChildren(...game.tiles.map(tile => tile.el));
+    for (const tile of game.tiles) tile.el.style.setProperty('--turns', tile.turns);
+    progress.current = number;
+    els.level.textContent = `${number}/${LEVELS.length}`;
+    els.target.textContent = String(game.par);
+    els.tagline.textContent = t.goal(game.tiles.filter(tile => tile.kind === 'flower').length);
+    for (const overlay of [els.win, els.levels]) overlay.hidden = true;
+    refresh(false);
+    saveState();
+  }
+
+  const openings = tile => rotateMask(tile.mask, tile.turns);
+
+  // Water spreads from the tap through every pair of openings that face each other.
+  function flow() {
+    const { size, tiles } = game;
+    const depth = new Array(tiles.length).fill(-1);
+    const from = new Array(tiles.length).fill(-1);
+    const queue = [game.source];
+    depth[game.source] = 0;
+    for (let head = 0; head < queue.length; head++) {
+      const cell = queue[head];
+      const open = openings(tiles[cell]);
+      const r = Math.floor(cell / size), c = cell % size;
+      for (let d = 0; d < 4; d++) {
+        if (!(open & (1 << d))) continue;
+        const nr = r + DIRS[d][0], nc = c + DIRS[d][1];
+        if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+        const next = nr * size + nc;
+        if (depth[next] >= 0 || !(openings(tiles[next]) & (1 << ((d + 2) % 4)))) continue;
+        depth[next] = depth[cell] + 1;
+        from[next] = (d + 2) % 4;
+        queue.push(next);
+      }
+    }
+    game.depth = depth;
+    game.from = from;
+  }
+
+  // Every tile wet means every opening is matched: the tile set has exactly enough joints for one tree.
+  const isSolved = () => { flow(); return game.depth.every(d => d >= 0); };
+
+  function label(tile) {
+    const r = Math.floor(tile.index / game.size) + 1, c = (tile.index % game.size) + 1;
+    const open = [0, 1, 2, 3].filter(d => openings(tile) & (1 << d)).map(d => t.dirs[d]).join(t.join);
+    return t.cell(r, c, t.kinds[tile.kind], open, game.depth[tile.index] >= 0);
+  }
+
+  function refresh(announce) {
+    flow();
+    let wetFlowers = 0, flowers = 0;
+    for (const tile of game.tiles) {
+      const wet = game.depth[tile.index] >= 0;
+      tile.el.classList.toggle('wet', wet);
+      tile.el.dataset.open = String(openings(tile));
+      tile.el.setAttribute('aria-label', label(tile));
+      if (tile.kind === 'flower') { flowers += 1; if (wet) wetFlowers += 1; }
+    }
+    els.moves.textContent = String(game.moves);
+    els.flowers.textContent = `${wetFlowers}/${flowers}`;
+    if (announce && wetFlowers !== game.wetFlowers) els.announcer.textContent = t.watered(wetFlowers, flowers);
+    game.wetFlowers = wetFlowers;
+  }
+
+  function saveState() {
+    progress.resume = game.over ? null : { level: game.level, turns: game.tiles.map(tile => ((tile.turns % 4) + 4) % 4), moves: game.moves, par: game.par };
+    saveProgress();
+  }
+
+  function rotate(tile) {
+    if (game.over) return;
+    tile.turns += 1;
+    tile.el.style.setProperty('--turns', tile.turns);
+    game.moves += 1;
+    refresh(true);
+    if (game.depth.every(d => d >= 0)) win();
+    else saveState();
+  }
+
+  function playWinFlow() {
+    const maxDepth = Math.max(...game.depth);
+    const step = Math.min(110, 2000 / (maxDepth + 1));
+    board.style.setProperty('--seg', `${step / 2}ms`);
+    for (const tile of game.tiles) {
+      const depth = game.depth[tile.index];
+      const inDir = game.from[tile.index];
+      const arrive = depth * step + step / 2;
+      tile.el.style.setProperty('--arrive', `${arrive}ms`);
+      tile.el.querySelector('.hub').style.setProperty('--delay', `${arrive - step / 4}ms`);
+      // Draw the incoming arm edge → centre and the outgoing arms centre → edge, so the water visibly travels.
+      for (const line of tile.el.querySelectorAll('.water')) {
+        const arm = Number(line.dataset.arm);
+        const incoming = (arm + tile.turns) % 4 === inDir;
+        const [ex, ey] = ARM_END[arm];
+        line.setAttribute('x1', incoming ? ex : 50); line.setAttribute('y1', incoming ? ey : 50);
+        line.setAttribute('x2', incoming ? 50 : ex); line.setAttribute('y2', incoming ? 50 : ey);
+        line.style.setProperty('--delay', `${incoming ? depth * step : arrive}ms`);
+      }
+    }
+    board.classList.add('won');
+    return (maxDepth + 1) * step;
+  }
+
+  function win() {
+    game.over = true;
+    const stars = starsFor(game.moves, game.par);
+    const key = String(game.level);
+    const previous = progress.best[key];
+    const better = !previous || game.moves < previous;
+    if (better) progress.best[key] = game.moves;
+    progress.stars[key] = Math.max(progress.stars[key] ?? 0, stars);
+    progress.unlocked = Math.min(LEVELS.length, Math.max(progress.unlocked, game.level + 1));
+    const last = game.level === LEVELS.length;
+    progress.current = last ? game.level : game.level + 1;
+    saveState();
+
+    els.winTitle.textContent = last ? t.allDone : t.won(game.level);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.moves, game.par);
+    els.newBest.hidden = !better || !previous;
+    els.next.hidden = last;
+    els.announcer.textContent = `${els.winTitle.textContent} ${t.starsLabel(stars)}`;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const duration = playWinFlow();
+    winTimer = setTimeout(() => { els.win.hidden = false; (last ? $('replay') : els.next).focus({ preventScroll: true }); }, reduced ? 300 : duration + 700);
+  }
+
+  function focusTile(index) {
+    game.cursor = index;
+    game.tiles[index]?.el.focus({ preventScroll: true });
+  }
+
+  function openLevels() {
+    els.levelGrid.replaceChildren(...LEVELS.map((config, index) => {
+      const number = index + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-btn${number === game.level ? ' current' : ''}`;
+      const locked = number > progress.unlocked;
+      button.disabled = locked;
+      const stars = progress.stars[number] ?? 0;
+      button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}</small>`;
+      button.setAttribute('aria-label', `${t.level} ${number}, ${config.size}×${config.size}${locked ? `, ${t.locked}` : `, ${t.starsLabel(stars)}`}`);
+      button.title = `${config.size}×${config.size}`;
+      button.addEventListener('click', () => { els.start.hidden = true; startLevel(number); focusTile(game.source); });
+      return button;
+    }));
+    els.levels.hidden = false;
+    els.levelGrid.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  const overlayOpen = () => !els.start.hidden || !els.win.hidden || !els.levels.hidden;
+
+  // Arrow keys move the selection around the grid; Space/Enter turns the selected pipe (native button click).
+  document.addEventListener('keydown', event => {
+    const dir = ARROWS[event.key];
+    if (dir === undefined || event.altKey || event.ctrlKey || event.metaKey || !game || overlayOpen()) return;
+    event.preventDefault();
+    const current = game.tiles.findIndex(tile => tile.el === document.activeElement);
+    if (current < 0) return focusTile(game.cursor);
+    const r = Math.floor(current / game.size) + DIRS[dir][0], c = (current % game.size) + DIRS[dir][1];
+    if (r >= 0 && r < game.size && c >= 0 && c < game.size) focusTile(r * game.size + c);
+  });
+
+  $('restart').addEventListener('click', () => startLevel(game.level, { fresh: true }));
+  $('open-levels').addEventListener('click', openLevels);
+  $('start-levels').addEventListener('click', () => { els.start.hidden = true; openLevels(); });
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; });
+  els.play.addEventListener('click', () => { els.start.hidden = true; focusTile(game.cursor); });
+  els.next.addEventListener('click', () => { startLevel(game.level + 1, { fresh: true }); focusTile(game.source); });
+  $('replay').addEventListener('click', () => { startLevel(game.level, { fresh: true }); focusTile(game.source); });
+
+  const first = Math.min(Math.max(1, progress.current | 0), progress.unlocked, LEVELS.length);
+  startLevel(first);
+  els.play.textContent = first > 1 || game.moves ? t.resume(first) : t.play;
+  els.play.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sliding Puzzle</title>
+<style>
+:root {
+  --bg: #2a2140;
+  --bg-2: #3d2f5c;
+  --board: #3a2d57;
+  --slot: #2e2447;
+  --text: #fbf3ea;
+  --muted: #bfb2d6;
+  --accent: #ff8a6b;
+  --accent-dark: #d9634a;
+  --tile: #fff3e2;
+  --tile-edge: #e2c9a8;
+  --ink: #3a2a52;
+  --mint: #7ddcb8;
+  --paper: #fffaf3;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at top, var(--bg-2), transparent 70%), radial-gradient(#ffffff0c 1.5px, transparent 2px);
+  background-size: 100% 100%, 24px 24px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; font-size: clamp(22px, 6.6vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+h1 span { color: var(--accent); }
+.chip { padding: 4px 10px; border-radius: 99px; background: #ffffff1c; color: var(--mint); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.new { flex-shrink: 0; padding: 9px 13px; border-radius: 12px; background: var(--accent); color: #2b130c; font-size: 14px; font-weight: 800; box-shadow: 0 3px 0 var(--accent-dark); }
+.new:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+
+.hud { display: flex; gap: 8px; align-items: stretch; }
+.stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 14px; background: #00000030; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.icon-btn { flex: 0 0 auto; width: 48px; border-radius: 14px; background: var(--paper); color: var(--ink); font-size: 21px; line-height: 1; box-shadow: 0 3px 0 var(--tile-edge); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tile-edge); }
+.icon-btn[aria-pressed="true"] { background: var(--mint); box-shadow: 0 3px 0 #4fae8c; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --size: min(100cqw, 100cqh); --gap: calc(var(--size) * .018); position: relative; width: var(--size); height: var(--size); border-radius: calc(var(--size) * .045); background: var(--board); box-shadow: 0 0 0 4px #4b3b6e, 0 18px 40px #0007; touch-action: none; }
+.board:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+.tiles, .peek { position: absolute; inset: var(--gap); }
+.tile {
+  --t: calc((100% - (var(--n) - 1) * var(--gap)) / var(--n));
+  position: absolute; top: 0; left: 0; width: var(--t); height: var(--t); padding: 0;
+  display: grid; place-items: center; border-radius: calc(var(--size) * .3 / var(--n));
+  background: var(--tile); color: var(--ink); box-shadow: inset 0 calc(var(--size) * -.06 / var(--n)) 0 var(--tile-edge);
+  font-size: calc(var(--size) * .4 / var(--n)); font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap))));
+  transition: transform .12s ease-out, background-color .2s, box-shadow .2s;
+}
+.tile.home:not(.pic) { background: #dff7ec; box-shadow: inset 0 calc(var(--size) * -.06 / var(--n)) 0 var(--mint); }
+.tile.pic { background-size: calc(var(--n) * 100%) calc(var(--n) * 100%); box-shadow: inset 0 0 0 1px #ffffff40, 0 2px 6px #0004; }
+.tile.pic i { position: absolute; top: 6%; left: 7%; min-width: 1.5em; padding: .1em .3em; border-radius: 99px; background: #2a2140b0; color: #fff; font-size: calc(var(--size) * .16 / var(--n)); font-style: normal; line-height: 1.3; }
+.tile.pic.home i { background: #2f9c76d0; }
+.tile:not(.pic) i { display: none; }
+.tile.ghost { pointer-events: none; opacity: 0; transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(.6); }
+.board.won .tile { transition: transform .12s ease-out, opacity .35s, border-radius .35s; }
+.board.won .tile.ghost { opacity: 1; transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))); }
+.board.won .tile.pic { border-radius: 0; box-shadow: none; }
+.board.won .tile.pic i { opacity: 0; transition: opacity .3s; }
+.board.won .tiles { animation: glow .9s ease-out; }
+@keyframes glow { 40% { filter: brightness(1.18); } }
+.peek { z-index: 3; border-radius: calc(var(--size) * .03); overflow: hidden; display: grid; gap: var(--gap); background: var(--board); animation: fade .15s; cursor: pointer; }
+.peek[hidden] { display: none; }
+.peek img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.peek b { display: grid; place-items: center; border-radius: calc(var(--size) * .3 / var(--n)); background: #dff7ec; color: var(--ink); font-size: calc(var(--size) * .4 / var(--n)); font-weight: 900; }
+.peek span { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); padding: 6px 12px; border-radius: 99px; background: #2a2140d9; color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+@keyframes fade { from { opacity: 0; } }
+.tip { text-align: center; font-size: 12px; line-height: 1.35; color: var(--muted); }
+@media (max-height: 640px) { .tip { display: none; } }
+
+.overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #160f2699; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); background: var(--paper); color: var(--ink); border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0006; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--accent-dark); }
+.panel .emoji { font-size: 42px; line-height: 1.2; }
+.panel p { margin-top: 8px; color: #6e6380; font-size: 15px; line-height: 1.4; }
+.panel .result { color: var(--ink); font-size: 18px; font-weight: 800; }
+.seg { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 16px; background: #efe6f6; }
+.seg button { padding: 10px 6px; border-radius: 12px; font-weight: 800; color: #7a6d8f; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.levels { margin-top: 12px; display: grid; gap: 9px; }
+.level { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 16px; background: #fbefe6; border: 2px solid transparent; text-align: left; }
+.level .size { font-size: 20px; font-weight: 900; color: var(--accent-dark); font-variant-numeric: tabular-nums; min-width: 2.6em; }
+.level strong { display: block; font-size: 16px; font-weight: 900; }
+.level small { display: block; margin-top: 1px; font-size: 12px; font-weight: 700; color: #7a6d8f; }
+.level:hover { border-color: #ffc2b0; }
+.level.current { border-color: var(--accent); }
+.badge { display: inline-block; margin-top: 12px; padding: 6px 14px; border-radius: 99px; background: #f2a93b; color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 16px; background: var(--accent); color: #2b130c; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--accent-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.secondary { margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 2px solid #e6d9ef; color: var(--ink); font-weight: 800; }
+.thumb { display: block; width: 120px; height: 120px; margin: 12px auto 0; border-radius: 16px; box-shadow: 0 6px 16px #0003; }
+.thumb[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Sliding <span>Puzzle</span></h1>
+    <span class="chip" id="chip"></span>
+    <button type="button" class="new" id="new" data-i18n="newGame"></button>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">—</strong></div>
+    <button type="button" class="icon-btn" id="peek-btn" aria-pressed="false" data-i18n-label="peek"><span aria-hidden="true">👁</span></button>
+    <button type="button" class="icon-btn" id="menu-btn" data-i18n-label="menu"><span aria-hidden="true">☰</span></button>
+  </div>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" tabindex="0" role="application" data-i18n-label="board" aria-describedby="tip">
+      <div class="tiles" id="tiles"></div>
+      <div class="peek" id="peek" hidden></div>
+    </div>
+  </div>
+  <p class="tip" id="tip" data-i18n="hint"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="menu" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <p class="emoji" aria-hidden="true">🧩</p>
+    <h2 id="menu-title">Sliding <span>Puzzle</span></h2>
+    <p data-i18n="tagline"></p>
+    <div class="seg" role="group" data-i18n-label="style">
+      <button type="button" data-mode="numbers" data-i18n="numbers"></button>
+      <button type="button" data-mode="picture" data-i18n="picture"></button>
+    </div>
+    <div class="levels" id="levels"></div>
+    <button type="button" class="secondary" id="close-menu" data-i18n="close"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <img class="thumb" id="thumb" alt="" hidden>
+    <p class="result" id="result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <button type="button" class="secondary" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { close: 'Close', tagline: 'Slide the tiles back into order.', moves: 'Moves', time: 'Time', best: 'Best', newGame: 'New', menu: 'Choose a puzzle', peek: 'Peek at the solution', style: 'Style', numbers: 'Numbers', picture: 'Picture', levels: ['Easy', 'Medium', 'Hard'], bestLine: (m, s) => `Best: ${m} moves · ${s}`, noBest: 'Not solved yet', hint: 'Tap a tile in line with the gap, swipe, or use the arrow keys.', won: 'Puzzle solved!', result: (m, s) => `${m} moves · ${s}`, newBest: 'New best!', again: 'Play again', change: 'Change puzzle', board: 'Sliding puzzle board', tile: (v, r, c) => `Tile ${v}, row ${r}, column ${c}`, piece: (v, r, c) => `Picture piece ${v}, row ${r}, column ${c}`, inPlace: 'in place', peeking: 'Tap to hide', peekOn: 'Showing the solution.', progress: (k, n) => `${k} of ${n} tiles in place.`, moved: v => `Moved tile ${v}.`, started: n => `New ${n} by ${n} puzzle.` },
+    vi: { close: 'Đóng', tagline: 'Trượt các ô về đúng thứ tự.', moves: 'Lượt', time: 'Thời gian', best: 'Kỷ lục', newGame: 'Ván mới', menu: 'Chọn câu đố', peek: 'Xem trước lời giải', style: 'Kiểu', numbers: 'Số', picture: 'Hình ảnh', levels: ['Dễ', 'Vừa', 'Khó'], bestLine: (m, s) => `Kỷ lục: ${m} lượt · ${s}`, noBest: 'Chưa giải', hint: 'Chạm ô thẳng hàng với ô trống, vuốt hoặc dùng phím mũi tên.', won: 'Đã giải xong!', result: (m, s) => `${m} lượt · ${s}`, newBest: 'Kỷ lục mới!', again: 'Chơi lại', change: 'Đổi câu đố', board: 'Bảng xếp hình trượt', tile: (v, r, c) => `Ô ${v}, hàng ${r}, cột ${c}`, piece: (v, r, c) => `Mảnh hình ${v}, hàng ${r}, cột ${c}`, inPlace: 'đúng chỗ', peeking: 'Chạm để ẩn', peekOn: 'Đang hiện lời giải.', progress: (k, n) => `${k}/${n} ô đã đúng chỗ.`, moved: v => `Đã trượt ô ${v}.`, started: n => `Câu đố mới ${n}×${n}.` },
+    zh: { close: '关闭', tagline: '滑动方块，把它们恢复原来的顺序。', moves: '步数', time: '时间', best: '最佳', newGame: '新一局', menu: '选择拼图', peek: '偷看答案', style: '样式', numbers: '数字', picture: '图片', levels: ['简单', '中等', '困难'], bestLine: (m, s) => `最佳：${m} 步 · ${s}`, noBest: '尚未完成', hint: '点击与空格同行或同列的方块、滑动屏幕或使用方向键。', won: '拼图完成！', result: (m, s) => `${m} 步 · ${s}`, newBest: '新纪录！', again: '再玩一次', change: '换个拼图', board: '滑块拼图棋盘', tile: (v, r, c) => `方块 ${v}，第 ${r} 行第 ${c} 列`, piece: (v, r, c) => `图块 ${v}，第 ${r} 行第 ${c} 列`, inPlace: '位置正确', peeking: '点击隐藏', peekOn: '正在显示答案。', progress: (k, n) => `${n} 块中已有 ${k} 块归位。`, moved: v => `移动了方块 ${v}。`, started: n => `新的 ${n}×${n} 拼图。` },
+    fr: { close: 'Fermer', tagline: 'Faites glisser les tuiles pour les remettre dans l’ordre.', moves: 'Coups', time: 'Temps', best: 'Record', newGame: 'Nouveau', menu: 'Choisir un puzzle', peek: 'Voir la solution', style: 'Style', numbers: 'Chiffres', picture: 'Image', levels: ['Facile', 'Moyen', 'Difficile'], bestLine: (m, s) => `Record : ${m} coups · ${s}`, noBest: 'Pas encore résolu', hint: 'Touchez une tuile alignée avec la case vide, balayez ou utilisez les flèches.', won: 'Puzzle résolu !', result: (m, s) => `${m} coups · ${s}`, newBest: 'Nouveau record !', again: 'Rejouer', change: 'Changer de puzzle', board: 'Plateau du taquin', tile: (v, r, c) => `Tuile ${v}, ligne ${r}, colonne ${c}`, piece: (v, r, c) => `Morceau ${v}, ligne ${r}, colonne ${c}`, inPlace: 'bien placée', peeking: 'Touchez pour masquer', peekOn: 'Solution affichée.', progress: (k, n) => `${k} tuiles sur ${n} bien placées.`, moved: v => `Tuile ${v} déplacée.`, started: n => `Nouveau puzzle ${n}×${n}.` },
+    th: { close: 'ปิด', tagline: 'เลื่อนแผ่นป้ายให้กลับมาเรียงตามลำดับ', moves: 'ครั้ง', time: 'เวลา', best: 'ดีที่สุด', newGame: 'เกมใหม่', menu: 'เลือกปริศนา', peek: 'แอบดูเฉลย', style: 'รูปแบบ', numbers: 'ตัวเลข', picture: 'รูปภาพ', levels: ['ง่าย', 'ปานกลาง', 'ยาก'], bestLine: (m, s) => `ดีที่สุด: ${m} ครั้ง · ${s}`, noBest: 'ยังไม่เคยไขได้', hint: 'แตะแผ่นที่อยู่แนวเดียวกับช่องว่าง ปัด หรือใช้ปุ่มลูกศร', won: 'ไขปริศนาสำเร็จ!', result: (m, s) => `${m} ครั้ง · ${s}`, newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', change: 'เปลี่ยนปริศนา', board: 'กระดานปริศนาเลื่อนแผ่น', tile: (v, r, c) => `แผ่น ${v} แถว ${r} คอลัมน์ ${c}`, piece: (v, r, c) => `ชิ้นภาพ ${v} แถว ${r} คอลัมน์ ${c}`, inPlace: 'อยู่ถูกที่', peeking: 'แตะเพื่อซ่อน', peekOn: 'กำลังแสดงเฉลย', progress: (k, n) => `อยู่ถูกที่แล้ว ${k} จาก ${n} แผ่น`, moved: v => `เลื่อนแผ่น ${v} แล้ว`, started: n => `ปริศนาใหม่ ${n}×${n}` },
+    ja: { close: '閉じる', tagline: 'タイルをスライドして順番どおりに並べよう。', moves: '手数', time: 'タイム', best: 'ベスト', newGame: '新しく', menu: 'パズルを選ぶ', peek: '完成図をのぞく', style: 'スタイル', numbers: '数字', picture: '絵', levels: ['かんたん', 'ふつう', 'むずかしい'], bestLine: (m, s) => `ベスト：${m}手 · ${s}`, noBest: '未クリア', hint: '空きマスと同じ列のタイルをタップ、スワイプ、または矢印キーで操作。', won: 'パズル完成！', result: (m, s) => `${m}手 · ${s}`, newBest: '自己ベスト更新！', again: 'もう一度', change: 'パズルを変える', board: 'スライドパズルの盤面', tile: (v, r, c) => `タイル ${v}、${r}行${c}列`, piece: (v, r, c) => `ピース ${v}、${r}行${c}列`, inPlace: '正しい位置', peeking: 'タップで閉じる', peekOn: '完成図を表示中。', progress: (k, n) => `${n}枚中${k}枚が正しい位置です。`, moved: v => `タイル ${v} を動かしました。`, started: n => `新しい ${n}×${n} パズル。` },
+    ko: { close: '닫기', tagline: '타일을 밀어서 순서대로 맞추세요.', moves: '이동', time: '시간', best: '최고', newGame: '새 게임', menu: '퍼즐 선택', peek: '정답 미리 보기', style: '스타일', numbers: '숫자', picture: '그림', levels: ['쉬움', '보통', '어려움'], bestLine: (m, s) => `최고: ${m}번 · ${s}`, noBest: '아직 풀지 않음', hint: '빈칸과 같은 줄의 타일을 탭하거나, 스와이프하거나, 방향키를 쓰세요.', won: '퍼즐 완성!', result: (m, s) => `${m}번 이동 · ${s}`, newBest: '최고 기록!', again: '다시 하기', change: '퍼즐 바꾸기', board: '슬라이딩 퍼즐 판', tile: (v, r, c) => `타일 ${v}, ${r}행 ${c}열`, piece: (v, r, c) => `그림 조각 ${v}, ${r}행 ${c}열`, inPlace: '제자리', peeking: '탭하면 닫혀요', peekOn: '정답을 보여 주는 중이에요.', progress: (k, n) => `${n}개 중 ${k}개가 제자리에 있어요.`, moved: v => `타일 ${v} 이동.`, started: n => `새 ${n}×${n} 퍼즐.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const SIZES = [3, 4, 5];
+  const STORE = { best: 'milaan.slidingPuzzle.best', prefs: 'milaan.slidingPuzzle.prefs' };
+  const DIRS = { left: [0, 1], right: [0, -1], up: [1, 0], down: [-1, 0] };
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), tiles: $('tiles'), peek: $('peek'), peekBtn: $('peek-btn'), moves: $('moves'), time: $('time'), best: $('best'), chip: $('chip'), announcer: $('announcer'), menu: $('menu'), levels: $('levels'), win: $('win'), result: $('result'), newBest: $('new-best'), thumb: $('thumb') };
+
+  const readJSON = (key, fallback) => { try { return { ...fallback, ...JSON.parse(localStorage.getItem(key)) }; } catch { return { ...fallback }; } };
+  const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const randInt = n => Math.floor(Math.random() * n);
+
+  let best = readJSON(STORE.best, {});
+  const prefs = readJSON(STORE.prefs, { size: 3, mode: 'numbers' });
+  if (!SIZES.includes(prefs.size)) prefs.size = 3;
+  let game = null;
+
+  // ---- Procedural pictures -------------------------------------------------
+  function seeded(seed) {
+    return () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  function ridge(ctx, rnd, base, rough, color, W) {
+    // Midpoint displacement gives a natural-looking mountain line.
+    let pts = [base + (rnd() - .5) * rough, base + (rnd() - .5) * rough];
+    let amp = rough;
+    for (let i = 0; i < 6; i++) {
+      const next = [];
+      for (let j = 0; j < pts.length - 1; j++) next.push(pts[j], (pts[j] + pts[j + 1]) / 2 + (rnd() - .5) * amp);
+      next.push(pts[pts.length - 1]);
+      pts = next; amp *= .55;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(0, W);
+    pts.forEach((y, i) => ctx.lineTo((i / (pts.length - 1)) * W, y));
+    ctx.lineTo(W, W); ctx.fill();
+  }
+
+  function drawMountains(ctx, rnd, W) {
+    const hue = 180 + rnd() * 180;
+    const sky = ctx.createLinearGradient(0, 0, 0, W * .7);
+    sky.addColorStop(0, `hsl(${hue} 70% 42%)`); sky.addColorStop(.6, `hsl(${hue + 40} 80% 70%)`); sky.addColorStop(1, `hsl(${hue + 70} 95% 80%)`);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, W);
+    ctx.fillStyle = '#fff6c9';
+    ctx.beginPath(); ctx.arc(W * (.2 + rnd() * .6), W * (.22 + rnd() * .15), W * .09, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = '#ffffffb0';
+      const x = rnd() * W, y = W * (.08 + rnd() * .2);
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + k * W * .035, y + Math.sin(k) * 6, W * (.03 + rnd() * .02), 0, Math.PI * 2); ctx.fill(); }
+    }
+    ridge(ctx, rnd, W * .45, W * .35, `hsl(${hue + 20} 35% 55%)`, W);
+    ridge(ctx, rnd, W * .58, W * .25, `hsl(${hue - 10} 35% 40%)`, W);
+    ridge(ctx, rnd, W * .72, W * .14, `hsl(${100 + rnd() * 40} 45% 38%)`, W);
+    ridge(ctx, rnd, W * .86, W * .08, `hsl(${90 + rnd() * 40} 50% 28%)`, W);
+    for (let i = 0; i < 14; i++) {
+      const x = rnd() * W, y = W * (.8 + rnd() * .18), h = W * (.06 + rnd() * .06);
+      ctx.fillStyle = `hsl(${130 + rnd() * 30} 45% ${18 + rnd() * 12}%)`;
+      ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x - h * .35, y); ctx.lineTo(x + h * .35, y); ctx.fill();
+    }
+  }
+
+  function drawSeaside(ctx, rnd, W) {
+    const sky = ctx.createLinearGradient(0, 0, 0, W * .55);
+    sky.addColorStop(0, '#ff7e6b'); sky.addColorStop(.55, '#ffb36b'); sky.addColorStop(1, '#ffe39a');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, W * .56);
+    const sunX = W * (.3 + rnd() * .4);
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(sunX, W * .5, W * .14, Math.PI, 0); ctx.fill();
+    const sea = ctx.createLinearGradient(0, W * .5, 0, W);
+    sea.addColorStop(0, '#2f7fb8'); sea.addColorStop(1, '#183f78');
+    ctx.fillStyle = sea; ctx.fillRect(0, W * .5, W, W * .5);
+    for (let i = 0; i < 26; i++) {
+      ctx.fillStyle = `rgba(255, 240, 190, ${.15 + rnd() * .35})`;
+      const y = W * (.52 + rnd() * .45), w = W * (.04 + rnd() * .12);
+      ctx.fillRect(sunX - w / 2 + (rnd() - .5) * W * .3 * (y / W), y, w, 3);
+    }
+    // Island with a palm tree.
+    const ix = W * (rnd() < .5 ? .2 : .78);
+    ctx.fillStyle = '#f2d39a'; ctx.beginPath(); ctx.ellipse(ix, W * .78, W * .2, W * .06, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = '#7a4b2a'; ctx.lineWidth = W * .02;
+    ctx.beginPath(); ctx.moveTo(ix, W * .76); ctx.quadraticCurveTo(ix + W * .05, W * .62, ix + W * .02, W * .5); ctx.stroke();
+    ctx.fillStyle = '#2f9a5a';
+    for (let a = 0; a < 6; a++) { ctx.save(); ctx.translate(ix + W * .02, W * .5); ctx.rotate(a * 1.05); ctx.beginPath(); ctx.ellipse(W * .07, 0, W * .08, W * .02, .3, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    // Sailboat.
+    const bx = W * (ix < W / 2 ? .65 : .3), by = W * .66;
+    ctx.fillStyle = '#7a3b2a'; ctx.beginPath(); ctx.moveTo(bx - W * .08, by); ctx.lineTo(bx + W * .08, by); ctx.lineTo(bx + W * .055, by + W * .04); ctx.lineTo(bx - W * .055, by + W * .04); ctx.fill();
+    ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.moveTo(bx, by - W * .2); ctx.lineTo(bx, by - W * .01); ctx.lineTo(bx + W * .09, by - W * .01); ctx.fill();
+    ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(bx - W * .01, by - W * .16); ctx.lineTo(bx - W * .01, by - W * .01); ctx.lineTo(bx - W * .07, by - W * .01); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      ctx.strokeStyle = '#3a2a52'; ctx.lineWidth = 3;
+      const x = rnd() * W, y = W * (.1 + rnd() * .25);
+      ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.quadraticCurveTo(x - 5, y - 7, x, y); ctx.quadraticCurveTo(x + 5, y - 7, x + 10, y); ctx.stroke();
+    }
+  }
+
+  function drawQuilt(ctx, rnd, W) {
+    const palettes = [['#ff8a6b', '#ffd36b', '#7ddcb8', '#5aa9e6', '#b388eb', '#fff3e2'], ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#073b4c', '#fef9ef'], ['#f4a261', '#e76f51', '#2a9d8f', '#e9c46a', '#264653', '#fdf0d5']];
+    const pal = palettes[randInt(palettes.length)];
+    const pick = () => pal[Math.floor(rnd() * pal.length)];
+    const n = 6, s = W / n;
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      const x = c * s, y = r * s, a = pick();
+      let b = pick(); if (b === a) b = pal[(pal.indexOf(a) + 2) % pal.length];
+      ctx.fillStyle = a; ctx.fillRect(x, y, s, s);
+      ctx.fillStyle = b;
+      const kind = Math.floor(rnd() * 4);
+      ctx.beginPath();
+      if (kind === 0) { ctx.moveTo(x, y); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); }
+      else if (kind === 1) ctx.arc(x + s / 2, y + s / 2, s * .34, 0, Math.PI * 2);
+      else if (kind === 2) ctx.arc(x + (rnd() < .5 ? 0 : s), y + (rnd() < .5 ? 0 : s), s, 0, Math.PI * 2);
+      else { ctx.moveTo(x + s / 2, y + s * .1); ctx.lineTo(x + s * .9, y + s / 2); ctx.lineTo(x + s / 2, y + s * .9); ctx.lineTo(x + s * .1, y + s / 2); }
+      ctx.save(); ctx.clip(new Path2D(`M${x} ${y}h${s}v${s}h${-s}z`)); ctx.fill(); ctx.restore();
+    }
+    // A big ring across the quilt makes the picture easier to read at a glance.
+    ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = W * .035;
+    ctx.beginPath(); ctx.arc(W * (.35 + rnd() * .3), W * (.35 + rnd() * .3), W * .3, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function makePicture() {
+    const W = 600;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = W;
+    const ctx = canvas.getContext('2d');
+    const rnd = seeded(randInt(2 ** 31));
+    [drawMountains, drawSeaside, drawQuilt][randInt(3)](ctx, rnd, W);
+    return canvas.toDataURL('image/jpeg', .9);
+  }
+
+  // ---- Board logic ---------------------------------------------------------
+  const inversions = list => { let k = 0; const a = list.filter(Boolean); for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) if (a[i] > a[j]) k++; return k; };
+  const isSolved = cells => cells.every((v, i) => v === (i === cells.length - 1 ? 0 : i + 1));
+
+  function shuffledCells(n) {
+    let cells;
+    do {
+      const nums = Array.from({ length: n * n - 1 }, (_, i) => i + 1);
+      for (let i = nums.length - 1; i > 0; i--) { const j = randInt(i + 1); [nums[i], nums[j]] = [nums[j], nums[i]]; }
+      // With the gap in its home corner a layout is solvable exactly when the tile permutation is even.
+      if (inversions(nums) % 2) [nums[0], nums[1]] = [nums[1], nums[0]];
+      cells = [...nums, 0];
+      // Walk the gap to a random cell with legal slides, which keeps it solvable.
+      let gap = n * n - 1;
+      const tr = randInt(n), tc = randInt(n);
+      while (Math.floor(gap / n) !== tr) { const next = gap - n; cells[gap] = cells[next]; cells[next] = 0; gap = next; }
+      while (gap % n !== tc) { const next = gap - 1; cells[gap] = cells[next]; cells[next] = 0; gap = next; }
+    } while (isSolved(cells) || cells.filter((v, i) => v === i + 1).length > n);
+    return cells;
+  }
+
+  function tileLabel(value, pos) {
+    const r = Math.floor(pos / game.n) + 1, c = (pos % game.n) + 1;
+    const base = game.mode === 'picture' ? t.piece(value, r, c) : t.tile(value, r, c);
+    return value === pos + 1 ? `${base}, ${t.inPlace}` : base;
+  }
+
+  function render() {
+    const { n, cells } = game;
+    cells.forEach((value, pos) => {
+      if (!value) return;
+      const el = game.tileEls[value];
+      el.style.setProperty('--r', Math.floor(pos / n));
+      el.style.setProperty('--c', pos % n);
+      el.classList.toggle('home', value === pos + 1);
+      el.setAttribute('aria-label', tileLabel(value, pos));
+    });
+    els.moves.textContent = String(game.moves);
+  }
+
+  function bestText(size) {
+    const b = best[size];
+    return b ? String(b.moves) : '—';
+  }
+
+  function newGame(size = prefs.size, mode = prefs.mode) {
+    prefs.size = size; prefs.mode = mode;
+    writeJSON(STORE.prefs, prefs);
+    const n = size;
+    game = { n, mode, cells: shuffledCells(n), moves: 0, elapsed: 0, running: false, done: false, picture: mode === 'picture' ? makePicture() : null, tileEls: [] };
+    els.board.style.setProperty('--n', n);
+    els.board.classList.remove('won');
+    els.tiles.replaceChildren();
+    for (let value = 1; value <= n * n; value++) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.tabIndex = -1;
+      el.className = `tile${game.picture ? ' pic' : ''}`;
+      const home = value - 1;
+      if (game.picture) {
+        el.style.backgroundImage = `url(${game.picture})`;
+        el.style.backgroundPosition = `${(home % n) / (n - 1) * 100}% ${Math.floor(home / n) / (n - 1) * 100}%`;
+        el.innerHTML = `<i aria-hidden="true">${value}</i>`;
+      } else el.textContent = value;
+      el.addEventListener('click', () => onTileClick(value));
+      game.tileEls[value] = el;
+      els.tiles.append(el);
+    }
+    // The last tile only appears to fill the gap when the puzzle is solved.
+    const last = game.tileEls[n * n];
+    last.classList.add('ghost');
+    last.setAttribute('aria-hidden', 'true');
+    last.style.setProperty('--r', n - 1); last.style.setProperty('--c', n - 1);
+    if (!game.picture) last.textContent = '';
+    setPeek(false);
+    render();
+    els.time.textContent = '0:00';
+    els.best.textContent = bestText(n);
+    els.chip.textContent = `${n}×${n}`;
+    els.menu.hidden = true; els.win.hidden = true;
+    els.announcer.textContent = t.started(n);
+  }
+
+  function slideTo(pos) {
+    const { n, cells } = game;
+    let gap = cells.indexOf(0);
+    const gr = Math.floor(gap / n), gc = gap % n, pr = Math.floor(pos / n), pc = pos % n;
+    if (pos === gap || (gr !== pr && gc !== pc)) return false;
+    const step = gr === pr ? Math.sign(pc - gc) : Math.sign(pr - gr) * n;
+    const movedValues = [];
+    while (gap !== pos) {
+      const next = gap + step;
+      movedValues.push(cells[next]);
+      cells[gap] = cells[next]; cells[next] = 0; gap = next;
+      game.moves++;
+    }
+    if (!game.running) game.running = true;
+    render();
+    const inPlace = cells.filter((v, i) => v === i + 1).length;
+    els.announcer.textContent = `${t.moved(movedValues.join(', '))} ${t.progress(inPlace, n * n - 1)}`;
+    if (isSolved(cells)) win();
+    return true;
+  }
+
+  function moveDir(dir) {
+    const { n, cells } = game;
+    const gap = cells.indexOf(0);
+    const [dr, dc] = DIRS[dir];
+    const r = Math.floor(gap / n) + dr, c = (gap % n) + dc;
+    if (r < 0 || r >= n || c < 0 || c >= n) return;
+    slideTo(r * n + c);
+  }
+
+  const canPlay = () => game && !game.done && els.menu.hidden && els.win.hidden;
+
+  function onTileClick(value) {
+    if (suppressClick || !canPlay()) return;
+    if (game.peeking) { setPeek(false); return; }
+    slideTo(game.cells.indexOf(value));
+  }
+
+  function win() {
+    game.done = true;
+    game.running = false;
+    const { n } = game;
+    const prev = best[n];
+    const better = !prev || game.moves < prev.moves || (game.moves === prev.moves && game.elapsed < prev.time);
+    if (better) { best[n] = { moves: game.moves, time: Math.floor(game.elapsed) }; writeJSON(STORE.best, best); }
+    els.best.textContent = bestText(n);
+    els.board.classList.add('won');
+    const last = game.tileEls[n * n];
+    last.classList.add('home');
+    if (!game.picture) last.textContent = n * n;
+    els.result.textContent = t.result(game.moves, formatTime(game.elapsed));
+    els.newBest.hidden = !better || !prev;
+    els.thumb.hidden = !game.picture;
+    if (game.picture) els.thumb.src = game.picture;
+    els.announcer.textContent = `${t.won} ${els.result.textContent}`;
+    setTimeout(() => { els.win.hidden = false; $('again').focus({ preventScroll: true }); }, 900);
+  }
+
+  function setPeek(on) {
+    if (!game) return;
+    game.peeking = on;
+    els.peekBtn.setAttribute('aria-pressed', String(on));
+    els.peek.hidden = !on;
+    if (!on) return;
+    const { n } = game;
+    els.peek.style.gridTemplate = `repeat(${n}, 1fr) / repeat(${n}, 1fr)`;
+    if (game.picture) els.peek.innerHTML = `<img src="${game.picture}" alt="">`;
+    else els.peek.innerHTML = Array.from({ length: n * n - 1 }, (_, i) => `<b>${i + 1}</b>`).join('');
+    const note = document.createElement('span');
+    note.textContent = t.peeking;
+    els.peek.append(note);
+    els.announcer.textContent = t.peekOn;
+  }
+
+  function openMenu() {
+    for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === prefs.mode));
+    els.levels.replaceChildren(...SIZES.map((size, i) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level${size === game?.n ? ' current' : ''}`;
+      const b = best[size];
+      button.innerHTML = `<span class="size">${size}×${size}</span><span><strong></strong><small></small></span>`;
+      button.querySelector('strong').textContent = t.levels[i];
+      button.querySelector('small').textContent = b ? t.bestLine(b.moves, formatTime(b.time)) : t.noBest;
+      button.addEventListener('click', () => { newGame(size, prefs.mode); els.board.focus({ preventScroll: true }); });
+      return button;
+    }));
+    els.win.hidden = true;
+    els.menu.hidden = false;
+    els.levels.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  // ---- Timer: rAF with clamped dt; rAF itself stops while the tab is hidden. ----
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    if (game?.running && !document.hidden && els.menu.hidden) {
+      game.elapsed += dt;
+      els.time.textContent = formatTime(game.elapsed);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+  // ---- Input ---------------------------------------------------------------
+  const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+  document.addEventListener('keydown', event => {
+    const dir = KEYS[event.key];
+    if (!dir || event.altKey || event.ctrlKey || event.metaKey || !canPlay()) return;
+    event.preventDefault();
+    if (game.peeking) setPeek(false);
+    moveDir(dir);
+  });
+
+  // A swipe slides the tile next to the gap; a short tap falls through to the tile's click.
+  let swipe = null, suppressClick = false;
+  els.board.addEventListener('pointerdown', event => {
+    if (!canPlay()) return;
+    swipe = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  });
+  els.board.addEventListener('pointerup', event => {
+    if (!swipe || swipe.id !== event.pointerId) return;
+    const dx = event.clientX - swipe.x, dy = event.clientY - swipe.y;
+    swipe = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    if (game.peeking) setPeek(false);
+    moveDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+  els.board.addEventListener('pointercancel', () => { swipe = null; });
+  els.peek.addEventListener('click', () => setPeek(false));
+  els.peekBtn.addEventListener('click', () => { if (canPlay()) setPeek(!game.peeking); });
+
+  for (const b of document.querySelectorAll('[data-mode]')) {
+    b.addEventListener('click', () => {
+      prefs.mode = b.dataset.mode;
+      writeJSON(STORE.prefs, prefs);
+      for (const other of document.querySelectorAll('[data-mode]')) other.setAttribute('aria-pressed', String(other === b));
+    });
+  }
+  $('new').addEventListener('click', () => { newGame(game.n, game.mode); els.board.focus({ preventScroll: true }); });
+  $('menu-btn').addEventListener('click', openMenu);
+  $('again').addEventListener('click', () => { newGame(game.n, game.mode); els.board.focus({ preventScroll: true }); });
+  $('change').addEventListener('click', openMenu);
+  $('close-menu').addEventListener('click', () => { els.menu.hidden = true; if (game.done) newGame(game.n, prefs.mode); els.board.focus({ preventScroll: true }); });
+
+  newGame();
+  openMenu();
+})();
+</script>
+</body>
+</html>

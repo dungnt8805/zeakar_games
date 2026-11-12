@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bus Sort</title>
+<style>
+:root {
+  --ink: #2d3047;
+  --muted: #6d7088;
+  --bg: #eaf6ff;
+  --sun: #ffc93c;
+  --sun-dark: #e0a400;
+  --teal: #19b3a6;
+  --teal-dark: #0e8c82;
+  --cream: #fffdf7;
+  --edge: #d3dcea;
+  --asphalt: #59617a;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(#d5ebfb 2px, transparent 2.5px), linear-gradient(#e6f4ff, #fff3dc);
+  background-size: 26px 26px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.icon { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 9px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(21px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; white-space: nowrap; line-height: 1; }
+h1 span, .panel h2 span { color: var(--sun-dark); }
+.stat { min-width: 56px; padding: 5px 8px; border-radius: 14px; background: #ffffffc4; text-align: center; box-shadow: 0 3px 0 var(--edge); }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--cream); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 var(--edge); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
+.icon-btn svg { width: 20px; height: 20px; vertical-align: middle; }
+
+.station { padding: 8px; border-radius: 18px; background: #ffffffb8; box-shadow: 0 4px 0 var(--edge); }
+.bays { display: grid; grid-template-columns: repeat(var(--bays, 5), 1fr); gap: 6px; }
+.bays.full-shake { animation: nope .35s; }
+.bay { position: relative; height: 46px; border-radius: 12px; border: 2px dashed #bcc7da; background: #f3f6fb; }
+.bay::before { content: attr(data-n); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: 900; color: #bcc7da; }
+.mini { position: absolute; inset: 3px; z-index: 1; display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: 1fr 1fr; gap: 2px; padding: 5px 13px 5px 19px; border-radius: 9px; background: linear-gradient(color-mix(in srgb, var(--c) 88%, #fff), color-mix(in srgb, var(--c) 82%, #000)); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 60%, #000); animation: arrive .35s var(--delay, 0ms) both cubic-bezier(.3, 1.4, .5, 1); }
+.mini::after { content: ""; position: absolute; right: 3px; top: 18%; bottom: 18%; width: 6px; border-radius: 2px 5px 5px 2px; background: #d6f1ff; }
+.mini i { border-radius: 3px; background: #ffffffa6; }
+.mini i.taken { background: radial-gradient(circle at 50% 40%, #2d3047 0 42%, transparent 46%), #ffffffd9; }
+.mini svg { position: absolute; left: 4px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); fill: #fff; filter: drop-shadow(0 1px 1px #0006); pointer-events: none; }
+.mini.depart { animation: depart .45s ease-in forwards; z-index: 2; }
+@keyframes arrive { from { transform: translateY(70%) scale(.7); opacity: 0; } }
+@keyframes depart { to { transform: translateX(130%); opacity: 0; } }
+.queue { position: relative; margin-top: 7px; height: 42px; overflow: hidden; border-radius: 12px; background: repeating-linear-gradient(90deg, #e9eef6 0 14px, #f4f7fb 14px 28px); --pitch: 22px; }
+.pax { position: absolute; bottom: 3px; left: calc(8px + var(--k) * var(--pitch)); width: 18px; height: 34px; transition: left .14s ease, transform .14s; }
+.pax::before { content: ""; position: absolute; left: 4px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: #f6d2b0; box-shadow: inset 0 -2px 0 #e2b68e; }
+.pax i { position: absolute; left: 1px; right: 1px; top: 11px; bottom: 0; display: grid; place-items: center; border-radius: 7px 7px 4px 4px; background: var(--c); box-shadow: inset 0 -3px 0 #0002; }
+.pax svg { width: 10px; height: 10px; fill: var(--s); }
+.pax.front { transform: scale(1.12); transform-origin: 50% 100%; }
+.pax.enter { animation: enter .25s both; }
+@keyframes enter { from { opacity: 0; transform: translateX(10px); } }
+.more { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 3px 7px; border-radius: 99px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 900; }
+.more[hidden] { display: none; }
+.flyer { position: fixed; z-index: 30; pointer-events: none; }
+
+.lot-wrap { flex: 1; min-height: 0; position: relative; }
+.lot { position: absolute; --cell: 50px; border-radius: 16px; background-color: var(--asphalt); background-image: linear-gradient(#ffffff17 1.5px, transparent 1.5px), linear-gradient(90deg, #ffffff17 1.5px, transparent 1.5px); background-size: var(--cell) var(--cell); background-position: -.75px -.75px; box-shadow: 0 0 0 6px #ffffffc0, 0 0 0 8px var(--edge), 0 10px 24px #2d304733; }
+.bus { position: absolute; padding: 0; left: calc(var(--cell) * var(--x)); top: calc(var(--cell) * var(--y)); width: calc(var(--cell) * var(--w)); height: calc(var(--cell) * var(--h)); touch-action: manipulation; }
+.bus:focus-visible { outline: none; }
+.bus:focus-visible .shape { outline: 3px solid #fff; outline-offset: 2px; }
+.shape { position: absolute; left: 50%; top: 50%; width: calc(var(--cell) * var(--len) - var(--cell) * .14); height: calc(var(--cell) * .76); transform: translate(-50%, -50%) rotate(var(--rot)); border-radius: calc(var(--cell) * .2) calc(var(--cell) * .26) calc(var(--cell) * .26) calc(var(--cell) * .2); background: linear-gradient(color-mix(in srgb, var(--c) 86%, #fff), var(--c) 45%, color-mix(in srgb, var(--c) 80%, #000)); box-shadow: 0 calc(var(--cell) * .05) 0 color-mix(in srgb, var(--c) 55%, #000), 0 calc(var(--cell) * .08) calc(var(--cell) * .12) #0005; }
+.shape::before { content: ""; position: absolute; right: 5%; top: 12%; bottom: 12%; width: calc(var(--cell) * .15); border-radius: 3px calc(var(--cell) * .1) calc(var(--cell) * .1) 3px; background: linear-gradient(90deg, #a9dcf5, #e6f7ff); }
+.shape::after { content: ""; position: absolute; left: 7%; right: calc(var(--cell) * .32); top: 22%; bottom: 22%; border-radius: calc(var(--cell) * .08); background: color-mix(in srgb, var(--c) 72%, #fff); box-shadow: inset 0 0 0 1.5px #ffffff59; }
+.bus.free .shape { box-shadow: 0 calc(var(--cell) * .05) 0 color-mix(in srgb, var(--c) 55%, #000), 0 0 0 2px #fffc, 0 0 calc(var(--cell) * .3) #fff8; }
+.tag { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; display: inline-flex; align-items: center; gap: 1px; padding: calc(var(--cell) * .03) calc(var(--cell) * .08); border-radius: 99px; background: #ffffffe6; color: var(--ink); font-size: calc(var(--cell) * .26); font-weight: 900; line-height: 1; pointer-events: none; }
+.tag svg { width: calc(var(--cell) * .24); height: calc(var(--cell) * .24); fill: var(--c); }
+.bus.blocker .shape { animation: flash .5s; }
+@keyframes flash { 30%, 70% { filter: brightness(1.45) saturate(.7); } }
+@keyframes nope { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.bottom { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.hint { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+.booster { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border-radius: 16px; background: var(--cream); box-shadow: 0 4px 0 var(--edge); font-size: 14px; font-weight: 800; }
+.booster svg { flex: 0 0 auto; width: 20px; height: 20px; color: var(--teal-dark); }
+.booster:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+.booster:disabled { opacity: .45; cursor: default; }
+.count { position: absolute; top: -7px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--teal); color: #fff; font-size: 12px; font-weight: 900; line-height: 22px; text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: #2d304766; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--cream); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #2d304766; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--muted); line-height: 1.45; }
+.picker { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.picker strong { min-width: 120px; font-size: 20px; }
+.picker button { width: 42px; height: 42px; border-radius: 50%; background: #fff1c7; font-size: 22px; font-weight: 900; }
+.picker button:disabled { opacity: .35; cursor: default; }
+.result { margin-top: 10px; font-size: 17px; font-weight: 700; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--sun); color: var(--ink); font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--sun-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--sun-dark); }
+.ghost { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #dff6f3; color: var(--teal-dark); font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #b6e6e0; }
+.ghost[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 600px) { .app { gap: 6px; } .bay { height: 38px; } .queue { height: 40px; } .hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <h1>Bus <span>Sort</span></h1>
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="left"></small><strong id="left">0</strong></div>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="levels"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </header>
+  <section class="station">
+    <div class="bays" id="bays" role="list" data-i18n-label="bays"></div>
+    <div class="queue" id="queue" role="img"><span class="more" id="more" hidden></span></div>
+  </section>
+  <div class="lot-wrap" id="lot-wrap">
+    <div class="lot" id="lot" role="group" data-i18n-label="lot"></div>
+  </div>
+  <div class="bottom">
+    <p class="hint" data-i18n="hint"></p>
+    <button type="button" class="booster" id="undo" aria-keyshortcuts="U"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span data-i18n="undo"></span><b class="count" id="undo-count" aria-hidden="true"></b></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🚌</p>
+    <h2 id="start-title">Bus <span>Sort</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <p class="text" data-i18n="how"></p>
+    <div class="picker">
+      <button type="button" id="prev" data-i18n-label="prev">‹</button>
+      <strong id="pick-level" aria-live="polite"></strong>
+      <button type="button" id="next" data-i18n-label="next">›</button>
+    </div>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="result" id="result"></p>
+    <button type="button" class="cta" id="next-level" data-i18n="next"></button>
+    <button type="button" class="ghost" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">🚧</p>
+    <h2 id="lose-title" data-i18n="lost"></h2>
+    <p class="text" data-i18n="lostText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="ghost" id="lose-undo" data-i18n="undo"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Send the right buses to the station so every passenger gets a ride.', how: 'Tap a bus with a clear road ahead to drive it to a bay. Passengers of the same colour hop on and full buses head off. Don’t let every bay fill up!', hint: 'Tap a bus whose way out is clear', level: 'Level', left: 'Riders', levels: 'Choose level', restart: 'Restart level', lot: 'Parking lot', bays: 'Bus bays', undo: 'Undo', boosterLabel: (name, n) => `${name}, ${n} left`, play: 'Play', levelN: n => `Level ${n}`, prev: 'Previous level', next: 'Next level', colors: ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink'], dirs: { up: 'facing up', down: 'facing down', left: 'facing left', right: 'facing right' }, bus: (c, s, dir, free) => `${c} bus, ${s} seats, ${dir}, ${free ? 'free to go' : 'blocked'}`, bay: (i, d) => `Bay ${i}: ${d}`, bayBus: (c, f, s) => `${c} bus, ${f} of ${s} seats taken`, empty: 'empty', queue: (list, more) => `Queue: ${list}${more ? `, and ${more} more` : ''}`, parked: (c, i) => `The ${c} bus pulls into bay ${i}.`, blocked: 'That bus is blocked in.', baysFull: 'Every bay is taken.', departed: c => `The ${c} bus is full and heads off!`, undone: 'Move undone.', won: n => `Level ${n} complete!`, result: p => `All ${p} passengers are on their way!`, replay: 'Replay level', lost: 'Station jammed!', lostText: 'Every bay is taken and nobody at the front of the queue can board.', retry: 'Try again', levelStart: (n, b, p) => `Level ${n}: ${b} buses, ${p} passengers.` },
+    vi: { tagline: 'Đưa đúng xe buýt vào bến để mọi hành khách đều có chỗ ngồi.', how: 'Chạm vào xe buýt có đường phía trước thông thoáng để lái vào bến. Hành khách cùng màu sẽ lên xe, xe đầy sẽ rời bến. Đừng để tất cả các bến bị lấp kín!', hint: 'Chạm vào xe buýt có lối ra thông thoáng', level: 'Màn', left: 'Khách', levels: 'Chọn màn', restart: 'Chơi lại màn', lot: 'Bãi đỗ xe', bays: 'Bến đỗ', undo: 'Hoàn tác', boosterLabel: (name, n) => `${name}, còn ${n} lượt`, play: 'Chơi', levelN: n => `Màn ${n}`, prev: 'Màn trước', next: 'Màn tiếp theo', colors: ['đỏ', 'xanh dương', 'xanh lá', 'vàng', 'tím', 'cam', 'hồng'], dirs: { up: 'hướng lên', down: 'hướng xuống', left: 'hướng trái', right: 'hướng phải' }, bus: (c, s, dir, free) => `Xe ${c}, ${s} chỗ, ${dir}, ${free ? 'có thể chạy' : 'đang bị chắn'}`, bay: (i, d) => `Bến ${i}: ${d}`, bayBus: (c, f, s) => `xe ${c}, đã có ${f}/${s} khách`, empty: 'trống', queue: (list, more) => `Hàng chờ: ${list}${more ? `, và ${more} người nữa` : ''}`, parked: (c, i) => `Xe ${c} đã vào bến ${i}.`, blocked: 'Xe này đang bị chắn đường.', baysFull: 'Tất cả các bến đều đã có xe.', departed: c => `Xe ${c} đã đầy và lăn bánh!`, undone: 'Đã hoàn tác.', won: n => `Hoàn thành màn ${n}!`, result: p => `Cả ${p} hành khách đã lên đường!`, replay: 'Chơi lại màn này', lost: 'Bến xe kẹt cứng!', lostText: 'Bến nào cũng có xe mà người đứng đầu hàng lại không lên được xe nào.', retry: 'Thử lại', levelStart: (n, b, p) => `Màn ${n}: ${b} xe buýt, ${p} hành khách.` },
+    zh: { tagline: '把对的巴士开进车站，让每位乘客都能坐上车。', how: '点前方畅通的巴士，把它开到停车位。同色乘客会自动上车，坐满就发车。别让所有停车位都被占满！', hint: '点一辆前方畅通的巴士', level: '关卡', left: '乘客', levels: '选择关卡', restart: '重玩本关', lot: '停车场', bays: '候车位', undo: '撤销', boosterLabel: (name, n) => `${name}，剩余 ${n} 次`, play: '开始', levelN: n => `第 ${n} 关`, prev: '上一关', next: '下一关', colors: ['红色', '蓝色', '绿色', '黄色', '紫色', '橙色', '粉色'], dirs: { up: '朝上', down: '朝下', left: '朝左', right: '朝右' }, bus: (c, s, dir, free) => `${c}巴士，${s} 座，${dir}，${free ? '可以开走' : '被挡住了'}`, bay: (i, d) => `候车位 ${i}：${d}`, bayBus: (c, f, s) => `${c}巴士，已坐 ${f}/${s}`, empty: '空', queue: (list, more) => `排队：${list}${more ? `，还有 ${more} 人` : ''}`, parked: (c, i) => `${c}巴士停进了 ${i} 号车位。`, blocked: '这辆巴士被挡住了。', baysFull: '候车位都满了。', departed: c => `${c}巴士坐满发车啦！`, undone: '已撤销一步。', won: n => `第 ${n} 关完成！`, result: p => `${p} 位乘客全部出发！`, replay: '重玩本关', lost: '车站堵住了！', lostText: '候车位全满，排在最前面的乘客却上不了任何一辆车。', retry: '再试一次', levelStart: (n, b, p) => `第 ${n} 关：${b} 辆巴士，${p} 位乘客。` },
+    fr: { tagline: 'Envoyez les bons bus à la gare pour que chaque passager trouve sa place.', how: 'Touchez un bus dont la route est libre pour l’amener à un quai. Les passagers de la même couleur montent, et les bus pleins s’en vont. Ne laissez pas tous les quais se remplir !', hint: 'Touchez un bus dont la sortie est libre', level: 'Niveau', left: 'Passagers', levels: 'Choisir un niveau', restart: 'Recommencer le niveau', lot: 'Parking', bays: 'Quais', undo: 'Annuler', boosterLabel: (name, n) => `${name}, encore ${n}`, play: 'Jouer', levelN: n => `Niveau ${n}`, prev: 'Niveau précédent', next: 'Niveau suivant', colors: ['rouge', 'bleu', 'vert', 'jaune', 'violet', 'orange', 'rose'], dirs: { up: 'tourné vers le haut', down: 'tourné vers le bas', left: 'tourné vers la gauche', right: 'tourné vers la droite' }, bus: (c, s, dir, free) => `Bus ${c}, ${s} places, ${dir}, ${free ? 'peut partir' : 'bloqué'}`, bay: (i, d) => `Quai ${i} : ${d}`, bayBus: (c, f, s) => `bus ${c}, ${f} places prises sur ${s}`, empty: 'libre', queue: (list, more) => `File d’attente : ${list}${more ? `, et ${more} de plus` : ''}`, parked: (c, i) => `Le bus ${c} se gare au quai ${i}.`, blocked: 'Ce bus est bloqué.', baysFull: 'Tous les quais sont occupés.', departed: c => `Le bus ${c} est plein et s’en va !`, undone: 'Coup annulé.', won: n => `Niveau ${n} terminé !`, result: p => `Les ${p} passagers sont en route !`, replay: 'Rejouer le niveau', lost: 'Gare embouteillée !', lostText: 'Tous les quais sont pris et personne en tête de file ne peut monter.', retry: 'Réessayer', levelStart: (n, b, p) => `Niveau ${n} : ${b} bus, ${p} passagers.` },
+    th: { tagline: 'ส่งรถบัสให้ถูกคันเข้าสถานี ให้ผู้โดยสารทุกคนได้ขึ้นรถ', how: 'แตะรถบัสที่ทางข้างหน้าโล่งเพื่อขับเข้าช่องจอด ผู้โดยสารสีเดียวกันจะขึ้นรถเอง รถเต็มแล้วจะออกไป อย่าปล่อยให้ช่องจอดเต็มทุกช่อง!', hint: 'แตะรถบัสที่ทางออกโล่ง', level: 'ด่าน', left: 'ผู้โดยสาร', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', lot: 'ลานจอดรถ', bays: 'ช่องจอดรถ', undo: 'ย้อนกลับ', boosterLabel: (name, n) => `${name} เหลือ ${n} ครั้ง`, play: 'เล่น', levelN: n => `ด่าน ${n}`, prev: 'ด่านก่อนหน้า', next: 'ด่านถัดไป', colors: ['แดง', 'น้ำเงิน', 'เขียว', 'เหลือง', 'ม่วง', 'ส้ม', 'ชมพู'], dirs: { up: 'หันขึ้น', down: 'หันลง', left: 'หันซ้าย', right: 'หันขวา' }, bus: (c, s, dir, free) => `รถบัสสี${c} ${s} ที่นั่ง ${dir} ${free ? 'ออกได้' : 'ถูกขวางอยู่'}`, bay: (i, d) => `ช่องจอด ${i}: ${d}`, bayBus: (c, f, s) => `รถบัสสี${c} มีคนนั่ง ${f}/${s}`, empty: 'ว่าง', queue: (list, more) => `คิว: ${list}${more ? ` และอีก ${more} คน` : ''}`, parked: (c, i) => `รถบัสสี${c}เข้าช่องจอด ${i} แล้ว`, blocked: 'รถคันนี้ถูกขวางอยู่', baysFull: 'ช่องจอดเต็มทุกช่องแล้ว', departed: c => `รถบัสสี${c}เต็มแล้ว ออกเดินทางได้!`, undone: 'ย้อนกลับแล้ว', won: n => `ผ่านด่าน ${n} แล้ว!`, result: p => `ผู้โดยสารทั้ง ${p} คนออกเดินทางแล้ว!`, replay: 'เล่นด่านนี้อีกครั้ง', lost: 'สถานีติดขัด!', lostText: 'ช่องจอดเต็มหมด และคนหัวแถวขึ้นรถคันไหนไม่ได้เลย', retry: 'ลองอีกครั้ง', levelStart: (n, b, p) => `ด่าน ${n}: รถบัส ${b} คัน ผู้โดยสาร ${p} คน` },
+    ja: { tagline: '正しいバスを乗り場に送って、乗客みんなを乗せてあげよう。', how: '前がふさがっていないバスをタップすると乗り場へ移動。同じ色の乗客が乗り込み、満席になると出発します。乗り場が全部埋まらないように気をつけて！', hint: '出口がふさがっていないバスをタップ', level: 'レベル', left: '乗客', levels: 'レベル選択', restart: 'レベルをやり直す', lot: '駐車場', bays: '乗り場', undo: '戻す', boosterLabel: (name, n) => `${name}、残り${n}回`, play: 'プレイ', levelN: n => `レベル ${n}`, prev: '前のレベル', next: '次のレベル', colors: ['赤', '青', '緑', '黄', '紫', 'オレンジ', 'ピンク'], dirs: { up: '上向き', down: '下向き', left: '左向き', right: '右向き' }, bus: (c, s, dir, free) => `${c}のバス、${s}席、${dir}、${free ? '出発できます' : 'ふさがれています'}`, bay: (i, d) => `乗り場 ${i}：${d}`, bayBus: (c, f, s) => `${c}のバス、${s}席中${f}席が埋まっています`, empty: '空き', queue: (list, more) => `行列：${list}${more ? `、ほか${more}人` : ''}`, parked: (c, i) => `${c}のバスが乗り場 ${i} に到着。`, blocked: 'このバスは出られません。', baysFull: '乗り場がすべて埋まっています。', departed: c => `${c}のバスが満席で出発！`, undone: '1手戻しました。', won: n => `レベル ${n} クリア！`, result: p => `${p}人の乗客が全員出発しました！`, replay: 'もう一度プレイ', lost: '乗り場が大渋滞！', lostText: '乗り場はすべて埋まり、先頭の乗客が乗れるバスがありません。', retry: 'もう一度', levelStart: (n, b, p) => `レベル ${n}：バス${b}台、乗客${p}人。` },
+    ko: { tagline: '알맞은 버스를 정류장으로 보내 모든 승객을 태워 주세요.', how: '앞길이 비어 있는 버스를 누르면 승강장으로 이동해요. 같은 색 승객이 타고, 꽉 찬 버스는 출발해요. 승강장이 모두 차지 않게 조심하세요!', hint: '앞이 비어 있는 버스를 누르세요', level: '레벨', left: '승객', levels: '레벨 선택', restart: '레벨 다시 하기', lot: '주차장', bays: '승강장', undo: '되돌리기', boosterLabel: (name, n) => `${name}, ${n}회 남음`, play: '시작', levelN: n => `레벨 ${n}`, prev: '이전 레벨', next: '다음 레벨', colors: ['빨강', '파랑', '초록', '노랑', '보라', '주황', '분홍'], dirs: { up: '위쪽 방향', down: '아래쪽 방향', left: '왼쪽 방향', right: '오른쪽 방향' }, bus: (c, s, dir, free) => `${c} 버스, ${s}인승, ${dir}, ${free ? '출발 가능' : '막혀 있음'}`, bay: (i, d) => `${i}번 승강장: ${d}`, bayBus: (c, f, s) => `${c} 버스, ${s}석 중 ${f}석 탑승`, empty: '비어 있음', queue: (list, more) => `대기 줄: ${list}${more ? `, 외 ${more}명` : ''}`, parked: (c, i) => `${c} 버스가 ${i}번 승강장에 도착했어요.`, blocked: '이 버스는 막혀 있어요.', baysFull: '승강장이 모두 찼어요.', departed: c => `${c} 버스가 꽉 차서 출발해요!`, undone: '한 수 되돌렸어요.', won: n => `레벨 ${n} 클리어!`, result: p => `승객 ${p}명이 모두 출발했어요!`, replay: '이 레벨 다시 하기', lost: '정류장이 꽉 막혔어요!', lostText: '승강장이 모두 찼는데 맨 앞 승객이 탈 수 있는 버스가 없어요.', retry: '다시 하기', levelStart: (n, b, p) => `레벨 ${n}: 버스 ${b}대, 승객 ${p}명.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Bus/passenger colour, then the colour of the symbol on a passenger's shirt.
+  const COLORS = [['#f2545b', '#ffffffb3'], ['#3d7cf2', '#ffffffb3'], ['#2bb673', '#ffffffb3'], ['#ffc93c', '#0000004d'], ['#9b5de5', '#ffffffb3'], ['#ff8c42', '#ffffffb3'], ['#ff7eb6', '#0000004d']];
+  const SYMBOLS = [
+    '<circle cx="10" cy="10" r="6.5"/>', '<path d="M10 2.5 18 17H2z"/>', '<rect x="3.5" y="3.5" width="13" height="13" rx="1.5"/>',
+    '<path d="M10 1.5 18.5 10 10 18.5 1.5 10z"/>', '<path d="m10 1.5 2.6 5.3 5.9.8-4.3 4.1 1.1 5.8L10 14.7l-5.3 2.8 1.1-5.8-4.3-4.1 5.9-.8z"/>',
+    '<path d="M7.8 2h4.4v5.8H18v4.4h-5.8V18H7.8v-5.8H2V7.8h5.8z"/>', '<path d="M10 18s-8-4.8-8-10a4.2 4.2 0 0 1 8-2.2A4.2 4.2 0 0 1 18 8c0 5.2-8 10-8 10z"/>',
+  ];
+  document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${SYMBOLS.map((s, i) => `<symbol id="sym${i}" viewBox="0 0 20 20">${s}</symbol>`).join('')}</svg>`);
+
+  const SEATS = { 2: 4, 3: 6, 4: 10 };
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const ROT = { right: '0deg', down: '90deg', left: '180deg', up: '-90deg' };
+  const UNDOS = 3;
+  const BOARD_MS = 140, MAX_CELL = 68;
+  const STORE = 'milaan.busSort.level';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = { lotWrap: $('lot-wrap'), lot: $('lot'), bays: $('bays'), queue: $('queue'), more: $('more'), level: $('level'), left: $('left'), announcer: $('announcer'), start: $('start'), pickLevel: $('pick-level'), prev: $('prev'), next: $('next'), win: $('win'), winTitle: $('win-title'), result: $('result'), lose: $('lose'), undo: $('undo'), loseUndo: $('lose-undo') };
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+
+  let highest = Math.max(1, Number(read(STORE, 1)) || 1);
+  let pickLevel = highest;
+  let game = null;
+
+  // Bigger lots, more buses and colours, fewer bays and longer coaches as levels go up.
+  function levelPlan(n) {
+    return {
+      cols: Math.min(7, 4 + Math.floor(n / 3)),
+      rows: Math.min(8, 5 + Math.floor(n / 3)),
+      buses: Math.min(20, 4 + Math.floor(n * 0.9)),
+      colors: Math.min(7, 2 + Math.floor((n + 1) / 2)),
+      bays: n <= 4 ? 5 : 4,
+      long: n >= 6 ? 0.15 : 0,
+      drive: Math.min(0.8, 0.45 + n * 0.03),
+    };
+  }
+
+  const cellsOf = bus => Array.from({ length: bus.len }, (_, i) => [bus.x + (bus.horizontal ? i : 0), bus.y + (bus.horizontal ? 0 : i)]);
+
+  function occupancy(buses, plan, gone) {
+    const occ = new Int16Array(plan.cols * plan.rows).fill(-1);
+    buses.forEach((bus, i) => { if (!gone[i]) for (const [x, y] of cellsOf(bus)) occ[y * plan.cols + x] = i; });
+    return occ;
+  }
+
+  // The first bus standing between this bus's nose and the lot edge, or -1 when the road is clear.
+  function blockerOf(bus, occ, plan) {
+    const [dx, dy] = DIRS[bus.dir];
+    let x = bus.dir === 'right' ? bus.x + bus.len : bus.x + dx;
+    let y = bus.dir === 'down' ? bus.y + bus.len : bus.y + dy;
+    while (x >= 0 && y >= 0 && x < plan.cols && y < plan.rows) {
+      if (occ[y * plan.cols + x] >= 0) return occ[y * plan.cols + x];
+      x += dx; y += dy;
+    }
+    return -1;
+  }
+
+  const freeBuses = (buses, plan, gone) => {
+    const occ = occupancy(buses, plan, gone);
+    return buses.map((_, i) => i).filter(i => !gone[i] && blockerOf(buses[i], occ, plan) < 0);
+  };
+
+  // Removing a bus never blocks another, so greedily driving out any free bus decides whether the lot can empty.
+  function clearable(buses, plan) {
+    const gone = buses.map(() => false);
+    for (let left = buses.length; left > 0; left--) {
+      const free = freeBuses(buses, plan, gone);
+      if (!free.length) return false;
+      gone[free[0]] = true;
+    }
+    return true;
+  }
+
+  function placeBuses(plan, rnd) {
+    const buses = [];
+    const taken = new Set();
+    for (let tries = 0; buses.length < plan.buses && tries < 600; tries++) {
+      const len = rnd() < plan.long ? 4 : rnd() < 0.55 ? 2 : 3;
+      const horizontal = rnd() < 0.5;
+      const w = horizontal ? len : 1, h = horizontal ? 1 : len;
+      if (w > plan.cols || h > plan.rows) continue;
+      const bus = { x: Math.floor(rnd() * (plan.cols - w + 1)), y: Math.floor(rnd() * (plan.rows - h + 1)), len, horizontal };
+      if (cellsOf(bus).some(([x, y]) => taken.has(`${x},${y}`))) continue;
+      const dirs = horizontal ? ['left', 'right'] : ['up', 'down'];
+      if (rnd() < 0.5) dirs.reverse();
+      for (const dir of dirs) {
+        bus.dir = dir;
+        if (!clearable([...buses, bus], plan)) continue;
+        buses.push(bus);
+        for (const [x, y] of cellsOf(bus)) taken.add(`${x},${y}`);
+        break;
+      }
+    }
+    return buses;
+  }
+
+  // Plays one random way of emptying the lot and writes down the queue that play would serve.
+  function buildQueue(buses, plan, rnd) {
+    const gone = buses.map(() => false);
+    const bays = [];
+    const queue = [];
+    let lotLeft = buses.length;
+    while (lotLeft || bays.length) {
+      const roomy = bays.filter(b => b.fill < b.cap);
+      if (lotLeft && bays.length < plan.bays && (!roomy.length || rnd() < plan.drive)) {
+        const free = freeBuses(buses, plan, gone);
+        const pick = free[Math.floor(rnd() * free.length)];
+        gone[pick] = true;
+        lotLeft--;
+        bays.push({ id: pick, color: buses[pick].color, cap: SEATS[buses[pick].len], fill: 0 });
+        continue;
+      }
+      const color = roomy[Math.floor(rnd() * roomy.length)].color;
+      queue.push(color);
+      boardAll(bays, [color], 0);
+    }
+    return queue;
+  }
+
+  // Front passengers board the earliest-arrived bus of their colour with a free seat; full buses leave.
+  function boardAll(bays, queue, at) {
+    while (at < queue.length) {
+      const bus = bays.find(b => b.color === queue[at] && b.fill < b.cap);
+      if (!bus) break;
+      bus.fill++;
+      at++;
+      if (bus.fill === bus.cap) bays.splice(bays.indexOf(bus), 1);
+    }
+    return at;
+  }
+
+  // Search over which free bus to send next; returns true/false, or null if it ran out of budget.
+  function verify(buses, queue, plan, limit = 40000) {
+    const seen = new Set();
+    let nodes = 0;
+    function dfs(gone, bays, at) {
+      if (at === queue.length) return true;
+      if (++nodes > limit) return null;
+      const key = gone.map(Number).join('') + bays.map(b => `${b.id}.${b.fill}`).join(',');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      if (bays.length >= plan.bays) return false;
+      const free = freeBuses(buses, plan, gone);
+      free.sort((a, b) => (buses[b].color === queue[at]) - (buses[a].color === queue[at]));
+      for (const i of free) {
+        const nextGone = gone.slice();
+        nextGone[i] = true;
+        const nextBays = bays.map(b => ({ ...b }));
+        nextBays.push({ id: i, color: buses[i].color, cap: SEATS[buses[i].len], fill: 0 });
+        const result = dfs(nextGone, nextBays, boardAll(nextBays, queue, at));
+        if (result !== false) return result;
+      }
+      return false;
+    }
+    return dfs(buses.map(() => false), [], 0);
+  }
+
+  function generateLevel(n) {
+    const plan = levelPlan(n);
+    for (let attempt = 0; ; attempt++) {
+      const rnd = seeded(n * 7919 + attempt * 101 + 5);
+      const buses = placeBuses(plan, rnd);
+      if (buses.length < Math.min(plan.buses, 4)) continue;
+      const colors = Math.min(plan.colors, buses.length);
+      const order = Array.from({ length: COLORS.length }, (_, i) => i);
+      for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+      const deal = buses.map((_, i) => order[i % colors]);
+      for (let i = deal.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [deal[i], deal[j]] = [deal[j], deal[i]]; }
+      buses.forEach((bus, i) => { bus.id = i; bus.color = deal[i]; });
+      const queue = buildQueue(buses, plan, rnd);
+      if (verify(buses, queue, plan) === true || attempt > 40) return { plan, buses, queue };
+    }
+  }
+
+  function startLevel(n) {
+    clearTimeout(game?.timer);
+    const { plan, buses, queue } = generateLevel(n);
+    game = { level: n, plan, buses, queue, at: 0, gone: buses.map(() => false), slots: Array(plan.bays).fill(null), seq: 0, history: [], undos: UNDOS, moves: 0, over: false, timer: 0, paxEls: new Map() };
+    els.bays.style.setProperty('--bays', plan.bays);
+    els.bays.replaceChildren(...game.slots.map((_, i) => {
+      const bay = document.createElement('div');
+      bay.className = 'bay';
+      bay.dataset.n = String(i + 1);
+      bay.setAttribute('role', 'listitem');
+      return bay;
+    }));
+    buildLot();
+    resetQueue();
+    for (const overlay of [els.start, els.win, els.lose]) overlay.hidden = true;
+    layout();
+    refresh();
+    els.announcer.textContent = t.levelStart(n, buses.length, queue.length);
+    game.timer = setTimeout(tick, BOARD_MS);
+    focusBus();
+  }
+
+  function buildLot() {
+    els.lot.replaceChildren();
+    for (const bus of game.buses) {
+      bus.el = null;
+      if (game.gone[bus.id]) continue;
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'bus';
+      const s = el.style;
+      s.setProperty('--x', bus.x);
+      s.setProperty('--y', bus.y);
+      s.setProperty('--w', bus.horizontal ? bus.len : 1);
+      s.setProperty('--h', bus.horizontal ? 1 : bus.len);
+      s.setProperty('--len', bus.len);
+      s.setProperty('--rot', ROT[bus.dir]);
+      s.setProperty('--c', COLORS[bus.color][0]);
+      el.innerHTML = `<span class="shape" aria-hidden="true"></span><span class="tag" aria-hidden="true"><svg viewBox="0 0 20 20"><use href="#sym${bus.color}"/></svg>${SEATS[bus.len]}</span>`;
+      el.addEventListener('click', () => onBus(bus));
+      bus.el = el;
+      els.lot.append(el);
+    }
+  }
+
+  function miniEl(slot, delay) {
+    const el = document.createElement('span');
+    el.className = 'mini';
+    el.style.setProperty('--c', COLORS[slot.color][0]);
+    el.style.setProperty('--cols', Math.ceil(slot.cap / 2));
+    el.style.setProperty('--delay', `${delay}ms`);
+    el.innerHTML = `${'<i></i>'.repeat(slot.cap)}<svg viewBox="0 0 20 20" aria-hidden="true"><use href="#sym${slot.color}"/></svg>`;
+    slot.el = el;
+    paintSeats(slot);
+    return el;
+  }
+
+  // Seats fill column by column from the windscreen end.
+  function paintSeats(slot) {
+    const cols = Math.ceil(slot.cap / 2);
+    [...slot.el.querySelectorAll('i')].forEach((seat, k) => {
+      const rank = (cols - 1 - (k % cols)) * 2 + Math.floor(k / cols);
+      seat.classList.toggle('taken', rank < slot.fill);
+    });
+  }
+
+  function paxEl(color) {
+    const el = document.createElement('span');
+    el.className = 'pax';
+    el.dataset.c = color;
+    el.style.setProperty('--c', COLORS[color][0]);
+    el.style.setProperty('--s', COLORS[color][1]);
+    el.innerHTML = `<i><svg viewBox="0 0 20 20"><use href="#sym${color}"/></svg></i>`;
+    return el;
+  }
+
+  function resetQueue() {
+    for (const el of game.paxEls.values()) el.remove();
+    game.paxEls.clear();
+    renderQueue(false);
+  }
+
+  // Only the front of the line is in the DOM; the rest is summed up in the "+N" badge.
+  function renderQueue(animate = true) {
+    const pitch = 22;
+    const visible = Math.max(4, Math.floor((els.queue.clientWidth - 52) / pitch));
+    const end = Math.min(game.queue.length, game.at + visible);
+    for (const [index, el] of game.paxEls) if (index < game.at || index >= end) { el.remove(); game.paxEls.delete(index); }
+    for (let index = game.at; index < end; index++) {
+      let el = game.paxEls.get(index);
+      if (!el) {
+        el = paxEl(game.queue[index]);
+        if (animate) el.classList.add('enter');
+        game.paxEls.set(index, el);
+        els.queue.insertBefore(el, els.more);
+      }
+      el.style.setProperty('--k', index - game.at);
+      el.classList.toggle('front', index === game.at);
+    }
+    const more = game.queue.length - end;
+    els.more.hidden = more <= 0;
+    els.more.textContent = `+${more}`;
+    const names = game.queue.slice(game.at, game.at + 5).map(c => t.colors[c]).join(', ');
+    els.queue.setAttribute('aria-label', game.at < game.queue.length ? t.queue(names, Math.max(0, game.queue.length - game.at - 5)) : t.queue('—', 0));
+  }
+
+  function layout() {
+    if (!game) return;
+    const { cols, rows } = game.plan;
+    const W = els.lotWrap.clientWidth - 16, H = els.lotWrap.clientHeight - 16;
+    const cell = Math.max(16, Math.floor(Math.min(W / cols, H / rows, MAX_CELL)));
+    const s = els.lot.style;
+    s.setProperty('--cell', `${cell}px`);
+    s.width = `${cell * cols}px`;
+    s.height = `${cell * rows}px`;
+    s.left = `${(els.lotWrap.clientWidth - cell * cols) / 2}px`;
+    s.top = `${(els.lotWrap.clientHeight - cell * rows) / 2}px`;
+    game.cell = cell;
+    renderQueue(false);
+  }
+
+  function refresh() {
+    const occ = occupancy(game.buses, game.plan, game.gone);
+    for (const bus of game.buses) {
+      if (!bus.el) continue;
+      const free = blockerOf(bus, occ, game.plan) < 0;
+      bus.el.classList.toggle('free', free);
+      bus.el.setAttribute('aria-label', t.bus(t.colors[bus.color], SEATS[bus.len], t.dirs[bus.dir], free));
+    }
+    game.slots.forEach((slot, i) => {
+      els.bays.children[i].setAttribute('aria-label', t.bay(i + 1, slot ? t.bayBus(t.colors[slot.color], slot.fill, slot.cap) : t.empty));
+    });
+    els.level.textContent = String(game.level);
+    els.left.textContent = String(game.queue.length - game.at);
+    els.undo.disabled = !game.undos || !game.history.length || game.over;
+    $('undo-count').textContent = String(game.undos);
+    els.undo.setAttribute('aria-label', t.boosterLabel(t.undo, game.undos));
+  }
+
+  function snapshot() {
+    return { gone: game.gone.slice(), slots: game.slots.map(s => s && { id: s.id, color: s.color, cap: s.cap, fill: s.fill, seq: s.seq }), at: game.at, seq: game.seq, moves: game.moves };
+  }
+
+  function onBus(bus) {
+    if (!game || game.over || game.gone[bus.id]) return;
+    const occ = occupancy(game.buses, game.plan, game.gone);
+    const blocker = blockerOf(bus, occ, game.plan);
+    if (blocker >= 0) return bump(bus, game.buses[blocker]);
+    const index = game.slots.findIndex(slot => !slot);
+    if (index < 0) {
+      els.bays.classList.remove('full-shake');
+      void els.bays.offsetWidth;
+      els.bays.classList.add('full-shake');
+      els.announcer.textContent = t.baysFull;
+      return;
+    }
+    game.history.push(snapshot());
+    const hadFocus = document.activeElement === bus.el;
+    game.gone[bus.id] = true;
+    game.moves += 1;
+    const travel = driveOut(bus);
+    const slot = { id: bus.id, color: bus.color, cap: SEATS[bus.len], fill: 0, seq: game.seq++, arriveAt: performance.now() + travel };
+    game.slots[index] = slot;
+    els.bays.children[index].append(miniEl(slot, travel));
+    els.announcer.textContent = t.parked(t.colors[bus.color], index + 1);
+    refresh();
+    if (hadFocus) focusBus(bus);
+  }
+
+  // Drive forward off the edge of the lot, fading out; returns how long the trip takes.
+  function driveOut(bus) {
+    const el = bus.el;
+    bus.el = null;
+    const { cols, rows } = game.plan;
+    const ahead = { right: cols - bus.x - bus.len, left: bus.x, down: rows - bus.y - bus.len, up: bus.y }[bus.dir];
+    if (reducedMotion.matches) { el.remove(); return 0; }
+    const [dx, dy] = DIRS[bus.dir];
+    const dist = (ahead + bus.len + 0.5) * game.cell;
+    const duration = 260 + ahead * 40;
+    el.style.zIndex = '5';
+    el.animate([
+      { transform: 'translate(0, 0)', opacity: 1 },
+      { transform: `translate(${dx * dist * 0.7}px, ${dy * dist * 0.7}px)`, opacity: 1, offset: 0.7 },
+      { transform: `translate(${dx * dist}px, ${dy * dist}px)`, opacity: 0 },
+    ], { duration, easing: 'ease-in' }).finished.then(() => el.remove());
+    return Math.round(duration * 0.75);
+  }
+
+  function bump(bus, blocker) {
+    els.announcer.textContent = t.blocked;
+    if (reducedMotion.matches) return;
+    const [dx, dy] = DIRS[bus.dir];
+    const nudge = game.cell * 0.18;
+    bus.el.animate([{ transform: 'translate(0, 0)' }, { transform: `translate(${dx * nudge}px, ${dy * nudge}px)`, offset: 0.35 }, { transform: 'translate(0, 0)' }], { duration: 300, easing: 'ease-out' });
+    blocker.el.classList.remove('blocker');
+    void blocker.el.offsetWidth;
+    blocker.el.classList.add('blocker');
+  }
+
+  // One passenger boards per tick; the loop also spots a jammed station and a cleared level.
+  function tick() {
+    game.timer = setTimeout(tick, BOARD_MS);
+    if (document.hidden || game.over) return;
+    const now = performance.now();
+    if (game.at < game.queue.length) {
+      const color = game.queue[game.at];
+      const target = game.slots.filter(slot => slot && slot.color === color && slot.fill < slot.cap).sort((a, b) => a.seq - b.seq)[0];
+      if (target) { if (target.arriveAt <= now) board(target); return; }
+      if (game.slots.every(Boolean) && game.slots.every(slot => slot.arriveAt <= now)) lose();
+      return;
+    }
+    if (game.slots.every(slot => !slot)) win();
+  }
+
+  function board(slot) {
+    const index = game.slots.indexOf(slot);
+    const paxNode = game.paxEls.get(game.at);
+    slot.fill += 1;
+    game.at += 1;
+    if (paxNode) {
+      game.paxEls.delete(game.at - 1);
+      flyTo(paxNode, slot.el);
+    }
+    paintSeats(slot);
+    renderQueue();
+    if (slot.fill === slot.cap) {
+      game.slots[index] = null;
+      const el = slot.el;
+      els.announcer.textContent = t.departed(t.colors[slot.color]);
+      if (reducedMotion.matches) el.remove();
+      else setTimeout(() => { el.classList.add('depart'); el.addEventListener('animationend', () => el.remove()); }, 220);
+    }
+    refresh();
+  }
+
+  function flyTo(node, target) {
+    if (reducedMotion.matches) return node.remove();
+    const from = node.getBoundingClientRect();
+    const to = target.getBoundingClientRect();
+    node.classList.remove('front', 'enter');
+    node.classList.add('flyer');
+    node.style.left = `${from.left}px`;
+    node.style.top = `${from.top}px`;
+    node.style.bottom = 'auto';
+    document.body.append(node);
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    node.animate([{ transform: 'translate(0, 0) scale(1)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.5)`, opacity: 0.2 }], { duration: 260, easing: 'ease-in' }).finished.then(() => node.remove());
+  }
+
+  function win() {
+    game.over = true;
+    clearTimeout(game.timer);
+    refresh();
+    if (game.level >= highest) { highest = game.level + 1; write(STORE, highest); }
+    els.winTitle.textContent = t.won(game.level);
+    els.result.textContent = t.result(game.queue.length);
+    els.announcer.textContent = `${t.won(game.level)} ${t.result(game.queue.length)}`;
+    setTimeout(() => { els.win.hidden = false; $('next-level').focus({ preventScroll: true }); }, reducedMotion.matches ? 0 : 500);
+  }
+
+  function lose() {
+    game.over = true;
+    refresh();
+    els.loseUndo.hidden = !game.undos || !game.history.length;
+    els.announcer.textContent = `${t.lost} ${t.lostText}`;
+    setTimeout(() => { els.lose.hidden = false; $('retry').focus({ preventScroll: true }); }, reducedMotion.matches ? 0 : 450);
+  }
+
+  function undo() {
+    if (!game || !game.undos || !game.history.length || !els.win.hidden) return;
+    const snap = game.history.pop();
+    game.undos -= 1;
+    game.gone = snap.gone;
+    game.at = snap.at;
+    game.seq = snap.seq;
+    game.moves = snap.moves;
+    game.over = false;
+    game.slots = snap.slots.map(s => s && { ...s, arriveAt: 0 });
+    game.slots.forEach((slot, i) => {
+      els.bays.children[i].replaceChildren();
+      if (slot) els.bays.children[i].append(miniEl(slot, 0));
+    });
+    document.querySelectorAll('.flyer').forEach(el => el.remove());
+    buildLot();
+    resetQueue();
+    els.lose.hidden = true;
+    refresh();
+    els.announcer.textContent = t.undone;
+    focusBus();
+  }
+
+  function focusBus(near) {
+    const left = game.buses.filter(bus => bus.el);
+    if (!left.length) return;
+    const pick = near ? left.sort((a, b) => Math.hypot(a.x - near.x, a.y - near.y) - Math.hypot(b.x - near.x, b.y - near.y))[0] : left.find(bus => bus.el.classList.contains('free')) || left[0];
+    pick.el.focus({ preventScroll: true });
+  }
+
+  function showPicker() {
+    pickLevel = Math.min(pickLevel, highest);
+    els.pickLevel.textContent = t.levelN(pickLevel);
+    els.prev.disabled = pickLevel <= 1;
+    els.next.disabled = pickLevel >= highest;
+  }
+
+  function openStart() {
+    pickLevel = game ? game.level : highest;
+    showPicker();
+    els.start.hidden = false;
+    $('play').focus({ preventScroll: true });
+  }
+
+  // Arrow keys hop focus to the nearest bus in that direction.
+  els.lot.addEventListener('keydown', event => {
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    const current = game?.buses.find(bus => bus.el && bus.el === document.activeElement);
+    if (!step || !current || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const center = bus => [bus.x + (bus.horizontal ? bus.len / 2 : 0.5), bus.y + (bus.horizontal ? 0.5 : bus.len / 2)];
+    const [cx, cy] = center(current);
+    let best = null, bestScore = Infinity;
+    for (const bus of game.buses) {
+      if (!bus.el || bus === current) continue;
+      const [bx, by] = center(bus);
+      const along = (bx - cx) * step[0] + (by - cy) * step[1];
+      if (along <= 0.1) continue;
+      const across = Math.abs((bx - cx) * step[1]) + Math.abs((by - cy) * step[0]);
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = bus; }
+    }
+    best?.el.focus({ preventScroll: true });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !els.start.hidden || !els.win.hidden) return;
+    if (event.key === 'u' || event.key === 'U') { event.preventDefault(); undo(); }
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.loseUndo.addEventListener('click', undo);
+  $('restart').addEventListener('click', () => startLevel(game.level));
+  $('retry').addEventListener('click', () => startLevel(game.level));
+  $('menu').addEventListener('click', openStart);
+  els.prev.addEventListener('click', () => { pickLevel -= 1; showPicker(); });
+  els.next.addEventListener('click', () => { pickLevel += 1; showPicker(); });
+  $('play').addEventListener('click', () => startLevel(pickLevel));
+  $('next-level').addEventListener('click', () => startLevel(game.level + 1));
+  $('replay').addEventListener('click', () => startLevel(game.level));
+  new ResizeObserver(layout).observe(els.lotWrap);
+
+  startLevel(highest);
+  openStart();
+})();
+</script>
+</body>
+</html>

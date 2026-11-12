@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tile Match</title>
+<style>
+:root {
+  --ink: #4b3a57;
+  --muted: #8a7690;
+  --bg: #fdeff4;
+  --pink: #ff8fb3;
+  --pink-dark: #e06c94;
+  --mint: #7fd3b0;
+  --mint-dark: #4fb08b;
+  --cream: #fffaf6;
+  --edge: #f0c9d8;
+  --slot: 48px;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(#f8dbe6 2px, transparent 2.5px), linear-gradient(#fdeff4, #f3e8fb);
+  background-size: 26px 26px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--pink-dark); outline-offset: 3px; }
+.tile:focus-visible { outline: none; }
+.tile:focus-visible .face { outline: 3px solid var(--pink-dark); outline-offset: -1px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(21px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; white-space: nowrap; line-height: 1; }
+h1 span { color: var(--pink-dark); }
+.stat { min-width: 56px; padding: 5px 8px; border-radius: 14px; background: #ffffffc4; text-align: center; box-shadow: 0 3px 0 var(--edge); }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--cream); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 var(--edge); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
+.icon-btn svg { width: 20px; height: 20px; vertical-align: middle; }
+svg { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; }
+.board { position: relative; --t: 48px; }
+.tile { position: absolute; padding: calc(var(--t) * .035); transform-origin: 0 0; touch-action: manipulation; }
+.face {
+  display: grid; place-items: center; width: 100%; height: 100%;
+  padding-bottom: calc(var(--t) * .07);
+  border-radius: 24%;
+  border: 1.5px solid #fff;
+  background: linear-gradient(170deg, #fffdfb 20%, var(--tint) 115%);
+  box-shadow: inset 0 calc(var(--t) * -.075) 0 color-mix(in srgb, var(--tint) 62%, #b98aa0), 0 2px 5px #8a5a7033;
+  font-size: calc(var(--t) * .54); line-height: 1;
+  transition: filter .2s, transform .15s;
+}
+.tile.covered { cursor: default; }
+.tile.covered .face { filter: brightness(.78) saturate(.6); }
+@media (hover: hover) { .tile.free:hover .face { transform: translateY(-4%); } }
+.tile.deal .face { animation: deal .35s calc(var(--d) * 6ms) both cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes deal { from { transform: translateY(-35%) scale(.5); opacity: 0; } }
+.tile.nope .face { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-6%); } 75% { transform: translateX(6%); } }
+.tile.spin .face { animation: spin .42s ease-in-out; }
+@keyframes spin { 50% { transform: scale(.25) rotate(160deg); } }
+.tile.clearing .face { animation: vanish .26s ease-in forwards; }
+@keyframes vanish { 40% { transform: scale(1.2); } to { transform: scale(0); opacity: 0; } }
+.in-tray, .in-hold { transition: left .2s ease; }
+
+.hold, .tray { position: relative; z-index: 10; }
+.hold { width: calc(var(--slot) * 3); height: var(--slot); margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); --t: var(--slot); }
+.hold i { margin: 4px; border-radius: 24%; border: 2px dashed #e9bfd0; }
+.tray { width: min(100%, 460px); margin: 0 auto; padding: 6px; border-radius: 20px; background: #fff6f9; box-shadow: inset 0 3px 0 #f6dbe5, 0 4px 0 var(--edge); transition: box-shadow .2s, background .2s; }
+.tray.danger { background: #ffeef0; box-shadow: inset 0 3px 0 #ffd0d6, 0 4px 0 #ff9fa9; }
+.slots { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); --t: var(--slot); }
+.slots i { aspect-ratio: 1; margin: 3px; border-radius: 24%; background: #f9e4ec; }
+
+.boosters { display: flex; gap: 10px; justify-content: center; }
+.booster { position: relative; flex: 1; max-width: 140px; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px; border-radius: 16px; background: var(--cream); box-shadow: 0 4px 0 var(--edge); font-size: 13px; font-weight: 800; }
+.booster svg { flex: 0 0 auto; width: 20px; height: 20px; color: var(--pink-dark); }
+.booster span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booster:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+.booster:disabled { opacity: .45; cursor: default; }
+.count { position: absolute; top: -7px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--mint-dark); color: #fff; font-size: 12px; font-weight: 900; line-height: 22px; text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #4b3a5755; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--cream); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #4b3a5755; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--pink-dark); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--muted); line-height: 1.45; }
+.picker { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.picker strong { min-width: 120px; font-size: 20px; }
+.picker button { width: 42px; height: 42px; border-radius: 50%; background: #fbe3ec; font-size: 22px; font-weight: 900; }
+.picker button:disabled { opacity: .35; cursor: default; }
+.stars { margin-top: 6px; font-size: 26px; letter-spacing: 4px; color: #ead7df; min-height: 1.3em; }
+.stars b { color: #ffc34d; text-shadow: 0 2px 0 #e9a325; display: inline-block; animation: star .4s calc(var(--i) * 150ms + .2s) both cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes star { from { transform: scale(0) rotate(-40deg); } }
+.result { margin-top: 6px; font-size: 16px; font-weight: 700; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--pink); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--pink-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--pink-dark); }
+.ghost { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #e7f6ef; color: #2f7a5e; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #bfe6d5; }
+.ghost[hidden] { display: none; }
+.store-link { display: inline-block; margin-top: 16px; font-size: 14px; font-weight: 700; color: var(--pink-dark); text-underline-offset: 4px; line-height: 1.4; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 560px) { .app { gap: 6px; } .booster { padding: 7px 6px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <h1>Tile <span>Match</span></h1>
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="left"></small><strong id="left">0</strong></div>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="levels"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </header>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" role="group" data-i18n-label="board"></div>
+  </div>
+  <div class="hold" id="hold" role="group" data-i18n-label="hold"><i></i><i></i><i></i></div>
+  <div class="tray" id="tray-box">
+    <div class="slots" id="tray" role="group" data-i18n-label="tray"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="boosters">
+    <button type="button" class="booster" id="undo" aria-keyshortcuts="U"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span data-i18n="undo"></span><b class="count" id="undo-count" aria-hidden="true"></b></button>
+    <button type="button" class="booster" id="shuffle" aria-keyshortcuts="S"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg><span data-i18n="shuffle"></span><b class="count" id="shuffle-count" aria-hidden="true"></b></button>
+    <button type="button" class="booster" id="pop" aria-keyshortcuts="P"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V3"/><path d="m7 8 5-5 5 5"/><rect x="3" y="15" width="18" height="6" rx="2"/></svg><span data-i18n="pop"></span><b class="count" id="pop-count" aria-hidden="true"></b></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🍡</p>
+    <h2 id="start-title">Tile <span>Match</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <p class="text" data-i18n="how"></p>
+    <div class="picker">
+      <button type="button" id="prev" data-i18n-label="prev">‹</button>
+      <strong id="pick-level" aria-live="polite"></strong>
+      <button type="button" id="next" data-i18n-label="next">›</button>
+    </div>
+    <p class="stars" id="pick-stars"></p>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="stars" id="win-stars" role="img"></p>
+    <p class="result" id="result"></p>
+    <button type="button" class="cta" id="next-level" data-i18n="nextLevel"></button>
+    <button type="button" class="ghost" id="replay" data-i18n="replay"></button>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=dev.lamian.games.tilematchpuzzle" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">🥺</p>
+    <h2 id="lose-title" data-i18n="lost"></h2>
+    <p class="text" data-i18n="lostText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="ghost" id="rescue-undo" data-i18n="rescue"></button>
+    <button type="button" class="ghost" id="rescue-pop" data-i18n="rescuePop"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Pick tiles into the tray — three alike vanish. Clear the whole board!', how: 'Only uncovered tiles can be picked. Don’t let the 7-slot tray fill up!', level: 'Level', left: 'Tiles', restart: 'Restart level', levels: 'Levels', board: 'Tile board', tray: 'Tray', hold: 'Holding row', undo: 'Undo', shuffle: 'Shuffle', pop: 'Pop', boosterLabel: (name, n) => `${name}, ${n} left`, tile: e => `${e} tile`, covered: e => `${e} tile, covered`, inTray: e => `${e} in the tray`, play: 'Play', levelN: n => `Level ${n}`, prev: 'Previous level', next: 'Next level', won: 'Level clear!', result: (m, b) => `${m} moves · ${b} boosters used`, starsLabel: n => `${n} of 3 stars`, nextLevel: 'Next level', replay: 'Replay', lost: 'Tray full!', lostText: 'There’s no room left for another tile.', retry: 'Try again', rescue: 'Undo last tile', rescuePop: 'Use Pop', full: 'Get Mochi Tiles on Google Play', matched: n => `Match! ${n} tiles left.`, shuffled: 'Tiles shuffled.', popped: 'Tiles moved to the holding row.', undone: 'Tile returned to the board.', levelStart: (n, c) => `Level ${n}. ${c} tiles.` },
+    vi: { tagline: 'Chọn ô vào khay — đủ ba ô giống nhau sẽ biến mất. Dọn sạch cả bàn!', how: 'Chỉ chọn được ô không bị che. Đừng để khay 7 ô bị đầy!', level: 'Màn', left: 'Số ô', restart: 'Chơi lại màn', levels: 'Chọn màn', board: 'Bàn ô', tray: 'Khay', hold: 'Hàng chờ', undo: 'Hoàn tác', shuffle: 'Xáo trộn', pop: 'Rút ra', boosterLabel: (name, n) => `${name}, còn ${n} lượt`, tile: e => `Ô ${e}`, covered: e => `Ô ${e}, đang bị che`, inTray: e => `${e} trong khay`, play: 'Chơi', levelN: n => `Màn ${n}`, prev: 'Màn trước', next: 'Màn sau', won: 'Hoàn thành màn!', result: (m, b) => `${m} lượt · dùng ${b} trợ giúp`, starsLabel: n => `${n}/3 sao`, nextLevel: 'Màn tiếp theo', replay: 'Chơi lại', lost: 'Khay đã đầy!', lostText: 'Không còn chỗ cho ô nào nữa.', retry: 'Thử lại', rescue: 'Hoàn tác ô vừa chọn', rescuePop: 'Dùng Rút ra', full: 'Tải Mochi Tiles trên Google Play', matched: n => `Ghép được! Còn ${n} ô.`, shuffled: 'Đã xáo trộn các ô.', popped: 'Đã chuyển ô ra hàng chờ.', undone: 'Đã trả ô về bàn.', levelStart: (n, c) => `Màn ${n}. ${c} ô.` },
+    zh: { tagline: '把方块放进收集槽，三个相同就会消除。清空整个棋盘！', how: '只能选择没有被遮挡的方块。别让 7 格收集槽装满！', level: '关卡', left: '方块', restart: '重玩本关', levels: '选择关卡', board: '方块棋盘', tray: '收集槽', hold: '暂存区', undo: '撤销', shuffle: '洗牌', pop: '移出', boosterLabel: (name, n) => `${name}，剩余 ${n} 次`, tile: e => `${e} 方块`, covered: e => `${e} 方块，被遮挡`, inTray: e => `收集槽中的 ${e}`, play: '开始', levelN: n => `第 ${n} 关`, prev: '上一关', next: '下一关', won: '过关！', result: (m, b) => `${m} 步 · 使用道具 ${b} 次`, starsLabel: n => `${n} 星（满分 3 星）`, nextLevel: '下一关', replay: '再玩一次', lost: '收集槽满了！', lostText: '已经没有空位放新的方块了。', retry: '再试一次', rescue: '撤销最后一块', rescuePop: '使用移出', full: '在 Google Play 获取 Mochi Tiles', matched: n => `消除！还剩 ${n} 个方块。`, shuffled: '方块已重新洗牌。', popped: '方块已移到暂存区。', undone: '方块已放回棋盘。', levelStart: (n, c) => `第 ${n} 关，共 ${c} 个方块。` },
+    fr: { tagline: 'Envoyez les tuiles dans la barre : trois identiques disparaissent. Videz tout le plateau !', how: 'Seules les tuiles dégagées peuvent être prises. Ne laissez pas la barre de 7 cases se remplir !', level: 'Niveau', left: 'Tuiles', restart: 'Recommencer le niveau', levels: 'Niveaux', board: 'Plateau de tuiles', tray: 'Barre', hold: 'Zone d’attente', undo: 'Annuler', shuffle: 'Mélanger', pop: 'Sortir', boosterLabel: (name, n) => `${name}, encore ${n}`, tile: e => `Tuile ${e}`, covered: e => `Tuile ${e}, recouverte`, inTray: e => `${e} dans la barre`, play: 'Jouer', levelN: n => `Niveau ${n}`, prev: 'Niveau précédent', next: 'Niveau suivant', won: 'Niveau réussi !', result: (m, b) => `${m} coups · ${b} bonus utilisé${b > 1 ? 's' : ''}`, starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, nextLevel: 'Niveau suivant', replay: 'Rejouer', lost: 'Barre pleine !', lostText: 'Il n’y a plus de place pour une autre tuile.', retry: 'Réessayer', rescue: 'Annuler la dernière tuile', rescuePop: 'Utiliser Sortir', full: 'Obtenir Mochi Tiles sur Google Play', matched: n => `Trio ! Encore ${n} tuiles.`, shuffled: 'Tuiles mélangées.', popped: 'Tuiles déplacées dans la zone d’attente.', undone: 'Tuile remise sur le plateau.', levelStart: (n, c) => `Niveau ${n}. ${c} tuiles.` },
+    th: { tagline: 'เลือกไทล์ลงถาด ครบสามอันที่เหมือนกันจะหายไป เคลียร์กระดานให้หมด!', how: 'เลือกได้เฉพาะไทล์ที่ไม่ถูกทับ อย่าให้ถาด 7 ช่องเต็ม!', level: 'ด่าน', left: 'ไทล์', restart: 'เริ่มด่านใหม่', levels: 'เลือกด่าน', board: 'กระดานไทล์', tray: 'ถาด', hold: 'แถวพัก', undo: 'ย้อนกลับ', shuffle: 'สลับ', pop: 'ดึงออก', boosterLabel: (name, n) => `${name} เหลือ ${n} ครั้ง`, tile: e => `ไทล์ ${e}`, covered: e => `ไทล์ ${e} ถูกทับอยู่`, inTray: e => `${e} ในถาด`, play: 'เล่น', levelN: n => `ด่าน ${n}`, prev: 'ด่านก่อนหน้า', next: 'ด่านถัดไป', won: 'ผ่านด่านแล้ว!', result: (m, b) => `${m} ครั้ง · ใช้ตัวช่วย ${b} ครั้ง`, starsLabel: n => `${n} จาก 3 ดาว`, nextLevel: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', lost: 'ถาดเต็มแล้ว!', lostText: 'ไม่มีที่ว่างให้ไทล์อีกแล้ว', retry: 'ลองอีกครั้ง', rescue: 'ย้อนไทล์ล่าสุด', rescuePop: 'ใช้ดึงออก', full: 'ดาวน์โหลด Mochi Tiles บน Google Play', matched: n => `จับคู่สำเร็จ! เหลือ ${n} ไทล์`, shuffled: 'สลับไทล์แล้ว', popped: 'ย้ายไทล์ไปแถวพักแล้ว', undone: 'คืนไทล์กลับกระดานแล้ว', levelStart: (n, c) => `ด่าน ${n} มี ${c} ไทล์` },
+    ja: { tagline: 'タイルをトレイに入れて、同じ絵柄を3つそろえて消そう。盤面をすべてクリア！', how: '上に何も重なっていないタイルだけ選べます。7マスのトレイがいっぱいになったら負け！', level: 'レベル', left: '残り', restart: 'レベルをやり直す', levels: 'レベル選択', board: 'タイル盤', tray: 'トレイ', hold: '一時置き場', undo: '戻す', shuffle: 'シャッフル', pop: '取り出し', boosterLabel: (name, n) => `${name}（残り${n}回）`, tile: e => `${e} のタイル`, covered: e => `${e} のタイル（下敷き）`, inTray: e => `トレイの ${e}`, play: 'プレイ', levelN: n => `レベル ${n}`, prev: '前のレベル', next: '次のレベル', won: 'レベルクリア！', result: (m, b) => `${m}手 · アイテム${b}回使用`, starsLabel: n => `星${n}つ（3つ中）`, nextLevel: '次のレベル', replay: 'もう一度', lost: 'トレイがいっぱい！', lostText: 'もうタイルを置く場所がありません。', retry: 'もう一度挑戦', rescue: '最後のタイルを戻す', rescuePop: '取り出しを使う', full: 'Google Play で Mochi Tiles を入手', matched: n => `そろった！残り${n}枚。`, shuffled: 'タイルをシャッフルしました。', popped: 'タイルを一時置き場に移しました。', undone: 'タイルを盤面に戻しました。', levelStart: (n, c) => `レベル ${n}。タイル${c}枚。` },
+    ko: { tagline: '타일을 트레이에 담으세요. 같은 타일 3개가 모이면 사라져요. 판을 모두 비우세요!', how: '가려지지 않은 타일만 고를 수 있어요. 7칸 트레이가 가득 차지 않게 하세요!', level: '레벨', left: '타일', restart: '레벨 다시 시작', levels: '레벨 선택', board: '타일 판', tray: '트레이', hold: '보관 칸', undo: '되돌리기', shuffle: '섞기', pop: '빼내기', boosterLabel: (name, n) => `${name}, ${n}회 남음`, tile: e => `${e} 타일`, covered: e => `${e} 타일, 가려짐`, inTray: e => `트레이의 ${e}`, play: '시작', levelN: n => `레벨 ${n}`, prev: '이전 레벨', next: '다음 레벨', won: '레벨 클리어!', result: (m, b) => `${m}수 · 아이템 ${b}회 사용`, starsLabel: n => `별 3개 중 ${n}개`, nextLevel: '다음 레벨', replay: '다시 하기', lost: '트레이가 가득 찼어요!', lostText: '더 이상 타일을 놓을 자리가 없어요.', retry: '다시 도전', rescue: '마지막 타일 되돌리기', rescuePop: '빼내기 사용', full: 'Google Play에서 Mochi Tiles 받기', matched: n => `매치! 타일 ${n}개 남음.`, shuffled: '타일을 섞었어요.', popped: '타일을 보관 칸으로 옮겼어요.', undone: '타일을 판으로 되돌렸어요.', levelStart: (n, c) => `레벨 ${n}. 타일 ${c}개.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const EMOJI = [
+    ['🍓', '#ffc9d6'], ['🍑', '#ffd6bd'], ['🍋', '#fff0a8'], ['🍇', '#dccdfb'], ['🥝', '#d3efbd'],
+    ['🐱', '#ffe2c2'], ['🐰', '#efdcff'], ['🍩', '#ffd0e5'], ['🧁', '#cfe9ff'], ['🍡', '#d9f4e2'],
+    ['🐻', '#ecd5c0'], ['🐼', '#e3e8f1'], ['🐥', '#fff1b8'], ['🍉', '#cdf2da'], ['🍪', '#f3dcc2'],
+    ['🐸', '#d4f2c9'], ['🍒', '#ffc6cf'], ['🍭', '#f8d2f0'],
+  ];
+  const TRAY_SIZE = 7, HOLD_SIZE = 3;
+  const LIFT = 0.09, MAX_TILE = 74;
+  const MOVE_MS = 260, CLEAR_MS = 260;
+  const BOOSTERS = { undo: 2, shuffle: 1, pop: 1 };
+  const STORE = { level: 'milaan.tileMatch.level', stars: 'milaan.tileMatch.stars' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const $ = id => document.getElementById(id);
+  const els = { app: $('app'), wrap: $('wrap'), board: $('board'), tray: $('tray'), trayBox: $('tray-box'), hold: $('hold'), level: $('level'), left: $('left'), announcer: $('announcer'), start: $('start'), pickLevel: $('pick-level'), pickStars: $('pick-stars'), prev: $('prev'), next: $('next'), play: $('play'), win: $('win'), winStars: $('win-stars'), result: $('result'), nextLevel: $('next-level'), lose: $('lose'), retry: $('retry'), rescueUndo: $('rescue-undo'), rescuePop: $('rescue-pop') };
+  const boosterEls = { undo: $('undo'), shuffle: $('shuffle'), pop: $('pop') };
+
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const rand = n => Math.floor(Math.random() * n);
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = rand(i + 1); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const starText = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+
+  let highest = Math.max(1, Number(read(STORE.level, 1)) || 1);
+  let pickLevel = highest;
+  let game = null;
+  let keyboardMode = false;
+
+  // Each level grows the grid, the stack height and the number of tile kinds.
+  function levelPlan(n) {
+    return {
+      cols: Math.min(7, 4 + Math.floor((n + 1) / 3)),
+      rows: Math.min(8, 5 + Math.floor(n / 3)),
+      layers: Math.min(6, 2 + Math.floor((n - 1) / 2)),
+      kinds: Math.min(15, 3 + n),
+      target: Math.min(141, 15 + 9 * n),
+    };
+  }
+
+  // Positions are in half-tile units, so a tile spans 2×2 and odd layers can sit half a tile offset.
+  const overlaps = (a, b) => Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2;
+  function isFreeIn(tile, tiles) {
+    for (const other of tiles) if (other.z > tile.z && overlaps(other, tile)) return false;
+    return true;
+  }
+
+  function buildLayout(plan) {
+    const tiles = [];
+    const offsets = [[1, 1], [1, 0], [0, 1]];
+    for (let z = 0; z < plan.layers; z++) {
+      const [ox, oy] = z % 2 ? offsets[rand(offsets.length)] : [0, 0];
+      const inset = Math.floor(z / 2);
+      const cw = plan.cols - ox - inset * 2, ch = plan.rows - oy - inset * 2;
+      if (cw < 1 || ch < 1) break;
+      const density = z === 0 ? 0.92 : 0.82;
+      for (let j = 0; j < ch; j++) for (let i = 0; i < Math.ceil(cw / 2); i++) {
+        if (Math.random() > density) continue;
+        // Mirror every pick left-to-right so the stacks look designed rather than random.
+        for (const k of new Set([i, cw - 1 - i])) {
+          const tile = { x: ox + (inset + k) * 2, y: oy + (inset + j) * 2, z };
+          if (z > 0 && !tiles.some(below => below.z === z - 1 && overlaps(below, tile))) continue;
+          tiles.push(tile);
+        }
+      }
+    }
+    return tiles;
+  }
+
+  // A random order in which every tile is uncovered at the moment it is taken.
+  function removalOrder(tiles) {
+    const pool = new Set(tiles), order = [];
+    while (pool.size) {
+      const free = [...pool].filter(tile => isFreeIn(tile, pool));
+      const pick = free[rand(free.length)];
+      order.push(pick);
+      pool.delete(pick);
+    }
+    return order;
+  }
+
+  function trimLayout(tiles, target) {
+    const pool = new Set(tiles);
+    const mirrorSum = Math.min(...tiles.map(tile => tile.x)) + Math.max(...tiles.map(tile => tile.x));
+    const goal = Math.floor(Math.min(target, pool.size) / 3) * 3;
+    while (pool.size > goal) {
+      const free = [...pool].filter(tile => isFreeIn(tile, pool));
+      const topZ = Math.max(...free.map(tile => tile.z));
+      const top = free.filter(tile => tile.z === topZ);
+      const tile = top[rand(top.length)];
+      pool.delete(tile);
+      const twin = top.find(other => other !== tile && other.y === tile.y && other.x === mirrorSum - tile.x);
+      if (twin && pool.size > goal) pool.delete(twin);
+    }
+    return [...pool];
+  }
+
+  // Types are dealt along a valid removal order, three at a time, so every level can be cleared.
+  function generateLevel(n) {
+    const plan = levelPlan(n);
+    let tiles = [];
+    for (let attempt = 0; attempt < 12 && tiles.length < Math.min(plan.target, 24); attempt++) tiles = buildLayout(plan);
+    tiles = trimLayout(tiles, plan.target);
+    const order = removalOrder(tiles);
+    const triples = order.length / 3;
+    const kinds = shuffle([...EMOJI.keys()]).slice(0, Math.min(plan.kinds, triples));
+    const tripleKinds = shuffle(Array.from({ length: triples }, (_, i) => kinds[i % kinds.length]));
+    order.forEach((tile, i) => { tile.type = tripleKinds[Math.floor(i / 3)]; });
+    return tiles;
+  }
+
+  function makeTileEl(tile, index) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'tile deal';
+    el.style.setProperty('--d', index);
+    el.innerHTML = '<span class="face" aria-hidden="true"></span>';
+    el.addEventListener('click', () => onTile(tile));
+    el.addEventListener('animationend', event => { if (event.target === el.firstChild) el.classList.remove('deal', 'nope', 'spin'); });
+    tile.el = el;
+    paintType(tile);
+  }
+
+  function paintType(tile) {
+    const [emoji, tint] = EMOJI[tile.type];
+    tile.el.firstChild.textContent = emoji;
+    tile.el.style.setProperty('--tint', tint);
+  }
+
+  function startLevel(n) {
+    const tiles = generateLevel(n);
+    tiles.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+    tiles.forEach((tile, i) => { tile.id = i; tile.where = 'board'; makeTileEl(tile, i); });
+    const xs = tiles.map(tile => tile.x), ys = tiles.map(tile => tile.y);
+    const bounds = { minX: Math.min(...xs), minY: Math.min(...ys), maxZ: Math.max(...tiles.map(tile => tile.z)) };
+    bounds.spanX = Math.max(...xs) + 2 - bounds.minX;
+    bounds.spanY = Math.max(...ys) + 2 - bounds.minY;
+    game = { level: n, board: tiles, tray: [], hold: [], history: [], boosters: { ...BOOSTERS }, used: 0, moves: 0, busy: false, over: false, bounds, total: tiles.length };
+    els.board.replaceChildren(...tiles.map(tile => tile.el));
+    els.tray.querySelectorAll('.tile').forEach(el => el.remove());
+    els.hold.querySelectorAll('.tile').forEach(el => el.remove());
+    tiles.forEach(placeOnBoard);
+    for (const overlay of [els.start, els.win, els.lose]) overlay.hidden = true;
+    fit();
+    refresh();
+    els.announcer.textContent = t.levelStart(n, tiles.length);
+    focusNearest();
+  }
+
+  function placeOnBoard(tile) {
+    const { minX, minY, maxZ } = game.bounds;
+    const s = tile.el.style;
+    s.left = `calc(var(--t) * ${(tile.x - minX) / 2})`;
+    s.top = `calc(var(--t) * ${(tile.y - minY) / 2 + (maxZ - tile.z) * LIFT})`;
+    s.width = s.height = 'var(--t)';
+    s.zIndex = String(tile.z + 1);
+  }
+
+  function layoutRow(list, size) {
+    list.forEach((tile, i) => {
+      const s = tile.el.style;
+      s.left = `calc(${i} * 100% / ${size})`;
+      s.top = '0';
+      s.width = `calc(100% / ${size})`;
+      s.height = '100%';
+      s.zIndex = '';
+    });
+  }
+
+  function layoutRows() {
+    layoutRow(game.tray, TRAY_SIZE);
+    layoutRow(game.hold, HOLD_SIZE);
+  }
+
+  // FLIP: measure where the tile is, move it to its new home, then animate from the old spot.
+  function relocate(tile, where) {
+    const el = tile.el;
+    const from = el.getBoundingClientRect();
+    el.getAnimations().forEach(anim => anim.cancel());
+    // Re-inserting an element restarts its CSS animations, so drop the deal-in one first.
+    el.classList.remove('deal');
+    tile.where = where;
+    el.classList.toggle('in-tray', where === 'tray');
+    el.classList.toggle('in-hold', where === 'hold');
+    if (where === 'board') { els.board.append(el); placeOnBoard(tile); }
+    else (where === 'tray' ? els.tray : els.hold).append(el);
+    layoutRows();
+    const to = el.getBoundingClientRect();
+    if (reducedMotion.matches || !to.width || !from.width) return;
+    el.animate([
+      { transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`, zIndex: 30 },
+      { transform: 'none', zIndex: 30 },
+    ], { duration: MOVE_MS, easing: 'cubic-bezier(.3, .9, .35, 1.08)' });
+  }
+
+  const isFree = tile => isFreeIn(tile, game.board);
+  const remaining = () => game.board.length + game.tray.length + game.hold.length;
+
+  function refresh() {
+    for (const tile of game.board) {
+      const free = isFree(tile);
+      const emoji = EMOJI[tile.type][0];
+      tile.el.classList.toggle('free', free);
+      tile.el.classList.toggle('covered', !free);
+      tile.el.tabIndex = free ? 0 : -1;
+      tile.el.setAttribute('aria-disabled', String(!free));
+      tile.el.setAttribute('aria-label', free ? t.tile(emoji) : t.covered(emoji));
+    }
+    for (const tile of game.tray) {
+      tile.el.classList.remove('free', 'covered');
+      tile.el.tabIndex = -1;
+      tile.el.setAttribute('aria-disabled', 'true');
+      tile.el.setAttribute('aria-label', t.inTray(EMOJI[tile.type][0]));
+    }
+    for (const tile of game.hold) {
+      tile.el.classList.remove('covered');
+      tile.el.classList.add('free');
+      tile.el.tabIndex = 0;
+      tile.el.setAttribute('aria-disabled', 'false');
+      tile.el.setAttribute('aria-label', `${t.hold}: ${t.tile(EMOJI[tile.type][0])}`);
+    }
+    els.trayBox.classList.toggle('danger', game.tray.length >= TRAY_SIZE - 1);
+    els.level.textContent = String(game.level);
+    els.left.textContent = String(remaining());
+    updateBoosters();
+  }
+
+  const lastUndoable = () => [...game.history].reverse().find(tile => tile.where === 'tray');
+
+  function updateBoosters() {
+    const ready = {
+      undo: Boolean(lastUndoable()),
+      shuffle: game.board.length > 1,
+      pop: !game.hold.length && game.tray.length > 0,
+    };
+    for (const [name, el] of Object.entries(boosterEls)) {
+      const left = game.boosters[name];
+      el.disabled = !left || !ready[name];
+      $(`${name}-count`).textContent = String(left);
+      el.setAttribute('aria-label', t.boosterLabel(t[name], left));
+    }
+    return ready;
+  }
+
+  function onTile(tile) {
+    if (game.busy || game.over) return;
+    if (tile.where === 'board') pickFromBoard(tile);
+    else if (tile.where === 'hold') pickFromHold(tile);
+  }
+
+  function pickFromBoard(tile) {
+    if (!isFree(tile)) {
+      tile.el.classList.remove('nope');
+      void tile.el.offsetWidth;
+      tile.el.classList.add('nope');
+      return;
+    }
+    const hadFocus = document.activeElement === tile.el;
+    game.board.splice(game.board.indexOf(tile), 1);
+    game.history.push(tile);
+    toTray(tile);
+    if (hadFocus) focusNearest(tile);
+  }
+
+  function pickFromHold(tile) {
+    if (game.tray.length >= TRAY_SIZE) return;
+    game.hold.splice(game.hold.indexOf(tile), 1);
+    toTray(tile);
+    if (game.hold.length && keyboardMode) game.hold[0].el.focus({ preventScroll: true });
+    else focusNearest();
+  }
+
+  // Same tiles sit together in the tray, so a new tile slides in right after its twins.
+  function toTray(tile) {
+    game.moves += 1;
+    let at = game.tray.length;
+    for (let i = game.tray.length - 1; i >= 0; i--) if (game.tray[i].type === tile.type) { at = i + 1; break; }
+    game.tray.splice(at, 0, tile);
+    relocate(tile, 'tray');
+    refresh();
+    const same = game.tray.filter(other => other.type === tile.type);
+    if (same.length >= 3) {
+      game.busy = true;
+      setTimeout(() => clearTriple(same.slice(0, 3)), MOVE_MS);
+    } else if (game.tray.length >= TRAY_SIZE) {
+      game.over = true;
+      setTimeout(lose, MOVE_MS + 200);
+    }
+  }
+
+  function clearTriple(triple) {
+    triple.forEach(tile => tile.el.classList.add('clearing'));
+    setTimeout(() => {
+      triple.forEach(tile => { tile.where = 'gone'; tile.el.remove(); });
+      game.tray = game.tray.filter(tile => !triple.includes(tile));
+      game.busy = false;
+      layoutRows();
+      refresh();
+      if (!remaining()) return win();
+      els.announcer.textContent = t.matched(remaining());
+    }, CLEAR_MS);
+  }
+
+  function spend(name) {
+    game.boosters[name] -= 1;
+    game.used += 1;
+  }
+
+  function undo() {
+    const tile = lastUndoable();
+    if (game.busy || game.over || !game.boosters.undo || !tile) return;
+    spend('undo');
+    game.history.splice(game.history.lastIndexOf(tile), 1);
+    game.tray.splice(game.tray.indexOf(tile), 1);
+    game.board.push(tile);
+    relocate(tile, 'board');
+    refresh();
+    els.announcer.textContent = t.undone;
+  }
+
+  function popTiles() {
+    if (game.busy || game.over || !game.boosters.pop || game.hold.length || !game.tray.length) return;
+    spend('pop');
+    const moving = game.tray.splice(0, HOLD_SIZE);
+    game.hold.push(...moving);
+    moving.forEach(tile => relocate(tile, 'hold'));
+    refresh();
+    els.announcer.textContent = t.popped;
+  }
+
+  // Re-deal the board along a fresh removal order, finishing the groups already in the tray first.
+  function shuffleBoard() {
+    if (game.busy || game.over || !game.boosters.shuffle || game.board.length < 2) return;
+    spend('shuffle');
+    const pool = new Map();
+    for (const tile of game.board) pool.set(tile.type, (pool.get(tile.type) || 0) + 1);
+    const waiting = new Map();
+    for (const tile of [...game.tray, ...game.hold]) waiting.set(tile.type, (waiting.get(tile.type) || 0) + 1);
+    const sequence = [];
+    const pending = [...waiting].filter(([, c]) => c % 3).sort((a, b) => (b[1] % 3) - (a[1] % 3));
+    for (const [type, c] of pending) {
+      const need = Math.min(3 - (c % 3), pool.get(type) || 0);
+      for (let i = 0; i < need; i++) sequence.push(type);
+      pool.set(type, pool.get(type) - need);
+    }
+    const groups = [];
+    for (const [type, c] of pool) for (let i = 0; i < c; i += 3) groups.push(Array(Math.min(3, c - i)).fill(type));
+    sequence.push(...shuffle(groups).flat());
+    const order = removalOrder(game.board);
+    order.forEach((tile, i) => { tile.type = sequence[i]; });
+    game.busy = true;
+    for (const tile of game.board) {
+      tile.el.classList.remove('spin');
+      void tile.el.offsetWidth;
+      tile.el.classList.add('spin');
+    }
+    setTimeout(() => {
+      game.board.forEach(paintType);
+      refresh();
+    }, reducedMotion.matches ? 0 : 200);
+    setTimeout(() => { game.busy = false; }, reducedMotion.matches ? 0 : 420);
+    refresh();
+    els.announcer.textContent = t.shuffled;
+  }
+
+  function win() {
+    game.over = true;
+    const stars = game.used === 0 ? 3 : game.used <= 2 ? 2 : 1;
+    const saved = read(STORE.stars, {});
+    if (!(saved[game.level] >= stars)) { saved[game.level] = stars; write(STORE.stars, saved); }
+    highest = Math.max(highest, game.level + 1);
+    pickLevel = highest;
+    write(STORE.level, highest);
+    els.winStars.innerHTML = [0, 1, 2].map(i => (i < stars ? `<b style="--i:${i}">★</b>` : '☆')).join('');
+    els.winStars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.moves, game.used);
+    els.announcer.textContent = `${t.won} ${t.starsLabel(stars)}. ${t.result(game.moves, game.used)}`;
+    setTimeout(() => { els.win.hidden = false; els.nextLevel.focus({ preventScroll: true }); }, 300);
+  }
+
+  function lose() {
+    els.rescueUndo.hidden = !(game.boosters.undo && lastUndoable());
+    els.rescuePop.hidden = !(game.boosters.pop && !game.hold.length);
+    els.lose.hidden = false;
+    els.announcer.textContent = `${t.lost} ${t.lostText}`;
+    els.retry.focus({ preventScroll: true });
+  }
+
+  function rescue(action) {
+    els.lose.hidden = true;
+    game.over = false;
+    action();
+  }
+
+  function focusNearest(near) {
+    if (!keyboardMode) return;
+    const free = game.board.filter(isFree);
+    if (!free.length) return;
+    const ref = near || free[0];
+    const dist = tile => (tile.x - ref.x) ** 2 + (tile.y - ref.y) ** 2 - tile.z;
+    free.sort((a, b) => dist(a) - dist(b))[0].el.focus({ preventScroll: true });
+  }
+
+  // Arrow keys hop between the uncovered tiles in roughly that direction.
+  function moveFocus(dx, dy) {
+    const free = game.board.filter(isFree);
+    const current = free.find(tile => tile.el === document.activeElement);
+    if (!current) return focusNearest();
+    let best = null, bestScore = Infinity;
+    for (const tile of free) {
+      const ddx = tile.x - current.x, ddy = tile.y - current.y;
+      const along = ddx * dx + ddy * dy;
+      if (along <= 0) continue;
+      const score = along + Math.abs(ddx * dy + ddy * dx) * 2;
+      if (score < bestScore) { bestScore = score; best = tile; }
+    }
+    best?.el.focus({ preventScroll: true });
+  }
+
+  function fit() {
+    const slot = els.tray.clientWidth / TRAY_SIZE;
+    els.app.style.setProperty('--slot', `${slot}px`);
+    if (!game) return;
+    const { spanX, spanY, maxZ } = game.bounds;
+    const w = els.wrap.clientWidth, h = els.wrap.clientHeight;
+    const size = Math.max(16, Math.min(w / (spanX / 2), h / (spanY / 2 + maxZ * LIFT), MAX_TILE));
+    els.board.style.setProperty('--t', `${size}px`);
+    els.board.style.width = `${size * spanX / 2}px`;
+    els.board.style.height = `${size * (spanY / 2 + maxZ * LIFT)}px`;
+  }
+
+  function showStart() {
+    pickLevel = Math.min(pickLevel, highest);
+    renderPicker();
+    els.win.hidden = els.lose.hidden = true;
+    els.start.hidden = false;
+    els.play.focus({ preventScroll: true });
+  }
+
+  function renderPicker() {
+    const stars = read(STORE.stars, {})[pickLevel] || 0;
+    els.pickLevel.textContent = t.levelN(pickLevel);
+    els.pickStars.innerHTML = stars ? [0, 1, 2].map(i => (i < stars ? '<b style="--i:0">★</b>' : '☆')).join('') : '';
+    els.pickStars.setAttribute('aria-label', stars ? t.starsLabel(stars) : '');
+    els.prev.disabled = pickLevel <= 1;
+    els.next.disabled = pickLevel >= highest;
+  }
+
+  const overlayOpen = () => !els.start.hidden || !els.win.hidden || !els.lose.hidden;
+  const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const HOTKEYS = { u: undo, z: undo, s: shuffleBoard, p: popTiles };
+  document.addEventListener('pointerdown', () => { keyboardMode = false; }, true);
+  document.addEventListener('keydown', event => {
+    keyboardMode = true;
+    if (event.altKey || event.ctrlKey || event.metaKey || !game || overlayOpen()) return;
+    if (ARROWS[event.key]) {
+      event.preventDefault();
+      moveFocus(...ARROWS[event.key]);
+      return;
+    }
+    const action = HOTKEYS[event.key.toLowerCase()];
+    if (action) { event.preventDefault(); action(); }
+  });
+
+  boosterEls.undo.addEventListener('click', undo);
+  boosterEls.shuffle.addEventListener('click', shuffleBoard);
+  boosterEls.pop.addEventListener('click', popTiles);
+  $('restart').addEventListener('click', () => { if (game) startLevel(game.level); });
+  $('menu').addEventListener('click', showStart);
+  els.prev.addEventListener('click', () => { pickLevel = Math.max(1, pickLevel - 1); renderPicker(); });
+  els.next.addEventListener('click', () => { pickLevel = Math.min(highest, pickLevel + 1); renderPicker(); });
+  els.play.addEventListener('click', () => {
+    if (game && game.level === pickLevel && !game.moves) { els.start.hidden = true; focusNearest(); }
+    else startLevel(pickLevel);
+  });
+  els.nextLevel.addEventListener('click', () => startLevel(game.level + 1));
+  $('replay').addEventListener('click', () => startLevel(game.level));
+  els.retry.addEventListener('click', () => startLevel(game.level));
+  els.rescueUndo.addEventListener('click', () => rescue(undo));
+  els.rescuePop.addEventListener('click', () => rescue(popTiles));
+
+  new ResizeObserver(fit).observe(els.app);
+  startLevel(pickLevel);
+  showStart();
+})();
+</script>
+</body>
+</html>

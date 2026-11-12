@@ -1,0 +1,190 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from './Navbar.astro';
+import Footer from './Footer.astro';
+import ArcadeCard from './ArcadeCard.astro';
+import { StoreButtons } from './StoreButtons';
+import { ARCADE_GAMES, arcadeCover, playableUrl, type ArcadeGame } from '../data/arcade';
+import { getGames } from '../data/games';
+import CONTENT from '../i18n/arcade-games.json';
+import { HTML_LANG, localizedArcadePath, localizedGamePath, localizedPath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+
+interface Props { lang: Locale; game: ArcadeGame; }
+const { lang, game } = Astro.props;
+const t = UI_TRANSLATIONS[lang];
+const a = t.arcade;
+const text = a.games[game.id];
+type Content = Record<string, Record<string, { intro: string; howTo: string[]; features: string[] }>>;
+const content = (CONTENT as Content)[lang]?.[game.id] ?? (CONTENT as Content).en[game.id];
+const store = game.gameId ? getGames(lang).find(entry => entry.id === game.gameId) : undefined;
+const heading = a.playTitle.replace('{game}', game.title);
+const title = `${heading} | Milaan Games`;
+const pageUrl = new URL(localizedArcadePath(lang, game.id), Astro.site).href;
+const cover = new URL(arcadeCover(game), Astro.site).href;
+const others = ARCADE_GAMES.filter(entry => entry.id !== game.id);
+
+const structuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'VideoGame',
+    name: game.title,
+    description: content.intro,
+    url: pageUrl,
+    image: cover,
+    inLanguage: HTML_LANG[lang],
+    genre: text.tag.split(' · ')[0],
+    gamePlatform: 'Web browser',
+    applicationCategory: 'Game',
+    operatingSystem: 'Any',
+    isAccessibleForFree: true,
+    publisher: { '@type': 'Organization', name: 'Milaan Games', url: new URL('/', Astro.site).href },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Milaan Games', item: new URL(localizedPath(lang), Astro.site).href },
+      { '@type': 'ListItem', position: 2, name: t.nav.arcade, item: new URL(localizedArcadePath(lang), Astro.site).href },
+      { '@type': 'ListItem', position: 3, name: game.title, item: pageUrl },
+    ],
+  },
+];
+---
+
+<Layout lang={lang} title={title} description={content.intro}>
+  <Fragment slot="head">
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={content.intro} />
+    <meta property="og:image" content={cover} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </Fragment>
+  <Navbar lang={lang} />
+
+  <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
+    <nav aria-label="Breadcrumb" class="breadcrumb">
+      <ol>
+        <li><a href={localizedPath(lang)}>{t.page.home}</a></li>
+        <li><a href={localizedArcadePath(lang)}>{t.nav.arcade}</a></li>
+        <li aria-current="page">{game.title}</li>
+      </ol>
+    </nav>
+
+    <div class="play-layout">
+      <header class="play-head">
+        <p class="section-kicker">{text.tag}</p>
+        <h1 class="section-title">{heading}</h1>
+        <p class="play-intro">{content.intro}</p>
+      </header>
+
+      <div class="play-stage">
+        <div class="play-frame" id="play-frame">
+          <div class="play-bar">
+            <span>{game.title}</span>
+            <button type="button" id="play-exit">{a.exitFullscreen} <span aria-hidden="true">✕</span></button>
+          </div>
+          <iframe src={playableUrl(game, lang)} title={game.title} sandbox={game.sandbox} allow="fullscreen"></iframe>
+        </div>
+        <button type="button" class="play-tool" id="play-fullscreen"><span aria-hidden="true">⛶</span> {a.fullscreen}</button>
+      </div>
+
+      <div class="play-info">
+        <section aria-labelledby="how-to-title">
+          <h2 id="how-to-title" class="play-subtitle">{a.howToTitle}</h2>
+          <ol class="play-steps">{content.howTo.map(step => <li>{step}</li>)}</ol>
+        </section>
+        <section aria-labelledby="features-title">
+          <h2 id="features-title" class="play-subtitle">{a.featuresTitle}</h2>
+          <ul class="play-features">{content.features.map(feature => <li>{feature}</li>)}</ul>
+        </section>
+        {store && (
+          <section class="play-store" aria-labelledby="full-game-title">
+            <div class="flex items-center gap-4">
+              <img src={store.icon} alt="" width="56" height="56" class="h-14 w-14 rounded-xl" loading="lazy" />
+              <div>
+                <h2 id="full-game-title" class="text-base font-semibold text-white"><a href={localizedGamePath(lang, store.id)} class="hover:text-amber-400">{a.getFull}: {store.title}</a></h2>
+                <p class="mt-1 text-sm text-slate-400">{a.fullGameText.replace('{app}', store.title)}</p>
+              </div>
+            </div>
+            <StoreButtons lang={lang} googlePlayUrl={store.googlePlayUrl} appStoreUrl={store.appStoreUrl} size="sm" />
+          </section>
+        )}
+      </div>
+    </div>
+
+    <section class="mt-16" aria-labelledby="more-games-title">
+      <h2 id="more-games-title" class="section-title">{a.moreGames}</h2>
+      <ul class="more-grid mt-6" role="list">
+        {others.map(entry => <ArcadeCard lang={lang} game={entry} heading="h3" />)}
+      </ul>
+    </section>
+  </main>
+
+  <Footer lang={lang} />
+</Layout>
+
+<script>
+  const frame = document.querySelector<HTMLElement>('#play-frame');
+  const enter = document.querySelector<HTMLButtonElement>('#play-fullscreen');
+  const exit = document.querySelector<HTMLButtonElement>('#play-exit');
+  const iframe = frame?.querySelector('iframe');
+
+  if (frame && enter && exit && iframe) {
+    // CSS "immersive" mode works everywhere, including iPhone Safari where element fullscreen is unavailable.
+    const setImmersive = (on: boolean) => {
+      if (frame.classList.contains('is-immersive') === on) return;
+      frame.classList.toggle('is-immersive', on);
+      document.documentElement.classList.toggle('play-locked', on);
+      (on ? iframe : enter).focus({ preventScroll: true });
+    };
+    enter.addEventListener('click', () => setImmersive(true));
+    exit.addEventListener('click', () => setImmersive(false));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') setImmersive(false); });
+    // Keys typed inside a same-origin game never reach this document, so listen there too.
+    const forwardEscape = () => {
+      try { iframe.contentDocument?.addEventListener('keydown', event => { if (event.key === 'Escape') setImmersive(false); }); } catch {}
+    };
+    iframe.addEventListener('load', forwardEscape);
+    if (iframe.contentDocument?.readyState === 'complete') forwardEscape();
+  }
+</script>
+
+<style>
+  .breadcrumb ol { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: #8e95a8; }
+  .breadcrumb li + li::before { content: '/'; margin-right: 6px; color: #4b5266; }
+  .breadcrumb a:hover { color: #ffb454; }
+  .breadcrumb [aria-current] { color: #d0d3df; }
+
+  .play-layout { display: grid; grid-template-areas: "head" "stage" "info"; gap: 24px; margin-top: 20px; }
+  .play-head { grid-area: head; }
+  .play-stage { grid-area: stage; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .play-info { grid-area: info; display: grid; gap: 28px; align-content: start; }
+  .play-intro { margin-top: 12px; max-width: 60ch; font-size: 15px; line-height: 1.8; color: #b7bdce; }
+
+  .play-frame { width: 100%; height: calc(100svh - 150px); min-height: 480px; max-height: 820px; display: flex; flex-direction: column; border: 1px solid #2a2f3e; border-radius: 18px; overflow: hidden; background: #0a0c14; box-shadow: 0 30px 70px #0008; }
+  .play-frame iframe { display: block; flex: 1; width: 100%; min-height: 0; border: 0; }
+  .play-bar { display: none; height: 48px; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; border-bottom: 1px solid #ffffff12; font: 700 15px var(--font-display); }
+  .play-bar button { padding: 10px 12px; border-radius: 10px; font: 600 13px var(--font-sans); color: #d0d3df; }
+  .play-bar button:hover { background: #ffffff10; color: #ffb454; }
+  .play-frame.is-immersive { position: fixed; inset: 0; z-index: 100; width: 100vw; height: 100dvh; max-height: none; min-height: 0; border: 0; border-radius: 0; }
+  .play-frame.is-immersive .play-bar { display: flex; }
+  :global(html.play-locked) { overflow: hidden; }
+  .play-tool { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #ffffff20; border-radius: 10px; font-size: 13px; color: #d0d3df; }
+  .play-tool:hover { border-color: #ffb454; color: #ffb454; }
+
+  .play-subtitle { font: 700 20px var(--font-display); letter-spacing: -.02em; }
+  .play-steps { margin-top: 12px; display: grid; gap: 10px; counter-reset: step; }
+  .play-steps li { position: relative; padding-left: 40px; font-size: 14px; line-height: 1.7; color: #b7bdce; counter-increment: step; }
+  .play-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: #ffb4541f; color: #ffb454; font-weight: 700; font-size: 13px; }
+  .play-features { margin-top: 12px; display: grid; gap: 8px; padding-left: 20px; list-style: disc; font-size: 14px; line-height: 1.7; color: #b7bdce; }
+  .play-features li::marker { color: #ffb454; }
+  .play-store { display: grid; gap: 16px; padding: 18px; border: 1px solid #ffffff13; border-radius: 16px; background: #111520; }
+
+  .more-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+
+  @media (min-width: 900px) {
+    .play-layout { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "stage head" "stage info"; column-gap: 48px; row-gap: 28px; }
+    .play-frame { width: calc(min(82vh, 800px) * 9 / 16); height: min(82vh, 800px); min-height: 0; }
+  }
+</style>

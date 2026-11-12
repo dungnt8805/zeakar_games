@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ball Sort</title>
+<style>
+:root {
+  --ink: #f4f1ff;
+  --muted: #a9b0d6;
+  --bg: #1d2148;
+  --panel: #fffaf2;
+  --panel-ink: #34284f;
+  --panel-muted: #7d7096;
+  --coral: #ff7a59;
+  --coral-dark: #e0573a;
+  --sun: #ffd166;
+  --wood: #c98a52;
+  --wood-dark: #8f5a2e;
+  --chip: #2b3165;
+  --chip-edge: #151935;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 15% 20%, #ffffff30 0 1.5px, transparent 2px), radial-gradient(circle at 60% 70%, #ffffff22 0 1px, transparent 1.6px), radial-gradient(ellipse at 50% -10%, #3d3f8a, transparent 60%), linear-gradient(#232857, #171a3a);
+  background-size: 58px 58px, 37px 37px, 100% 100%, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+.icon { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(21px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; white-space: nowrap; line-height: 1; }
+h1 span { color: var(--coral); }
+.stat { min-width: 56px; padding: 5px 8px; border-radius: 14px; background: var(--chip); text-align: center; box-shadow: 0 3px 0 var(--chip-edge); }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--chip); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 var(--chip-edge); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--chip-edge); }
+.icon-btn svg { width: 20px; height: 20px; vertical-align: middle; }
+.hint { text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+
+.board-wrap { flex: 1; min-height: 0; position: relative; }
+.board { position: absolute; inset: 0; --w: 40px; --h: 170px; --d: 34px; --p: 3px; --bw: 2px; }
+.tube { position: absolute; left: 0; top: 0; z-index: 2; width: var(--w); height: var(--h); transition: left .3s ease, top .3s ease; touch-action: manipulation; }
+.tube:focus-visible { outline: none; }
+.tube:focus-visible .glass { outline: 3px solid var(--sun); outline-offset: 4px; }
+.glass { position: absolute; inset: 0; border: var(--bw) solid #ffffff4d; border-top-color: transparent; border-radius: calc(var(--w) * .18) calc(var(--w) * .18) calc(var(--w) / 2) calc(var(--w) / 2); background: linear-gradient(90deg, #ffffff1f, #ffffff08 40%, #ffffff05 60%, #ffffff24); box-shadow: inset 0 -6px 14px #0003; transition: box-shadow .2s, border-color .2s; }
+.glass::before { content: ""; position: absolute; left: 14%; top: 8%; bottom: 14%; width: 10%; border-radius: 99px; background: #ffffff1f; }
+.tube::after { content: ""; position: absolute; left: -16%; right: -16%; bottom: calc(var(--w) * -.2); height: calc(var(--w) * .26); border-radius: 8px; background: linear-gradient(var(--wood), var(--wood-dark)); box-shadow: 0 4px 8px #0006; z-index: -1; }
+.tube.selected .glass { border-color: #ffd16699; box-shadow: inset 0 -6px 14px #0003, 0 0 20px #ffd16655; }
+.tube.target .glass { border-color: #7ee0b399; }
+.tube.landing { z-index: 6; }
+.tube.nope { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-10%); } 75% { transform: translateX(10%); } }
+.ball { position: absolute; left: calc(var(--bw) + var(--p)); bottom: calc(var(--bw) + var(--p) + var(--i) * var(--d)); z-index: 3; width: var(--d); height: var(--d); border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 34% 28%, #fff 0 7%, color-mix(in srgb, var(--c) 55%, #fff) 14%, var(--c) 46%, color-mix(in srgb, var(--c) 62%, #000) 100%); box-shadow: inset 0 -2px 4px #0004, 0 2px 3px #0005; transition: transform .2s cubic-bezier(.3, 1.3, .5, 1); }
+.ball svg { width: 38%; height: 38%; fill: var(--s); margin-top: 6%; }
+.ball.lift { transform: translateY(calc(-1 * var(--lift))); }
+.ball.flying { z-index: 8; }
+.lid { position: absolute; z-index: 4; left: -8%; right: -8%; top: calc(var(--w) * -.2); height: calc(var(--w) * .3); border-radius: 50% 50% 22% 22% / 80% 80% 30% 30%; background: linear-gradient(#ffe28f, var(--sun) 50%, #e8a93a); box-shadow: inset 0 -3px 0 #c98a1d, 0 3px 6px #0005; display: none; }
+.tube.done .lid { display: block; animation: lid .45s cubic-bezier(.3, 1.6, .5, 1); }
+.tube.done .glass { border-color: #ffd16680; box-shadow: inset 0 -6px 14px #0003, 0 0 16px #ffd16640; }
+@keyframes lid { from { transform: translateY(-140%) scale(.6); opacity: 0; } }
+.spark { position: absolute; z-index: 9; font-size: calc(var(--w) * .4); line-height: 1; color: var(--sun); text-shadow: 0 0 8px #ffb703; pointer-events: none; animation: spark .75s ease-out forwards; }
+@keyframes spark { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(80deg); opacity: 0; } }
+
+.boosters { display: flex; gap: 10px; justify-content: center; }
+.booster { position: relative; flex: 1; max-width: 160px; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 6px; border-radius: 16px; background: var(--chip); box-shadow: 0 4px 0 var(--chip-edge); font-size: 14px; font-weight: 800; }
+.booster svg { flex: 0 0 auto; width: 20px; height: 20px; color: var(--sun); }
+.booster span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booster:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--chip-edge); }
+.booster:disabled { opacity: .45; cursor: default; }
+.count { position: absolute; top: -7px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--coral); color: #fff; font-size: 12px; font-weight: 900; line-height: 22px; text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #0d102699; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--panel); color: var(--panel-ink); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--coral); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--panel-muted); line-height: 1.45; }
+.panel :focus-visible { outline-color: var(--coral-dark); }
+.picker { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.picker strong { min-width: 120px; font-size: 20px; }
+.picker button { width: 42px; height: 42px; border-radius: 50%; background: #ffe9df; font-size: 22px; font-weight: 900; }
+.picker button:disabled { opacity: .35; cursor: default; }
+.result { margin-top: 10px; font-size: 17px; font-weight: 700; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--coral); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--coral-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--coral-dark); }
+.ghost { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #fff0c9; color: #8a5a00; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #f3d78e; }
+.ghost[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-aspect-ratio: 4/3) { .app { max-width: 860px; } }
+@media (max-height: 560px) { .app { gap: 6px; } .booster { padding: 7px 6px; } .hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <h1>Ball <span>Sort</span></h1>
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="levels"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </header>
+  <p class="hint" data-i18n="hint"></p>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" role="group" data-i18n-label="board"></div>
+  </div>
+  <div class="boosters">
+    <button type="button" class="booster" id="undo" aria-keyshortcuts="U"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span data-i18n="undo"></span><b class="count" id="undo-count" aria-hidden="true"></b></button>
+    <button type="button" class="booster" id="extra" aria-keyshortcuts="T"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v14a4 4 0 0 0 8 0V3"/><path d="M12 8v6M9 11h6"/></svg><span data-i18n="extra"></span><b class="count" id="extra-count" aria-hidden="true"></b></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🔮</p>
+    <h2 id="start-title">Ball <span>Sort</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <p class="text" data-i18n="how"></p>
+    <div class="picker">
+      <button type="button" id="prev" data-i18n-label="prev">‹</button>
+      <strong id="pick-level" aria-live="polite"></strong>
+      <button type="button" id="next" data-i18n-label="next">›</button>
+    </div>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🏆</p>
+    <h2 id="win-title"></h2>
+    <p class="result" id="result"></p>
+    <button type="button" class="cta" id="next-level" data-i18n="next"></button>
+    <button type="button" class="ghost" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🤔</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p class="text" data-i18n="stuckText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="ghost" id="stuck-undo" data-i18n="undo"></button>
+    <button type="button" class="ghost" id="stuck-extra" data-i18n="extraName"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Sort the glossy balls until every tube holds a single colour.', how: 'Tap a tube to lift its top balls, then tap another tube. Balls only land on the same colour or in an empty tube.', hint: 'Tap a tube, then where the balls should go', level: 'Level', moves: 'Moves', levels: 'Choose level', restart: 'Restart level', board: 'Tubes', undo: 'Undo', extra: '+ Tube', extraName: 'Extra tube', boosterLabel: (name, n) => `${name}, ${n} left`, play: 'Play', levelN: n => `Level ${n}`, prev: 'Previous level', next: 'Next level', tube: (i, d) => `Tube ${i}: ${d}`, empty: 'empty', complete: 'complete', selected: 'selected', colors: ['red', 'orange', 'yellow', 'lime', 'green', 'cyan', 'blue', 'purple', 'pink', 'brown', 'silver', 'magenta'], moved: (c, to) => `Moved ${c} to tube ${to}.`, done: c => `All the ${c} balls are together!`, undone: 'Move undone.', added: 'An empty tube was added.', won: n => `Level ${n} complete!`, result: m => `Sorted in ${m} moves`, replay: 'Replay level', stuck: 'No moves left', stuckText: 'Undo a move, add an empty tube or try the level again.', retry: 'Try again', levelStart: (n, c, cap) => `Level ${n}: ${c} colours, ${cap} balls per tube.` },
+    vi: { tagline: 'Xếp những quả bóng bóng loáng cho đến khi mỗi ống chỉ còn một màu.', how: 'Chạm một ống để nhấc các bóng trên cùng, rồi chạm ống khác. Bóng chỉ đặt được lên cùng màu hoặc vào ống trống.', hint: 'Chạm một ống, rồi chạm nơi muốn thả bóng', level: 'Màn', moves: 'Lượt', levels: 'Chọn màn', restart: 'Chơi lại màn', board: 'Các ống bóng', undo: 'Hoàn tác', extra: '+ Ống', extraName: 'Thêm ống', boosterLabel: (name, n) => `${name}, còn ${n} lượt`, play: 'Chơi', levelN: n => `Màn ${n}`, prev: 'Màn trước', next: 'Màn tiếp theo', tube: (i, d) => `Ống ${i}: ${d}`, empty: 'trống', complete: 'đã xong', selected: 'đang chọn', colors: ['đỏ', 'cam', 'vàng', 'xanh cốm', 'xanh lá', 'xanh lơ', 'xanh dương', 'tím', 'hồng', 'nâu', 'bạc', 'hồng sen'], moved: (c, to) => `Đã chuyển bóng ${c} sang ống ${to}.`, done: c => `Bóng ${c} đã về chung một ống!`, undone: 'Đã hoàn tác.', added: 'Đã thêm một ống trống.', won: n => `Hoàn thành màn ${n}!`, result: m => `Xếp xong sau ${m} lượt`, replay: 'Chơi lại màn này', stuck: 'Hết nước đi', stuckText: 'Hãy hoàn tác, thêm ống trống hoặc chơi lại màn này.', retry: 'Thử lại', levelStart: (n, c, cap) => `Màn ${n}: ${c} màu, ${cap} bóng mỗi ống.` },
+    zh: { tagline: '整理亮晶晶的彩球，让每根管子只剩一种颜色。', how: '点一根管子拿起顶部的球，再点另一根管子放下。球只能放在相同颜色上，或放进空管。', hint: '先点管子，再点要放球的位置', level: '关卡', moves: '步数', levels: '选择关卡', restart: '重玩本关', board: '球管', undo: '撤销', extra: '+ 管子', extraName: '加一根管子', boosterLabel: (name, n) => `${name}，剩余 ${n} 次`, play: '开始', levelN: n => `第 ${n} 关`, prev: '上一关', next: '下一关', tube: (i, d) => `管子 ${i}：${d}`, empty: '空', complete: '已完成', selected: '已选中', colors: ['红色', '橙色', '黄色', '草绿色', '绿色', '青色', '蓝色', '紫色', '粉色', '棕色', '银色', '品红色'], moved: (c, to) => `已把${c}球移到管子 ${to}。`, done: c => `${c}球已经集齐！`, undone: '已撤销一步。', added: '已加入一根空管。', won: n => `第 ${n} 关完成！`, result: m => `共用 ${m} 步`, replay: '重玩本关', stuck: '没有可走的步了', stuckText: '可以撤销一步、加一根空管，或重新挑战本关。', retry: '再试一次', levelStart: (n, c, cap) => `第 ${n} 关：${c} 种颜色，每管 ${cap} 个球。` },
+    fr: { tagline: 'Triez les billes brillantes jusqu’à ce que chaque tube ne contienne qu’une couleur.', how: 'Touchez un tube pour soulever ses billes du dessus, puis touchez un autre tube. Les billes ne se posent que sur la même couleur ou dans un tube vide.', hint: 'Touchez un tube, puis l’endroit où poser les billes', level: 'Niveau', moves: 'Coups', levels: 'Choisir un niveau', restart: 'Recommencer le niveau', board: 'Tubes', undo: 'Annuler', extra: '+ Tube', extraName: 'Tube en plus', boosterLabel: (name, n) => `${name}, encore ${n}`, play: 'Jouer', levelN: n => `Niveau ${n}`, prev: 'Niveau précédent', next: 'Niveau suivant', tube: (i, d) => `Tube ${i} : ${d}`, empty: 'vide', complete: 'terminé', selected: 'sélectionné', colors: ['rouge', 'orange', 'jaune', 'vert clair', 'vert', 'cyan', 'bleu', 'violet', 'rose', 'marron', 'argent', 'magenta'], moved: (c, to) => `Billes ${c} déplacées dans le tube ${to}.`, done: c => `Toutes les billes ${c} sont réunies !`, undone: 'Coup annulé.', added: 'Un tube vide a été ajouté.', won: n => `Niveau ${n} terminé !`, result: m => `Trié en ${m} coups`, replay: 'Rejouer le niveau', stuck: 'Plus aucun coup', stuckText: 'Annulez un coup, ajoutez un tube vide ou recommencez le niveau.', retry: 'Réessayer', levelStart: (n, c, cap) => `Niveau ${n} : ${c} couleurs, ${cap} billes par tube.` },
+    th: { tagline: 'เรียงลูกบอลสีมันวาวจนแต่ละหลอดเหลือแค่สีเดียว', how: 'แตะหลอดเพื่อยกลูกบอลบนสุด แล้วแตะอีกหลอดเพื่อวาง ลูกบอลวางได้เฉพาะบนสีเดียวกันหรือในหลอดว่าง', hint: 'แตะหลอด แล้วแตะหลอดที่จะวางลูกบอล', level: 'ด่าน', moves: 'ครั้ง', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', board: 'หลอดลูกบอล', undo: 'ย้อนกลับ', extra: '+ หลอด', extraName: 'เพิ่มหลอด', boosterLabel: (name, n) => `${name} เหลือ ${n} ครั้ง`, play: 'เล่น', levelN: n => `ด่าน ${n}`, prev: 'ด่านก่อนหน้า', next: 'ด่านถัดไป', tube: (i, d) => `หลอด ${i}: ${d}`, empty: 'ว่าง', complete: 'เสร็จแล้ว', selected: 'เลือกอยู่', colors: ['แดง', 'ส้ม', 'เหลือง', 'เขียวอ่อน', 'เขียว', 'ฟ้าอมเขียว', 'น้ำเงิน', 'ม่วง', 'ชมพู', 'น้ำตาล', 'เงิน', 'บานเย็น'], moved: (c, to) => `ย้ายลูกบอลสี${c}ไปหลอด ${to} แล้ว`, done: c => `ลูกบอลสี${c}อยู่รวมกันครบแล้ว!`, undone: 'ย้อนกลับแล้ว', added: 'เพิ่มหลอดว่างแล้ว', won: n => `ผ่านด่าน ${n} แล้ว!`, result: m => `เรียงเสร็จใน ${m} ครั้ง`, replay: 'เล่นด่านนี้อีกครั้ง', stuck: 'ไม่มีทางเดินแล้ว', stuckText: 'ลองย้อนกลับ เพิ่มหลอดว่าง หรือเริ่มด่านนี้ใหม่', retry: 'ลองอีกครั้ง', levelStart: (n, c, cap) => `ด่าน ${n}: ${c} สี หลอดละ ${cap} ลูก` },
+    ja: { tagline: 'ツヤツヤのボールを仕分けて、どのチューブも1色だけにしよう。', how: 'チューブをタップして上のボールを持ち上げ、別のチューブをタップ。置けるのは同じ色の上か、空のチューブだけ。', hint: 'チューブをタップして、置き場所をタップ', level: 'レベル', moves: '手数', levels: 'レベル選択', restart: 'レベルをやり直す', board: 'チューブ', undo: '戻す', extra: '+ チューブ', extraName: 'チューブを追加', boosterLabel: (name, n) => `${name}、残り${n}回`, play: 'プレイ', levelN: n => `レベル ${n}`, prev: '前のレベル', next: '次のレベル', tube: (i, d) => `チューブ ${i}：${d}`, empty: '空', complete: '完成', selected: '選択中', colors: ['赤', 'オレンジ', '黄', '黄緑', '緑', 'シアン', '青', '紫', 'ピンク', '茶', 'シルバー', 'マゼンタ'], moved: (c, to) => `${c}のボールをチューブ ${to} に移しました。`, done: c => `${c}のボールがそろいました！`, undone: '1手戻しました。', added: '空のチューブを追加しました。', won: n => `レベル ${n} クリア！`, result: m => `${m}手でクリア`, replay: 'もう一度プレイ', stuck: '動かせる手がありません', stuckText: '1手戻すか、空のチューブを足すか、最初からやり直そう。', retry: 'もう一度', levelStart: (n, c, cap) => `レベル ${n}：${c}色、1本に${cap}個。` },
+    ko: { tagline: '반짝이는 공을 정리해서 모든 튜브를 한 가지 색으로 채우세요.', how: '튜브를 눌러 맨 위 공을 들어 올린 다음 다른 튜브를 누르세요. 같은 색 위나 빈 튜브에만 놓을 수 있어요.', hint: '튜브를 누르고, 공을 놓을 곳을 누르세요', level: '레벨', moves: '이동', levels: '레벨 선택', restart: '레벨 다시 하기', board: '튜브', undo: '되돌리기', extra: '+ 튜브', extraName: '튜브 추가', boosterLabel: (name, n) => `${name}, ${n}회 남음`, play: '시작', levelN: n => `레벨 ${n}`, prev: '이전 레벨', next: '다음 레벨', tube: (i, d) => `${i}번 튜브: ${d}`, empty: '비어 있음', complete: '완성', selected: '선택됨', colors: ['빨강', '주황', '노랑', '연두', '초록', '청록', '파랑', '보라', '분홍', '갈색', '은색', '자홍'], moved: (c, to) => `${c} 공을 ${to}번 튜브로 옮겼어요.`, done: c => `${c} 공이 모두 모였어요!`, undone: '한 수 되돌렸어요.', added: '빈 튜브를 하나 추가했어요.', won: n => `레벨 ${n} 클리어!`, result: m => `${m}번 만에 완성`, replay: '이 레벨 다시 하기', stuck: '더 이상 옮길 곳이 없어요', stuckText: '한 수 되돌리거나, 빈 튜브를 추가하거나, 처음부터 다시 해 보세요.', retry: '다시 하기', levelStart: (n, c, cap) => `레벨 ${n}: ${c}가지 색, 튜브마다 공 ${cap}개.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Ball colour, then the colour of its faint symbol.
+  const COLORS = [
+    ['#ff4d4d', '#ffffff80'], ['#ff9f1c', '#ffffff80'], ['#ffd60a', '#00000040'], ['#a7e34b', '#00000040'],
+    ['#1fae5b', '#ffffff80'], ['#3ccdf0', '#00000040'], ['#3a6bff', '#ffffff80'], ['#9b5de5', '#ffffff80'],
+    ['#ff7eb6', '#00000040'], ['#a0643b', '#ffffff80'], ['#dfe5ee', '#00000040'], ['#c2189f', '#ffffff80'],
+  ];
+  const SYMBOLS = [
+    '<circle cx="10" cy="10" r="6"/>', '<path d="M10 3 17.5 16.5h-15z"/>', '<rect x="4" y="4" width="12" height="12" rx="1.5"/>',
+    '<path d="M10 2.5 17.5 10 10 17.5 2.5 10z"/>', '<path d="m10 2.2 2.35 4.9 5.35.7-3.9 3.7 1 5.3L10 14.2l-4.8 2.6 1-5.3-3.9-3.7 5.35-.7z"/>',
+    '<path d="M8 3h4v5h5v4h-5v5H8v-5H3V8h5z"/>', '<path d="M10 17s-7-4.3-7-9a3.8 3.8 0 0 1 7-2 3.8 3.8 0 0 1 7 2c0 4.7-7 9-7 9z"/>',
+    '<path d="m4.5 7.3 2.8-2.8L10 7.2l2.7-2.7 2.8 2.8-2.7 2.7 2.7 2.7-2.8 2.8-2.7-2.7-2.7 2.7-2.8-2.8 2.7-2.7z"/>',
+    '<path fill-rule="evenodd" d="M10 3.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 3.3a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z"/>',
+    '<path d="M10 2.5s5.5 6 5.5 9.5a5.5 5.5 0 0 1-11 0C4.5 8.5 10 2.5 10 2.5z"/>', '<path d="M6 3.5h8l4 6.5-4 6.5H6L2 10z"/>',
+    '<path d="M11.5 2 4.5 11H9l-1 7 7-9h-4.5z"/>',
+  ];
+  document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${SYMBOLS.map((s, i) => `<symbol id="sym${i}" viewBox="0 0 20 20">${s}</symbol>`).join('')}</svg>`);
+
+  const UNDOS = 5, EXTRAS = 1;
+  const PAD = 0.07, HEAD = 0.5, MAX_W = 60;
+  const HOP_MS = 430, STAGGER = 90;
+  const STORE = 'milaan.ballSort.level';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = { wrap: $('wrap'), board: $('board'), level: $('level'), moves: $('moves'), announcer: $('announcer'), start: $('start'), pickLevel: $('pick-level'), prev: $('prev'), next: $('next'), win: $('win'), winTitle: $('win-title'), result: $('result'), stuck: $('stuck'), undo: $('undo'), extra: $('extra'), stuckUndo: $('stuck-undo'), stuckExtra: $('stuck-extra') };
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+
+  let highest = Math.max(1, Number(read(STORE, 1)) || 1);
+  let pickLevel = highest;
+  let game = null;
+  let cap = 4;
+
+  const top = tube => tube[tube.length - 1];
+  const topRun = tube => { let k = 1; while (k < tube.length && tube[tube.length - 1 - k] === top(tube)) k++; return k; };
+  const uniform = tube => tube.every(c => c === tube[0]);
+  const isDone = tube => tube.length === cap && uniform(tube);
+  const canMove = (src, dst) => src !== dst && src.length > 0 && !isDone(src) && dst.length < cap && (!dst.length || top(dst) === top(src));
+  const solved = tubes => tubes.every(tube => !tube.length || isDone(tube));
+  const hasMove = tubes => tubes.some(src => tubes.some(dst => canMove(src, dst)));
+
+  // Depth-first search over moves (with obvious pruning) to prove a deal can be finished.
+  function solvable(start, limit = 60000) {
+    const seen = new Set();
+    let nodes = 0;
+    function dfs(tubes) {
+      if (solved(tubes)) return true;
+      if (++nodes > limit) return false;
+      const key = tubes.map(tube => tube.join('')).sort().join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      const moves = [];
+      tubes.forEach((src, a) => {
+        if (!src.length || isDone(src)) return;
+        const run = topRun(src);
+        let triedEmpty = false;
+        tubes.forEach((dst, b) => {
+          if (a === b || dst.length >= cap) return;
+          if (dst.length && top(dst) !== top(src)) return;
+          if (!dst.length) { if (triedEmpty || uniform(src)) return; triedEmpty = true; }
+          const n = Math.min(run, cap - dst.length);
+          const score = (dst.length ? 10 : 0) + (n === run ? 3 : 0) + (dst.length + n === cap && uniform(dst) ? 20 : 0);
+          moves.push([score, a, b, n]);
+        });
+      });
+      moves.sort((x, y) => y[0] - x[0]);
+      for (const [, a, b, n] of moves) {
+        const next = tubes.map(tube => tube.slice());
+        next[b].push(...next[a].splice(next[a].length - n, n));
+        if (dfs(next)) return true;
+      }
+      return false;
+    }
+    return dfs(start.map(tube => tube.slice()));
+  }
+
+  // Tubes hold 4 balls at first and 5 from level 8; colours keep growing in both stages.
+  function levelPlan(n) {
+    const tall = n >= 8;
+    const colors = tall ? Math.min(11, 5 + Math.floor((n - 8) * 0.45)) : Math.min(7, 3 + Math.floor((n - 1) * 0.6));
+    return { cap: tall ? 5 : 4, colors, maxPairs: n > 20 ? 1 : Math.max(1, Math.floor(colors * 0.5)) };
+  }
+
+  function generateLevel(n) {
+    const plan = levelPlan(n);
+    cap = plan.cap;
+    const rnd = seeded(n * 104729 + 3);
+    const kinds = Array.from({ length: COLORS.length }, (_, i) => i);
+    for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+    const used = kinds.slice(0, plan.colors);
+    for (let attempt = 0; ; attempt++) {
+      const pool = used.flatMap(c => Array(cap).fill(c));
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      const tubes = used.map((_, i) => pool.slice(i * cap, i * cap + cap));
+      tubes.push([], []);
+      if (attempt < 400) {
+        if (tubes.some(tube => tube.length && topRun(tube) >= cap - 1)) continue;
+        let pairs = 0;
+        for (const tube of tubes) for (let i = 1; i < tube.length; i++) if (tube[i] === tube[i - 1]) pairs++;
+        if (pairs > plan.maxPairs) continue;
+      }
+      if (solvable(tubes)) return tubes;
+    }
+  }
+
+  function startLevel(n) {
+    const tubes = generateLevel(n);
+    game = { level: n, tubes, els: [], balls: [], pos: [], selected: -1, history: [], undos: UNDOS, extras: EXTRAS, moves: 0, busy: new Set(), over: false, colors: levelPlan(n).colors };
+    els.board.replaceChildren();
+    els.board.dataset.cap = String(cap);
+    tubes.forEach((_, i) => addTubeEl(i));
+    for (const overlay of [els.start, els.win, els.stuck]) overlay.hidden = true;
+    layout();
+    refresh();
+    els.announcer.textContent = t.levelStart(n, game.colors, cap);
+    game.els[0].focus({ preventScroll: true });
+  }
+
+  function ballEl(color) {
+    const el = document.createElement('span');
+    el.className = 'ball';
+    el.dataset.c = color;
+    el.style.setProperty('--c', COLORS[color][0]);
+    el.style.setProperty('--s', COLORS[color][1]);
+    el.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><use href="#sym${color}"/></svg>`;
+    return el;
+  }
+
+  function addTubeEl(i) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'tube';
+    el.innerHTML = '<span class="glass" aria-hidden="true"></span><span class="lid" aria-hidden="true"></span>';
+    el.addEventListener('click', () => onTube(i));
+    game.els[i] = el;
+    game.balls[i] = game.tubes[i].map(color => ballEl(color));
+    el.append(...game.balls[i]);
+    els.board.append(el);
+    renderTube(i);
+  }
+
+  function describe(tube) {
+    if (!tube.length) return t.empty;
+    const parts = [];
+    for (let i = 0; i < tube.length; i++) {
+      if (i && tube[i] === tube[i - 1]) { parts[parts.length - 1].n++; continue; }
+      parts.push({ c: tube[i], n: 1 });
+    }
+    return parts.map(p => (p.n > 1 ? `${t.colors[p.c]} ×${p.n}` : t.colors[p.c])).join(', ');
+  }
+
+  // Ball elements stay put between moves; this only re-stacks them and updates state classes.
+  function renderTube(i) {
+    const tube = game.tubes[i];
+    const el = game.els[i];
+    const selected = game.selected === i;
+    const run = selected ? topRun(tube) : 0;
+    game.balls[i].forEach((ball, k) => {
+      ball.style.setProperty('--i', k);
+      ball.classList.toggle('lift', k >= tube.length - run);
+    });
+    el.classList.toggle('done', isDone(tube));
+    el.classList.toggle('selected', selected);
+    el.setAttribute('aria-pressed', String(selected));
+    const extra = [isDone(tube) && t.complete, selected && t.selected].filter(Boolean);
+    el.setAttribute('aria-label', t.tube(i + 1, [describe(tube), ...extra].join(', ')));
+  }
+
+  // Choose the row count that gives the biggest tubes for the frame, then centre each row.
+  function layout() {
+    if (!game) return;
+    const W = els.wrap.clientWidth, H = els.wrap.clientHeight;
+    const n = game.tubes.length;
+    const ballRatio = 1 - 2 * PAD - 0.1;
+    const k = cap * ballRatio + 2 * PAD + HEAD;
+    const gapY = 1.25;
+    let best = null;
+    for (let rows = 1; rows <= 4; rows++) {
+      const cols = Math.ceil(n / rows);
+      const w = Math.min(MAX_W, W / (cols * 1.55), H / (rows * (k + gapY) + 0.1));
+      if (!best || w > best.w + 0.5) best = { rows, cols, w };
+    }
+    const w = Math.floor(best.w);
+    const bw = Math.max(2, Math.round(w * 0.05));
+    const p = Math.max(1, Math.round(w * PAD));
+    const d = w - 2 * bw - 2 * p;
+    const h = Math.round(cap * d + 2 * p + bw + w * HEAD);
+    const pitchX = w * 1.55, pitchY = h + w * gapY;
+    const blockH = best.rows * pitchY - w * gapY;
+    const y0 = Math.max(w * 1.05, (H - blockH) / 2 + w * 0.5);
+    game.pos = [];
+    const base = Math.floor(n / best.rows), extra = n % best.rows;
+    let index = 0;
+    for (let r = 0; r < best.rows; r++) {
+      const count = base + (r < extra ? 1 : 0);
+      const x0 = (W - (count * pitchX - w * 0.55)) / 2;
+      for (let c = 0; c < count; c++, index++) game.pos[index] = { x: Math.round(x0 + c * pitchX), y: Math.round(y0 + r * pitchY), row: r };
+    }
+    game.size = { w, h, d, p, bw };
+    const b = els.board.style;
+    b.setProperty('--w', `${w}px`);
+    b.setProperty('--h', `${h}px`);
+    b.setProperty('--d', `${d}px`);
+    b.setProperty('--p', `${p}px`);
+    b.setProperty('--bw', `${bw}px`);
+    game.els.forEach((el, i) => {
+      el.style.left = `${game.pos[i].x}px`;
+      el.style.top = `${game.pos[i].y}px`;
+      el.style.setProperty('--lift', `${liftFor(i)}px`);
+    });
+  }
+
+  // How far the top ball rises so it floats just above the tube mouth.
+  function liftFor(i) {
+    const { h, d, p, bw } = game.size;
+    return h - bw - p - game.tubes[i].length * d + d * 1.12;
+  }
+
+  // Board coordinates of a ball slot (top-left of the ball).
+  function slotXY(i, k) {
+    const { h, d, p, bw } = game.size;
+    return { x: game.pos[i].x + bw + p, y: game.pos[i].y + h - bw - p - (k + 1) * d };
+  }
+
+  function refresh() {
+    els.level.textContent = String(game.level);
+    els.moves.textContent = String(game.moves);
+    const idle = !game.busy.size && !game.over;
+    els.undo.disabled = !game.undos || !game.history.length || !idle;
+    els.extra.disabled = !game.extras || game.over;
+    $('undo-count').textContent = String(game.undos);
+    $('extra-count').textContent = String(game.extras);
+    els.undo.setAttribute('aria-label', t.boosterLabel(t.undo, game.undos));
+    els.extra.setAttribute('aria-label', t.boosterLabel(t.extraName, game.extras));
+    const sel = game.selected;
+    game.els.forEach((el, i) => {
+      el.classList.toggle('target', sel >= 0 && !game.busy.has(i) && canMove(game.tubes[sel], game.tubes[i]));
+      el.style.setProperty('--lift', `${liftFor(i)}px`);
+    });
+  }
+
+  function select(i) {
+    const previous = game.selected;
+    game.selected = i;
+    if (previous >= 0) renderTube(previous);
+    if (i >= 0) renderTube(i);
+    refresh();
+  }
+
+  function nope(i) {
+    const el = game.els[i];
+    el.classList.remove('nope');
+    void el.offsetWidth;
+    el.classList.add('nope');
+  }
+
+  function onTube(i) {
+    if (!game || game.over || game.busy.has(i)) return;
+    const tube = game.tubes[i];
+    const sel = game.selected;
+    if (sel < 0) {
+      if (!tube.length || isDone(tube)) return nope(i);
+      return select(i);
+    }
+    if (sel === i) return select(-1);
+    if (canMove(game.tubes[sel], tube)) return move(sel, i);
+    if (tube.length && !isDone(tube)) return select(i);
+    nope(sel);
+    select(-1);
+  }
+
+  function move(a, b) {
+    const src = game.tubes[a], dst = game.tubes[b];
+    const n = Math.min(topRun(src), cap - dst.length);
+    const color = top(src);
+    const wasLifted = game.selected === a;
+    const before = dst.length;
+    // Top ball goes first and lands lowest, so the moving balls flip order.
+    const moving = game.balls[a].splice(game.balls[a].length - n, n).reverse();
+    const starts = moving.map((ball, k) => {
+      const at = slotXY(a, src.length - 1 - k);
+      return { x: at.x, y: at.y - (wasLifted ? liftFor(a) : 0) };
+    });
+    src.length -= n;
+    dst.push(...Array(n).fill(color));
+    game.balls[b].push(...moving);
+    game.history.push({ a, b, n });
+    game.moves += 1;
+    game.selected = -1;
+    game.busy.add(a).add(b);
+    moving.forEach(ball => ball.classList.remove('lift'));
+    game.els[b].append(...moving);
+    renderTube(a);
+    renderTube(b);
+    refresh();
+    els.announcer.textContent = t.moved(t.colors[color], b + 1);
+    game.els[b].classList.add('landing');
+    const finish = () => {
+      game.els[b].classList.remove('landing');
+      game.busy.delete(a);
+      game.busy.delete(b);
+      renderTube(a);
+      renderTube(b);
+      if (isDone(dst)) { sparkle(b); els.announcer.textContent = t.done(t.colors[color]); }
+      refresh();
+      checkEnd();
+    };
+    if (reducedMotion.matches) return finish();
+    Promise.all(moving.map((ball, k) => hop(ball, starts[k], slotXY(b, before + k), Math.min(game.pos[a].y, game.pos[b].y), k))).then(finish);
+  }
+
+  // Up out of the source, across above both tubes, then a drop with a small bounce.
+  function hop(ball, from, to, topY, k) {
+    const { d } = game.size;
+    const airY = topY - d * 1.15;
+    const offset = (x, y) => `translate(${x - to.x}px, ${y - to.y}px)`;
+    ball.classList.add('flying');
+    const anim = ball.animate([
+      { transform: offset(from.x, from.y), offset: 0 },
+      { transform: offset(from.x, airY), offset: 0.3, easing: 'ease-in-out' },
+      { transform: offset(to.x, airY), offset: 0.62, easing: 'ease-in' },
+      { transform: `${offset(to.x, to.y)} scale(1.08, .9)`, offset: 0.9 },
+      { transform: 'translate(0px, 0px)', offset: 1 },
+    ], { duration: HOP_MS, delay: k * STAGGER, fill: 'backwards' });
+    return anim.finished.then(() => ball.classList.remove('flying'));
+  }
+
+  function sparkle(i) {
+    if (reducedMotion.matches) return;
+    const { w } = game.size;
+    const p = game.pos[i];
+    for (let k = 0; k < 8; k++) {
+      const s = document.createElement('span');
+      s.className = 'spark';
+      s.textContent = k % 2 ? '★' : '✦';
+      const angle = (k / 8) * Math.PI * 2 - Math.PI / 2;
+      s.style.left = `${p.x + w / 2}px`;
+      s.style.top = `${p.y}px`;
+      s.style.setProperty('--dx', `${Math.cos(angle) * w * 1.2}px`);
+      s.style.setProperty('--dy', `${Math.sin(angle) * w * 1.2}px`);
+      s.addEventListener('animationend', () => s.remove());
+      els.board.append(s);
+    }
+  }
+
+  function checkEnd() {
+    if (game.busy.size || game.over) return;
+    if (solved(game.tubes)) return win();
+    if (!hasMove(game.tubes)) stuck();
+  }
+
+  function win() {
+    game.over = true;
+    refresh();
+    if (game.level >= highest) { highest = game.level + 1; write(STORE, highest); }
+    els.winTitle.textContent = t.won(game.level);
+    els.result.textContent = t.result(game.moves);
+    els.announcer.textContent = `${t.won(game.level)} ${t.result(game.moves)}`;
+    setTimeout(() => { els.win.hidden = false; $('next-level').focus({ preventScroll: true }); }, reducedMotion.matches ? 0 : 750);
+  }
+
+  function stuck() {
+    els.stuckUndo.hidden = !game.undos || !game.history.length;
+    els.stuckExtra.hidden = !game.extras;
+    els.announcer.textContent = `${t.stuck}. ${t.stuckText}`;
+    setTimeout(() => { if (game.over || game.busy.size || hasMove(game.tubes)) return; els.stuck.hidden = false; $('retry').focus({ preventScroll: true }); }, 400);
+  }
+
+  function undo() {
+    if (!game || game.over || game.busy.size || !game.undos || !game.history.length) return;
+    const { a, b, n } = game.history.pop();
+    const color = top(game.tubes[b]);
+    game.tubes[b].length -= n;
+    game.tubes[a].push(...Array(n).fill(color));
+    const back = game.balls[b].splice(game.balls[b].length - n, n);
+    game.balls[a].push(...back);
+    game.els[a].append(...back);
+    game.undos -= 1;
+    game.moves -= 1;
+    const previous = game.selected;
+    game.selected = -1;
+    for (const i of new Set([a, b, previous])) if (i >= 0) renderTube(i);
+    refresh();
+    els.stuck.hidden = true;
+    els.announcer.textContent = t.undone;
+  }
+
+  function addTube() {
+    if (!game || game.over || !game.extras) return;
+    game.extras -= 1;
+    game.tubes.push([]);
+    addTubeEl(game.tubes.length - 1);
+    layout();
+    refresh();
+    els.stuck.hidden = true;
+    els.announcer.textContent = t.added;
+  }
+
+  function showPicker() {
+    pickLevel = Math.min(pickLevel, highest);
+    els.pickLevel.textContent = t.levelN(pickLevel);
+    els.prev.disabled = pickLevel <= 1;
+    els.next.disabled = pickLevel >= highest;
+  }
+
+  function openStart() {
+    pickLevel = game ? game.level : highest;
+    showPicker();
+    els.start.hidden = false;
+    $('play').focus({ preventScroll: true });
+  }
+
+  // Arrow keys walk between tubes; up/down jump to the nearest tube in the next row.
+  els.board.addEventListener('keydown', event => {
+    const i = game ? game.els.indexOf(document.activeElement) : -1;
+    if (i < 0 || event.altKey || event.ctrlKey || event.metaKey) return;
+    let next = -1;
+    if (event.key === 'ArrowLeft') next = i - 1;
+    else if (event.key === 'ArrowRight') next = i + 1;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      const row = game.pos[i].row + (event.key === 'ArrowUp' ? -1 : 1);
+      let bestDist = Infinity;
+      game.pos.forEach((p, j) => { const dist = Math.abs(p.x - game.pos[i].x); if (p.row === row && dist < bestDist) { bestDist = dist; next = j; } });
+    } else return;
+    event.preventDefault();
+    if (next >= 0 && next < game.els.length) game.els[next].focus({ preventScroll: true });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !els.start.hidden || !els.win.hidden) return;
+    const key = event.key.toLowerCase();
+    if (key === 'u') { event.preventDefault(); undo(); }
+    else if (key === 't') { event.preventDefault(); addTube(); }
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.extra.addEventListener('click', addTube);
+  els.stuckUndo.addEventListener('click', undo);
+  els.stuckExtra.addEventListener('click', addTube);
+  $('restart').addEventListener('click', () => startLevel(game.level));
+  $('retry').addEventListener('click', () => startLevel(game.level));
+  $('menu').addEventListener('click', openStart);
+  els.prev.addEventListener('click', () => { pickLevel -= 1; showPicker(); });
+  els.next.addEventListener('click', () => { pickLevel += 1; showPicker(); });
+  $('play').addEventListener('click', () => startLevel(pickLevel));
+  $('next-level').addEventListener('click', () => startLevel(game.level + 1));
+  $('replay').addEventListener('click', () => startLevel(game.level));
+  new ResizeObserver(layout).observe(els.wrap);
+
+  startLevel(highest);
+  openStart();
+})();
+</script>
+</body>
+</html>

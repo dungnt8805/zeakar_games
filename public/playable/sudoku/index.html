@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sudoku</title>
+<style>
+:root {
+  --bg: #e9edfb;
+  --ink: #262a45;
+  --muted: #6c7294;
+  --paper: #ffffff;
+  --accent: #4f5fd9;
+  --accent-dark: #3a48b5;
+  --line: #ccd3ee;
+  --line-strong: #3b4272;
+  --peer: #e2e7fc;
+  --same: #c3cdfa;
+  --selected: #aebcf8;
+  --wrong: #e5484d;
+  --wrong-bg: #ffe3e3;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: linear-gradient(#dfe4f8 1px, transparent 1px), linear-gradient(90deg, #dfe4f8 1px, transparent 1px);
+  background-size: 26px 26px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { font-size: clamp(24px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+h1 span { color: var(--accent); }
+.chip { padding: 4px 10px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.spacer { flex: 1; }
+.chip:empty { display: none; }
+.new { flex-shrink: 0; padding: 9px 13px; border-radius: 12px; background: var(--paper); color: var(--accent-dark); font-size: 14px; font-weight: 800; box-shadow: 0 3px 0 var(--line); }
+.new:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+
+.hud { display: flex; gap: 8px; }
+.stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 14px; background: #ffffffc0; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat.danger strong { color: var(--wrong); }
+.pause { flex: 0 0 auto; width: 48px; border-radius: 14px; background: #ffffffc0; display: grid; place-items: center; }
+.pause svg { width: 20px; height: 20px; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --size: min(100cqw, 100cqh); width: var(--size); height: var(--size); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 14px; background: var(--line-strong); box-shadow: 0 12px 30px #3b427230; }
+.box { display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); gap: 1px; background: var(--line); overflow: hidden; }
+.box:nth-child(1) { border-top-left-radius: 11px; }
+.box:nth-child(3) { border-top-right-radius: 11px; }
+.box:nth-child(7) { border-bottom-left-radius: 11px; }
+.box:nth-child(9) { border-bottom-right-radius: 11px; }
+.cell { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; background: var(--paper); font-size: calc(var(--size) * .066); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); transition: background-color .12s; }
+.cell:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: -3px; }
+.cell.peer { background: var(--peer); }
+.cell.same { background: var(--same); }
+.cell.selected { background: var(--selected); }
+.cell.given { color: var(--ink); font-weight: 800; }
+.cell.hinted { color: #0f8f7a; }
+.cell.wrong { color: var(--wrong); background: var(--wrong-bg); }
+.cell.wrong.selected { background: #ffc9c9; }
+.cell.pop .v { animation: pop .25s; }
+.cell.shake { animation: shake .3s; }
+@keyframes pop { 50% { transform: scale(1.3); } }
+@keyframes shake { 25% { transform: translateX(-8%); } 75% { transform: translateX(8%); } }
+.board.reveal .cell.wrong { animation: flash 1s ease-in-out 2; }
+@keyframes flash { 50% { background: #ff9d9d; } }
+.notes { position: absolute; inset: 6%; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); font-size: calc(var(--size) * .026); font-weight: 700; color: var(--muted); line-height: 1; }
+.notes i { display: grid; place-items: center; font-style: normal; border-radius: 30%; }
+.notes i.hit { background: var(--accent); color: #fff; }
+.board.won .cell { animation: wave .5s calc(var(--d) * 30ms) both; }
+@keyframes wave { 50% { transform: scale(.85); background: #c8f2e6; } }
+.board.paused .cell > * { visibility: hidden; }
+
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tool { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; border-radius: 14px; background: #ffffffc0; color: var(--muted); font-size: 11px; font-weight: 800; line-height: 1.15; }
+.tool svg { width: 22px; height: 22px; color: var(--ink); }
+.tool[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.tool[aria-pressed="true"] svg { color: #fff; }
+.tool:disabled { opacity: .45; cursor: default; }
+.count { position: absolute; top: 4px; right: calc(50% - 24px); min-width: 17px; padding: 1px 4px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 10px; line-height: 15px; }
+.tool:active:not(:disabled) { transform: translateY(1px); }
+
+.pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
+.key { position: relative; height: clamp(46px, 8.5vh, 62px); border-radius: 12px; background: var(--paper); color: var(--accent-dark); font-size: clamp(22px, 6.5vw, 30px); font-weight: 800; box-shadow: 0 3px 0 var(--line); transition: opacity .2s; }
+.key small { position: absolute; bottom: 3px; left: 0; right: 0; font-size: 9px; font-weight: 700; color: var(--muted); }
+.key:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+.key.done { opacity: .3; }
+.pad.noting .key { color: var(--muted); font-size: clamp(16px, 4.6vw, 21px); }
+.endbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 16px; background: var(--paper); }
+.endbar[hidden], .tools[hidden], .pad[hidden] { display: none; }
+.endbar strong { flex: 1; color: var(--wrong); font-size: 16px; }
+.endbar button { padding: 10px 14px; border-radius: 12px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 800; }
+.endbar button.ghost { background: transparent; color: var(--accent-dark); border: 2px solid var(--line); }
+
+.overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #262a4566; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); background: var(--paper); border-radius: 26px; padding: 24px 20px; text-align: center; box-shadow: 0 20px 50px #0004; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--accent); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel p { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.panel .result { color: var(--ink); font-size: 18px; font-weight: 800; }
+.levels { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.level { padding: 14px 8px; border-radius: 16px; background: var(--peer); border: 2px solid transparent; }
+.level strong { display: block; font-size: 17px; font-weight: 900; color: var(--accent-dark); }
+.level small { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.level:hover { border-color: var(--selected); }
+.level.current { border-color: var(--accent); }
+.badge { display: inline-block; margin-top: 12px; padding: 6px 14px; border-radius: 99px; background: #f2a93b; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--accent-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.secondary { margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 2px solid var(--line); color: var(--accent-dark); font-weight: 800; }
+.secondary[hidden] { display: none; }
+.panel .keys { margin-top: 14px; font-size: 12px; }
+.store-link { display: inline-block; margin-top: 16px; font-size: 14px; font-weight: 700; color: var(--accent-dark); text-underline-offset: 4px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Su<span>doku</span></h1>
+    <span class="chip" id="chip"></span>
+    <span class="spacer"></span>
+    <button type="button" class="new" id="new" data-i18n="newGame"></button>
+  </div>
+  <div class="hud">
+    <div class="stat" id="mistakes-stat"><small data-i18n="mistakes"></small><strong id="mistakes">0/3</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">—</strong></div>
+    <button type="button" class="pause" id="pause" data-i18n-label="pause">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+    </button>
+  </div>
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" data-i18n-label="board"></div>
+  </div>
+  <div class="tools" id="tools">
+    <button type="button" class="tool" id="undo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      <span data-i18n="undo"></span>
+    </button>
+    <button type="button" class="tool" id="erase">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20H8.5L4 15.5a2 2 0 0 1 0-2.8L13.2 3.5a2 2 0 0 1 2.8 0l4.5 4.5a2 2 0 0 1 0 2.8L11 20"/><path d="m9 9 7 7"/></svg>
+      <span data-i18n="erase"></span>
+    </button>
+    <button type="button" class="tool" id="notes" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="m14 6 3 3"/></svg>
+      <span data-i18n="notes"></span>
+    </button>
+    <button type="button" class="tool" id="hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.9.7 1.4 1.6 1.4 2.7h4.4c0-1.1.5-2 1.4-2.7A6 6 0 0 0 12 3z"/></svg>
+      <span data-i18n="hint"></span>
+      <b class="count" id="hint-count" aria-hidden="true">3</b>
+    </button>
+  </div>
+  <div class="pad" id="pad"></div>
+  <div class="endbar" id="endbar" hidden>
+    <strong data-i18n="lost"></strong>
+    <button type="button" class="ghost" id="end-retry" data-i18n="retry"></button>
+    <button type="button" id="end-new" data-i18n="newGame"></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <h2 id="start-title">Su<span>doku</span></h2>
+    <p data-i18n="tagline"></p>
+    <div class="levels" id="levels" role="group" data-i18n-label="choose"></div>
+    <button type="button" class="secondary" id="back" data-i18n="back" hidden></button>
+    <p class="keys" data-i18n="keys"></p>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <p class="emoji" aria-hidden="true">☕</p>
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <p class="result" id="paused-time"></p>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="result" id="win-result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <button type="button" class="secondary" id="win-change" data-i18n="change"></button>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=com.zeakar.games.sudoku" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<div class="overlay" id="lost" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lost-title">
+    <p class="emoji" aria-hidden="true">💥</p>
+    <h2 id="lost-title" data-i18n="lost"></h2>
+    <p data-i18n="lostText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="secondary" id="lost-new" data-i18n="newGame"></button>
+    <button type="button" class="secondary" id="review" data-i18n="review"></button>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=com.zeakar.games.sudoku" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Fill every row, column and 3×3 box with the numbers 1 to 9.', newGame: 'New game', mistakes: 'Mistakes', time: 'Time', best: 'Best', pause: 'Pause', resume: 'Resume', paused: 'Paused', undo: 'Undo', erase: 'Erase', notes: 'Notes', hint: 'Hint', board: 'Sudoku board', levels: { easy: 'Easy', medium: 'Medium', hard: 'Hard', expert: 'Expert' }, choose: 'Pick a difficulty', keys: 'Keys: 1–9 to fill · arrows to move · N for notes · Backspace to erase', back: 'Back to game', won: 'Puzzle solved!', result: (level, time) => `${level} · ${time}`, newBest: 'New best time!', again: 'New puzzle', change: 'Change difficulty', lost: 'Game over', lostText: 'Three mistakes! The wrong numbers are marked in red.', retry: 'Retry puzzle', review: 'View board', full: 'Get Sudoku Challenge on Google Play', cell: (r, c) => `Row ${r}, column ${c}`, empty: 'empty', noteList: list => `notes ${list}`, wrong: 'wrong', mistake: n => `Wrong number — ${n} of 3 mistakes.`, hintsLeft: n => `${n} hints left`, noHints: 'No hints left', complete: d => `All the ${d}s are placed!`, bestTime: s => `Best ${s}`, noBest: 'No best yet', remaining: (d, n) => `${d}: ${n} left`, notesOn: 'Notes on', notesOff: 'Notes off' },
+    vi: { tagline: 'Điền các số từ 1 đến 9 vào mỗi hàng, mỗi cột và mỗi khối 3×3.', newGame: 'Ván mới', mistakes: 'Lỗi sai', time: 'Thời gian', best: 'Kỷ lục', pause: 'Tạm dừng', resume: 'Tiếp tục', paused: 'Đang tạm dừng', undo: 'Hoàn tác', erase: 'Xóa', notes: 'Ghi chú', hint: 'Gợi ý', board: 'Bảng Sudoku', levels: { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó', expert: 'Chuyên gia' }, choose: 'Chọn độ khó', keys: 'Phím: 1–9 để điền · mũi tên để di chuyển · N để ghi chú · Backspace để xóa', back: 'Quay lại ván chơi', won: 'Giải xong rồi!', result: (level, time) => `${level} · ${time}`, newBest: 'Kỷ lục mới!', again: 'Câu đố mới', change: 'Đổi độ khó', lost: 'Thua rồi', lostText: 'Sai 3 lần! Các số sai đã được tô đỏ.', retry: 'Chơi lại câu này', review: 'Xem bảng', full: 'Tải Sudoku Challenge trên Google Play', cell: (r, c) => `Hàng ${r}, cột ${c}`, empty: 'trống', noteList: list => `ghi chú ${list}`, wrong: 'sai', mistake: n => `Sai số — ${n}/3 lỗi.`, hintsLeft: n => `Còn ${n} gợi ý`, noHints: 'Đã hết gợi ý', complete: d => `Đã điền đủ các số ${d}!`, bestTime: s => `Kỷ lục ${s}`, noBest: 'Chưa có kỷ lục', remaining: (d, n) => `${d}: còn ${n}`, notesOn: 'Bật ghi chú', notesOff: 'Tắt ghi chú' },
+    zh: { tagline: '在每一行、每一列和每个 3×3 宫中填入 1 到 9。', newGame: '新游戏', mistakes: '错误', time: '时间', best: '最佳', pause: '暂停', resume: '继续', paused: '已暂停', undo: '撤销', erase: '擦除', notes: '笔记', hint: '提示', board: '数独棋盘', levels: { easy: '简单', medium: '中等', hard: '困难', expert: '专家' }, choose: '选择难度', keys: '按键：1–9 填数 · 方向键移动 · N 切换笔记 · Backspace 擦除', back: '返回游戏', won: '解题成功！', result: (level, time) => `${level} · ${time}`, newBest: '新纪录！', again: '新题目', change: '更换难度', lost: '游戏结束', lostText: '已经错了 3 次！填错的数字已标为红色。', retry: '重玩本题', review: '查看棋盘', full: '在 Google Play 获取 Sudoku Challenge', cell: (r, c) => `第 ${r} 行，第 ${c} 列`, empty: '空', noteList: list => `笔记 ${list}`, wrong: '错误', mistake: n => `数字填错了——已错 ${n}/3 次。`, hintsLeft: n => `剩余 ${n} 次提示`, noHints: '提示已用完', complete: d => `数字 ${d} 已全部填完！`, bestTime: s => `最佳 ${s}`, noBest: '暂无纪录', remaining: (d, n) => `${d}：还剩 ${n} 个`, notesOn: '笔记模式已开启', notesOff: '笔记模式已关闭' },
+    fr: { tagline: 'Remplissez chaque ligne, colonne et carré 3×3 avec les chiffres de 1 à 9.', newGame: 'Nouvelle partie', mistakes: 'Erreurs', time: 'Temps', best: 'Record', pause: 'Pause', resume: 'Reprendre', paused: 'En pause', undo: 'Annuler', erase: 'Effacer', notes: 'Notes', hint: 'Indice', board: 'Grille de sudoku', levels: { easy: 'Facile', medium: 'Moyen', hard: 'Difficile', expert: 'Expert' }, choose: 'Choisissez la difficulté', keys: 'Touches : 1–9 pour remplir · flèches pour se déplacer · N pour les notes · Retour arrière pour effacer', back: 'Retour à la partie', won: 'Grille résolue !', result: (level, time) => `${level} · ${time}`, newBest: 'Nouveau record !', again: 'Nouvelle grille', change: 'Changer de difficulté', lost: 'Partie perdue', lostText: 'Trois erreurs ! Les chiffres faux sont marqués en rouge.', retry: 'Recommencer la grille', review: 'Voir la grille', full: 'Obtenir Sudoku Challenge sur Google Play', cell: (r, c) => `Ligne ${r}, colonne ${c}`, empty: 'vide', noteList: list => `notes ${list}`, wrong: 'faux', mistake: n => `Mauvais chiffre — ${n} erreur${n > 1 ? 's' : ''} sur 3.`, hintsLeft: n => `${n} indice${n > 1 ? 's' : ''} restant${n > 1 ? 's' : ''}`, noHints: 'Plus d’indices disponibles', complete: d => `Tous les ${d} sont placés !`, bestTime: s => `Record ${s}`, noBest: 'Pas encore de record', remaining: (d, n) => `${d} : encore ${n}`, notesOn: 'Notes activées', notesOff: 'Notes désactivées' },
+    th: { tagline: 'เติมเลข 1 ถึง 9 ให้ครบทุกแถว ทุกคอลัมน์ และทุกช่อง 3×3', newGame: 'เกมใหม่', mistakes: 'ผิด', time: 'เวลา', best: 'ดีที่สุด', pause: 'หยุดชั่วคราว', resume: 'เล่นต่อ', paused: 'หยุดชั่วคราว', undo: 'ย้อนกลับ', erase: 'ลบ', notes: 'จดโน้ต', hint: 'คำใบ้', board: 'กระดานซูโดกุ', levels: { easy: 'ง่าย', medium: 'ปานกลาง', hard: 'ยาก', expert: 'เซียน' }, choose: 'เลือกระดับความยาก', keys: 'ปุ่ม: 1–9 เติมเลข · ลูกศรเลื่อนช่อง · N จดโน้ต · Backspace ลบ', back: 'กลับไปเล่นต่อ', won: 'ไขปริศนาสำเร็จ!', result: (level, time) => `${level} · ${time}`, newBest: 'สถิติใหม่!', again: 'ปริศนาใหม่', change: 'เปลี่ยนระดับ', lost: 'จบเกม', lostText: 'ผิดครบ 3 ครั้งแล้ว! ตัวเลขที่ผิดถูกทำเป็นสีแดง', retry: 'เล่นข้อนี้อีกครั้ง', review: 'ดูกระดาน', full: 'ดาวน์โหลด Sudoku Challenge บน Google Play', cell: (r, c) => `แถว ${r} คอลัมน์ ${c}`, empty: 'ว่าง', noteList: list => `โน้ต ${list}`, wrong: 'ผิด', mistake: n => `ใส่เลขผิด — ผิด ${n} จาก 3 ครั้ง`, hintsLeft: n => `เหลือคำใบ้ ${n} ครั้ง`, noHints: 'คำใบ้หมดแล้ว', complete: d => `เติมเลข ${d} ครบแล้ว!`, bestTime: s => `ดีที่สุด ${s}`, noBest: 'ยังไม่มีสถิติ', remaining: (d, n) => `${d}: เหลือ ${n}`, notesOn: 'เปิดโหมดจดโน้ต', notesOff: 'ปิดโหมดจดโน้ต' },
+    ja: { tagline: '各行・各列・各3×3ブロックに1〜9を1つずつ入れよう。', newGame: '新しいゲーム', mistakes: 'ミス', time: 'タイム', best: 'ベスト', pause: '一時停止', resume: '再開', paused: '一時停止中', undo: '元に戻す', erase: '消去', notes: 'メモ', hint: 'ヒント', board: '数独の盤面', levels: { easy: 'かんたん', medium: 'ふつう', hard: 'むずかしい', expert: '達人' }, choose: '難易度を選んでください', keys: 'キー：1〜9で入力 · 矢印で移動 · Nでメモ · Backspaceで消去', back: 'ゲームに戻る', won: 'クリア！', result: (level, time) => `${level} · ${time}`, newBest: '自己ベスト更新！', again: '新しい問題', change: '難易度を変更', lost: 'ゲームオーバー', lostText: 'ミスが3回になりました。間違えた数字は赤で表示されています。', retry: 'この問題をやり直す', review: '盤面を見る', full: 'Google Play で Sudoku Challenge を入手', cell: (r, c) => `${r}行${c}列`, empty: '空き', noteList: list => `メモ ${list}`, wrong: '間違い', mistake: n => `数字が違います（ミス ${n}/3）`, hintsLeft: n => `ヒント残り${n}回`, noHints: 'ヒントはもうありません', complete: d => `${d}をすべて配置しました！`, bestTime: s => `ベスト ${s}`, noBest: '記録なし', remaining: (d, n) => `${d}：残り${n}`, notesOn: 'メモ入力オン', notesOff: 'メモ入力オフ' },
+    ko: { tagline: '모든 행, 열, 3×3 칸에 1부터 9까지 한 번씩 채우세요.', newGame: '새 게임', mistakes: '실수', time: '시간', best: '최고', pause: '일시정지', resume: '계속하기', paused: '일시정지됨', undo: '되돌리기', erase: '지우기', notes: '메모', hint: '힌트', board: '스도쿠 보드', levels: { easy: '쉬움', medium: '보통', hard: '어려움', expert: '전문가' }, choose: '난이도를 선택하세요', keys: '키: 1–9 입력 · 방향키 이동 · N 메모 · Backspace 지우기', back: '게임으로 돌아가기', won: '퍼즐 완성!', result: (level, time) => `${level} · ${time}`, newBest: '최고 기록!', again: '새 퍼즐', change: '난이도 변경', lost: '게임 오버', lostText: '실수 3번! 틀린 숫자는 빨간색으로 표시돼요.', retry: '이 퍼즐 다시 하기', review: '보드 보기', full: 'Google Play에서 Sudoku Challenge 받기', cell: (r, c) => `${r}행 ${c}열`, empty: '빈칸', noteList: list => `메모 ${list}`, wrong: '틀림', mistake: n => `틀린 숫자예요 — 실수 ${n}/3`, hintsLeft: n => `힌트 ${n}개 남음`, noHints: '힌트를 모두 사용했어요', complete: d => `숫자 ${d} 완성!`, bestTime: s => `최고 ${s}`, noBest: '기록 없음', remaining: (d, n) => `${d}: ${n}개 남음`, notesOn: '메모 켜짐', notesOff: '메모 꺼짐' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Target clue counts; every puzzle is checked to have exactly one solution.
+  const LEVELS = { easy: 40, medium: 33, hard: 28, expert: 24 };
+  const MAX_MISTAKES = 3;
+  const MAX_HINTS = 3;
+  const STORAGE_KEY = 'milaan.sudoku.best';
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), pad: $('pad'), tools: $('tools'), endbar: $('endbar'), chip: $('chip'), mistakes: $('mistakes'), mistakesStat: $('mistakes-stat'), time: $('time'), best: $('best'), notes: $('notes'), hint: $('hint'), hintCount: $('hint-count'), undo: $('undo'), erase: $('erase'), levels: $('levels'), back: $('back'), winResult: $('win-result'), newBest: $('new-best'), pausedTime: $('paused-time'), announcer: $('announcer') };
+  const overlays = { start: $('start'), paused: $('paused'), win: $('win'), lost: $('lost') };
+
+  const readBest = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch {} };
+  const formatTime = ms => {
+    const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+    return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
+  };
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const announce = text => { els.announcer.textContent = text; };
+
+  const ROW_OF = [], COL_OF = [], BOX_OF = [], PEERS = [];
+  for (let i = 0; i < 81; i++) { ROW_OF[i] = Math.floor(i / 9); COL_OF[i] = i % 9; BOX_OF[i] = Math.floor(ROW_OF[i] / 3) * 3 + Math.floor(COL_OF[i] / 3); }
+  for (let i = 0; i < 81; i++) PEERS[i] = [...Array(81).keys()].filter(j => j !== i && (ROW_OF[j] === ROW_OF[i] || COL_OF[j] === COL_OF[i] || BOX_OF[j] === BOX_OF[i]));
+  const bitCount = mask => { let n = 0; while (mask) { mask &= mask - 1; n++; } return n; };
+
+  // Bitmask backtracking that always branches on the most constrained cell.
+  // Stops once `limit` solutions are found; with limit 1 the grid is left filled in.
+  function solve(grid, limit, random) {
+    const rows = new Uint16Array(9), cols = new Uint16Array(9), boxes = new Uint16Array(9);
+    const empties = [];
+    for (let i = 0; i < 81; i++) {
+      const v = grid[i];
+      if (!v) { empties.push(i); continue; }
+      const bit = 1 << v;
+      if ((rows[ROW_OF[i]] | cols[COL_OF[i]] | boxes[BOX_OF[i]]) & bit) return 0;
+      rows[ROW_OF[i]] |= bit; cols[COL_OF[i]] |= bit; boxes[BOX_OF[i]] |= bit;
+    }
+    let count = 0;
+    const search = depth => {
+      if (depth === empties.length) { count++; return count >= limit; }
+      let pick = depth, pickMask = 0, pickCount = 10;
+      for (let k = depth; k < empties.length; k++) {
+        const i = empties[k];
+        const mask = ~(rows[ROW_OF[i]] | cols[COL_OF[i]] | boxes[BOX_OF[i]]) & 0x3fe;
+        const n = bitCount(mask);
+        if (n < pickCount) { pick = k; pickMask = mask; pickCount = n; if (n <= 1) break; }
+      }
+      if (!pickCount) return false;
+      [empties[depth], empties[pick]] = [empties[pick], empties[depth]];
+      const i = empties[depth], r = ROW_OF[i], c = COL_OF[i], b = BOX_OF[i];
+      const digits = [];
+      for (let d = 1; d <= 9; d++) if (pickMask & (1 << d)) digits.push(d);
+      if (random) shuffle(digits);
+      for (const d of digits) {
+        const bit = 1 << d;
+        rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit; grid[i] = d;
+        if (search(depth + 1)) return true;
+        rows[r] &= ~bit; cols[c] &= ~bit; boxes[b] &= ~bit;
+      }
+      grid[i] = 0;
+      return false;
+    };
+    search(0);
+    return count;
+  }
+
+  // Dig holes from a random full grid, keeping each removal only if the answer stays unique.
+  // Low clue targets are not always reachable in one pass, so retry within a small time budget.
+  function generate(level) {
+    const target = LEVELS[level];
+    const deadline = performance.now() + 160;
+    let best = null;
+    do {
+      const solution = new Uint8Array(81);
+      solve(solution, 1, true);
+      const puzzle = solution.slice();
+      let clues = 81;
+      for (const i of shuffle([...Array(81).keys()])) {
+        if (clues <= target) break;
+        const v = puzzle[i];
+        puzzle[i] = 0;
+        if (solve(puzzle.slice(), 2, false) === 1) clues--;
+        else puzzle[i] = v;
+      }
+      if (!best || clues < best.clues) best = { puzzle, solution, clues };
+    } while (best.clues > target && performance.now() < deadline);
+    return best;
+  }
+
+  let game = null;
+  let modal = null;
+  let lastLevel = 'easy';
+  const cellEls = [];
+  const keyEls = [];
+
+  function buildBoard() {
+    for (let b = 0; b < 9; b++) {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.setAttribute('role', 'presentation');
+      els.board.append(box);
+    }
+    for (let i = 0; i < 81; i++) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'cell';
+      el.setAttribute('role', 'gridcell');
+      el.tabIndex = -1;
+      el.style.setProperty('--d', ROW_OF[i] + COL_OF[i]);
+      el.addEventListener('click', () => select(i));
+      cellEls[i] = el;
+    }
+    // Boxes hold their cells in reading order, so append cell by cell into the right box.
+    for (let i = 0; i < 81; i++) els.board.children[BOX_OF[i]].append(cellEls[i]);
+    for (let d = 1; d <= 9; d++) {
+      const key = document.createElement('button');
+      key.type = 'button';
+      key.className = 'key';
+      key.innerHTML = `${d}<small></small>`;
+      key.addEventListener('click', () => input(d));
+      keyEls[d] = key;
+      els.pad.append(key);
+    }
+  }
+
+  function buildLevels() {
+    const best = readBest();
+    els.levels.replaceChildren();
+    for (const level of Object.keys(LEVELS)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `level${level === lastLevel ? ' current' : ''}`;
+      btn.dataset.level = level;
+      btn.innerHTML = '<strong></strong><small></small>';
+      btn.firstChild.textContent = t.levels[level];
+      btn.lastChild.textContent = best[level] ? t.bestTime(formatTime(best[level])) : t.noBest;
+      btn.addEventListener('click', () => startGame(level));
+      els.levels.append(btn);
+    }
+  }
+
+  function showOverlay(name, focusEl) {
+    for (const [key, el] of Object.entries(overlays)) el.hidden = key !== name;
+    modal = name;
+    if (focusEl) setTimeout(() => focusEl.focus({ preventScroll: true }), 30);
+  }
+
+  function hideOverlays() {
+    for (const el of Object.values(overlays)) el.hidden = true;
+    modal = null;
+  }
+
+  function openStart() {
+    lastLevel = game?.level || lastLevel;
+    buildLevels();
+    els.back.hidden = !(game && game.state === 'play');
+    showOverlay('start', els.levels.querySelector('.current') || els.levels.firstChild);
+  }
+
+  function startGame(level, reuse) {
+    lastLevel = level;
+    const { puzzle, solution } = reuse || generate(level);
+    game = {
+      level, puzzle, solution,
+      value: puzzle.slice(),
+      notes: new Uint16Array(81),
+      fixed: Uint8Array.from(puzzle, v => (v ? 1 : 0)),
+      selected: -1, notesMode: false, mistakes: 0, hints: MAX_HINTS, history: [],
+      elapsed: 0, state: 'play',
+    };
+    els.board.classList.remove('won', 'reveal', 'paused');
+    els.endbar.hidden = true;
+    els.tools.hidden = false;
+    els.pad.hidden = false;
+    els.chip.textContent = t.levels[level];
+    els.time.textContent = '0:00';
+    hideOverlays();
+    setNotesMode(false, true);
+    render();
+    const first = game.value.findIndex(v => !v);
+    select(first, true);
+    startClock();
+  }
+
+  // The clock advances on animation frames with a clamped step, so it naturally stops in hidden tabs.
+  let lastFrame = 0, frameId = 0;
+  function startClock() {
+    cancelAnimationFrame(frameId);
+    lastFrame = performance.now();
+    const tick = now => {
+      const dt = Math.min(50, now - lastFrame);
+      lastFrame = now;
+      if (game.state === 'play' && !modal && !document.hidden) {
+        const before = Math.floor(game.elapsed / 1000);
+        game.elapsed += dt;
+        if (Math.floor(game.elapsed / 1000) !== before) els.time.textContent = formatTime(game.elapsed);
+      }
+      if (game.state === 'play') frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+  }
+
+  function cellLabel(i) {
+    const v = game.value[i];
+    let state;
+    if (v) state = v !== game.solution[i] ? `${v}, ${t.wrong}` : String(v);
+    else if (game.notes[i]) state = t.noteList([1, 2, 3, 4, 5, 6, 7, 8, 9].filter(d => game.notes[i] & (1 << d)).join(' '));
+    else state = t.empty;
+    return `${t.cell(ROW_OF[i] + 1, COL_OF[i] + 1)}: ${state}`;
+  }
+
+  function placedCount(d) {
+    let n = 0;
+    for (let i = 0; i < 81; i++) if (game.value[i] === d && game.solution[i] === d) n++;
+    return n;
+  }
+
+  function render() {
+    const sel = game.selected;
+    const selValue = sel >= 0 ? game.value[sel] : 0;
+    for (let i = 0; i < 81; i++) {
+      const el = cellEls[i];
+      const v = game.value[i];
+      const peer = sel >= 0 && i !== sel && (ROW_OF[i] === ROW_OF[sel] || COL_OF[i] === COL_OF[sel] || BOX_OF[i] === BOX_OF[sel]);
+      el.className = 'cell'
+        + (game.fixed[i] === 1 ? ' given' : game.fixed[i] === 2 ? ' hinted' : '')
+        + (v && v !== game.solution[i] ? ' wrong' : '')
+        + (i === sel ? ' selected' : selValue && v === selValue ? ' same' : peer ? ' peer' : '');
+      if (v) el.innerHTML = `<span class="v">${v}</span>`;
+      else if (game.notes[i]) {
+        let html = '<span class="notes" aria-hidden="true">';
+        for (let d = 1; d <= 9; d++) html += game.notes[i] & (1 << d) ? `<i${d === selValue ? ' class="hit"' : ''}>${d}</i>` : '<i></i>';
+        el.innerHTML = `${html}</span>`;
+      } else el.textContent = '';
+      el.setAttribute('aria-label', cellLabel(i));
+      el.setAttribute('aria-selected', String(i === sel));
+      el.tabIndex = i === (sel >= 0 ? sel : 0) ? 0 : -1;
+    }
+    for (let d = 1; d <= 9; d++) {
+      const left = 9 - placedCount(d);
+      keyEls[d].classList.toggle('done', left === 0);
+      keyEls[d].lastChild.textContent = left || '';
+      keyEls[d].setAttribute('aria-label', t.remaining(d, left));
+    }
+    els.mistakes.textContent = `${game.mistakes}/${MAX_MISTAKES}`;
+    els.mistakesStat.classList.toggle('danger', game.mistakes > 0);
+    els.hintCount.textContent = String(game.hints);
+    els.hint.disabled = game.hints === 0;
+    els.hint.setAttribute('aria-label', `${t.hint}: ${t.hintsLeft(game.hints)}`);
+    els.undo.disabled = !game.history.length;
+    const best = readBest()[game.level];
+    els.best.textContent = best ? formatTime(best) : '—';
+  }
+
+  function select(i, focus) {
+    if (!game || i < 0) return;
+    game.selected = i;
+    render();
+    if (focus || document.activeElement?.classList.contains('cell')) cellEls[i].focus({ preventScroll: true });
+  }
+
+  function animateCell(i, name) {
+    const el = cellEls[i];
+    el.classList.remove(name);
+    void el.offsetWidth;
+    el.classList.add(name);
+  }
+
+  const isLocked = i => game.fixed[i] || game.value[i] === game.solution[i];
+  const snapshot = list => list.map(i => ({ i, value: game.value[i], notes: game.notes[i] }));
+
+  function setNotesMode(on, silent) {
+    game.notesMode = on;
+    els.notes.setAttribute('aria-pressed', String(on));
+    els.pad.classList.toggle('noting', on);
+    if (!silent) announce(on ? t.notesOn : t.notesOff);
+  }
+
+  function input(d) {
+    if (!game || game.state !== 'play' || modal) return;
+    const i = game.selected;
+    if (i < 0 || isLocked(i)) return;
+    const bit = 1 << d;
+    if (game.notesMode) {
+      if (game.value[i]) return;
+      game.history.push(snapshot([i]));
+      game.notes[i] ^= bit;
+      render();
+      return;
+    }
+    if (game.value[i] === d) return;
+    const correct = d === game.solution[i];
+    // A correct number also clears that pencil mark from its row, column and box.
+    const touched = correct ? [i, ...PEERS[i].filter(j => !game.value[j] && game.notes[j] & bit)] : [i];
+    game.history.push(snapshot(touched));
+    game.value[i] = d;
+    game.notes[i] = 0;
+    if (correct) {
+      for (const j of touched) game.notes[j] &= ~bit;
+      render();
+      animateCell(i, 'pop');
+      if (placedCount(d) === 9) announce(t.complete(d));
+      checkWin();
+    } else {
+      game.mistakes++;
+      render();
+      animateCell(i, 'shake');
+      announce(t.mistake(game.mistakes));
+      if (game.mistakes >= MAX_MISTAKES) lose();
+    }
+  }
+
+  function erase() {
+    if (!game || game.state !== 'play' || modal) return;
+    const i = game.selected;
+    if (i < 0 || isLocked(i) || (!game.value[i] && !game.notes[i])) return;
+    game.history.push(snapshot([i]));
+    game.value[i] = 0;
+    game.notes[i] = 0;
+    render();
+  }
+
+  function undo() {
+    if (!game || game.state !== 'play' || modal || !game.history.length) return;
+    const entry = game.history.pop();
+    // Cells filled by a hint since then stay solved.
+    for (const s of entry) if (game.fixed[s.i] !== 2) { game.value[s.i] = s.value; game.notes[s.i] = s.notes; }
+    game.selected = entry[0].i;
+    render();
+    cellEls[game.selected].focus({ preventScroll: true });
+  }
+
+  function hint() {
+    if (!game || game.state !== 'play' || modal) return;
+    if (!game.hints) return announce(t.noHints);
+    const sel = game.selected;
+    let i = sel >= 0 && !isLocked(sel) ? sel : -1;
+    if (i < 0) {
+      const open = [...Array(81).keys()].filter(j => game.value[j] !== game.solution[j]);
+      if (!open.length) return;
+      i = open[Math.floor(Math.random() * open.length)];
+    }
+    const d = game.solution[i];
+    game.value[i] = d;
+    game.notes[i] = 0;
+    game.fixed[i] = 2;
+    for (const j of PEERS[i]) game.notes[j] &= ~(1 << d);
+    game.hints--;
+    select(i, true);
+    animateCell(i, 'pop');
+    announce(`${t.cell(ROW_OF[i] + 1, COL_OF[i] + 1)}: ${d}. ${t.hintsLeft(game.hints)}`);
+    checkWin();
+  }
+
+  function checkWin() {
+    for (let i = 0; i < 81; i++) if (game.value[i] !== game.solution[i]) return;
+    game.state = 'won';
+    game.selected = -1;
+    render();
+    const all = readBest();
+    const isBest = !all[game.level] || game.elapsed < all[game.level];
+    if (isBest) { all[game.level] = Math.round(game.elapsed); writeBest(all); }
+    els.best.textContent = formatTime(all[game.level]);
+    els.time.textContent = formatTime(game.elapsed);
+    els.winResult.textContent = t.result(t.levels[game.level], formatTime(game.elapsed));
+    els.newBest.hidden = !isBest;
+    els.board.classList.add('won');
+    announce(`${t.won} ${els.winResult.textContent}`);
+    setTimeout(() => showOverlay('win', $('again')), 900);
+  }
+
+  function lose() {
+    game.state = 'lost';
+    announce(`${t.lost}. ${t.lostText}`);
+    setTimeout(() => showOverlay('lost', $('retry')), 500);
+  }
+
+  function reviewBoard() {
+    hideOverlays();
+    els.tools.hidden = true;
+    els.pad.hidden = true;
+    els.endbar.hidden = false;
+    els.board.classList.remove('reveal');
+    void els.board.offsetWidth;
+    els.board.classList.add('reveal');
+    $('end-retry').focus({ preventScroll: true });
+  }
+
+  function retry() { startGame(game.level, { puzzle: game.puzzle, solution: game.solution }); }
+
+  function setPaused(paused) {
+    if (!game || game.state !== 'play') return;
+    els.board.classList.toggle('paused', paused);
+    if (paused) {
+      els.pausedTime.textContent = `${t.levels[game.level]} · ${formatTime(game.elapsed)}`;
+      showOverlay('paused', $('resume'));
+    } else {
+      hideOverlays();
+      if (game.selected >= 0) cellEls[game.selected].focus({ preventScroll: true });
+    }
+  }
+
+  function moveSelection(dr, dc) {
+    const sel = game.selected >= 0 ? game.selected : 40;
+    const r = (ROW_OF[sel] + dr + 9) % 9, c = (COL_OF[sel] + dc + 9) % 9;
+    select(game.selected >= 0 ? r * 9 + c : sel, true);
+  }
+
+  const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  document.addEventListener('keydown', event => {
+    if (!game || game.state !== 'play' || modal || event.altKey) return;
+    const key = event.key;
+    if ((event.ctrlKey || event.metaKey) && (key === 'z' || key === 'Z')) { event.preventDefault(); undo(); return; }
+    if (event.ctrlKey || event.metaKey) return;
+    if (/^[1-9]$/.test(key)) { event.preventDefault(); input(Number(key)); }
+    else if (ARROWS[key]) { event.preventDefault(); moveSelection(...ARROWS[key]); }
+    else if (key === 'Backspace' || key === 'Delete' || key === '0') { event.preventDefault(); erase(); }
+    else if (key === 'n' || key === 'N') { event.preventDefault(); setNotesMode(!game.notesMode); }
+  });
+
+  els.board.addEventListener('focusin', event => {
+    const i = cellEls.indexOf(event.target);
+    if (i >= 0 && i !== game?.selected && game?.state === 'play') select(i);
+  });
+  $('new').addEventListener('click', openStart);
+  $('pause').addEventListener('click', () => setPaused(true));
+  $('resume').addEventListener('click', () => setPaused(false));
+  els.notes.addEventListener('click', () => { if (game?.state === 'play') setNotesMode(!game.notesMode); });
+  els.erase.addEventListener('click', erase);
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', hint);
+  els.back.addEventListener('click', () => { hideOverlays(); if (game.selected >= 0) cellEls[game.selected].focus({ preventScroll: true }); });
+  $('again').addEventListener('click', () => startGame(game.level));
+  $('win-change').addEventListener('click', openStart);
+  $('retry').addEventListener('click', retry);
+  $('end-retry').addEventListener('click', retry);
+  $('lost-new').addEventListener('click', openStart);
+  $('end-new').addEventListener('click', openStart);
+  $('review').addEventListener('click', reviewBoard);
+
+  buildBoard();
+  openStart();
+})();
+</script>
+</body>
+</html>

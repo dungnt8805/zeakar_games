@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chicken Cross</title>
+<style>
+:root {
+  --bg: #1d3b2f;
+  --ink: #23303b;
+  --text: #ffffff;
+  --muted: #607080;
+  --sun: #ffd23f;
+  --sun-dark: #d9a400;
+  --paper: #fffdf6;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #2f5a45, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff20, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffd23f88; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 6cqh 6cqw; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.title { font-size: min(14cqw, 8cqh); font-weight: 900; letter-spacing: -.02em; line-height: 1; color: #fff; text-shadow: 0 4px 0 var(--ink), 0 8px 24px #23303b88; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.title span { color: var(--sun); }
+.tagline { margin-top: 1.8cqh; max-width: 28em; font-size: max(13px, min(4cqw, 2.4cqh)); font-weight: 700; line-height: 1.4; color: var(--ink); background: #ffffffd9; padding: 6px 12px; border-radius: 12px; }
+.spacer { flex: 1; }
+.cta { padding: 14px 30px; border-radius: 99px; background: var(--sun); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--sun-dark), 0 10px 24px #0004; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--sun-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; max-width: 30em; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #ffffffc4; padding: 4px 10px; border-radius: 99px; }
+.small:empty { display: none; }
+
+.center { justify-content: center; background: #10201a55; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 20px 18px; border-radius: 22px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #d6cdb4, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.cause { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--muted); line-height: 1.35; }
+.cause:empty { display: none; }
+.scores { display: flex; justify-content: center; gap: 22px; margin-top: 14px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: #ff6b6b; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--sun); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--sun-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--sun-dark); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title">Chicken <span>Cross</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="over"></h2>
+          <p class="cause" id="cause"></p>
+          <div class="scores">
+            <div><small data-i18n="score"></small><strong id="final-score">0</strong></div>
+            <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+            <div><small data-i18n="coins"></small><strong id="final-coins">0</strong></div>
+          </div>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Hop across busy roads, rivers and railways. How far can your chicken go?', controls: 'Tap to hop forward · swipe or use the arrow keys to turn', start: 'Tap to start', best: n => `Best: ${n}`, canvas: 'Chicken Cross — tap to hop forward, swipe or use the arrow keys to move', paused: 'Paused', resume: 'Resume', over: 'Game over', score: 'Score', bestLabel: 'Best', coins: 'Coins', newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', causes: { car: 'Squashed by traffic!', train: 'Flattened by a train!', drown: 'Splash! Chickens can’t swim.', drift: 'Swept away by the river!', eagle: 'An eagle grabbed you. Keep moving!' }, milestone: n => `${n} rows!`, go: 'Go!', hurry: 'Hurry up!', final: s => `${s} rows crossed.` },
+    vi: { tagline: 'Nhảy qua đường đông xe, sông và đường ray. Chú gà của bạn đi được bao xa?', controls: 'Chạm để nhảy tới · vuốt hoặc dùng phím mũi tên để đổi hướng', start: 'Chạm để bắt đầu', best: n => `Kỷ lục: ${n}`, canvas: 'Chicken Cross — chạm để nhảy tới, vuốt hoặc dùng phím mũi tên để di chuyển', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', score: 'Điểm', bestLabel: 'Kỷ lục', coins: 'Xu', newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', causes: { car: 'Bị xe tông bẹp rồi!', train: 'Bị tàu hỏa cán qua!', drown: 'Tõm! Gà đâu biết bơi.', drift: 'Bị dòng sông cuốn đi mất!', eagle: 'Đại bàng quắp mất rồi. Đi tiếp đừng dừng!' }, milestone: n => `${n} hàng!`, go: 'Đi nào!', hurry: 'Nhanh lên!', final: s => `Đã vượt ${s} hàng.` },
+    zh: { tagline: '跳过繁忙的马路、河流和铁轨，看看你的小鸡能走多远！', controls: '点击向前跳 · 滑动或用方向键转向', start: '点击开始', best: n => `最高：${n}`, canvas: 'Chicken Cross——点击向前跳，滑动或用方向键移动', paused: '已暂停', resume: '继续', over: '游戏结束', score: '得分', bestLabel: '最高', coins: '金币', newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', causes: { car: '被车撞扁了！', train: '被火车压扁了！', drown: '扑通！小鸡可不会游泳。', drift: '被河水冲走了！', eagle: '被老鹰抓走了，别停下来！' }, milestone: n => `${n} 行！`, go: '出发！', hurry: '快点走！', final: s => `穿过了 ${s} 行。` },
+    fr: { tagline: 'Traversez routes, rivières et voies ferrées en sautillant. Jusqu’où ira votre poulet ?', controls: 'Touchez pour avancer · balayez ou utilisez les flèches pour tourner', start: 'Touchez pour commencer', best: n => `Record : ${n}`, canvas: 'Chicken Cross — touchez pour avancer, balayez ou utilisez les flèches pour bouger', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', score: 'Score', bestLabel: 'Record', coins: 'Pièces', newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', causes: { car: 'Écrasé par la circulation !', train: 'Renversé par un train !', drown: 'Plouf ! Les poulets ne nagent pas.', drift: 'Emporté par la rivière !', eagle: 'Un aigle vous a attrapé. Ne traînez pas !' }, milestone: n => `${n} rangées !`, go: 'C’est parti !', hurry: 'Dépêchez-vous !', final: s => `${s} rangées traversées.` },
+    th: { tagline: 'กระโดดข้ามถนนที่รถพลุกพล่าน แม่น้ำ และรางรถไฟ ไก่ของคุณจะไปได้ไกลแค่ไหน?', controls: 'แตะเพื่อกระโดดไปข้างหน้า · ปัดหรือใช้ปุ่มลูกศรเพื่อเลี้ยว', start: 'แตะเพื่อเริ่ม', best: n => `สูงสุด: ${n}`, canvas: 'Chicken Cross — แตะเพื่อกระโดดไปข้างหน้า ปัดหรือใช้ปุ่มลูกศรเพื่อเคลื่อนที่', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', score: 'คะแนน', bestLabel: 'สูงสุด', coins: 'เหรียญ', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', causes: { car: 'โดนรถชนแบน!', train: 'โดนรถไฟทับ!', drown: 'ตูม! ไก่ว่ายน้ำไม่เป็นนะ', drift: 'โดนกระแสน้ำพัดไปแล้ว!', eagle: 'โดนนกอินทรีโฉบไป อย่าหยุดเดินนะ!' }, milestone: n => `${n} แถว!`, go: 'ไปเลย!', hurry: 'รีบหน่อย!', final: s => `ข้ามได้ ${s} แถว` },
+    ja: { tagline: '車道や川、線路をぴょんぴょん渡ろう。ニワトリはどこまで行けるかな？', controls: 'タップで前へジャンプ · スワイプか矢印キーで方向転換', start: 'タップでスタート', best: n => `ベスト：${n}`, canvas: 'Chicken Cross — タップで前へ、スワイプか矢印キーで移動', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', score: 'スコア', bestLabel: 'ベスト', coins: 'コイン', newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', causes: { car: '車にひかれちゃった！', train: '電車にひかれちゃった！', drown: 'ドボン！ニワトリは泳げません。', drift: '川に流されちゃった！', eagle: 'ワシにさらわれた！止まらずに進もう。' }, milestone: n => `${n} マス突破！`, go: 'スタート！', hurry: '急いで！', final: s => `${s} マス進んだ。` },
+    ko: { tagline: '복잡한 도로와 강, 철길을 폴짝폴짝 건너세요. 닭이 얼마나 멀리 갈 수 있을까요?', controls: '탭하면 앞으로 점프 · 스와이프나 방향키로 방향 전환', start: '탭해서 시작', best: n => `최고: ${n}`, canvas: 'Chicken Cross — 탭하면 앞으로, 스와이프나 방향키로 이동', paused: '일시 정지', resume: '계속하기', over: '게임 오버', score: '점수', bestLabel: '최고', coins: '코인', newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', causes: { car: '차에 치였어요!', train: '기차에 치였어요!', drown: '풍덩! 닭은 수영을 못해요.', drift: '강물에 떠내려갔어요!', eagle: '독수리가 낚아챘어요. 멈추지 마세요!' }, milestone: n => `${n}줄 돌파!`, go: '출발!', hurry: '서둘러요!', final: s => `${s}줄을 건넜어요.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait world: 9 columns of 40 px tiles. Positions are in tile units; rows count forward.
+  const W = 360, H = 640, T = 40, COLS = 9, STEP = 1 / 120;
+  const HOP_TIME = 0.13, IDLE_LIMIT = 8, SPAN = COLS + 8, TRAIN_LEN = 10, TRAIN_SPEED = 20;
+  const MILESTONE = 25;
+  const STORAGE = { best: 'milaan.chickenCross.best', coins: 'milaan.chickenCross.coins' };
+  const CAR_COLORS = [['#ff6b6b', '#d84a4a'], ['#ffb454', '#e08d2a'], ['#54a0ff', '#3478d1'], ['#9b7bf0', '#7756d0'], ['#4ecdc4', '#2ea79e'], ['#f78fb3', '#d76a91']];
+  const DIRS = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), cause: $('cause'), finalScore: $('final-score'), finalBest: $('final-best'), finalCoins: $('final-coins'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readNum = key => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
+  const writeNum = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+
+  let game, scale = 1, acc = 0, last = performance.now();
+  const saved = { best: readNum(STORAGE.best), coins: readNum(STORAGE.coins) };
+
+  function reset() {
+    game = {
+      state: 'ready', time: 0, rows: new Map(), plan: [], cam: -5, score: 0, coins: 0, nextMilestone: MILESTONE,
+      chicken: { x: 4.5, r: 0, face: 'up', hop: null, log: null, bump: 0 },
+      queue: null, idle: 0, deadT: 0, cause: '', eagle: null, particles: [], banner: null, overAt: 0, hurried: false,
+    };
+    for (let r = -6; r < 20; r++) game.rows.set(r, makeRow(r));
+    els.startBest.textContent = saved.best ? t.best(saved.best) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+  }
+
+  // ---------- world generation ----------
+  const difficulty = r => clamp(r / 160, 0, 1);
+
+  function fillLane(lenFn, gapFn) {
+    const items = [];
+    let x = -4 + rand(0, 3);
+    while (true) {
+      const len = lenFn();
+      if (x + len > SPAN - 4) break;
+      items.push({ x, len, color: pick(CAR_COLORS), kind: len > 2 ? 'truck' : 'car' });
+      x += len + gapFn();
+    }
+    // Make sure the gap across the wrap seam is as wide as the others.
+    const lastItem = items[items.length - 1];
+    if (items.length > 1 && items[0].x + SPAN - (lastItem.x + lastItem.len) < 2) items.pop();
+    return items;
+  }
+
+  function grassRow(r, prev) {
+    const row = { type: 'grass', trees: new Map(), coin: -1, shade: r % 2 };
+    if (r < 0) { for (let c = 0; c < COLS; c++) row.trees.set(c, r === -1 ? pick(['bush', 'bush', 'rock']) : Math.random() < 0.5 ? 'tall' : 'tree'); return row; }
+    const protect = new Set([4]);
+    if (r > 2) {
+      protect.clear();
+      if (prev && prev.type === 'river' && prev.pads) for (const c of prev.pads) protect.add(c);
+      if (prev && prev.type === 'grass') for (const c of shuffle([...Array(COLS).keys()].filter(c => !prev.trees.has(c))).slice(0, 3)) protect.add(c);
+    }
+    const count = r <= 2 ? randInt(0, 2) : randInt(1, 3) + Math.round(difficulty(r) * 2);
+    const free = shuffle([...Array(COLS).keys()].filter(c => !protect.has(c) && (r > 2 || c < 2 || c > 6)));
+    for (const c of free.slice(0, count)) row.trees.set(c, pick(['tree', 'tree', 'tall', 'rock']));
+    if (r > 2 && Math.random() < 0.22) {
+      const open = [...Array(COLS).keys()].filter(c => !row.trees.has(c));
+      row.coin = pick(open);
+    }
+    return row;
+  }
+
+  function roadRow(r) {
+    const d = difficulty(r);
+    const fast = Math.random() < 0.12 + 0.2 * d;
+    const speed = fast ? rand(3.6, 4.6) + d : rand(1.1, 2) + d * rand(0.5, 1.8);
+    const truck = Math.random() < 0.35;
+    const cars = fast
+      ? fillLane(() => 1.3, () => rand(6, 9))
+      : fillLane(() => (truck ? 2.3 : 1.3), () => rand(2.6, 4.6) - d * 0.6);
+    return { type: 'road', dir: Math.random() < 0.5 ? -1 : 1, speed, cars, coin: Math.random() < 0.12 ? randInt(0, COLS - 1) : -1 };
+  }
+
+  function riverRow(r, mode, prev) {
+    const d = difficulty(r);
+    const row = { type: 'river', dir: Math.random() < 0.5 ? -1 : 1, speed: 0, logs: [], pads: null, coin: -1 };
+    if (mode === 'pads') {
+      const pads = new Set();
+      if (prev && prev.type === 'grass') {
+        for (const c of shuffle([...Array(COLS).keys()].filter(c => !prev.trees.has(c))).slice(0, 2)) pads.add(c);
+      }
+      while (pads.size < randInt(3, 5)) pads.add(randInt(0, COLS - 1));
+      row.pads = pads;
+      return row;
+    }
+    row.speed = rand(0.8, 1.5) + d * rand(0.2, 1);
+    row.logs = fillLane(() => randInt(2, 4) - (d > 0.5 && Math.random() < 0.5 ? 1 : 0), () => rand(1.2, 2.8) + d * 0.6);
+    return row;
+  }
+
+  function railRow(r) {
+    return { type: 'rail', dir: Math.random() < 0.5 ? -1 : 1, phase: 'idle', timer: rand(1.5, 5), trainX: 0, coin: -1 };
+  }
+
+  function planChunk(r) {
+    const d = difficulty(r);
+    const plan = [];
+    for (let i = randInt(1, 2 - (d > 0.6 ? 1 : 0)); i > 0; i--) plan.push('grass');
+    const roll = Math.random();
+    if (r > 14 && roll < 0.18) {
+      for (let i = randInt(1, d > 0.4 ? 2 : 1); i > 0; i--) plan.push('rail');
+    } else if (r > 7 && roll < 0.5) {
+      const n = randInt(1, 2 + Math.round(d));
+      const modes = n === 3 ? pick([['logs', 'pads', 'logs'], ['logs', 'logs', 'logs']]) : n === 2 ? pick([['logs', 'logs'], ['pads', 'logs'], ['logs', 'pads']]) : [Math.random() < 0.3 ? 'pads' : 'logs'];
+      plan.push(...modes);
+    } else {
+      for (let i = randInt(1, 2 + Math.round(d * 2)); i > 0; i--) plan.push('road');
+    }
+    return plan;
+  }
+
+  function makeRow(r) {
+    const prev = game.rows.get(r - 1);
+    if (r <= 2) return grassRow(r, prev);
+    if (!game.plan.length) game.plan = planChunk(r);
+    const kind = game.plan.shift();
+    if (kind === 'grass') return grassRow(r, prev);
+    if (kind === 'road') return roadRow(r);
+    if (kind === 'rail') return railRow(r);
+    return riverRow(r, kind, prev);
+  }
+
+  // ---------- game flow ----------
+  function begin() {
+    if (game.state !== 'ready') return false;
+    game.state = 'play';
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(t.go);
+    return true;
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+    els.resume.focus({ preventScroll: true });
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+  }
+
+  function chickenPos() {
+    const c = game.chicken;
+    if (!c.hop) return { x: c.x, r: c.r, z: 0 };
+    const k = c.hop.t;
+    return { x: c.hop.fx + (c.hop.tx - c.hop.fx) * k, r: c.hop.fr + (c.hop.tr - c.hop.fr) * k, z: Math.sin(k * Math.PI) * 10 };
+  }
+
+  function move(dir) {
+    if (game.state === 'ready') begin();
+    if (game.state !== 'play') return;
+    const c = game.chicken;
+    if (c.hop) { game.queue = dir; return; }
+    c.face = dir;
+    const [dx, dr] = DIRS[dir];
+    const tr = c.r + dr;
+    const target = game.rows.get(tr);
+    const here = game.rows.get(c.r);
+    let tx = c.x + dx;
+    // Landing on solid ground snaps to the tile grid; logs and lily pads keep the exact position.
+    if (target.type !== 'river' || target.pads) tx = dr && here.type === 'river' && !here.pads ? Math.floor(c.x) + 0.5 : tx;
+    if (target.type !== 'river' && (tx < 0.5 || tx > COLS - 0.5)) { c.bump = 1; return; }
+    if (target.type === 'grass' && target.trees.has(Math.floor(tx))) { c.bump = 1; return; }
+    c.hop = { fx: c.x, fr: c.r, tx, tr, t: 0 };
+    c.log = null;
+    game.idle = 0;
+  }
+
+  function land() {
+    const c = game.chicken;
+    c.x = c.hop.tx; c.r = c.hop.tr; c.hop = null;
+    const row = game.rows.get(c.r);
+    if (c.r > game.score) {
+      game.score = c.r;
+      if (game.score >= game.nextMilestone) {
+        const text = t.milestone(game.nextMilestone);
+        game.banner = { text, t: 0 };
+        announce(text);
+        game.nextMilestone += MILESTONE;
+      }
+    }
+    if (row.type === 'river') {
+      if (row.pads) {
+        const col = Math.floor(c.x);
+        if (row.pads.has(col) && Math.abs(c.x - (col + 0.5)) < 0.42) { c.x = col + 0.5; }
+        else return die('drown');
+      } else {
+        c.log = row.logs.find(l => c.x > l.x - 0.15 && c.x < l.x + l.len + 0.15) || null;
+        if (!c.log) return die('drown');
+        c.x = clamp(c.x, c.log.x + 0.35, c.log.x + c.log.len - 0.35);
+      }
+    }
+    if (row.coin >= 0 && row.coin === Math.floor(c.x)) {
+      row.coin = -1;
+      game.coins++;
+      sparkle(c.x, c.r, '#ffd23f', 8);
+    }
+    if (game.queue) { const q = game.queue; game.queue = null; move(q); }
+  }
+
+  function sparkle(x, r, color, count, up = 90) {
+    if (reducedMotion) count = Math.ceil(count / 3);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = 30 + Math.random() * up;
+      game.particles.push({ x: x * T, y: T / 2, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.6, r: 2 + Math.random() * 3, color, wr: r });
+    }
+  }
+
+  function die(cause) {
+    if (game.state !== 'play') return;
+    const c = game.chicken;
+    game.state = 'dying';
+    game.cause = cause;
+    game.deadT = 0;
+    if (cause === 'drown' || cause === 'drift') sparkle(c.x, c.r, '#d8f4ff', 14, 120);
+    if (cause === 'eagle') game.eagle = { t: 0 };
+    if (cause === 'car' || cause === 'train') sparkle(chickenPos().x, chickenPos().r, '#ffffff', 12, 140);
+  }
+
+  function finish() {
+    game.state = 'over';
+    const isBest = game.score > saved.best;
+    if (isBest) { saved.best = game.score; writeNum(STORAGE.best, saved.best); }
+    if (game.coins) { saved.coins += game.coins; writeNum(STORAGE.coins, saved.coins); }
+    els.cause.textContent = t.causes[game.cause];
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(saved.best);
+    els.finalCoins.textContent = String(game.coins);
+    els.newBest.hidden = !isBest;
+    announce(`${t.over}. ${t.causes[game.cause]} ${t.final(game.score)}${isBest ? ` ${t.newBest}` : ''}`);
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    els.again.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    if (game.state !== 'over' || performance.now() - game.overAt < 350) return;
+    reset();
+    canvas.focus({ preventScroll: true });
+  }
+
+  // ---------- simulation ----------
+  function stepLane(items, v, dt) {
+    for (const o of items) {
+      o.x += v * dt;
+      if (v > 0 && o.x > COLS + 4) o.x -= SPAN;
+      if (v < 0 && o.x + o.len < -4) o.x += SPAN;
+    }
+  }
+
+  function stepRows(dt) {
+    const lo = Math.floor(game.cam) - 2, hi = Math.ceil(game.cam) + 18;
+    for (let r = lo; r <= hi; r++) {
+      const row = game.rows.get(r);
+      if (!row) continue;
+      if (row.type === 'road') stepLane(row.cars, row.dir * row.speed, dt);
+      else if (row.type === 'river' && !row.pads) stepLane(row.logs, row.dir * row.speed, dt);
+      else if (row.type === 'rail') {
+        if (row.phase === 'pass') {
+          row.trainX += row.dir * TRAIN_SPEED * dt;
+          if (row.dir > 0 ? row.trainX > COLS + 1 : row.trainX + TRAIN_LEN < -1) { row.phase = 'idle'; row.timer = rand(3, 7) - difficulty(r) * 2; }
+        } else if ((row.timer -= dt) <= 0) {
+          if (row.phase === 'idle') { row.phase = 'warn'; row.timer = 1.2; }
+          else { row.phase = 'pass'; row.trainX = row.dir > 0 ? -TRAIN_LEN - 1 : COLS + 1; }
+        }
+      }
+    }
+  }
+
+  function hitCheck() {
+    const p = chickenPos();
+    const row = game.rows.get(Math.round(p.r));
+    if (!row) return;
+    const left = p.x - 0.3, right = p.x + 0.3;
+    if (row.type === 'road') {
+      for (const car of row.cars) if (right > car.x + 0.08 && left < car.x + car.len - 0.08) return die('car');
+    } else if (row.type === 'rail' && row.phase === 'pass') {
+      if (right > row.trainX && left < row.trainX + TRAIN_LEN) die('train');
+    }
+  }
+
+  function step(dt) {
+    game.time += dt;
+    if (game.banner && (game.banner.t += dt) > 1.6) game.banner = null;
+    for (const q of game.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 260 * dt; q.life -= dt; }
+    game.particles = game.particles.filter(q => q.life > 0);
+    stepRows(dt);
+    const c = game.chicken;
+    c.bump = Math.max(0, c.bump - dt * 6);
+    if (game.state === 'play') {
+      if (c.hop) {
+        c.hop.t = Math.min(1, c.hop.t + dt / HOP_TIME);
+        if (c.hop.t >= 1) land();
+      } else if (c.log) {
+        const row = game.rows.get(c.r);
+        c.x += row.dir * row.speed * dt;
+        if (c.x < 0.1 || c.x > COLS - 0.1) die('drift');
+      }
+      if (game.state !== 'play') return;
+      hitCheck();
+      if (game.state !== 'play') return;
+      // The view keeps creeping forward and an eagle swoops in on chickens that dawdle.
+      game.idle += dt;
+      const target = c.r - 5;
+      if (target > game.cam) game.cam += (target - game.cam) * Math.min(1, dt * 5);
+      if (game.score > 0) game.cam += (0.25 + Math.min(0.2, game.score * 0.0015)) * dt;
+      const danger = chickenPos().r - game.cam < 1.4 || game.idle > IDLE_LIMIT - 2.5;
+      if (danger && !game.hurried) { game.hurried = true; announce(t.hurry); }
+      if (!danger) game.hurried = false;
+      if (chickenPos().r < game.cam - 0.3 || game.idle > IDLE_LIMIT) die('eagle');
+      while (!game.rows.has(Math.ceil(game.cam) + 19)) {
+        const r = Math.max(...game.rows.keys()) + 1;
+        game.rows.set(r, makeRow(r));
+      }
+      for (const r of game.rows.keys()) if (r < game.cam - 4) game.rows.delete(r);
+      return;
+    }
+    if (game.state === 'dying') {
+      game.deadT += dt;
+      if (game.eagle) game.eagle.t += dt;
+      if (game.deadT > (game.cause === 'eagle' ? 1.5 : 1)) finish();
+    }
+  }
+
+  // ---------- drawing ----------
+  const rowTop = r => H - (r - game.cam + 1) * T;
+
+  // A blocky box seen from above and slightly in front: top face lifted by its height, front face below it.
+  function box(x, y, w, d, hz, top, front) {
+    ctx.fillStyle = front;
+    ctx.fillRect(x, y + d - hz, w, hz);
+    ctx.fillStyle = top;
+    ctx.fillRect(x, y - hz, w, d);
+  }
+
+  function drawGround(row, r, y) {
+    if (row.type === 'grass') {
+      ctx.fillStyle = row.shade ? '#9be15d' : '#8fd655';
+      ctx.fillRect(0, y, W, T);
+      ctx.fillStyle = row.shade ? '#8fd655' : '#86cc4d';
+      for (let c = (r & 1); c < COLS; c += 2) ctx.fillRect(c * T + 6, y + 6, 6, 6);
+    } else if (row.type === 'road') {
+      ctx.fillStyle = '#545867';
+      ctx.fillRect(0, y, W, T);
+      const above = game.rows.get(r + 1);
+      ctx.fillStyle = '#ffffffb0';
+      if (above && above.type === 'road') for (let x = 6; x < W; x += 40) ctx.fillRect(x, y - 1.5, 22, 3);
+      else { ctx.fillStyle = '#6b7080'; ctx.fillRect(0, y, W, 4); }
+      const below = game.rows.get(r - 1);
+      if (!below || below.type !== 'road') { ctx.fillStyle = '#41444f'; ctx.fillRect(0, y + T - 4, W, 4); }
+    } else if (row.type === 'river') {
+      ctx.fillStyle = '#4cbdf0';
+      ctx.fillRect(0, y, W, T);
+      ctx.fillStyle = '#7bd3f7';
+      const off = reducedMotion ? 0 : (game.time * 24 * (row.dir || 1)) % 60;
+      for (let x = -60 + off; x < W + 60; x += 60) { ctx.fillRect(x, y + 10, 18, 3); ctx.fillRect(x + 30, y + 26, 14, 3); }
+      const below = game.rows.get(r - 1);
+      if (below && below.type !== 'river') { ctx.fillStyle = '#3aa3d6'; ctx.fillRect(0, y + T - 5, W, 5); }
+    } else if (row.type === 'rail') {
+      ctx.fillStyle = '#b9ab98';
+      ctx.fillRect(0, y, W, T);
+      ctx.fillStyle = '#7a5a3a';
+      for (let x = 2; x < W; x += 20) ctx.fillRect(x, y + 7, 9, T - 14);
+      ctx.fillStyle = '#8d96a3';
+      ctx.fillRect(0, y + 11, W, 4); ctx.fillRect(0, y + T - 15, W, 4);
+      ctx.fillStyle = '#c9d0da';
+      ctx.fillRect(0, y + 11, W, 1.5); ctx.fillRect(0, y + T - 15, W, 1.5);
+    }
+  }
+
+  function drawTree(c, y, kind) {
+    const x = c * T;
+    if (kind === 'rock') { box(x + 6, y + 10, T - 12, T - 18, 12, '#b8bec9', '#8e95a3'); return; }
+    if (kind === 'bush') { box(x + 3, y + 8, T - 6, T - 14, 14, '#5cc267', '#3f9a4a'); return; }
+    box(x + 15, y + 18, 10, 10, 10, '#8a5a34', '#6b4325');
+    const hz = kind === 'tall' ? 40 : 28;
+    box(x + 5, y + 8, T - 10, T - 16, hz, '#4fb05a', '#378a42');
+    if (kind === 'tall') box(x + 10, y + 10, T - 20, T - 22, hz + 10, '#5cc267', '#3f9a4a');
+  }
+
+  function drawCoin(c, y) {
+    const cx = c * T + T / 2, cy = y + T / 2 - 12 + (reducedMotion ? 0 : Math.sin(game.time * 4 + c) * 3);
+    const w = reducedMotion ? 9 : Math.abs(Math.cos(game.time * 3 + c)) * 9 + 2;
+    ctx.fillStyle = '#00000022';
+    ctx.beginPath(); ctx.ellipse(cx, y + T / 2 + 6, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e6a700';
+    ctx.fillRect(cx - w, cy - 9, w * 2, 18);
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillRect(cx - w + 2, cy - 7, w * 2 - 4, 14);
+  }
+
+  function drawCar(car, y, dir) {
+    const x = car.x * T, w = car.len * T;
+    const [top, front] = car.color;
+    ctx.fillStyle = '#00000026';
+    ctx.fillRect(x + 2, y + T - 7, w - 4, 5);
+    if (car.kind === 'truck') {
+      const cabW = 26;
+      const cabX = dir > 0 ? x + w - cabW : x;
+      box(dir > 0 ? x : x + cabW + 2, y + 6, w - cabW - 2, T - 12, 24, '#eef1f5', '#c9cfd8');
+      box(cabX, y + 8, cabW, T - 14, 16, top, front);
+      ctx.fillStyle = '#bfe6ff';
+      ctx.fillRect(dir > 0 ? cabX + cabW - 9 : cabX + 3, y + 8 - 16 + 3, 6, T - 20);
+    } else {
+      box(x, y + 8, w, T - 14, 12, top, front);
+      box(x + w * 0.22, y + 10, w * 0.56, T - 18, 22, top, front);
+      ctx.fillStyle = '#bfe6ff';
+      ctx.fillRect(x + w * 0.22 + (dir > 0 ? w * 0.4 : 3), y + 10 - 22 + 3, w * 0.13, T - 24);
+    }
+    // Headlights on the front bumper.
+    ctx.fillStyle = '#fff3b0';
+    const hx = dir > 0 ? x + w - 6 : x + 2;
+    ctx.fillRect(hx, y + T - 6 - 8, 4, 4);
+  }
+
+  function drawLog(l, y) {
+    const x = l.x * T, w = l.len * T;
+    box(x + 2, y + 7, w - 4, T - 14, 6, '#a8743f', '#7d5328');
+    ctx.fillStyle = '#c8945c';
+    ctx.fillRect(x + 2, y + 1, 6, T - 14);
+    ctx.fillRect(x + w - 8, y + 1, 6, T - 14);
+    ctx.fillStyle = '#8f6233';
+    for (let i = 1; i < l.len; i++) ctx.fillRect(x + i * T - 1, y + 3, 2, T - 18);
+  }
+
+  function drawPad(c, y) {
+    const cx = c * T + T / 2, cy = y + T / 2;
+    ctx.fillStyle = '#2f8f4a';
+    ctx.beginPath(); ctx.ellipse(cx, cy + 3, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#57c26a';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.ellipse(cx, cy, 16, 12, 0, 0.35, Math.PI * 2 - 0.1); ctx.closePath(); ctx.fill();
+    if ((c * 7) % 3 === 0) { ctx.fillStyle = '#ffb3cf'; ctx.fillRect(cx - 7, cy - 6, 5, 5); }
+  }
+
+  function drawTrain(row, y) {
+    const x = row.trainX * T, w = TRAIN_LEN * T;
+    ctx.fillStyle = '#00000030';
+    ctx.fillRect(x, y + T - 6, w, 5);
+    for (let i = 0; i < TRAIN_LEN; i += 2.5) {
+      const cx = x + i * T;
+      box(cx + 2, y + 4, 2.5 * T - 4, T - 8, 26, i === 0 && row.dir < 0 || i + 2.5 >= TRAIN_LEN && row.dir > 0 ? '#ff6b6b' : '#e9edf3', i === 0 && row.dir < 0 || i + 2.5 >= TRAIN_LEN && row.dir > 0 ? '#d24a4a' : '#bcc4d0');
+      ctx.fillStyle = '#5a6a80';
+      for (let k = 0; k < 4; k++) ctx.fillRect(cx + 12 + k * 22, y + T - 4 - 26 + 6, 12, 8);
+    }
+  }
+
+  function drawSignal(row, y) {
+    const on = row.phase !== 'idle' && Math.floor(game.time * 6) % 2 === 0;
+    box(4, y + 22, 6, 6, 30, '#dde2ea', '#aab2bf');
+    ctx.fillStyle = '#2b2f3a';
+    ctx.fillRect(1, y - 14, 12, 12);
+    ctx.fillStyle = on ? '#ff4d4d' : '#6b3a3a';
+    ctx.beginPath(); ctx.arc(7, y - 8, 4, 0, Math.PI * 2); ctx.fill();
+    if (on) { ctx.fillStyle = '#ff4d4d33'; ctx.fillRect(0, y, W, T); }
+  }
+
+  function drawChicken(px, py, z, face, flat) {
+    const s = flat ? 0.25 : 1;
+    ctx.fillStyle = '#00000030';
+    ctx.beginPath(); ctx.ellipse(px, py + T / 2 + 8, 13 - z * 0.3, 5, 0, 0, Math.PI * 2); ctx.fill();
+    const w = flat ? 30 : 24, d = flat ? 26 : 20, hz = 22 * s;
+    const x = px - w / 2, y = py + T / 2 - d / 2 + 4 - z;
+    // Feet, body, wings, comb and beak are all little boxes.
+    if (!flat) { ctx.fillStyle = '#ff9f1c'; ctx.fillRect(px - 7, y + d - 1, 4, 4); ctx.fillRect(px + 3, y + d - 1, 4, 4); }
+    box(x, y, w, d, hz, '#ffffff', '#e2e4ec');
+    if (flat) return;
+    const side = face === 'left' ? -1 : face === 'right' ? 1 : 0;
+    ctx.fillStyle = '#d6d9e3';
+    if (side >= 0) ctx.fillRect(x - 3, y - hz + d + 2, 3, 10);
+    if (side <= 0) ctx.fillRect(x + w, y - hz + d + 2, 3, 10);
+    ctx.fillStyle = '#ff5a5a';
+    ctx.fillRect(px - 3 + side * 4, y - hz - 4 + (face === 'down' ? 6 : face === 'up' ? -2 : 2), 6, 6);
+    ctx.fillStyle = '#ff9f1c';
+    if (face === 'up') ctx.fillRect(px - 3, y - hz - 4, 6, 5);
+    else if (face === 'down') { ctx.fillRect(px - 3, y + d - hz + 6, 6, 5); ctx.fillStyle = '#23303b'; ctx.fillRect(px - 7, y + d - hz + 2, 3, 3); ctx.fillRect(px + 4, y + d - hz + 2, 3, 3); }
+    else {
+      ctx.fillRect(side > 0 ? x + w : x - 5, y + d - hz + 3, 5, 5);
+      ctx.fillStyle = '#23303b';
+      ctx.fillRect(side > 0 ? x + w - 7 : x + 4, y - hz + d - 6, 3, 3);
+    }
+    if (face === 'up') { ctx.fillStyle = '#e2e4ec'; ctx.fillRect(px - 5, y - hz + d - 6, 10, 4); }
+  }
+
+  function drawEagle(x, y, flap, talons) {
+    ctx.save();
+    ctx.translate(x, y);
+    const wing = reducedMotion ? 0 : Math.sin(flap) * 7;
+    // Stepped, feathered wings spread wide on both sides of the body.
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 4; i++) {
+        const w = 16, x0 = s > 0 ? 12 + i * 14 : -12 - i * 14 - w, lift = wing * (i + 1) / 4;
+        box(x0, -14 + i * 3 + lift, w, 26 - i * 4, 8, i === 3 ? '#3b2412' : '#6b4226', '#472a14');
+      }
+    }
+    box(-9, 8, 18, 16, 6, '#5a361c', '#3b2412');
+    box(-13, -22, 26, 34, 14, '#7a4b28', '#573418');
+    box(-10, -38, 20, 18, 18, '#ffffff', '#dfe3ea');
+    ctx.fillStyle = '#ffb000';
+    ctx.fillRect(-4, -26, 8, 9);
+    ctx.fillStyle = '#23303b';
+    ctx.fillRect(-8, -50, 3, 4); ctx.fillRect(5, -50, 3, 4);
+    if (talons) { ctx.fillStyle = '#ffb000'; ctx.fillRect(-9, 22, 5, 7); ctx.fillRect(4, 22, 5, 7); }
+    ctx.restore();
+  }
+
+  function outlinedText(text, x, y, size, fill, align = 'center') {
+    ctx.font = `900 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.2;
+    ctx.strokeStyle = '#23303b';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function drawHud() {
+    if (game.state === 'ready') return;
+    outlinedText(String(game.score), 14, 34, 40, '#ffffff', 'left');
+    if (saved.best) {
+      ctx.font = '800 13px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.lineWidth = 3; ctx.strokeStyle = '#23303b'; ctx.strokeText(t.best(Math.max(saved.best, game.score)), 15, 66);
+      ctx.fillStyle = '#ffe680'; ctx.fillText(t.best(Math.max(saved.best, game.score)), 15, 66);
+    }
+    box(W - 30, 22, 16, 14, 4, '#ffd23f', '#e6a700');
+    outlinedText(String(game.coins), W - 36, 26, 22, '#ffd23f', 'right');
+    if (game.banner && game.state === 'play') {
+      ctx.globalAlpha = Math.min(1, (1.6 - game.banner.t) * 2);
+      outlinedText(game.banner.text, W / 2, 110 - game.banner.t * 6, 26, '#ffd23f');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    const c = game.chicken;
+    const lo = Math.floor(game.cam) - 1, hi = Math.ceil(game.cam) + 17;
+    for (let r = hi; r >= lo; r--) { const row = game.rows.get(r); if (row) drawGround(row, r, rowTop(r)); }
+    const p = chickenPos();
+    const chickenRow = c.hop ? Math.min(c.hop.fr, c.hop.tr) : c.r;
+    const flat = game.state === 'dying' && (game.cause === 'car' || game.cause === 'train');
+    const sunk = game.state === 'dying' && (game.cause === 'drown' || game.cause === 'drift');
+    for (let r = hi; r >= lo; r--) {
+      const row = game.rows.get(r);
+      if (!row) continue;
+      const y = rowTop(r);
+      if (row.type === 'river') {
+        if (row.pads) for (const col of row.pads) drawPad(col, y);
+        else for (const l of row.logs) drawLog(l, y);
+      }
+      if (row.type === 'grass') for (const [col, kind] of row.trees) drawTree(col, y, kind);
+      if (row.coin >= 0) drawCoin(row.coin, y);
+      if (row.type === 'road') for (const car of row.cars) drawCar(car, y, row.dir);
+      if (row.type === 'rail') { if (row.phase === 'pass') drawTrain(row, y); drawSignal(row, y); }
+      if (r === chickenRow && !sunk && !(game.eagle && game.eagle.t > 0.6)) {
+        const bump = c.bump * 3 * (c.face === 'left' ? -1 : c.face === 'right' ? 1 : 0);
+        drawChicken(p.x * T + bump, rowTop(p.r), p.z + (c.face === 'up' || c.face === 'down' ? c.bump * 3 : 0), c.face, flat);
+      }
+    }
+    for (const q of game.particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 2));
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x - q.r, rowTop(q.wr) + q.y - q.r, q.r * 2, q.r * 2);
+    }
+    ctx.globalAlpha = 1;
+    if (game.state === 'play' && (p.r - game.cam < 1.6 || game.idle > IDLE_LIMIT - 2.5)) {
+      // Warning: red edge pulses and the eagle's shadow sweeps closer.
+      const k = 0.5 + 0.5 * Math.sin(game.time * 10);
+      const g = ctx.createLinearGradient(0, H, 0, H - 120);
+      g.addColorStop(0, `rgba(255, 70, 70, ${0.35 + k * 0.2})`); g.addColorStop(1, 'rgba(255, 70, 70, 0)');
+      ctx.fillStyle = g; ctx.fillRect(0, H - 120, W, 120);
+    }
+    if (game.eagle) {
+      const e = game.eagle.t;
+      const tx = p.x * T, ty = rowTop(p.r) + T / 2;
+      const y = e < 0.6 ? -120 + (ty + 120) * (e / 0.6) : ty - (e - 0.6) * 900;
+      ctx.fillStyle = '#00000033';
+      if (e < 0.6) { ctx.beginPath(); ctx.ellipse(tx, ty + 10, 30 + e * 60, 8 + e * 10, 0, 0, Math.PI * 2); ctx.fill(); }
+      if (e > 0.6) drawChicken(tx, y - T / 2 + 22, 0, 'down', false);
+      drawEagle(tx, y - 14, game.time * 14, e <= 0.6);
+    }
+    drawHud();
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never jumps traffic forward by more than ~50 ms.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      if (game.state !== 'paused' && game.state !== 'over') {
+        acc += dt;
+        while (acc >= STEP) { step(STEP); acc -= STEP; }
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Swipe picks a direction; a short tap hops forward.
+  const swipe = { id: null, x: 0, y: 0 };
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (game.state === 'paused') { resume(); return; }
+    if (game.state === 'over') return;
+    canvas.setPointerCapture(event.pointerId);
+    swipe.id = event.pointerId; swipe.x = event.clientX; swipe.y = event.clientY;
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (event.pointerId !== swipe.id) return;
+    swipe.id = null;
+    const dx = event.clientX - swipe.x, dy = event.clientY - swipe.y;
+    if (Math.hypot(dx, dy) < 18 * Math.max(1, scale * 0.6)) move('up');
+    else if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+    else move(dy < 0 ? 'up' : 'down');
+  });
+  canvas.addEventListener('pointercancel', () => { swipe.id = null; });
+
+  const KEY_DIRS = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (KEY_DIRS[event.key]) {
+      event.preventDefault();
+      if (event.repeat || game.state === 'over') return;
+      if (game.state === 'paused') resume();
+      move(KEY_DIRS[event.key]);
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest('button')) return;
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (game.state === 'over') restart();
+    else if (game.state === 'paused') resume();
+    else move('up');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', () => begin());
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

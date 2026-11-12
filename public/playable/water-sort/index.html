@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Water Sort</title>
+<style>
+:root {
+  --ink: #233462;
+  --muted: #6a77a0;
+  --bg: #e4f1ff;
+  --accent: #4f7cff;
+  --accent-dark: #3559d4;
+  --mint: #3cc6a8;
+  --mint-dark: #25a185;
+  --cream: #fbfdff;
+  --edge: #c9d9f7;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 20% 30%, #ffffff99 0 3px, transparent 4px), radial-gradient(circle at 70% 80%, #ffffff80 0 2px, transparent 3px), linear-gradient(170deg, #e8f6ff, #e6e2ff);
+  background-size: 46px 46px, 34px 34px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 3px; }
+.icon { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(21px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; white-space: nowrap; line-height: 1; }
+h1 span, .panel h2 span { color: var(--accent); }
+.stat { min-width: 56px; padding: 5px 8px; border-radius: 14px; background: #ffffffc4; text-align: center; box-shadow: 0 3px 0 var(--edge); }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--cream); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 var(--edge); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
+.icon-btn svg { width: 20px; height: 20px; vertical-align: middle; }
+.hint { text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+
+.board-wrap { flex: 1; min-height: 0; position: relative; }
+.board { position: absolute; inset: 0; --w: 40px; --h: 150px; --lh: 32px; --bw: 3px; }
+.tube { position: absolute; left: 0; top: 0; z-index: 2; width: var(--w); height: var(--h); transition: transform .18s ease, left .3s ease, top .3s ease; touch-action: manipulation; }
+.tube:focus-visible { outline: none; }
+.tube:focus-visible .glass { outline: 3px solid var(--accent-dark); outline-offset: 4px; }
+.tube::before { content: ""; position: absolute; z-index: 3; left: -14%; right: -14%; top: calc(var(--bw) * -1); height: calc(var(--w) * .16); border-radius: 99px; background: #fffffff0; box-shadow: 0 2px 4px #3559d433; }
+.glass { position: absolute; inset: 0; overflow: hidden; border: var(--bw) solid #ffffffd9; border-top: 0; border-radius: 0 0 calc(var(--w) / 2) calc(var(--w) / 2); background: linear-gradient(90deg, #ffffff66, #ffffff1a 35%, #ffffff1a 65%, #ffffff73); box-shadow: inset 0 0 0 1px #8fb0f055, 0 8px 16px #3559d42b; transition: box-shadow .2s; }
+.glass::after { content: ""; position: absolute; z-index: 2; left: 16%; top: 10%; bottom: 16%; width: 13%; border-radius: 99px; background: #ffffff70; pointer-events: none; }
+.liquid { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; }
+.layer { position: relative; flex: none; height: var(--lh); display: grid; place-items: center; overflow: hidden; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 80%, #000) 0%, var(--c) 28%, color-mix(in srgb, var(--c) 78%, #fff) 72%, var(--c) 100%); }
+.layer:last-child::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--lh) * .13); background: color-mix(in srgb, var(--c) 55%, #fff); }
+.layer svg { width: calc(var(--lh) * .42); height: calc(var(--lh) * .42); fill: var(--s); }
+.tube.selected { transform: translateY(calc(var(--w) * -.42)); }
+.tube.selected .glass { box-shadow: inset 0 0 0 1px #8fb0f055, 0 0 0 3px #ffffffcc, 0 0 22px #4f7cff88; }
+.tube.target .glass { box-shadow: inset 0 0 0 1px #8fb0f055, 0 0 0 2px #3cc6a8aa, 0 8px 16px #3559d42b; }
+.tube.pouring { z-index: 5; }
+.tube.nope { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-10%); } 75% { transform: translateX(10%); } }
+.cap { position: absolute; z-index: 4; left: 4%; right: 4%; top: calc(var(--w) * -.24); height: calc(var(--w) * .36); border-radius: 30% 30% 18% 18% / 45% 45% 25% 25%; background: linear-gradient(90deg, #c98d5c, #ecc49b 40%, #d39a68); box-shadow: inset 0 -3px 0 #a86f43, 0 2px 4px #0003; display: none; }
+.tube.done .cap { display: block; animation: cap .45s cubic-bezier(.3, 1.6, .5, 1); }
+.tube.done .glass { box-shadow: inset 0 0 0 1px #8fb0f055, 0 0 18px #fff6, 0 8px 16px #3559d42b; }
+@keyframes cap { from { transform: translateY(-120%) rotate(-12deg); opacity: 0; } }
+.stream { position: absolute; z-index: 1; width: calc(var(--w) * .17); border-radius: 99px; background: var(--c); transform-origin: 50% 0; pointer-events: none; }
+.spark { position: absolute; z-index: 6; font-size: calc(var(--w) * .42); line-height: 1; color: #fff3a6; text-shadow: 0 0 6px #ffd84d; pointer-events: none; animation: spark .75s ease-out forwards; }
+@keyframes spark { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(70deg); opacity: 0; } }
+
+.boosters { display: flex; gap: 10px; justify-content: center; }
+.booster { position: relative; flex: 1; max-width: 160px; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 6px; border-radius: 16px; background: var(--cream); box-shadow: 0 4px 0 var(--edge); font-size: 14px; font-weight: 800; }
+.booster svg { flex: 0 0 auto; width: 20px; height: 20px; color: var(--accent); }
+.booster span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booster:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+.booster:disabled { opacity: .45; cursor: default; }
+.count { position: absolute; top: -7px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--mint-dark); color: #fff; font-size: 12px; font-weight: 900; line-height: 22px; text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #23346255; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--cream); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #23346255; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--muted); line-height: 1.45; }
+.picker { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.picker strong { min-width: 120px; font-size: 20px; }
+.picker button { width: 42px; height: 42px; border-radius: 50%; background: #e3ecff; font-size: 22px; font-weight: 900; }
+.picker button:disabled { opacity: .35; cursor: default; }
+.result { margin-top: 10px; font-size: 17px; font-weight: 700; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #e3f7f1; color: #1f7c66; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #bfe9dc; }
+.ghost[hidden] { display: none; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-aspect-ratio: 4/3) { .app { max-width: 860px; } }
+@media (max-height: 560px) { .app { gap: 6px; } .booster { padding: 7px 6px; } .hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <h1>Water <span>Sort</span></h1>
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="levels"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </header>
+  <p class="hint" data-i18n="hint"></p>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" role="group" data-i18n-label="board"></div>
+  </div>
+  <div class="boosters">
+    <button type="button" class="booster" id="undo" aria-keyshortcuts="U"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span data-i18n="undo"></span><b class="count" id="undo-count" aria-hidden="true"></b></button>
+    <button type="button" class="booster" id="extra" aria-keyshortcuts="T"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v14a4 4 0 0 0 8 0V3"/><path d="M6 3h12"/><path d="M12 8v6M9 11h6"/></svg><span data-i18n="extra"></span><b class="count" id="extra-count" aria-hidden="true"></b></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🧪</p>
+    <h2 id="start-title">Water <span>Sort</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <p class="text" data-i18n="how"></p>
+    <div class="picker">
+      <button type="button" id="prev" data-i18n-label="prev">‹</button>
+      <strong id="pick-level" aria-live="polite"></strong>
+      <button type="button" id="next" data-i18n-label="next">›</button>
+    </div>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="result" id="result"></p>
+    <button type="button" class="cta" id="next-level" data-i18n="next"></button>
+    <button type="button" class="ghost" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🫙</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p class="text" data-i18n="stuckText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="ghost" id="stuck-undo" data-i18n="undo"></button>
+    <button type="button" class="ghost" id="stuck-extra" data-i18n="extraName"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Pour the coloured water until every tube holds a single colour.', how: 'Tap a tube, then another to pour. Water only goes onto the same colour or into an empty tube.', hint: 'Tap a tube, then the tube to pour into', level: 'Level', moves: 'Moves', levels: 'Choose level', restart: 'Restart level', board: 'Tubes', undo: 'Undo', extra: '+ Tube', extraName: 'Extra tube', boosterLabel: (name, n) => `${name}, ${n} left`, play: 'Play', levelN: n => `Level ${n}`, prev: 'Previous level', next: 'Next level', tube: (i, d) => `Tube ${i}: ${d}`, empty: 'empty', complete: 'complete', selected: 'selected', colors: ['red', 'orange', 'yellow', 'lime', 'green', 'sky blue', 'blue', 'purple', 'pink', 'brown', 'grey', 'berry'], poured: (c, to) => `Poured ${c} into tube ${to}.`, done: c => `All the ${c} is sorted!`, undone: 'Move undone.', added: 'An empty tube was added.', won: n => `Level ${n} complete!`, result: m => `Sorted in ${m} moves`, replay: 'Replay level', stuck: 'No moves left', stuckText: 'Undo a move, add an empty tube or try the level again.', retry: 'Try again', levelStart: (n, c) => `Level ${n}: ${c} colours.` },
+    vi: { tagline: 'Rót nước màu cho đến khi mỗi ống chỉ còn đúng một màu.', how: 'Chạm một ống rồi chạm ống khác để rót. Nước chỉ rót được lên cùng màu hoặc vào ống trống.', hint: 'Chạm một ống, rồi chạm ống muốn rót vào', level: 'Màn', moves: 'Lượt', levels: 'Chọn màn', restart: 'Chơi lại màn', board: 'Các ống nước', undo: 'Hoàn tác', extra: '+ Ống', extraName: 'Thêm ống', boosterLabel: (name, n) => `${name}, còn ${n} lượt`, play: 'Chơi', levelN: n => `Màn ${n}`, prev: 'Màn trước', next: 'Màn tiếp theo', tube: (i, d) => `Ống ${i}: ${d}`, empty: 'trống', complete: 'đã xong', selected: 'đang chọn', colors: ['đỏ', 'cam', 'vàng', 'xanh cốm', 'xanh lá', 'xanh da trời', 'xanh dương', 'tím', 'hồng', 'nâu', 'xám', 'đỏ mận'], poured: (c, to) => `Đã rót màu ${c} vào ống ${to}.`, done: c => `Màu ${c} đã xếp xong!`, undone: 'Đã hoàn tác.', added: 'Đã thêm một ống trống.', won: n => `Hoàn thành màn ${n}!`, result: m => `Xếp xong sau ${m} lượt`, replay: 'Chơi lại màn này', stuck: 'Hết nước đi', stuckText: 'Hãy hoàn tác, thêm ống trống hoặc chơi lại màn này.', retry: 'Thử lại', levelStart: (n, c) => `Màn ${n}: ${c} màu.` },
+    zh: { tagline: '把彩色的水倒来倒去，让每支试管只剩一种颜色。', how: '先点一支试管，再点另一支即可倒水。水只能倒在相同颜色上，或倒进空试管。', hint: '先点试管，再点要倒入的试管', level: '关卡', moves: '步数', levels: '选择关卡', restart: '重玩本关', board: '试管', undo: '撤销', extra: '+ 试管', extraName: '加一支试管', boosterLabel: (name, n) => `${name}，剩余 ${n} 次`, play: '开始', levelN: n => `第 ${n} 关`, prev: '上一关', next: '下一关', tube: (i, d) => `试管 ${i}：${d}`, empty: '空', complete: '已完成', selected: '已选中', colors: ['红色', '橙色', '黄色', '草绿色', '绿色', '天蓝色', '蓝色', '紫色', '粉色', '棕色', '灰色', '莓红色'], poured: (c, to) => `已把${c}倒入试管 ${to}。`, done: c => `${c}已经集齐！`, undone: '已撤销一步。', added: '已加入一支空试管。', won: n => `第 ${n} 关完成！`, result: m => `共用 ${m} 步`, replay: '重玩本关', stuck: '没有可走的步了', stuckText: '可以撤销一步、加一支空试管，或重新挑战本关。', retry: '再试一次', levelStart: (n, c) => `第 ${n} 关：${c} 种颜色。` },
+    fr: { tagline: 'Versez l’eau colorée jusqu’à ce que chaque tube ne contienne qu’une seule couleur.', how: 'Touchez un tube, puis un autre pour verser. L’eau ne se verse que sur la même couleur ou dans un tube vide.', hint: 'Touchez un tube, puis celui où verser', level: 'Niveau', moves: 'Coups', levels: 'Choisir un niveau', restart: 'Recommencer le niveau', board: 'Tubes', undo: 'Annuler', extra: '+ Tube', extraName: 'Tube en plus', boosterLabel: (name, n) => `${name}, encore ${n}`, play: 'Jouer', levelN: n => `Niveau ${n}`, prev: 'Niveau précédent', next: 'Niveau suivant', tube: (i, d) => `Tube ${i} : ${d}`, empty: 'vide', complete: 'terminé', selected: 'sélectionné', colors: ['rouge', 'orange', 'jaune', 'vert clair', 'vert', 'bleu ciel', 'bleu', 'violet', 'rose', 'marron', 'gris', 'framboise'], poured: (c, to) => `Eau ${c} versée dans le tube ${to}.`, done: c => `Couleur ${c} triée !`, undone: 'Coup annulé.', added: 'Un tube vide a été ajouté.', won: n => `Niveau ${n} terminé !`, result: m => `Trié en ${m} coups`, replay: 'Rejouer le niveau', stuck: 'Plus aucun coup', stuckText: 'Annulez un coup, ajoutez un tube vide ou recommencez le niveau.', retry: 'Réessayer', levelStart: (n, c) => `Niveau ${n} : ${c} couleurs.` },
+    th: { tagline: 'เทน้ำสีไปมาจนแต่ละหลอดเหลือแค่สีเดียว', how: 'แตะหลอดหนึ่ง แล้วแตะอีกหลอดเพื่อเท น้ำเทได้เฉพาะบนสีเดียวกันหรือลงหลอดว่าง', hint: 'แตะหลอด แล้วแตะหลอดที่จะเทลงไป', level: 'ด่าน', moves: 'ครั้ง', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', board: 'หลอดทดลอง', undo: 'ย้อนกลับ', extra: '+ หลอด', extraName: 'เพิ่มหลอด', boosterLabel: (name, n) => `${name} เหลือ ${n} ครั้ง`, play: 'เล่น', levelN: n => `ด่าน ${n}`, prev: 'ด่านก่อนหน้า', next: 'ด่านถัดไป', tube: (i, d) => `หลอด ${i}: ${d}`, empty: 'ว่าง', complete: 'เสร็จแล้ว', selected: 'เลือกอยู่', colors: ['แดง', 'ส้ม', 'เหลือง', 'เขียวอ่อน', 'เขียว', 'ฟ้า', 'น้ำเงิน', 'ม่วง', 'ชมพู', 'น้ำตาล', 'เทา', 'แดงเบอร์รี่'], poured: (c, to) => `เทสี${c}ลงหลอด ${to} แล้ว`, done: c => `สี${c}ครบแล้ว!`, undone: 'ย้อนกลับแล้ว', added: 'เพิ่มหลอดว่างแล้ว', won: n => `ผ่านด่าน ${n} แล้ว!`, result: m => `เรียงเสร็จใน ${m} ครั้ง`, replay: 'เล่นด่านนี้อีกครั้ง', stuck: 'ไม่มีทางเทแล้ว', stuckText: 'ลองย้อนกลับ เพิ่มหลอดว่าง หรือเริ่มด่านนี้ใหม่', retry: 'ลองอีกครั้ง', levelStart: (n, c) => `ด่าน ${n}: ${c} สี` },
+    ja: { tagline: '色水を移し替えて、どの試験管も1色だけにしよう。', how: '試験管をタップしてから、注ぎ先の試験管をタップ。注げるのは同じ色の上か、空の試験管だけ。', hint: '試験管をタップして、注ぎ先をタップ', level: 'レベル', moves: '手数', levels: 'レベル選択', restart: 'レベルをやり直す', board: '試験管', undo: '戻す', extra: '+ 試験管', extraName: '試験管を追加', boosterLabel: (name, n) => `${name}、残り${n}回`, play: 'プレイ', levelN: n => `レベル ${n}`, prev: '前のレベル', next: '次のレベル', tube: (i, d) => `試験管 ${i}：${d}`, empty: '空', complete: '完成', selected: '選択中', colors: ['赤', 'オレンジ', '黄', '黄緑', '緑', '水色', '青', '紫', 'ピンク', '茶', 'グレー', 'ベリー'], poured: (c, to) => `${c}を試験管 ${to} に注ぎました。`, done: c => `${c}がそろいました！`, undone: '1手戻しました。', added: '空の試験管を追加しました。', won: n => `レベル ${n} クリア！`, result: m => `${m}手でクリア`, replay: 'もう一度プレイ', stuck: '動かせる手がありません', stuckText: '1手戻すか、空の試験管を足すか、最初からやり直そう。', retry: 'もう一度', levelStart: (n, c) => `レベル ${n}：${c}色。` },
+    ko: { tagline: '색깔 물을 옮겨 담아 모든 병을 한 가지 색으로 채우세요.', how: '병을 누른 다음 다른 병을 눌러 따르세요. 같은 색 위나 빈 병에만 따를 수 있어요.', hint: '병을 누르고, 따를 병을 누르세요', level: '레벨', moves: '이동', levels: '레벨 선택', restart: '레벨 다시 하기', board: '병', undo: '되돌리기', extra: '+ 병', extraName: '병 추가', boosterLabel: (name, n) => `${name}, ${n}회 남음`, play: '시작', levelN: n => `레벨 ${n}`, prev: '이전 레벨', next: '다음 레벨', tube: (i, d) => `${i}번 병: ${d}`, empty: '비어 있음', complete: '완성', selected: '선택됨', colors: ['빨강', '주황', '노랑', '연두', '초록', '하늘색', '파랑', '보라', '분홍', '갈색', '회색', '베리'], poured: (c, to) => `${to}번 병에 ${c} 물을 따랐어요.`, done: c => `${c} 정리 완료!`, undone: '한 수 되돌렸어요.', added: '빈 병을 하나 추가했어요.', won: n => `레벨 ${n} 클리어!`, result: m => `${m}번 만에 완성`, replay: '이 레벨 다시 하기', stuck: '더 이상 따를 곳이 없어요', stuckText: '한 수 되돌리거나, 빈 병을 추가하거나, 처음부터 다시 해 보세요.', retry: '다시 하기', levelStart: (n, c) => `레벨 ${n}: ${c}가지 색.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Liquid colour, then the colour of its symbol (dark on light liquids so the mark stays subtle but readable).
+  const COLORS = [
+    ['#ef4b4b', '#ffffff8c'], ['#ff9a2e', '#ffffff8c'], ['#ffd93b', '#00000047'], ['#9be15d', '#00000047'],
+    ['#1f9d55', '#ffffff8c'], ['#5ccaf5', '#00000047'], ['#3159d6', '#ffffff8c'], ['#8b4fd1', '#ffffff8c'],
+    ['#ff8fc7', '#00000047'], ['#9a6237', '#ffffff8c'], ['#a3abb7', '#00000047'], ['#b8265e', '#ffffff8c'],
+  ];
+  const SYMBOLS = [
+    '<circle cx="10" cy="10" r="6"/>', '<path d="M10 3 17.5 16.5h-15z"/>', '<rect x="4" y="4" width="12" height="12" rx="1.5"/>',
+    '<path d="M10 2.5 17.5 10 10 17.5 2.5 10z"/>', '<path d="m10 2.2 2.35 4.9 5.35.7-3.9 3.7 1 5.3L10 14.2l-4.8 2.6 1-5.3-3.9-3.7 5.35-.7z"/>',
+    '<path d="M8 3h4v5h5v4h-5v5H8v-5H3V8h5z"/>', '<path d="M10 17s-7-4.3-7-9a3.8 3.8 0 0 1 7-2 3.8 3.8 0 0 1 7 2c0 4.7-7 9-7 9z"/>',
+    '<path d="m4.5 7.3 2.8-2.8L10 7.2l2.7-2.7 2.8 2.8-2.7 2.7 2.7 2.7-2.8 2.8-2.7-2.7-2.7 2.7-2.8-2.8 2.7-2.7z"/>',
+    '<path fill-rule="evenodd" d="M10 3.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 3.3a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z"/>',
+    '<path d="M10 2.5s5.5 6 5.5 9.5a5.5 5.5 0 0 1-11 0C4.5 8.5 10 2.5 10 2.5z"/>', '<path d="M6 3.5h8l4 6.5-4 6.5H6L2 10z"/>',
+    '<path d="M11.5 2 4.5 11H9l-1 7 7-9h-4.5z"/>',
+  ];
+  document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${SYMBOLS.map((s, i) => `<symbol id="sym${i}" viewBox="0 0 20 20">${s}</symbol>`).join('')}</svg>`);
+
+  const CAP = 4;
+  const UNDOS = 5, EXTRAS = 1;
+  const LAYER = 0.8, HEADROOM = 0.62, MAX_W = 64;
+  const STORE = 'milaan.waterSort.level';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = { wrap: $('wrap'), board: $('board'), level: $('level'), moves: $('moves'), announcer: $('announcer'), start: $('start'), pickLevel: $('pick-level'), prev: $('prev'), next: $('next'), win: $('win'), winTitle: $('win-title'), result: $('result'), stuck: $('stuck'), undo: $('undo'), extra: $('extra'), stuckUndo: $('stuck-undo'), stuckExtra: $('stuck-extra') };
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // Seeded so a level number always deals the same puzzle.
+  const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+
+  let highest = Math.max(1, Number(read(STORE, 1)) || 1);
+  let pickLevel = highest;
+  let game = null;
+
+  const top = tube => tube[tube.length - 1];
+  const topRun = tube => { let k = 1; while (k < tube.length && tube[tube.length - 1 - k] === top(tube)) k++; return k; };
+  const uniform = tube => tube.every(c => c === tube[0]);
+  const isDone = tube => tube.length === CAP && uniform(tube);
+  const canPour = (src, dst) => src !== dst && src.length > 0 && !isDone(src) && dst.length < CAP && (!dst.length || top(dst) === top(src));
+  const solved = tubes => tubes.every(tube => !tube.length || isDone(tube));
+  const hasMove = tubes => tubes.some(src => tubes.some(dst => canPour(src, dst)));
+
+  // Depth-first search over pours (with obvious pruning) to prove a deal can be finished.
+  function solvable(start, limit = 60000) {
+    const seen = new Set();
+    let nodes = 0;
+    function dfs(tubes) {
+      if (solved(tubes)) return true;
+      if (++nodes > limit) return false;
+      const key = tubes.map(tube => tube.join('')).sort().join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      const moves = [];
+      tubes.forEach((src, a) => {
+        if (!src.length || isDone(src)) return;
+        const run = topRun(src);
+        let triedEmpty = false;
+        tubes.forEach((dst, b) => {
+          if (a === b || dst.length >= CAP) return;
+          if (dst.length && top(dst) !== top(src)) return;
+          if (!dst.length) { if (triedEmpty || uniform(src)) return; triedEmpty = true; }
+          const n = Math.min(run, CAP - dst.length);
+          const score = (dst.length ? 10 : 0) + (n === run ? 3 : 0) + (dst.length + n === CAP && uniform(dst) ? 20 : 0);
+          moves.push([score, a, b, n]);
+        });
+      });
+      moves.sort((x, y) => y[0] - x[0]);
+      for (const [, a, b, n] of moves) {
+        const next = tubes.map(tube => tube.slice());
+        next[b].push(...next[a].splice(next[a].length - n, n));
+        if (dfs(next)) return true;
+      }
+      return false;
+    }
+    return dfs(start.map(tube => tube.slice()));
+  }
+
+  // More colours each level; later levels also allow fewer ready-made pairs in the deal.
+  function levelPlan(n) {
+    const colors = Math.min(12, 3 + Math.floor((n - 1) * 0.55));
+    return { colors, maxPairs: n > 18 ? 1 : Math.max(1, Math.floor(colors * 0.5)) };
+  }
+
+  function generateLevel(n) {
+    const plan = levelPlan(n);
+    const rnd = seeded(n * 7919 + 17);
+    const kinds = Array.from({ length: COLORS.length }, (_, i) => i);
+    for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+    const used = kinds.slice(0, plan.colors);
+    for (let attempt = 0; ; attempt++) {
+      const pool = used.flatMap(c => Array(CAP).fill(c));
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      const tubes = used.map((_, i) => pool.slice(i * CAP, i * CAP + CAP));
+      tubes.push([], []);
+      if (attempt < 400) {
+        if (tubes.some(tube => tube.length && topRun(tube) >= CAP - 1)) continue;
+        let pairs = 0;
+        for (const tube of tubes) for (let i = 1; i < tube.length; i++) if (tube[i] === tube[i - 1]) pairs++;
+        if (pairs > plan.maxPairs) continue;
+      }
+      if (solvable(tubes)) return tubes;
+    }
+  }
+
+  function startLevel(n) {
+    const tubes = generateLevel(n);
+    game = { level: n, tubes, els: [], pos: [], selected: -1, history: [], undos: UNDOS, extras: EXTRAS, moves: 0, busy: new Set(), over: false, colors: levelPlan(n).colors };
+    els.board.replaceChildren();
+    tubes.forEach((_, i) => addTubeEl(i));
+    for (const overlay of [els.start, els.win, els.stuck]) overlay.hidden = true;
+    layout();
+    refresh();
+    els.announcer.textContent = t.levelStart(n, game.colors);
+    game.els[0].focus({ preventScroll: true });
+  }
+
+  function addTubeEl(i) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'tube';
+    el.innerHTML = '<span class="glass" aria-hidden="true"><span class="liquid"></span></span><span class="cap" aria-hidden="true"></span>';
+    el.addEventListener('click', () => onTube(i));
+    game.els[i] = el;
+    els.board.append(el);
+    renderTube(i);
+  }
+
+  function layerEl(color) {
+    const span = document.createElement('span');
+    span.className = 'layer';
+    span.dataset.c = color;
+    span.style.setProperty('--c', COLORS[color][0]);
+    span.style.setProperty('--s', COLORS[color][1]);
+    span.innerHTML = `<svg viewBox="0 0 20 20"><use href="#sym${color}"/></svg>`;
+    return span;
+  }
+
+  function describe(tube) {
+    if (!tube.length) return t.empty;
+    const parts = [];
+    for (let i = 0; i < tube.length; i++) {
+      if (i && tube[i] === tube[i - 1]) { parts[parts.length - 1].n++; continue; }
+      parts.push({ c: tube[i], n: 1 });
+    }
+    return parts.map(p => (p.n > 1 ? `${t.colors[p.c]} ×${p.n}` : t.colors[p.c])).join(', ');
+  }
+
+  function renderTube(i) {
+    const tube = game.tubes[i];
+    const el = game.els[i];
+    el.querySelector('.liquid').replaceChildren(...tube.map(layerEl));
+    el.classList.toggle('done', isDone(tube));
+    el.classList.toggle('selected', game.selected === i);
+    el.setAttribute('aria-pressed', String(game.selected === i));
+    const extra = [isDone(tube) && t.complete, game.selected === i && t.selected].filter(Boolean);
+    el.setAttribute('aria-label', t.tube(i + 1, [describe(tube), ...extra].join(', ')));
+  }
+
+  // Choose the row count that gives the biggest tubes for the frame, then centre each row.
+  function layout() {
+    if (!game) return;
+    const W = els.wrap.clientWidth, H = els.wrap.clientHeight;
+    const n = game.tubes.length;
+    const k = CAP * LAYER + HEADROOM;
+    let best = null;
+    for (let rows = 1; rows <= 4; rows++) {
+      const cols = Math.ceil(n / rows);
+      const w = Math.min(MAX_W, W / (cols * 1.62), H / (rows * (k + 0.75) + 0.35));
+      if (!best || w > best.w + 0.5) best = { rows, cols, w };
+    }
+    const w = Math.floor(best.w);
+    const h = Math.round(w * k);
+    const lh = w * LAYER;
+    const pitchX = w * 1.62, pitchY = h + w * 0.75;
+    const blockH = best.rows * pitchY - w * 0.75;
+    const y0 = Math.max(w * 0.45, (H - blockH) / 2 + w * 0.2);
+    game.pos = [];
+    const base = Math.floor(n / best.rows), extra = n % best.rows;
+    let index = 0;
+    for (let r = 0; r < best.rows; r++) {
+      const count = base + (r < extra ? 1 : 0);
+      const x0 = (W - (count * pitchX - w * 0.62)) / 2;
+      for (let c = 0; c < count; c++, index++) game.pos[index] = { x: Math.round(x0 + c * pitchX), y: Math.round(y0 + r * pitchY), row: r };
+    }
+    const b = els.board.style;
+    b.setProperty('--w', `${w}px`);
+    b.setProperty('--h', `${h}px`);
+    b.setProperty('--lh', `${lh}px`);
+    b.setProperty('--bw', `${Math.max(2, Math.round(w * 0.06))}px`);
+    game.size = { w, h, lh, bw: Math.max(2, Math.round(w * 0.06)) };
+    game.els.forEach((el, i) => { el.style.left = `${game.pos[i].x}px`; el.style.top = `${game.pos[i].y}px`; });
+  }
+
+  function refresh() {
+    els.level.textContent = String(game.level);
+    els.moves.textContent = String(game.moves);
+    const idle = !game.busy.size && !game.over;
+    els.undo.disabled = !game.undos || !game.history.length || !idle;
+    els.extra.disabled = !game.extras || game.over;
+    $('undo-count').textContent = String(game.undos);
+    $('extra-count').textContent = String(game.extras);
+    els.undo.setAttribute('aria-label', t.boosterLabel(t.undo, game.undos));
+    els.extra.setAttribute('aria-label', t.boosterLabel(t.extraName, game.extras));
+    const sel = game.selected;
+    game.els.forEach((el, i) => el.classList.toggle('target', sel >= 0 && !game.busy.has(i) && canPour(game.tubes[sel], game.tubes[i])));
+  }
+
+  function select(i) {
+    const previous = game.selected;
+    game.selected = i;
+    if (previous >= 0) renderTube(previous);
+    if (i >= 0) renderTube(i);
+    refresh();
+  }
+
+  function nope(i) {
+    const el = game.els[i];
+    el.classList.remove('nope');
+    void el.offsetWidth;
+    el.classList.add('nope');
+  }
+
+  function onTube(i) {
+    if (!game || game.over || game.busy.has(i)) return;
+    const tube = game.tubes[i];
+    const sel = game.selected;
+    if (sel < 0) {
+      if (!tube.length || isDone(tube)) return nope(i);
+      return select(i);
+    }
+    if (sel === i) return select(-1);
+    if (canPour(game.tubes[sel], tube)) return pour(sel, i);
+    if (tube.length && !isDone(tube)) return select(i);
+    nope(sel);
+    select(-1);
+  }
+
+  function pour(a, b) {
+    const src = game.tubes[a], dst = game.tubes[b];
+    const n = Math.min(topRun(src), CAP - dst.length);
+    const color = top(src);
+    const before = dst.length;
+    dst.push(...src.splice(src.length - n, n));
+    game.history.push({ a, b, n });
+    game.moves += 1;
+    game.selected = -1;
+    game.busy.add(a).add(b);
+    refresh();
+    els.announcer.textContent = t.poured(t.colors[color], b + 1);
+    const finish = () => {
+      game.busy.delete(a);
+      game.busy.delete(b);
+      renderTube(a);
+      renderTube(b);
+      if (isDone(dst)) { sparkle(b); els.announcer.textContent = t.done(t.colors[color]); }
+      refresh();
+      checkEnd();
+    };
+    if (reducedMotion.matches) return finish();
+    animatePour(a, b, n, color, before).then(finish);
+  }
+
+  // Lift the source over the target, tilt it, run a stream down and trade the layers, then swing back.
+  async function animatePour(a, b, n, color, before) {
+    const { w, h, lh, bw } = game.size;
+    const pa = game.pos[a], pb = game.pos[b];
+    const srcEl = game.els[a], dstEl = game.els[b];
+    const tilt = 64 * Math.PI / 180;
+    // Tilt toward the target, unless that would swing the tube out of the frame.
+    const reach = (w / 2) * Math.cos(tilt) + h * Math.sin(tilt) + w / 2;
+    const overflow = s => { const far = pb.x + w / 2 - s * reach; return Math.max(0, -far, far - els.wrap.clientWidth); };
+    let side = pb.x >= pa.x ? 1 : -1;
+    if (overflow(-side) < overflow(side)) side = -side;
+    const lip = { x: pb.x + w / 2, y: pb.y - w * 0.2 };
+    const mouth = { x: lip.x - side * (w / 2) * Math.cos(tilt), y: lip.y - (w / 2) * Math.sin(tilt) };
+    const center = { x: mouth.x - side * (h / 2) * Math.sin(tilt), y: mouth.y + (h / 2) * Math.cos(tilt) };
+    const dx = center.x - (pa.x + w / 2), dy = center.y - (pa.y + h / 2);
+    const posed = `translate(${dx}px, ${dy}px) rotate(${side * 64}deg)`;
+    const lifted = srcEl.classList.contains('selected') ? `translate(0px, ${-0.42 * w}px) rotate(0deg)` : 'translate(0px, 0px) rotate(0deg)';
+    srcEl.classList.remove('selected', 'target');
+    srcEl.classList.add('pouring');
+    await srcEl.animate([{ transform: lifted }, { transform: posed }], { duration: 260, easing: 'ease-in-out', fill: 'forwards' }).finished;
+
+    const stream = document.createElement('span');
+    stream.className = 'stream';
+    stream.style.setProperty('--c', COLORS[color][0]);
+    const bottom = pb.y + h - bw - before * lh;
+    stream.style.left = `${lip.x - w * 0.085}px`;
+    stream.style.top = `${lip.y}px`;
+    stream.style.height = `${Math.max(4, bottom - lip.y)}px`;
+    els.board.append(stream);
+    await stream.animate([{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 110, easing: 'ease-in' }).finished;
+
+    const duration = 220 + n * 90;
+    const layers = [...srcEl.querySelectorAll('.layer')].slice(-n);
+    layers.forEach(layer => layer.animate([{ height: `${lh}px` }, { height: '0px' }], { duration, fill: 'forwards' }));
+    const liquid = dstEl.querySelector('.liquid');
+    const incoming = Array.from({ length: n }, () => layerEl(color));
+    incoming.forEach(layer => { layer.style.height = '0px'; liquid.append(layer); layer.animate([{ height: '0px' }, { height: `${lh}px` }], { duration, fill: 'forwards' }); });
+    await wait(duration);
+
+    stream.animate([{ transform: 'translateY(0) scaleY(1)' }, { transform: `translateY(${bottom - lip.y}px) scaleY(0)` }], { duration: 120, fill: 'forwards' }).finished.then(() => stream.remove());
+    await srcEl.animate([{ transform: posed }, { transform: 'translate(0px, 0px) rotate(0deg)' }], { duration: 240, easing: 'ease-in-out' }).finished;
+    srcEl.getAnimations().forEach(anim => anim.cancel());
+    srcEl.classList.remove('pouring');
+  }
+
+  function sparkle(i) {
+    if (reducedMotion.matches) return;
+    const { w } = game.size;
+    const p = game.pos[i];
+    for (let k = 0; k < 7; k++) {
+      const s = document.createElement('span');
+      s.className = 'spark';
+      s.textContent = '✦';
+      const angle = (k / 7) * Math.PI * 2 - Math.PI / 2;
+      s.style.left = `${p.x + w / 2}px`;
+      s.style.top = `${p.y + w * 0.2}px`;
+      s.style.setProperty('--dx', `${Math.cos(angle) * w * 1.1}px`);
+      s.style.setProperty('--dy', `${Math.sin(angle) * w * 1.1}px`);
+      s.addEventListener('animationend', () => s.remove());
+      els.board.append(s);
+    }
+  }
+
+  function checkEnd() {
+    if (game.busy.size || game.over) return;
+    if (solved(game.tubes)) return win();
+    if (!hasMove(game.tubes)) stuck();
+  }
+
+  function win() {
+    game.over = true;
+    refresh();
+    if (game.level >= highest) { highest = game.level + 1; write(STORE, highest); }
+    els.winTitle.textContent = t.won(game.level);
+    els.result.textContent = t.result(game.moves);
+    els.announcer.textContent = `${t.won(game.level)} ${t.result(game.moves)}`;
+    setTimeout(() => { els.win.hidden = false; $('next-level').focus({ preventScroll: true }); }, reducedMotion.matches ? 0 : 750);
+  }
+
+  function stuck() {
+    els.stuckUndo.hidden = !game.undos || !game.history.length;
+    els.stuckExtra.hidden = !game.extras;
+    els.announcer.textContent = `${t.stuck}. ${t.stuckText}`;
+    setTimeout(() => { if (game.over || game.busy.size || hasMove(game.tubes)) return; els.stuck.hidden = false; $('retry').focus({ preventScroll: true }); }, 400);
+  }
+
+  function undo() {
+    if (!game || game.over || game.busy.size || !game.undos || !game.history.length) return;
+    const { a, b, n } = game.history.pop();
+    const src = game.tubes[a], dst = game.tubes[b];
+    src.push(...dst.splice(dst.length - n, n));
+    game.undos -= 1;
+    game.moves -= 1;
+    game.selected = -1;
+    game.els.forEach((_, i) => renderTube(i));
+    refresh();
+    els.stuck.hidden = true;
+    els.announcer.textContent = t.undone;
+  }
+
+  function addTube() {
+    if (!game || game.over || !game.extras) return;
+    game.extras -= 1;
+    game.tubes.push([]);
+    addTubeEl(game.tubes.length - 1);
+    layout();
+    refresh();
+    els.stuck.hidden = true;
+    els.announcer.textContent = t.added;
+  }
+
+  function showPicker() {
+    pickLevel = Math.min(pickLevel, highest);
+    els.pickLevel.textContent = t.levelN(pickLevel);
+    els.prev.disabled = pickLevel <= 1;
+    els.next.disabled = pickLevel >= highest;
+  }
+
+  function openStart() {
+    pickLevel = game ? game.level : highest;
+    showPicker();
+    els.start.hidden = false;
+    $('play').focus({ preventScroll: true });
+  }
+
+  // Arrow keys walk between tubes; up/down jump to the nearest tube in the next row.
+  els.board.addEventListener('keydown', event => {
+    const i = game ? game.els.indexOf(document.activeElement) : -1;
+    if (i < 0 || event.altKey || event.ctrlKey || event.metaKey) return;
+    let next = -1;
+    if (event.key === 'ArrowLeft') next = i - 1;
+    else if (event.key === 'ArrowRight') next = i + 1;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      const row = game.pos[i].row + (event.key === 'ArrowUp' ? -1 : 1);
+      let bestDist = Infinity;
+      game.pos.forEach((p, j) => { const d = Math.abs(p.x - game.pos[i].x); if (p.row === row && d < bestDist) { bestDist = d; next = j; } });
+    } else return;
+    event.preventDefault();
+    if (next >= 0 && next < game.els.length) game.els[next].focus({ preventScroll: true });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !els.start.hidden || !els.win.hidden) return;
+    const key = event.key.toLowerCase();
+    if (key === 'u') { event.preventDefault(); undo(); }
+    else if (key === 't') { event.preventDefault(); addTube(); }
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.extra.addEventListener('click', addTube);
+  els.stuckUndo.addEventListener('click', undo);
+  els.stuckExtra.addEventListener('click', addTube);
+  $('restart').addEventListener('click', () => startLevel(game.level));
+  $('retry').addEventListener('click', () => startLevel(game.level));
+  $('menu').addEventListener('click', openStart);
+  els.prev.addEventListener('click', () => { pickLevel -= 1; showPicker(); });
+  els.next.addEventListener('click', () => { pickLevel += 1; showPicker(); });
+  $('play').addEventListener('click', () => startLevel(pickLevel));
+  $('next-level').addEventListener('click', () => startLevel(game.level + 1));
+  $('replay').addEventListener('click', () => startLevel(game.level));
+  new ResizeObserver(layout).observe(els.wrap);
+
+  startLevel(highest);
+  openStart();
+})();
+</script>
+</body>
+</html>

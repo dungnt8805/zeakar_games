@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memory Pairs</title>
+<style>
+:root {
+  --ink: #2b2a33;
+  --muted: #6b6457;
+  --sun: #f6d96b;
+  --teal: #14a39a;
+  --teal-dark: #0e7f78;
+  --paper: #fffdf6;
+  --star: #f2a93b;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--sun);
+  background-image: radial-gradient(#f9e48f 2px, transparent 2.5px);
+  background-size: 28px 28px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; gap: 12px; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+header { text-align: center; }
+h1 { font-size: clamp(24px, 7.5vw, 32px); font-weight: 900; letter-spacing: -.03em; }
+h1 span { color: var(--teal-dark); }
+.tagline { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.tagline .timed { color: #d9534f; }
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 7px 6px; border-radius: 14px; background: #ffffffb3; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat strong.low { color: #d9534f; }
+.icon-btn { flex: 0 0 auto; width: 46px; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 #d8b94c; }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #d8b94c; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board {
+  --gap: clamp(4px, 1.8cqmin, 10px);
+  --cell: min(calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols)), calc((100cqh - (var(--rows) - 1) * var(--gap)) / var(--rows)));
+  display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); gap: var(--gap);
+}
+.card { position: relative; perspective: 600px; border-radius: 18%; }
+.card .inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+.card.flipped .inner, .card.matched .inner { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; border-radius: 18%; display: grid; place-items: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.back { background: var(--teal); color: #f2f2ec; font-size: calc(var(--cell) * .48); font-weight: 900; box-shadow: inset 0 -4px 0 #0003; }
+.card:hover:not(.flipped):not(.matched) .back { background: #18b3a9; }
+.front { transform: rotateY(180deg); font-size: calc(var(--cell) * .52); line-height: 1; box-shadow: inset 0 -4px 0 #0002; }
+.card.matched .front { animation: bounce .45s .2s; }
+.card.matched { cursor: default; }
+@keyframes bounce { 40% { transform: rotateY(180deg) scale(1.12); } }
+.board.won .card.matched .front { animation: party .6s calc(var(--i) * 30ms) both; }
+@keyframes party { 50% { transform: rotateY(180deg) translateY(-12%) rotate(8deg); } }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: #2b2a3366; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #0005; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; }
+.panel .emoji { font-size: 44px; }
+.panel p { margin-top: 8px; color: var(--muted); }
+.stars { margin-top: 6px; font-size: 38px; letter-spacing: 4px; color: #e3d6ad; }
+.stars b { color: var(--star); }
+.result { font-size: 18px; font-weight: 700; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--teal); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--teal-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--teal-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #e6dcc0; font-weight: 800; }
+.store-link { display: inline-block; margin-top: 14px; font-size: 14px; font-weight: 700; color: var(--teal-dark); text-underline-offset: 4px; }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 2px; border-radius: 14px; background: #fff4cf; box-shadow: 0 3px 0 #e2c86a; font-size: 18px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: var(--star); }
+.level-btn.current { background: var(--teal); color: #fff; box-shadow: 0 3px 0 var(--teal-dark); }
+.level-btn.current small { color: #ffe9a8; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+
+/* Landscape frames (fullscreen on desktop) get room to lay the board sideways. */
+@media (min-aspect-ratio: 4/3) { .app { max-width: 980px; } }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Memory <span>Pairs</span></h1>
+    <p class="tagline" id="tagline"></p>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="board-wrap" id="board-wrap"><div class="board" id="board"></div></div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=com.zeakar.games.matchingcard" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">⏰</p>
+    <h2 id="lose-title" data-i18n="timeUp"></h2>
+    <p data-i18n="timeUpText"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { goal: n => `Find all ${n} pairs`, timed: s => `⏱ ${s} limit`, level: 'Level', moves: 'Moves', time: 'Time', levels: 'Levels', restart: 'Restart level', won: n => `Level ${n} complete!`, allDone: 'You finished every level!', result: (m, s) => `${m} moves · ${s}`, newBest: 'New best!', next: 'Next level', replay: 'Replay level', timeUp: 'Time’s up!', timeUpText: 'Find every pair before the clock runs out.', retry: 'Try again', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, full: 'Get Memory Pairs on Google Play', card: n => `Card ${n}`, hidden: 'face down', match: 'Pair found', noMatch: 'No match' },
+    vi: { goal: n => `Tìm đủ ${n} cặp`, timed: s => `⏱ giới hạn ${s}`, level: 'Màn', moves: 'Lượt', time: 'Thời gian', levels: 'Chọn màn', restart: 'Chơi lại màn', won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã phá đảo tất cả các màn!', result: (m, s) => `${m} lượt · ${s}`, newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại màn này', timeUp: 'Hết giờ!', timeUpText: 'Hãy tìm đủ các cặp trước khi hết thời gian.', retry: 'Thử lại', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, full: 'Tải Memory Pairs trên Google Play', card: n => `Thẻ ${n}`, hidden: 'đang úp', match: 'Ghép đúng', noMatch: 'Không khớp' },
+    zh: { goal: n => `找出全部 ${n} 对`, timed: s => `⏱ 限时 ${s}`, level: '关卡', moves: '步数', time: '时间', levels: '选择关卡', restart: '重玩本关', won: n => `第 ${n} 关完成！`, allDone: '你已通关所有关卡！', result: (m, s) => `${m} 步 · ${s}`, newBest: '新纪录！', next: '下一关', replay: '重玩本关', timeUp: '时间到！', timeUpText: '在时间结束前找出所有配对。', retry: '再试一次', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, full: '在 Google Play 获取 Memory Pairs', card: n => `卡片 ${n}`, hidden: '背面朝上', match: '配对成功', noMatch: '不匹配' },
+    fr: { goal: n => `Trouvez les ${n} paires`, timed: s => `⏱ limite ${s}`, level: 'Niveau', moves: 'Coups', time: 'Temps', levels: 'Niveaux', restart: 'Recommencer le niveau', won: n => `Niveau ${n} terminé !`, allDone: 'Vous avez terminé tous les niveaux !', result: (m, s) => `${m} coups · ${s}`, newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer le niveau', timeUp: 'Temps écoulé !', timeUpText: 'Trouvez toutes les paires avant la fin du chrono.', retry: 'Réessayer', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, full: 'Obtenir Memory Pairs sur Google Play', card: n => `Carte ${n}`, hidden: 'face cachée', match: 'Paire trouvée', noMatch: 'Pas de paire' },
+    th: { goal: n => `จับคู่ให้ครบ ${n} คู่`, timed: s => `⏱ จำกัดเวลา ${s}`, level: 'ด่าน', moves: 'ครั้ง', time: 'เวลา', levels: 'เลือกด่าน', restart: 'เริ่มด่านใหม่', won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณผ่านครบทุกด่านแล้ว!', result: (m, s) => `${m} ครั้ง · ${s}`, newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นด่านนี้อีกครั้ง', timeUp: 'หมดเวลา!', timeUpText: 'จับคู่ให้ครบก่อนหมดเวลา', retry: 'ลองอีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, full: 'ดาวน์โหลด Memory Pairs บน Google Play', card: n => `การ์ด ${n}`, hidden: 'คว่ำอยู่', match: 'จับคู่ถูก', noMatch: 'ไม่ตรงกัน' },
+    ja: { goal: n => `${n}組のペアを全部見つけよう`, timed: s => `⏱ 制限時間 ${s}`, level: 'レベル', moves: '手数', time: 'タイム', levels: 'レベル選択', restart: 'レベルをやり直す', won: n => `レベル ${n} クリア！`, allDone: '全レベルクリア！', result: (m, s) => `${m}手 · ${s}`, newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度プレイ', timeUp: 'タイムアップ！', timeUpText: '時間内にすべてのペアを見つけよう。', retry: 'もう一度', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, full: 'Google Play で Memory Pairs を入手', card: n => `カード ${n}`, hidden: '裏向き', match: 'ペア成立', noMatch: '不一致' },
+    ko: { goal: n => `${n}쌍을 모두 찾으세요`, timed: s => `⏱ 제한 시간 ${s}`, level: '레벨', moves: '횟수', time: '시간', levels: '레벨 선택', restart: '레벨 다시 하기', won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨을 클리어했어요!', result: (m, s) => `${m}회 · ${s}`, newBest: '최고 기록!', next: '다음 레벨', replay: '이 레벨 다시 하기', timeUp: '시간 종료!', timeUpText: '시간이 끝나기 전에 모든 짝을 찾으세요.', retry: '다시 하기', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, full: 'Google Play에서 Memory Pairs 받기', card: n => `카드 ${n}`, hidden: '뒤집힘', match: '짝 찾음', noMatch: '짝이 아님' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const FRUITS = [
+    ['🍉', '#ef6f5e'], ['🍇', '#9b6bd6'], ['🍓', '#f4a3a8'], ['🍒', '#e85a7a'], ['🍍', '#7cc36b'], ['🥝', '#c9a46a'],
+    ['🍑', '#f5a65b'], ['🍋', '#5bb8e8'], ['🍎', '#f0c419'], ['🍐', '#4fb38a'], ['🍊', '#6a8fe0'], ['🍌', '#b07ad9'],
+    ['🥥', '#e98c5f'], ['🥭', '#3fb5a3'], ['🫐', '#f2d16b'], ['🍈', '#e57373'], ['🥕', '#8bc34a'], ['🌽', '#7e8ce0'],
+    ['🍆', '#f6b26b'], ['🥑', '#d98bb5'], ['🥦', '#f28b66'], ['🍄', '#60b0d8'], ['🌶️', '#a5d66b'], ['🥔', '#9d7fe0'],
+  ];
+  // Boards grow level by level; a few levels add a time limit (seconds). short × long side.
+  const LEVELS = [
+    { short: 3, long: 4 }, { short: 4, long: 4 }, { short: 4, long: 5 }, { short: 4, long: 6 }, { short: 5, long: 6 },
+    { short: 6, long: 6 }, { short: 6, long: 6, limit: 120 }, { short: 6, long: 7 }, { short: 6, long: 7, limit: 150 }, { short: 6, long: 8 },
+  ];
+  const STORAGE_KEY = 'milaan.memoryPairs.progress';
+  const MISMATCH_DELAY = 800;
+
+  const $ = id => document.getElementById(id);
+  const board = $('board');
+  const wrap = $('board-wrap');
+  const els = { tagline: $('tagline'), level: $('level'), moves: $('moves'), time: $('time'), announcer: $('announcer'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), newBest: $('new-best'), next: $('next'), lose: $('lose'), levels: $('levels'), levelGrid: $('level-grid') };
+
+  const readProgress = () => { try { return { unlocked: 1, stars: {}, best: {}, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { unlocked: 1, stars: {}, best: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const formatTime = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const starsFor = (moves, pairs) => (moves <= Math.ceil(pairs * 1.6) ? 3 : moves <= Math.ceil(pairs * 2.3) ? 2 : 1);
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+
+  let progress = readProgress();
+  let game;
+
+  function layout() {
+    // Lay the long side of the board along the longer side of the frame.
+    const { short, long } = LEVELS[game.level - 1];
+    const wide = wrap.clientWidth > wrap.clientHeight;
+    game.cols = wide ? long : short;
+    board.style.setProperty('--cols', game.cols);
+    board.style.setProperty('--rows', wide ? short : long);
+  }
+
+  function label(card) {
+    const open = card.el.classList.contains('flipped') || card.el.classList.contains('matched');
+    return open ? `${t.card(card.index + 1)}: ${card.fruit}` : `${t.card(card.index + 1)}, ${t.hidden}`;
+  }
+
+  function stopTimer() { clearInterval(game?.timer); clearTimeout(game?.pending); }
+
+  function startLevel(number) {
+    stopTimer();
+    const config = LEVELS[number - 1];
+    const pairs = (config.short * config.long) / 2;
+    const deck = shuffle(shuffle(FRUITS.slice()).slice(0, pairs).flatMap(fruit => [fruit, fruit]));
+    game = { level: number, pairs, limit: config.limit, cards: [], open: [], moves: 0, matched: 0, startedAt: 0, pausedAt: 0, timer: 0, pending: 0, over: false, cols: config.short };
+    board.replaceChildren();
+    board.classList.remove('won');
+    deck.forEach(([fruit, color], index) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'card';
+      el.style.setProperty('--i', index);
+      el.innerHTML = `<span class="inner"><span class="face back" aria-hidden="true">?</span><span class="face front" aria-hidden="true" style="background:${color}">${fruit}</span></span>`;
+      const card = { el, fruit, index };
+      el.setAttribute('aria-label', label(card));
+      el.addEventListener('click', () => flip(card));
+      game.cards.push(card);
+      board.append(el);
+    });
+    layout();
+    els.level.textContent = `${number}/${LEVELS.length}`;
+    els.moves.textContent = '0';
+    els.time.textContent = formatTime((config.limit ?? 0) * 1000);
+    els.time.classList.remove('low');
+    els.tagline.innerHTML = '';
+    els.tagline.append(t.goal(pairs));
+    if (config.limit) {
+      const timed = document.createElement('span');
+      timed.className = 'timed';
+      timed.textContent = ` · ${t.timed(formatTime(config.limit * 1000))}`;
+      els.tagline.append(timed);
+    }
+    for (const overlay of [els.win, els.lose, els.levels]) overlay.hidden = true;
+  }
+
+  const elapsed = () => (game.pausedAt || performance.now()) - game.startedAt;
+
+  function tick() {
+    if (!game.limit) { els.time.textContent = formatTime(elapsed()); return; }
+    const left = game.limit * 1000 - elapsed();
+    els.time.textContent = formatTime(left);
+    els.time.classList.toggle('low', left <= 15_000);
+    if (left <= 0) lose();
+  }
+
+  function setOpen(card, open) {
+    card.el.classList.toggle('flipped', open);
+    card.el.setAttribute('aria-label', label(card));
+  }
+
+  function closeMismatch() {
+    clearTimeout(game.pending);
+    game.pending = 0;
+    game.open.forEach(card => setOpen(card, false));
+    game.open = [];
+  }
+
+  function flip(card) {
+    if (game.over || card.el.classList.contains('matched') || game.open.includes(card)) return;
+    // A third tap while a mismatch is showing hides it straight away instead of waiting.
+    if (game.open.length === 2) closeMismatch();
+    if (!game.startedAt) { game.startedAt = performance.now(); game.timer = setInterval(tick, 250); }
+    setOpen(card, true);
+    game.open.push(card);
+    if (game.open.length < 2) return;
+
+    game.moves += 1;
+    els.moves.textContent = String(game.moves);
+    const [a, b] = game.open;
+    if (a.fruit === b.fruit) {
+      for (const c of game.open) { c.el.classList.remove('flipped'); c.el.classList.add('matched'); c.el.setAttribute('aria-disabled', 'true'); c.el.setAttribute('aria-label', label(c)); }
+      game.open = [];
+      game.matched += 1;
+      els.announcer.textContent = `${t.match}: ${a.fruit}`;
+      if (game.matched === game.pairs) win();
+    } else {
+      els.announcer.textContent = t.noMatch;
+      game.pending = setTimeout(closeMismatch, MISMATCH_DELAY);
+    }
+  }
+
+  function win() {
+    game.over = true;
+    stopTimer();
+    const ms = elapsed();
+    const stars = starsFor(game.moves, game.pairs);
+    const key = String(game.level);
+    const previous = progress.best[key];
+    const better = !previous || game.moves < previous;
+    if (better) progress.best[key] = game.moves;
+    progress.stars[key] = Math.max(progress.stars[key] ?? 0, stars);
+    progress.unlocked = Math.min(LEVELS.length, Math.max(progress.unlocked, game.level + 1));
+    saveProgress();
+
+    const last = game.level === LEVELS.length;
+    els.winTitle.textContent = last ? t.allDone : t.won(game.level);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.moves, formatTime(ms));
+    els.newBest.hidden = !better || !previous;
+    els.next.hidden = last;
+    els.announcer.textContent = `${els.winTitle.textContent} ${t.starsLabel(stars)}`;
+    board.classList.add('won');
+    setTimeout(() => { els.win.hidden = false; (last ? $('replay') : els.next).focus({ preventScroll: true }); }, 700);
+  }
+
+  function lose() {
+    game.over = true;
+    stopTimer();
+    els.announcer.textContent = t.timeUp;
+    els.lose.hidden = false;
+    $('retry').focus({ preventScroll: true });
+  }
+
+  function openLevels() {
+    els.levelGrid.replaceChildren(...LEVELS.map((config, index) => {
+      const number = index + 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-btn${number === game.level ? ' current' : ''}`;
+      const locked = number > progress.unlocked;
+      button.disabled = locked;
+      const stars = progress.stars[number] ?? 0;
+      button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}${config.limit ? '⏱' : ''}</small>`;
+      button.setAttribute('aria-label', `${t.level} ${number}${locked ? `, ${t.locked}` : `, ${t.starsLabel(stars)}`}`);
+      button.addEventListener('click', () => startLevel(number));
+      return button;
+    }));
+    els.levels.hidden = false;
+    els.levelGrid.querySelector('.current')?.focus({ preventScroll: true });
+  }
+
+  // Pause the clock while the tab or iframe is hidden.
+  document.addEventListener('visibilitychange', () => {
+    if (!game?.startedAt || game.over) return;
+    if (document.hidden) game.pausedAt = performance.now();
+    else if (game.pausedAt) { game.startedAt += performance.now() - game.pausedAt; game.pausedAt = 0; }
+  });
+
+  // Arrow keys move focus around the grid.
+  board.addEventListener('keydown', event => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -game.cols, ArrowDown: game.cols }[event.key];
+    if (!step) return;
+    const current = game.cards.findIndex(card => card.el === document.activeElement);
+    const next = current + step;
+    if (current < 0 || next < 0 || next >= game.cards.length) return;
+    event.preventDefault();
+    game.cards[next].el.focus();
+  });
+  new ResizeObserver(() => game && layout()).observe(wrap);
+  $('restart').addEventListener('click', () => startLevel(game.level));
+  $('open-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; });
+  els.next.addEventListener('click', () => { startLevel(game.level + 1); game.cards[0].el.focus({ preventScroll: true }); });
+  $('replay').addEventListener('click', () => { startLevel(game.level); game.cards[0].el.focus({ preventScroll: true }); });
+  $('retry').addEventListener('click', () => { startLevel(game.level); game.cards[0].el.focus({ preventScroll: true }); });
+
+  startLevel(Math.min(progress.unlocked, LEVELS.length));
+})();
+</script>
+</body>
+</html>

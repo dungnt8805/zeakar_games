@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mole Smash</title>
+<style>
+:root {
+  --ink: #2f3a1c;
+  --muted: #5f6d47;
+  --grass: #79c450;
+  --grass-dark: #5aa236;
+  --soil: #8d5b34;
+  --accent: #ff7a2f;
+  --accent-dark: #d4561a;
+  --gold: #ffc531;
+  --bad: #e5484d;
+  --paper: #fffbef;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: linear-gradient(180deg, #bfe7ff 0%, #d9f2c4 38%, #b5e08f 100%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 3px; }
+
+.app { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.hud { display: flex; align-items: stretch; gap: 6px; width: 100%; max-width: 520px; margin: 0 auto; }
+.stat { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 14px; background: #ffffffb8; text-align: center; box-shadow: 0 3px 0 #8fc26a66; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.stat strong.low { color: var(--bad); }
+.stat strong .mult { font-size: 13px; color: var(--accent-dark); margin-left: 2px; }
+.icon-btn { flex: 0 0 auto; width: 46px; border-radius: 14px; background: var(--paper); color: var(--accent-dark); box-shadow: 0 4px 0 #c7b48a; display: grid; place-items: center; }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #c7b48a; }
+.icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.timebar { width: 100%; max-width: 520px; margin: 0 auto; height: 8px; border-radius: 99px; background: #ffffff8c; overflow: hidden; flex: 0 0 auto; }
+.timebar i { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--grass-dark); transform-origin: left; }
+.timebar.low i { background: var(--bad); }
+
+.field { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; container-type: size; }
+.board { --cols: 3; --rows: 3; --aspect: 1; --max: 520px; display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: repeat(var(--rows), 1fr); gap: 1.5%; width: min(100cqw, calc(100cqh * var(--aspect)), var(--max)); padding: 2.5%; border-radius: 26px; background: repeating-linear-gradient(135deg, var(--grass) 0 18px, #72bd49 18px 36px); box-shadow: inset 0 0 0 4px #ffffff40, 0 8px 0 var(--grass-dark), 0 18px 30px #3b6a1f40; touch-action: manipulation; }
+.board:focus { outline: none; }
+.board.shake { animation: shake .3s; }
+@keyframes shake { 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+
+.hole { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; border-radius: 22%; container-type: size; cursor: pointer; touch-action: manipulation; }
+.hole:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
+.pit { position: absolute; left: 9%; right: 9%; bottom: 12%; height: 28%; border-radius: 50%; background: radial-gradient(ellipse at 50% 30%, #1e1009 50%, #3d2414 80%); box-shadow: 0 0 0 4cqw #7a4a28, 0 0 0 5.5cqw #6a3f22; }
+.win { position: absolute; left: 11%; right: 11%; top: 0; bottom: 26%; overflow: hidden; pointer-events: none; }
+.critter { position: absolute; inset: 0; transform: translateY(102%); transition: transform .13s ease-out; }
+.hole.up .critter { transform: translateY(0); }
+.hole.down .critter { transition-duration: .17s; transition-timing-function: ease-in; }
+.critter svg { display: block; width: 100%; height: 100%; }
+.mound { position: absolute; left: 4%; right: 4%; bottom: 4%; height: 22%; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(#a06a3d, #7a4a28); box-shadow: inset 0 3cqw 0 #b97d4a; pointer-events: none; }
+.hammer { position: absolute; left: 44%; top: -4%; width: 56%; height: 62%; transform-origin: 50% 95%; opacity: 0; pointer-events: none; z-index: 3; }
+.hammer svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 3px 2px #0004); }
+.hammer.swing { animation: swing .24s ease-out; }
+@keyframes swing { 0% { opacity: 1; transform: rotate(30deg); } 40% { opacity: 1; transform: rotate(-62deg); } 75% { opacity: 1; transform: rotate(-56deg); } 100% { opacity: 0; transform: rotate(-56deg); } }
+.hat { position: absolute; left: 22%; top: 4%; width: 56%; height: 40%; opacity: 0; pointer-events: none; z-index: 2; }
+.hat svg { width: 100%; height: 100%; }
+.hat.fly { animation: fly .6s ease-out; }
+@keyframes fly { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(40%, -70%) rotate(70deg); } }
+.pop { position: absolute; left: 0; right: 0; top: 8%; text-align: center; font-size: 19cqw; font-weight: 900; color: #fff; text-shadow: 0 2px 0 var(--accent-dark), 0 0 8px #0005; opacity: 0; pointer-events: none; z-index: 4; white-space: nowrap; }
+.pop.bad { text-shadow: 0 2px 0 #8a1c20, 0 0 8px #0005; color: #ffd6d6; }
+.pop.gold { color: #fff4b8; text-shadow: 0 2px 0 #b07800, 0 0 10px #ffc53199; }
+.pop.show { animation: rise-pop .7s ease-out; }
+@keyframes rise-pop { 0% { opacity: 1; transform: translateY(10%) scale(.8); } 30% { opacity: 1; transform: translateY(-10%) scale(1.1); } 100% { opacity: 0; transform: translateY(-60%) scale(1); } }
+.key { position: absolute; left: 7%; top: 7%; min-width: 15cqw; padding: 1cqw 2.5cqw; border-radius: 3cqw; background: #ffffffa8; color: var(--muted); font-size: 10cqw; font-weight: 800; line-height: 1.2; pointer-events: none; }
+@media (hover: none), (pointer: coarse) { .key { display: none; } }
+
+.banner { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; z-index: 6; }
+.banner[hidden] { display: none; }
+.banner strong { font-size: clamp(30px, 10vw, 54px); font-weight: 900; letter-spacing: -.02em; color: #fff; text-shadow: 0 4px 0 var(--accent-dark), 0 0 24px #0006; animation: pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: #2f3a1c55; backdrop-filter: blur(2px); }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: 100%; overflow: auto; padding: 22px 20px; border-radius: 28px; background: var(--paper); text-align: center; box-shadow: 0 20px 50px #2f3a1c55; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.panel .emoji { font-size: 44px; line-height: 1; }
+.panel h1 { font-size: clamp(36px, 11vw, 46px); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; }
+.panel h1 span { color: var(--accent); }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.panel p { margin-top: 8px; font-size: 15px; line-height: 1.45; color: var(--muted); }
+.panel .small { font-size: 12px; }
+@media (hover: none), (pointer: coarse) { .panel .keys-hint { display: none; } }
+.legend { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; }
+.legend div { display: grid; justify-items: center; align-content: start; gap: 2px; padding: 6px 2px; border-radius: 14px; background: #eef7dc; }
+.legend div.bad { background: #fde8e6; }
+.legend svg { width: 40px; height: 44px; }
+.legend b { font-size: 14px; font-weight: 900; }
+.legend .bad b { color: var(--bad); }
+.legend span { font-size: 10.5px; font-weight: 700; line-height: 1.2; color: var(--muted); }
+.result { margin-top: 10px; font-size: 22px !important; font-weight: 900; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 12px !important; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #4a3600 !important; font-size: 13px !important; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 5px 0 var(--accent-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost { margin-top: 10px; width: 100%; padding: 12px; border-radius: 16px; background: #eef7dc; color: var(--grass-dark); font-size: 16px; font-weight: 800; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 600px) { .panel { padding: 14px 16px; } .panel .emoji { display: none; } .legend { margin-top: 8px; } .cta { margin-top: 12px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .hammer.swing { opacity: 1; transform: rotate(-56deg); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="sprites"></defs></svg>
+<main class="app">
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">60</strong></div>
+    <div class="stat"><small data-i18n="combo"></small><strong id="combo">0</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">0</strong></div>
+    <button type="button" class="icon-btn" id="pause" data-i18n-label="pause"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
+  </div>
+  <div class="timebar" id="timebar"><i id="timefill"></i></div>
+  <div class="field" id="field">
+    <div class="board" id="board" role="group" tabindex="-1" data-i18n-label="field"></div>
+    <div class="banner" id="banner" hidden><strong id="banner-text"></strong></div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🔨</p>
+    <h1 id="start-title">Mole <span>Smash</span></h1>
+    <p data-i18n="tagline"></p>
+    <div class="legend">
+      <div><svg viewBox="0 0 100 110" aria-hidden="true"><use href="#s-mole"/></svg><b>+10</b><span data-i18n="legMole"></span></div>
+      <div><svg viewBox="0 0 100 110" aria-hidden="true"><use href="#s-gold"/></svg><b>+50</b><span data-i18n="legGold"></span></div>
+      <div><svg viewBox="0 0 100 110" aria-hidden="true"><use href="#s-helmet"/></svg><b>+25</b><span data-i18n="legHelmet"></span></div>
+      <div class="bad"><svg viewBox="0 0 100 110" aria-hidden="true"><use href="#s-bunny"/></svg><b>−20</b><span data-i18n="legBunny"></span></div>
+      <div class="bad"><svg viewBox="0 0 100 110" aria-hidden="true"><use href="#s-bomb"/></svg><b>−30</b><span data-i18n="legBomb"></span></div>
+    </div>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+    <p class="result" id="start-best"></p>
+    <p class="small keys-hint" data-i18n="controls"></p>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <p class="result" id="paused-score"></p>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <button type="button" class="ghost" data-action="menu" data-i18n="menu"></button>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <p class="emoji" aria-hidden="true">⏱️</p>
+    <h2 id="over-title" data-i18n="timeUp"></h2>
+    <p class="result" id="final"></p>
+    <p id="stats"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <button type="button" class="ghost" data-action="menu" data-i18n="menu"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { score: 'Score', time: 'Time', combo: 'Combo', best: 'Best', pause: 'Pause', field: 'Mole field', tagline: 'Bonk the moles as they pop up — but leave the bunnies and bombs alone!', legMole: 'Mole', legGold: 'Golden', legHelmet: '2 hits', legBunny: 'Don’t hit', legBomb: 'Don’t hit', play: 'Play', bestLine: n => `Best score: ${n}`, controls: 'Tap the holes, or press the key shown on each one (numpad 1–9 works too). P pauses.', ready: 'Ready?', go: 'Smash!', paused: 'Paused', resume: 'Resume', menu: 'Menu', timeUp: 'Time’s up!', final: s => `Score ${s}`, stats: (h, a, c) => `Hits ${h} · Accuracy ${a}% · Best combo ${c}`, newBest: 'New best!', again: 'Play again', multi: m => `Combo ×${m}!`, tenLeft: '10 seconds left!', bunnyHit: 'Oops, a bunny! −20', bombHit: 'Bomb! −30', goldHit: 'Golden mole!', milestone: s => `${s} points!`, hole: (n, key, what) => `Hole ${n}${key ? ` (${key})` : ''}: ${what}`, st: { empty: 'empty', mole: 'mole', gold: 'golden mole', helmet: 'mole with a helmet', bunny: 'bunny, don’t hit', bomb: 'bomb, don’t hit' } },
+    vi: { score: 'Điểm', time: 'Thời gian', combo: 'Combo', best: 'Kỷ lục', pause: 'Tạm dừng', field: 'Bãi chuột chũi', tagline: 'Đập chuột chũi ngay khi chúng ló lên — nhưng tha cho thỏ và bom nhé!', legMole: 'Chuột chũi', legGold: 'Chuột vàng', legHelmet: 'Đập 2 lần', legBunny: 'Đừng đập', legBomb: 'Đừng đập', play: 'Chơi', bestLine: n => `Kỷ lục: ${n}`, controls: 'Chạm vào các hang, hoặc bấm phím hiện trên mỗi hang (bàn phím số 1–9 cũng được). P để tạm dừng.', ready: 'Sẵn sàng?', go: 'Đập nào!', paused: 'Tạm dừng', resume: 'Chơi tiếp', menu: 'Menu', timeUp: 'Hết giờ!', final: s => `Điểm ${s}`, stats: (h, a, c) => `Trúng ${h} · Chính xác ${a}% · Combo cao nhất ${c}`, newBest: 'Kỷ lục mới!', again: 'Chơi lại', multi: m => `Combo ×${m}!`, tenLeft: 'Còn 10 giây!', bunnyHit: 'Ối, trúng thỏ rồi! −20', bombHit: 'Trúng bom! −30', goldHit: 'Chuột vàng!', milestone: s => `${s} điểm!`, hole: (n, key, what) => `Hang ${n}${key ? ` (${key})` : ''}: ${what}`, st: { empty: 'trống', mole: 'chuột chũi', gold: 'chuột vàng', helmet: 'chuột đội mũ sắt', bunny: 'thỏ, đừng đập', bomb: 'bom, đừng đập' } },
+    zh: { score: '得分', time: '时间', combo: '连击', best: '最高分', pause: '暂停', field: '地鼠草地', tagline: '地鼠一冒头就敲下去——但别碰兔子和炸弹！', legMole: '地鼠', legGold: '金地鼠', legHelmet: '敲 2 下', legBunny: '别敲', legBomb: '别敲', play: '开始', bestLine: n => `最高分：${n}`, controls: '点击洞口，或按洞口上显示的按键（小键盘 1–9 也可以）。P 键暂停。', ready: '准备好了吗？', go: '开敲！', paused: '已暂停', resume: '继续', menu: '菜单', timeUp: '时间到！', final: s => `得分 ${s}`, stats: (h, a, c) => `命中 ${h} · 命中率 ${a}% · 最高连击 ${c}`, newBest: '新纪录！', again: '再玩一次', multi: m => `连击 ×${m}！`, tenLeft: '还剩 10 秒！', bunnyHit: '哎呀，敲到兔子了！−20', bombHit: '炸弹！−30', goldHit: '金地鼠！', milestone: s => `${s} 分！`, hole: (n, key, what) => `第 ${n} 个洞${key ? `（${key}）` : ''}：${what}`, st: { empty: '空', mole: '地鼠', gold: '金地鼠', helmet: '戴头盔的地鼠', bunny: '兔子，别敲', bomb: '炸弹，别敲' } },
+    fr: { score: 'Score', time: 'Temps', combo: 'Combo', best: 'Record', pause: 'Pause', field: 'Prairie aux taupes', tagline: 'Assommez les taupes dès qu’elles sortent — mais épargnez les lapins et les bombes !', legMole: 'Taupe', legGold: 'Dorée', legHelmet: '2 coups', legBunny: 'À éviter', legBomb: 'À éviter', play: 'Jouer', bestLine: n => `Record : ${n}`, controls: 'Touchez les trous ou appuyez sur la touche affichée sur chacun (le pavé numérique 1–9 marche aussi). P pour la pause.', ready: 'Prêt ?', go: 'Tapez !', paused: 'Pause', resume: 'Reprendre', menu: 'Menu', timeUp: 'Temps écoulé !', final: s => `Score ${s}`, stats: (h, a, c) => `Coups ${h} · Précision ${a} % · Meilleur combo ${c}`, newBest: 'Nouveau record !', again: 'Rejouer', multi: m => `Combo ×${m} !`, tenLeft: 'Plus que 10 secondes !', bunnyHit: 'Oups, un lapin ! −20', bombHit: 'Bombe ! −30', goldHit: 'Taupe dorée !', milestone: s => `${s} points !`, hole: (n, key, what) => `Trou ${n}${key ? ` (${key})` : ''} : ${what}`, st: { empty: 'vide', mole: 'taupe', gold: 'taupe dorée', helmet: 'taupe casquée', bunny: 'lapin, à éviter', bomb: 'bombe, à éviter' } },
+    th: { score: 'คะแนน', time: 'เวลา', combo: 'คอมโบ', best: 'สูงสุด', pause: 'หยุดชั่วคราว', field: 'ทุ่งตัวตุ่น', tagline: 'ทุบตัวตุ่นทันทีที่โผล่ขึ้นมา แต่อย่าทุบกระต่ายกับระเบิดนะ!', legMole: 'ตัวตุ่น', legGold: 'ตุ่นทอง', legHelmet: 'ทุบ 2 ที', legBunny: 'ห้ามทุบ', legBomb: 'ห้ามทุบ', play: 'เล่น', bestLine: n => `คะแนนสูงสุด: ${n}`, controls: 'แตะที่หลุม หรือกดปุ่มที่แสดงบนแต่ละหลุม (ใช้แป้นตัวเลข 1–9 ก็ได้) กด P เพื่อหยุดชั่วคราว', ready: 'พร้อมไหม?', go: 'ทุบเลย!', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', timeUp: 'หมดเวลา!', final: s => `คะแนน ${s}`, stats: (h, a, c) => `ทุบโดน ${h} · แม่นยำ ${a}% · คอมโบสูงสุด ${c}`, newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', multi: m => `คอมโบ ×${m}!`, tenLeft: 'เหลืออีก 10 วินาที!', bunnyHit: 'อุ๊ย ทุบโดนกระต่าย! −20', bombHit: 'ระเบิด! −30', goldHit: 'ตุ่นทอง!', milestone: s => `${s} คะแนน!`, hole: (n, key, what) => `หลุม ${n}${key ? ` (${key})` : ''}: ${what}`, st: { empty: 'ว่าง', mole: 'ตัวตุ่น', gold: 'ตุ่นทอง', helmet: 'ตัวตุ่นใส่หมวกเหล็ก', bunny: 'กระต่าย ห้ามทุบ', bomb: 'ระเบิด ห้ามทุบ' } },
+    ja: { score: 'スコア', time: 'タイム', combo: 'コンボ', best: 'ベスト', pause: '一時停止', field: 'モグラの原っぱ', tagline: '顔を出したモグラをたたこう。ウサギと爆弾はたたかないで！', legMole: 'モグラ', legGold: '金モグラ', legHelmet: '2回たたく', legBunny: 'たたかない', legBomb: 'たたかない', play: 'プレイ', bestLine: n => `ベストスコア：${n}`, controls: '穴をタップするか、穴に表示されたキーを押そう（テンキー 1〜9 もOK）。P で一時停止。', ready: '準備はいい？', go: 'たたけ！', paused: '一時停止中', resume: '再開', menu: 'メニュー', timeUp: 'タイムアップ！', final: s => `スコア ${s}`, stats: (h, a, c) => `ヒット ${h} · 命中率 ${a}% · 最高コンボ ${c}`, newBest: '自己ベスト更新！', again: 'もう一度', multi: m => `コンボ ×${m}！`, tenLeft: '残り10秒！', bunnyHit: 'あっ、ウサギ！−20', bombHit: '爆弾！−30', goldHit: '金モグラ！', milestone: s => `${s}点達成！`, hole: (n, key, what) => `穴 ${n}${key ? `（${key}）` : ''}：${what}`, st: { empty: '空', mole: 'モグラ', gold: '金モグラ', helmet: 'ヘルメットのモグラ', bunny: 'ウサギ（たたかない）', bomb: '爆弾（たたかない）' } },
+    ko: { score: '점수', time: '시간', combo: '콤보', best: '최고', pause: '일시정지', field: '두더지 들판', tagline: '튀어나오는 두더지를 때리세요. 토끼와 폭탄은 건드리지 마세요!', legMole: '두더지', legGold: '황금', legHelmet: '2번 때리기', legBunny: '때리지 마요', legBomb: '때리지 마요', play: '시작', bestLine: n => `최고 점수: ${n}`, controls: '구멍을 탭하거나 각 구멍에 표시된 키를 누르세요(숫자 키패드 1–9도 가능). P로 일시정지.', ready: '준비됐나요?', go: '때려라!', paused: '일시정지', resume: '계속하기', menu: '메뉴', timeUp: '시간 종료!', final: s => `점수 ${s}`, stats: (h, a, c) => `적중 ${h} · 정확도 ${a}% · 최고 콤보 ${c}`, newBest: '최고 기록!', again: '다시 하기', multi: m => `콤보 ×${m}!`, tenLeft: '10초 남았어요!', bunnyHit: '앗, 토끼예요! −20', bombHit: '폭탄! −30', goldHit: '황금 두더지!', milestone: s => `${s}점 달성!`, hole: (n, key, what) => `구멍 ${n}${key ? ` (${key})` : ''}: ${what}`, st: { empty: '비어 있음', mole: '두더지', gold: '황금 두더지', helmet: '헬멧 쓴 두더지', bunny: '토끼, 때리지 마세요', bomb: '폭탄, 때리지 마세요' } },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const ROUND = 60, ROWS = 3, READY_TIME = 1.1, MILESTONE = 250;
+  const STORAGE_KEY = 'milaan.moleSmash.best';
+  const POINTS = { mole: 10, gold: 50, helmet: 25, helmetHit: 5, bunny: -20, bomb: -30 };
+  const DECOYS = new Set(['bunny', 'bomb']);
+  // Physical key positions (event.code), so the grid matches the keyboard on any layout.
+  const KEYS = {
+    3: [['KeyQ', 'KeyW', 'KeyE'], ['KeyA', 'KeyS', 'KeyD'], ['KeyZ', 'KeyX', 'KeyC']],
+    4: [['KeyQ', 'KeyW', 'KeyE', 'KeyR'], ['KeyA', 'KeyS', 'KeyD', 'KeyF'], ['KeyZ', 'KeyX', 'KeyC', 'KeyV']],
+  };
+  const NUMPAD = [['Numpad7', 'Numpad8', 'Numpad9', 'NumpadSubtract'], ['Numpad4', 'Numpad5', 'Numpad6', 'NumpadAdd'], ['Numpad1', 'Numpad2', 'Numpad3', 'NumpadEnter']];
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), field: $('field'), score: $('score'), time: $('time'), combo: $('combo'), best: $('best'), timebar: $('timebar'), timefill: $('timefill'), banner: $('banner'), bannerText: $('banner-text'), announcer: $('announcer'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), pausedScore: $('paused-score'), resume: $('resume'), over: $('over'), final: $('final'), stats: $('stats'), newBest: $('new-best'), again: $('again'), pause: $('pause') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+
+  // ---------- Art ----------
+  function moleArt({ body, belly, dark, dizzy = false, extra = '' }) {
+    const eyes = dizzy
+      ? '<path d="M31 45l11 11M42 45l-11 11M58 45l11 11M69 45l-11 11" stroke="#2a1a12" stroke-width="4.5" stroke-linecap="round"/>'
+      : '<circle cx="37" cy="51" r="5.5" fill="#2a1a12"/><circle cx="63" cy="51" r="5.5" fill="#2a1a12"/><circle cx="39" cy="49" r="1.8" fill="#fff"/><circle cx="65" cy="49" r="1.8" fill="#fff"/>';
+    const mouth = dizzy
+      ? '<ellipse cx="50" cy="77" rx="6" ry="4.5" fill="#7a2a2a"/><path d="M50 79q3 6 6 2" stroke="#ff7a9a" stroke-width="3" fill="none" stroke-linecap="round"/>'
+      : '<rect x="45" y="70" width="10" height="8" rx="2" fill="#fff"/><path d="M50 70v8" stroke="#d8d0c8" stroke-width="1.2"/>';
+    const stars = dizzy ? '<path d="M22 22l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z M78 18l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z" fill="#ffd84d"/>' : '';
+    return `<path d="M14 112V60a36 36 0 0 1 72 0v52z" fill="${body}"/><ellipse cx="50" cy="97" rx="25" ry="22" fill="${belly}"/><ellipse cx="27" cy="65" rx="7" ry="4.5" fill="#ff9fb0" opacity=".75"/><ellipse cx="73" cy="65" rx="7" ry="4.5" fill="#ff9fb0" opacity=".75"/>${eyes}<ellipse cx="50" cy="63" rx="9" ry="6.5" fill="#ff7a9a"/><ellipse cx="47" cy="61" rx="3" ry="1.8" fill="#fff" opacity=".6"/>${mouth}<ellipse cx="27" cy="101" rx="9.5" ry="6.5" fill="${dark}"/><ellipse cx="73" cy="101" rx="9.5" ry="6.5" fill="${dark}"/>${extra}${stars}`;
+  }
+  const HAT = '<path d="M15 45a35 26 0 0 1 70 0z" fill="#9aa7bb"/><path d="M28 30a24 16 0 0 1 22-9" stroke="#d5dde8" stroke-width="4" fill="none" stroke-linecap="round"/><rect x="9" y="41" width="82" height="9" rx="4.5" fill="#76839a"/><circle cx="30" cy="45.5" r="2.2" fill="#c3cddb"/><circle cx="50" cy="45.5" r="2.2" fill="#c3cddb"/><circle cx="70" cy="45.5" r="2.2" fill="#c3cddb"/>';
+  const SPARKLES = '<path d="M86 22l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#fff6c2"/><path d="M14 34l2 4 4 2-4 2-2 4-2-4-4-2 4-2z" fill="#fff6c2"/>';
+  const MOLE = { body: '#8b5a3c', belly: '#c9997a', dark: '#6a4029' };
+  const GOLD = { body: '#f2b927', belly: '#ffe38a', dark: '#c98f0a' };
+  function bunnyArt(sad) {
+    const eyes = sad
+      ? '<path d="M33 56l8 4-8 4M67 56l-8 4 8 4" stroke="#2a1a12" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 68q-2 6 1 9" stroke="#6fc3ff" stroke-width="4" fill="none" stroke-linecap="round"/>'
+      : '<circle cx="38" cy="60" r="5" fill="#2a1a12"/><circle cx="62" cy="60" r="5" fill="#2a1a12"/><circle cx="40" cy="58" r="1.6" fill="#fff"/><circle cx="64" cy="58" r="1.6" fill="#fff"/>';
+    return `<ellipse cx="36" cy="28" rx="9.5" ry="25" fill="#fff" stroke="#d9d2de" stroke-width="2"/><ellipse cx="36" cy="30" rx="4.5" ry="17" fill="#ffb3c4"/><ellipse cx="64" cy="28" rx="9.5" ry="25" fill="#fff" stroke="#d9d2de" stroke-width="2"/><ellipse cx="64" cy="30" rx="4.5" ry="17" fill="#ffb3c4"/><path d="M16 112V68a34 34 0 0 1 68 0v44z" fill="#fff" stroke="#d9d2de" stroke-width="2"/><ellipse cx="50" cy="99" rx="21" ry="17" fill="#f3eef6"/>${eyes}<ellipse cx="28" cy="72" rx="6" ry="4" fill="#ffb3c4" opacity=".8"/><ellipse cx="72" cy="72" rx="6" ry="4" fill="#ffb3c4" opacity=".8"/><path d="M46 69h8l-4 5z" fill="#ff7a9a"/><path d="M50 74v4M50 78q-4 3-7 0M50 78q4 3 7 0" stroke="#9a7a8a" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M24 74h-12M25 79l-11 3M76 74h12M75 79l11 3" stroke="#c9bfcf" stroke-width="1.5" stroke-linecap="round"/><ellipse cx="30" cy="103" rx="8.5" ry="6" fill="#ece5f0"/><ellipse cx="70" cy="103" rx="8.5" ry="6" fill="#ece5f0"/>`;
+  }
+  const BOMB = '<circle cx="50" cy="76" r="33" fill="#2c3045"/><ellipse cx="36" cy="60" rx="8" ry="4.5" fill="#ffffff40" transform="rotate(-30 36 60)"/><rect x="41" y="38" width="18" height="10" rx="3" fill="#6d7390"/><path d="M50 38q2-16 20-18" stroke="#c9a26b" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M71 12l3 6 6 1-5 4 2 6-6-3-6 3 2-6-5-4 6-1z" fill="#ffcf3d"/><circle cx="71" cy="20" r="3" fill="#fff"/><path d="M33 66l13 5M67 66l-13 5" stroke="#ff6b6b" stroke-width="4.5" stroke-linecap="round"/><circle cx="41" cy="77" r="4.5" fill="#fff"/><circle cx="59" cy="77" r="4.5" fill="#fff"/><path d="M42 94q8-6 16 0" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>';
+  const BOOM = '<path d="M50 22l9 24 26-8-15 22 24 18-30 0-3 30-12-26-26 14 14-26-26-14 28-6z" fill="#ff8a2b"/><path d="M50 40l6 15 16-5-9 14 15 11-18 0-2 18-8-16-16 9 9-16-16-9 17-4z" fill="#ffd84d"/><circle cx="50" cy="66" r="7" fill="#fff8d6"/>';
+  const HAMMER = '<rect x="44" y="34" width="12" height="62" rx="6" fill="#c68b55"/><rect x="44" y="34" width="4" height="62" rx="2" fill="#e0aa74"/><rect x="16" y="8" width="68" height="32" rx="11" fill="#e8473f"/><rect x="12" y="6" width="12" height="36" rx="5" fill="#b72f2a"/><rect x="76" y="6" width="12" height="36" rx="5" fill="#b72f2a"/><rect x="28" y="13" width="44" height="6" rx="3" fill="#ffffff59"/>';
+  const SPRITES = {
+    'mole': moleArt(MOLE), 'mole-hit': moleArt({ ...MOLE, dizzy: true }),
+    'gold': moleArt({ ...GOLD, extra: SPARKLES }), 'gold-hit': moleArt({ ...GOLD, dizzy: true, extra: SPARKLES }),
+    'helmet': moleArt({ ...MOLE, extra: HAT }),
+    'bunny': bunnyArt(false), 'bunny-hit': bunnyArt(true),
+    'bomb': BOMB, 'bomb-hit': BOOM,
+  };
+  $('sprites').innerHTML = Object.entries(SPRITES).map(([id, art]) => `<symbol id="s-${id}" viewBox="0 0 100 110">${art}</symbol>`).join('') + `<symbol id="s-hat" viewBox="0 0 100 60">${HAT}</symbol><symbol id="s-hammer" viewBox="0 0 100 100">${HAMMER}</symbol>`;
+
+  // ---------- Board ----------
+  let cols = 3;
+  let holes = [];
+  let keyLabels = null;
+  let game = { state: 'start', score: 0, best: readBest() };
+
+  function keyName(code) {
+    const label = keyLabels && keyLabels.get(code);
+    return (label || code.replace(/^Key/, '')).toUpperCase();
+  }
+
+  function buildBoard(count) {
+    cols = count;
+    els.board.style.setProperty('--cols', cols);
+    els.board.style.setProperty('--max', cols === 4 ? '860px' : '520px');
+    els.board.textContent = '';
+    holes = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < cols; c++) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'hole';
+      el.innerHTML = '<span class="pit"></span><span class="win"><span class="critter"><svg viewBox="0 0 100 110" preserveAspectRatio="xMidYMax meet" aria-hidden="true"><use></use></svg></span></span><span class="mound"></span><span class="hat" aria-hidden="true"><svg viewBox="0 0 100 60"><use href="#s-hat"></use></svg></span><span class="hammer" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="#s-hammer"></use></svg></span><span class="pop" aria-hidden="true"></span><kbd class="key" aria-hidden="true"></kbd>';
+      const hole = { el, index: holes.length, code: KEYS[cols][r][c], use: el.querySelector('.critter use'), hammer: el.querySelector('.hammer'), hat: el.querySelector('.hat'), pop: el.querySelector('.pop'), kind: null, phase: 'empty', t: 0, hp: 0 };
+      el.querySelector('.key').textContent = keyName(hole.code);
+      el.addEventListener('pointerdown', event => { if (event.button === 0 || event.pointerType !== 'mouse') bonk(hole); });
+      el.addEventListener('click', event => { if (event.detail === 0) bonk(hole); });
+      holes.push(hole);
+      labelHole(hole);
+      els.board.append(el);
+    }
+  }
+
+  function labelHole(hole) {
+    const what = hole.phase === 'up' ? t.st[hole.kind === 'bare' ? 'mole' : hole.kind] : t.st.empty;
+    hole.el.setAttribute('aria-label', t.hole(hole.index + 1, keyName(hole.code), what));
+  }
+
+  function fitBoard() {
+    const rect = els.field.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const wanted = rect.width > rect.height * 1.15 ? 4 : 3;
+    if (wanted !== cols) buildBoard(wanted);
+    // Cells stretch a little taller than wide on tall screens so the board fills the space.
+    const cellRatio = Math.min(cols === 4 ? 1.05 : 1.4, Math.max(cols === 4 ? 0.85 : 1, (rect.height / ROWS) / (rect.width / cols)));
+    const aspect = cols / (ROWS * cellRatio);
+    els.board.style.setProperty('--aspect', aspect);
+    els.board.style.aspectRatio = String(aspect);
+  }
+
+  // ---------- Round ----------
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function newGame() {
+    for (const hole of holes) clearHole(hole);
+    game = { state: 'ready', score: 0, best: readBest(), timeLeft: ROUND, elapsed: 0, readyT: READY_TIME, combo: 0, bestCombo: 0, hits: 0, whiffs: 0, spawnT: 0.2, lastHole: -1, warned: false, nextMilestone: MILESTONE, last: performance.now() };
+    els.start.hidden = true;
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    updateHud();
+    showBanner(t.ready, READY_TIME * 1000);
+    if (!els.board.contains(document.activeElement)) els.board.focus({ preventScroll: true });
+    loop();
+  }
+
+  const progress = () => Math.min(1, game.elapsed / ROUND);
+  const multiplier = () => game.combo >= 24 ? 4 : game.combo >= 12 ? 3 : game.combo >= 5 ? 2 : 1;
+
+  function pickKind() {
+    const p = progress(), e = game.elapsed;
+    const weights = { mole: 1, gold: e > 3 ? 0.09 : 0, helmet: e > 8 ? 0.16 + p * 0.12 : 0, bunny: e > 5 ? 0.12 + p * 0.06 : 0, bomb: e > 14 ? 0.1 + p * 0.1 : 0 };
+    let roll = Math.random() * Object.values(weights).reduce((a, b) => a + b, 0);
+    for (const [kind, w] of Object.entries(weights)) { roll -= w; if (roll <= 0) return kind; }
+    return 'mole';
+  }
+
+  function spawn() {
+    const p = progress();
+    const maxActive = Math.min(1 + Math.floor(p * 3.4) + (cols === 4 ? 1 : 0), cols === 4 ? 5 : 4);
+    const active = holes.filter(h => h.phase !== 'empty').length;
+    if (active >= maxActive) return;
+    const free = holes.filter(h => h.phase === 'empty' && h.index !== game.lastHole);
+    if (!free.length) return;
+    const hole = free[Math.floor(Math.random() * free.length)];
+    const kind = pickKind();
+    const base = lerp(1.3, 0.62, p);
+    const stay = base * (kind === 'gold' ? 0.75 : kind === 'helmet' ? 1.4 : DECOYS.has(kind) ? 1.15 : 1);
+    game.lastHole = hole.index;
+    hole.kind = kind;
+    hole.hp = kind === 'helmet' ? 2 : 1;
+    hole.phase = 'up';
+    hole.t = stay;
+    hole.use.setAttribute('href', `#s-${kind}`);
+    hole.el.classList.remove('down');
+    hole.el.classList.add('up');
+    labelHole(hole);
+  }
+
+  function sink(hole, delay = 0) {
+    hole.phase = delay ? 'hit' : 'down';
+    hole.t = delay || 0.18;
+    if (!delay) { hole.el.classList.remove('up'); hole.el.classList.add('down'); }
+    labelHole(hole);
+  }
+
+  function clearHole(hole) {
+    hole.phase = 'empty';
+    hole.kind = null;
+    hole.el.classList.remove('up', 'down');
+    labelHole(hole);
+  }
+
+  function restartAnim(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function popText(hole, text, tone = '') {
+    hole.pop.textContent = text;
+    hole.pop.className = `pop ${tone}`;
+    restartAnim(hole.pop, 'show');
+  }
+
+  function bonk(hole) {
+    if (game.state !== 'play') return;
+    restartAnim(hole.hammer, 'swing');
+    if (hole.phase !== 'up') {
+      game.whiffs += 1;
+      breakCombo();
+      return updateHud();
+    }
+    const kind = hole.kind;
+    if (DECOYS.has(kind)) {
+      addScore(POINTS[kind]);
+      popText(hole, String(POINTS[kind]).replace('-', '−'), 'bad');
+      hole.use.setAttribute('href', `#s-${kind}-hit`);
+      breakCombo();
+      sink(hole, 0.45);
+      if (!reducedMotion) restartAnim(els.board, 'shake');
+      announce(kind === 'bomb' ? t.bombHit : t.bunnyHit);
+      return updateHud();
+    }
+    game.hits += 1;
+    game.combo += 1;
+    game.bestCombo = Math.max(game.bestCombo, game.combo);
+    const m = multiplier();
+    if (m > 1 && game.combo === [0, 0, 5, 12, 24][m]) showBanner(t.multi(m), 800);
+    if (kind === 'helmet' && hole.hp > 1) {
+      hole.hp -= 1;
+      hole.kind = 'bare';
+      hole.use.setAttribute('href', '#s-mole');
+      hole.t = Math.max(hole.t, 0.55);
+      restartAnim(hole.hat, 'fly');
+      addScore(POINTS.helmetHit * m);
+      popText(hole, `+${POINTS.helmetHit * m}`);
+      return updateHud();
+    }
+    const base = kind === 'bare' ? POINTS.helmet : POINTS[kind];
+    addScore(base * m);
+    popText(hole, `+${base * m}`, kind === 'gold' ? 'gold' : '');
+    if (kind === 'gold') announce(t.goldHit);
+    hole.use.setAttribute('href', `#s-${kind === 'gold' ? 'gold' : 'mole'}-hit`);
+    sink(hole, 0.32);
+    updateHud();
+  }
+
+  function breakCombo() { game.combo = 0; }
+
+  function addScore(points) {
+    game.score = Math.max(0, game.score + points);
+    if (game.score >= game.nextMilestone) {
+      while (game.score >= game.nextMilestone) game.nextMilestone += MILESTONE;
+      announce(t.milestone(game.score));
+    }
+  }
+
+  function update(dt) {
+    if (game.state === 'ready') {
+      game.readyT -= dt;
+      if (game.readyT <= 0) { game.state = 'play'; showBanner(t.go, 600); }
+      return;
+    }
+    game.elapsed += dt;
+    game.timeLeft = Math.max(0, game.timeLeft - dt);
+    if (!game.warned && game.timeLeft <= 10) { game.warned = true; announce(t.tenLeft); }
+    game.spawnT -= dt;
+    if (game.spawnT <= 0) {
+      spawn();
+      const p = progress();
+      game.spawnT = lerp(0.85, 0.36, p) * rand(0.7, 1.3);
+    }
+    for (const hole of holes) {
+      if (hole.phase === 'empty') continue;
+      hole.t -= dt;
+      if (hole.t > 0) continue;
+      if (hole.phase === 'up') {
+        // A real mole that gets away breaks the combo; decoys simply leave.
+        if (!DECOYS.has(hole.kind) && game.combo > 0) breakCombo();
+        sink(hole);
+      } else if (hole.phase === 'hit') sink(hole);
+      else clearHole(hole);
+    }
+    updateHud();
+    if (game.timeLeft <= 0) endGame();
+  }
+
+  function endGame() {
+    game.state = 'over';
+    for (const hole of holes) clearHole(hole);
+    const isBest = game.score > game.best;
+    if (isBest) writeBest(game.score);
+    const swings = game.hits + game.whiffs;
+    const accuracy = swings ? Math.round(game.hits / swings * 100) : 0;
+    els.final.textContent = t.final(game.score);
+    els.stats.textContent = t.stats(game.hits, accuracy, game.bestCombo);
+    els.newBest.hidden = !isBest;
+    els.over.hidden = false;
+    els.banner.hidden = true;
+    updateHud();
+    announce(`${t.timeUp} ${t.final(game.score)}. ${isBest ? t.newBest : ''}`);
+    els.again.focus({ preventScroll: true });
+  }
+
+  function showMenu() {
+    if (game.state === 'paused' || game.state === 'play' || game.state === 'ready') for (const hole of holes) clearHole(hole);
+    game = { state: 'start', score: 0, best: readBest(), timeLeft: ROUND, combo: 0 };
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+    els.startBest.textContent = t.bestLine(game.best);
+    els.banner.hidden = true;
+    updateHud();
+    els.play.focus({ preventScroll: true });
+  }
+
+  function pause() {
+    if (game.state !== 'play' && game.state !== 'ready') return;
+    game.resumeTo = game.state;
+    game.state = 'paused';
+    els.pausedScore.textContent = t.final(game.score);
+    els.paused.hidden = false;
+    els.resume.focus({ preventScroll: true });
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    game.state = game.resumeTo;
+    els.paused.hidden = true;
+    els.board.focus({ preventScroll: true });
+    loop();
+  }
+
+  function updateHud() {
+    const secs = Math.ceil(game.timeLeft);
+    els.score.textContent = String(game.score);
+    els.time.textContent = String(secs);
+    els.time.classList.toggle('low', secs <= 10 && game.state !== 'start');
+    els.timebar.classList.toggle('low', secs <= 10 && game.state !== 'start');
+    els.timefill.style.transform = `scaleX(${game.timeLeft / ROUND})`;
+    const m = game.combo ? multiplier() : 1;
+    els.combo.innerHTML = m > 1 ? `${game.combo}<span class="mult">×${m}</span>` : String(game.combo);
+    els.best.textContent = String(Math.max(game.best, game.score));
+  }
+
+  function showBanner(text, ms = 900) {
+    els.bannerText.textContent = text;
+    els.banner.hidden = false;
+    announce(text);
+    clearTimeout(showBanner.timer);
+    showBanner.timer = setTimeout(() => { els.banner.hidden = true; }, ms);
+  }
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function loop() {
+    cancelAnimationFrame(loop.frame);
+    game.last = performance.now();
+    const tick = time => {
+      // Clamp dt so a stalled frame never burns the round clock.
+      const dt = Math.min(0.05, Math.max(0, (time - game.last) / 1000));
+      game.last = time;
+      if (game.state === 'ready' || game.state === 'play') {
+        update(dt);
+        loop.frame = requestAnimationFrame(tick);
+      }
+    };
+    loop.frame = requestAnimationFrame(tick);
+  }
+
+  // ---------- Input ----------
+  function holeForCode(code) {
+    for (let r = 0; r < ROWS; r++) {
+      const c = KEYS[cols][r].indexOf(code);
+      if (c >= 0) return holes[r * cols + c];
+      const n = NUMPAD[r].indexOf(code);
+      if (n >= 0 && n < cols) return holes[r * cols + n];
+    }
+    return null;
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'p' || event.key === 'P') {
+      if (game.state === 'play' || game.state === 'ready') { event.preventDefault(); return pause(); }
+      if (game.state === 'paused') { event.preventDefault(); return resume(); }
+    }
+    if (game.state !== 'play' && game.state !== 'ready') return;
+    const hole = holeForCode(event.code);
+    if (!hole) return;
+    event.preventDefault();
+    if (!event.repeat) bonk(hole);
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  els.play.addEventListener('click', newGame);
+  els.again.addEventListener('click', newGame);
+  els.resume.addEventListener('click', resume);
+  els.pause.addEventListener('click', pause);
+  for (const button of document.querySelectorAll('[data-action="menu"]')) button.addEventListener('click', showMenu);
+
+  buildBoard(3);
+  new ResizeObserver(fitBoard).observe(els.field);
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+    navigator.keyboard.getLayoutMap().then(map => {
+      keyLabels = map;
+      for (const hole of holes) { hole.el.querySelector('.key').textContent = keyName(hole.code); labelHole(hole); }
+    }).catch(() => {});
+  }
+  showMenu();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sky Hopper</title>
+<style>
+:root {
+  --bg: #0f1a33;
+  --ink: #1d2a4a;
+  --text: #ffffff;
+  --muted: #5d6b8a;
+  --sun: #ffc93c;
+  --sun-dark: #e09b00;
+  --paper: #fffaf0;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #24386a, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffc93c88; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 6cqh 6cqw; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.title { font-size: min(14cqw, 8cqh); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: #fff; text-shadow: 0 3px 0 var(--ink), 0 8px 24px #1d2a4a88; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.title span { color: var(--sun); }
+.tagline { margin-top: 1.6cqh; max-width: 30em; font-size: max(13px, min(4cqw, 2.4cqh)); font-weight: 700; line-height: 1.4; color: var(--ink); background: #ffffffcc; padding: 6px 12px; border-radius: 12px; }
+.spacer { flex: 1; }
+.cta { padding: 14px 30px; border-radius: 99px; background: var(--sun); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--sun-dark), 0 10px 24px #0004; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--sun-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #ffffffb3; padding: 4px 10px; border-radius: 99px; }
+.small:empty { display: none; }
+
+.center { justify-content: center; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 20px 18px; border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #d9c9a3, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.result { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
+.medal-box { display: grid; justify-items: center; gap: 6px; min-width: 84px; }
+.medal { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; color: #ffffffdd; border: 3px dashed #c9bfa6; }
+.medal[data-kind] { border: 0; box-shadow: inset 0 -5px 0 #0002, 0 4px 10px #0003; }
+.medal[data-kind="bronze"] { background: radial-gradient(circle at 35% 30%, #f7c79c, #cd7f32 60%, #9c5a1e); }
+.medal[data-kind="silver"] { background: radial-gradient(circle at 35% 30%, #ffffff, #c6cfdb 55%, #8e9aae); }
+.medal[data-kind="gold"] { background: radial-gradient(circle at 35% 30%, #fff3b0, #ffc93c 55%, #d89500); }
+.medal[data-kind="platinum"] { background: radial-gradient(circle at 35% 30%, #ffffff, #b9f0ff 50%, #7cc7e8); }
+.medal-box small { font-size: 12px; font-weight: 800; color: var(--muted); }
+.scores { display: grid; gap: 8px; text-align: left; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.to-next { margin-top: 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.to-next:empty { display: none; }
+.badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 99px; background: #ff6b8b; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--sun); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--sun-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--sun-dark); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title">Sky <span>Hopper</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="over"></h2>
+          <div class="result">
+            <div class="medal-box"><div class="medal" id="medal" aria-hidden="true">★</div><small id="medal-name"></small></div>
+            <div class="scores">
+              <div><small data-i18n="score"></small><strong id="final-score">0</strong></div>
+              <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+            </div>
+          </div>
+          <p class="to-next" id="to-next"></p>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const FR_MEDALS = { bronze: 'de bronze', silver: 'd’argent', gold: 'd’or', platinum: 'de platine' };
+  const I18N = {
+    en: { tagline: 'Hop through the gaps between the cloud towers. How far can you fly?', controls: 'Tap, click or press Space to hop', start: 'Tap to start', best: n => `Best: ${n}`, canvas: 'Sky Hopper — tap or press Space to hop', paused: 'Paused', resume: 'Resume', over: 'Game over', score: 'Score', bestLabel: 'Best', newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', medals: { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' }, noMedal: 'No medal yet', toNext: (n, m) => `${n} more points for ${m}`, medalGot: m => `${m} medal!`, go: 'Go!', final: (s, m) => `${s} points. ${m}` },
+    vi: { tagline: 'Nhảy qua khe hở giữa các tháp mây. Bạn bay được bao xa?', controls: 'Chạm, nhấp chuột hoặc bấm Space để nhảy', start: 'Chạm để bắt đầu', best: n => `Kỷ lục: ${n}`, canvas: 'Sky Hopper — chạm hoặc bấm Space để nhảy', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', score: 'Điểm', bestLabel: 'Kỷ lục', newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', medals: { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch kim' }, noMedal: 'Chưa có huy chương', toNext: (n, m) => `Còn ${n} điểm nữa để giành huy chương ${m}`, medalGot: m => `Huy chương ${m}!`, go: 'Bay nào!', final: (s, m) => `${s} điểm. ${m}` },
+    zh: { tagline: '穿过云塔之间的缝隙，看看你能飞多远！', controls: '点击屏幕或按空格键跳跃', start: '点击开始', best: n => `最高分：${n}`, canvas: 'Sky Hopper——点击或按空格键跳跃', paused: '已暂停', resume: '继续', over: '游戏结束', score: '得分', bestLabel: '最高分', newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', medals: { bronze: '铜牌', silver: '银牌', gold: '金牌', platinum: '白金牌' }, noMedal: '还没有奖牌', toNext: (n, m) => `再得 ${n} 分即可获得${m}`, medalGot: m => `获得${m}！`, go: '出发！', final: (s, m) => `${s} 分。${m}` },
+    fr: { tagline: 'Sautez entre les tours de nuages. Jusqu’où irez-vous ?', controls: 'Touchez, cliquez ou appuyez sur Espace pour sauter', start: 'Touchez pour commencer', best: n => `Record : ${n}`, canvas: 'Sky Hopper — touchez ou appuyez sur Espace pour sauter', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', score: 'Score', bestLabel: 'Record', newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', medals: { bronze: 'Bronze', silver: 'Argent', gold: 'Or', platinum: 'Platine' }, noMedal: 'Pas encore de médaille', toNext: (n, m, k) => `Plus que ${n} points avant la médaille ${FR_MEDALS[k]}`, medalGot: (m, k) => `Médaille ${FR_MEDALS[k]} !`, go: 'C’est parti !', final: (s, m) => `${s} points. ${m}` },
+    th: { tagline: 'กระโดดผ่านช่องว่างระหว่างหอคอยเมฆ จะบินไปได้ไกลแค่ไหน?', controls: 'แตะ คลิก หรือกด Space เพื่อกระโดด', start: 'แตะเพื่อเริ่ม', best: n => `สูงสุด: ${n}`, canvas: 'Sky Hopper — แตะหรือกด Space เพื่อกระโดด', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', score: 'คะแนน', bestLabel: 'สูงสุด', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', medals: { bronze: 'เหรียญทองแดง', silver: 'เหรียญเงิน', gold: 'เหรียญทอง', platinum: 'เหรียญแพลทินัม' }, noMedal: 'ยังไม่มีเหรียญ', toNext: (n, m) => `อีก ${n} คะแนนจะได้${m}`, medalGot: m => `ได้${m}!`, go: 'ไปเลย!', final: (s, m) => `${s} คะแนน ${m}` },
+    ja: { tagline: '雲のタワーのすき間をくぐり抜けよう。どこまで飛べるかな？', controls: 'タップ、クリック、スペースキーでジャンプ', start: 'タップでスタート', best: n => `ベスト：${n}`, canvas: 'Sky Hopper — タップかスペースキーでジャンプ', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', score: 'スコア', bestLabel: 'ベスト', newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', medals: { bronze: 'ブロンズ', silver: 'シルバー', gold: 'ゴールド', platinum: 'プラチナ' }, noMedal: 'メダルはまだありません', toNext: (n, m) => `あと ${n} 点で${m}メダル`, medalGot: m => `${m}メダル獲得！`, go: 'スタート！', final: (s, m) => `${s} 点。${m}` },
+    ko: { tagline: '구름 탑 사이의 틈을 뛰어 통과하세요. 얼마나 멀리 날 수 있을까요?', controls: '탭, 클릭 또는 Space로 점프', start: '탭해서 시작', best: n => `최고: ${n}`, canvas: 'Sky Hopper — 탭하거나 Space를 눌러 점프', paused: '일시 정지', resume: '계속하기', over: '게임 오버', score: '점수', bestLabel: '최고', newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', medals: { bronze: '브론즈', silver: '실버', gold: '골드', platinum: '플래티넘' }, noMedal: '아직 메달이 없어요', toNext: (n, m) => `${m} 메달까지 ${n}점 남았어요`, medalGot: m => `${m} 메달 획득!`, go: '출발!', final: (s, m) => `${s}점. ${m}` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait world, simulated in fixed 1/120 s steps for consistent jumps on any frame rate.
+  const W = 360, H = 640, GROUND_Y = H - 76, STEP = 1 / 120;
+  const BIRD_X = 104, BIRD_R = 16, HIT_R = 11.5;
+  const GRAVITY = 1550, HOP = -450, MAX_FALL = 640;
+  const PILLAR_W = 66, SPACING = 205;
+  const MEDALS = [{ key: 'platinum', at: 100 }, { key: 'gold', at: 50 }, { key: 'silver', at: 25 }, { key: 'bronze', at: 10 }];
+  const STORAGE_KEY = 'milaan.skyHopper.best';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const speedFor = score => Math.min(150 + score * 1.6, 235);
+  const gapFor = score => Math.max(126, 170 - score * 0.9);
+  const medalFor = score => MEDALS.find(m => score >= m.at);
+
+  // Day → sunset → night keyframes, blended by score.
+  const SKIES = [
+    { at: 0, skyTop: '#55c3ff', skyBottom: '#c8f1ff', cloud: '#ffffff', far: '#a5dcc4', near: '#71c79a', grass: '#7fd68f', ground: '#f4d9a0', groundDark: '#e8c482', tower: '#ffd9e6', towerShade: '#f2aec6', window: '#9fd9ff', cap: '#ffffff', stars: 0 },
+    { at: 25, skyTop: '#ff7d6b', skyBottom: '#ffd29a', cloud: '#ffe3d3', far: '#e0909b', near: '#b5708c', grass: '#d3a065', ground: '#f2c08a', groundDark: '#e2a56d', tower: '#ffcaa8', towerShade: '#ec9a80', window: '#ffe7a3', cap: '#fff1e6', stars: 0.15 },
+    { at: 45, skyTop: '#141a46', skyBottom: '#433c82', cloud: '#7b80c4', far: '#353b7c', near: '#262c62', grass: '#3d5a7a', ground: '#2e3462', groundDark: '#262b55', tower: '#7378c9', towerShade: '#555aa5', window: '#ffe08a', cap: '#c9cdf5', stars: 1 },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), medal: $('medal'), medalName: $('medal-name'), finalScore: $('final-score'), finalBest: $('final-best'), toNext: $('to-next'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+
+  const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const SKY_RGB = SKIES.map(s => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'string' ? hex(v) : v])));
+  function paletteAt(score) {
+    let i = 0;
+    while (i < SKIES.length - 2 && score >= SKIES[i + 1].at) i++;
+    const a = SKY_RGB[i], b = SKY_RGB[i + 1];
+    const raw = Math.max(0, Math.min(1, (score - a.at) / (b.at - a.at)));
+    // Hold each look for a while, then blend smoothly into the next.
+    const k = Math.max(0, Math.min(1, (raw - 0.35) / 0.65));
+    const f = k * k * (3 - 2 * k);
+    const out = {};
+    for (const key of Object.keys(a)) {
+      if (key === 'at') continue;
+      out[key] = Array.isArray(a[key]) ? `rgb(${a[key].map((v, j) => Math.round(v + (b[key][j] - v) * f)).join(',')})` : a[key] + (b[key] - a[key]) * f;
+    }
+    return out;
+  }
+
+  let game, scale = 1, acc = 0, last = performance.now();
+  const best = { value: readBest() };
+
+  function reset() {
+    game = { state: 'ready', score: 0, bird: { y: H * 0.45, vy: 0, rot: 0, flap: 1 }, pillars: [], particles: [], scroll: 0, time: 0, skyT: game ? game.skyT : 0, flash: 0, scorePop: 0, banner: null, overAt: 0 };
+    els.startBest.textContent = best.value ? t.best(best.value) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+  }
+
+  function begin() {
+    game.state = 'play';
+    game.pillars = [];
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(t.go);
+  }
+
+  function hop() {
+    const b = game.bird;
+    b.vy = HOP;
+    b.flap = 0;
+    if (!reducedMotion) for (let i = 0; i < 3; i++) game.particles.push({ x: BIRD_X - 10, y: b.y + 6, vx: -60 - Math.random() * 60, vy: (Math.random() - 0.5) * 50, life: 0.45, r: 3 + Math.random() * 3, color: '#ffffff' });
+  }
+
+  function tap() {
+    if (game.state === 'ready') { begin(); hop(); }
+    else if (game.state === 'play') hop();
+    else if (game.state === 'paused') resume();
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+    hop();
+  }
+
+  function spawnPillar() {
+    const gap = gapFor(game.score);
+    const prev = game.pillars[game.pillars.length - 1];
+    const min = 70 + gap / 2, max = GROUND_Y - 50 - gap / 2;
+    let y = min + Math.random() * (max - min);
+    // Keep consecutive gaps within reach so every course stays passable.
+    if (prev) y = Math.max(prev.gapY - 165, Math.min(prev.gapY + 165, y));
+    game.pillars.push({ x: prev ? prev.x + SPACING : W + 60, gapY: y, gap, scored: false, windows: Math.random() < 0.5 });
+  }
+
+  function circleHitsRect(cx, cy, r, x, y, w, h) {
+    const nx = Math.max(x, Math.min(cx, x + w)), ny = Math.max(y, Math.min(cy, y + h));
+    return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
+  }
+
+  function addScore() {
+    game.score++;
+    game.scorePop = 1;
+    const medal = MEDALS.find(m => m.at === game.score);
+    if (medal) {
+      const name = t.medals[medal.key];
+      game.banner = { text: t.medalGot(name, medal.key), t: 0, kind: medal.key };
+      announce(t.medalGot(name, medal.key));
+    }
+  }
+
+  function crash() {
+    if (game.state !== 'play') return;
+    game.state = 'dying';
+    game.flash = reducedMotion ? 0.3 : 1;
+    game.bird.vy = Math.min(game.bird.vy, -180);
+    const count = reducedMotion ? 4 : 12;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, s = 80 + Math.random() * 160;
+      game.particles.push({ x: BIRD_X, y: game.bird.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.7, r: 2.5 + Math.random() * 2.5, color: i % 2 ? '#ffd23f' : '#ffffff' });
+    }
+  }
+
+  function finish() {
+    game.state = 'over';
+    const isBest = game.score > best.value;
+    if (isBest) { best.value = game.score; writeBest(best.value); }
+    const medal = medalFor(game.score);
+    const nextMedal = [...MEDALS].reverse().find(m => m.at > game.score);
+    if (medal) { els.medal.dataset.kind = medal.key; els.medal.textContent = '★'; } else { delete els.medal.dataset.kind; els.medal.textContent = '?'; }
+    els.medalName.textContent = medal ? t.medals[medal.key] : t.noMedal;
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(best.value);
+    els.toNext.textContent = nextMedal ? t.toNext(nextMedal.at - game.score, t.medals[nextMedal.key], nextMedal.key) : '';
+    els.newBest.hidden = !isBest;
+    announce(`${t.over}. ${t.final(game.score, medal ? t.medals[medal.key] : t.noMedal)}${isBest ? ` ${t.newBest}` : ''}`);
+    setTimeout(() => {
+      if (game.state !== 'over') return;
+      els.over.hidden = false;
+      game.overAt = performance.now();
+      els.again.focus({ preventScroll: true });
+    }, 450);
+  }
+
+  function restart() {
+    // Ignore restarts in the first moments after the panel appears so frantic tapping can't skip the result.
+    if (game.state !== 'over' || els.over.hidden || performance.now() - game.overAt < 350) return;
+    reset();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function step(dt) {
+    const b = game.bird;
+    game.time += dt;
+    b.flap += dt;
+    game.flash = Math.max(0, game.flash - dt * 3);
+    game.scorePop = Math.max(0, game.scorePop - dt * 5);
+    game.skyT += (game.score - game.skyT) * Math.min(1, dt * 1.2);
+    if (game.banner && (game.banner.t += dt) > 1.6) game.banner = null;
+    for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    game.particles = game.particles.filter(p => p.life > 0);
+
+    if (game.state === 'ready') {
+      game.scroll += 70 * dt;
+      b.y = H * 0.45 + Math.sin(game.time * 3) * 9;
+      b.rot = Math.sin(game.time * 3 + 1) * 0.08;
+      return;
+    }
+    if (game.state === 'play') {
+      const speed = speedFor(game.score);
+      game.scroll += speed * dt;
+      b.vy = Math.min(MAX_FALL, b.vy + GRAVITY * dt);
+      b.y += b.vy * dt;
+      if (b.y < BIRD_R) { b.y = BIRD_R; b.vy = Math.max(0, b.vy); }
+      b.rot += (Math.max(-0.4, Math.min(1.3, b.vy / 650)) - b.rot) * Math.min(1, dt * 12);
+      for (const p of game.pillars) p.x -= speed * dt;
+      game.pillars = game.pillars.filter(p => p.x > -PILLAR_W - 10);
+      while (!game.pillars.length || game.pillars[game.pillars.length - 1].x < W + 40 - SPACING) spawnPillar();
+      for (const p of game.pillars) {
+        if (!p.scored && p.x + PILLAR_W / 2 < BIRD_X) { p.scored = true; addScore(); }
+        const top = p.gapY - p.gap / 2, bottom = p.gapY + p.gap / 2;
+        if (circleHitsRect(BIRD_X, b.y, HIT_R, p.x + 2, -400, PILLAR_W - 4, top + 400 - 1) || circleHitsRect(BIRD_X, b.y, HIT_R, p.x + 2, bottom + 1, PILLAR_W - 4, 1000)) crash();
+      }
+      if (b.y + HIT_R >= GROUND_Y) { b.y = GROUND_Y - HIT_R; crash(); }
+      return;
+    }
+    if (game.state === 'dying') {
+      b.vy = Math.min(MAX_FALL * 1.3, b.vy + GRAVITY * dt);
+      b.y += b.vy * dt;
+      b.rot += (1.5 - b.rot) * Math.min(1, dt * 6);
+      if (b.y + HIT_R >= GROUND_Y) { b.y = GROUND_Y - HIT_R; finish(); }
+    }
+  }
+
+  // ---------- drawing ----------
+  const CLOUDS = Array.from({ length: 6 }, (_, i) => ({ x: i * 90 + (i % 2) * 30, y: 70 + ((i * 53) % 190), s: 0.7 + ((i * 37) % 10) / 20 }));
+  const STARS = Array.from({ length: 40 }, (_, i) => ({ x: (i * 97) % W, y: (i * 61) % (GROUND_Y - 120), r: 0.6 + (i % 3) * 0.5, p: i }));
+
+  function puff(x, y, s) {
+    ctx.beginPath();
+    ctx.arc(x, y, 16 * s, 0, Math.PI * 2);
+    ctx.arc(x + 18 * s, y - 8 * s, 20 * s, 0, Math.PI * 2);
+    ctx.arc(x + 40 * s, y, 15 * s, 0, Math.PI * 2);
+    ctx.rect(x, y, 40 * s, 15 * s);
+    ctx.fill();
+  }
+
+  function hills(base, a1, f1, a2, f2, offset, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y + 2);
+    for (let x = 0; x <= W + 8; x += 8) ctx.lineTo(x, base + a1 * Math.sin((x + offset) / f1) + a2 * Math.sin((x + offset) / f2));
+    ctx.lineTo(W, GROUND_Y + 2);
+    ctx.fill();
+  }
+
+  function drawSky(pal) {
+    const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    sky.addColorStop(0, pal.skyTop);
+    sky.addColorStop(1, pal.skyBottom);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, GROUND_Y);
+    if (pal.stars > 0.01) {
+      ctx.fillStyle = '#ffffff';
+      for (const s of STARS) {
+        ctx.globalAlpha = pal.stars * (0.5 + 0.5 * Math.sin(game.time * 2 + s.p));
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // The sun sinks through sunset and the moon rises after it.
+    const sunK = Math.min(1, game.skyT / 30);
+    if (sunK < 1) {
+      const sy = 110 + sunK * (GROUND_Y - 150);
+      ctx.globalAlpha = 1 - Math.max(0, (sunK - 0.75) / 0.25);
+      ctx.fillStyle = '#fff6c2';
+      ctx.beginPath(); ctx.arc(272, sy, 46, 0, Math.PI * 2); ctx.globalAlpha *= 0.25; ctx.fill();
+      ctx.globalAlpha = 1 - Math.max(0, (sunK - 0.75) / 0.25);
+      ctx.fillStyle = sunK > 0.5 ? '#ffb36b' : '#fff3a6';
+      ctx.beginPath(); ctx.arc(272, sy, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    const moonK = Math.max(0, Math.min(1, (game.skyT - 32) / 14));
+    if (moonK > 0) {
+      ctx.globalAlpha = moonK;
+      const my = 230 - moonK * 120;
+      ctx.fillStyle = '#fdf6d8';
+      ctx.beginPath(); ctx.arc(84, my, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e6dcb4';
+      ctx.beginPath(); ctx.arc(78, my - 5, 4, 0, Math.PI * 2); ctx.arc(91, my + 7, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = pal.cloud;
+    ctx.globalAlpha = 0.85;
+    for (const c of CLOUDS) {
+      const span = W + 160;
+      const x = ((c.x - game.scroll * 0.12 * c.s) % span + span) % span - 90;
+      puff(x, c.y, c.s);
+    }
+    ctx.globalAlpha = 1;
+    hills(GROUND_Y - 95, 24, 70, 12, 29, game.scroll * 0.25, pal.far);
+    hills(GROUND_Y - 38, 16, 52, 9, 23, game.scroll * 0.5 + 400, pal.near);
+  }
+
+  function capBand(x, y, dir, pal) {
+    // Puffy cloud cushion that marks the edge of the gap; dir = -1 hangs above, +1 sits below.
+    ctx.fillStyle = pal.cap;
+    const top = dir < 0 ? y - 18 : y;
+    ctx.beginPath(); ctx.roundRect(x - 4, top, PILLAR_W + 8, 18, 9); ctx.fill();
+    for (let px = x + 4; px <= x + PILLAR_W - 4; px += 14.5) {
+      ctx.beginPath(); ctx.arc(px, dir < 0 ? y - 16 : y + 16, 9, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function towerBody(x, y0, y1, pal, windows) {
+    if (y1 <= y0) return;
+    ctx.fillStyle = pal.tower;
+    ctx.fillRect(x, y0, PILLAR_W, y1 - y0);
+    ctx.fillStyle = pal.towerShade;
+    ctx.fillRect(x + PILLAR_W * 0.68, y0, PILLAR_W * 0.32, y1 - y0);
+    ctx.fillRect(x, y0, 4, y1 - y0);
+    ctx.globalAlpha = 0.35;
+    for (let y = y0 + 22; y < y1; y += 34) ctx.fillRect(x, y, PILLAR_W, 3);
+    ctx.globalAlpha = 1;
+    if (!windows) return;
+    ctx.fillStyle = pal.window;
+    for (let y = y0 + 34; y < y1 - 26; y += 68) { ctx.beginPath(); ctx.roundRect(x + PILLAR_W * 0.3, y, 13, 18, [7, 7, 2, 2]); ctx.fill(); }
+  }
+
+  function drawPillars(pal) {
+    for (const p of game.pillars) {
+      const top = p.gapY - p.gap / 2, bottom = p.gapY + p.gap / 2;
+      towerBody(p.x, -10, top - 10, pal, p.windows);
+      towerBody(p.x, bottom + 10, GROUND_Y, pal, !p.windows);
+      capBand(p.x, top, -1, pal);
+      capBand(p.x, bottom, 1, pal);
+    }
+  }
+
+  function drawGround(pal) {
+    ctx.fillStyle = pal.ground;
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.fillStyle = pal.groundDark;
+    const offset = game.scroll % 28;
+    for (let x = -offset - 28; x < W + 28; x += 28) {
+      ctx.beginPath(); ctx.moveTo(x, GROUND_Y + 16); ctx.lineTo(x + 14, GROUND_Y + 16); ctx.lineTo(x + 2, H); ctx.lineTo(x - 12, H); ctx.fill();
+    }
+    ctx.fillStyle = pal.grass;
+    ctx.fillRect(0, GROUND_Y, W, 12);
+    for (let x = -(game.scroll % 18) - 18; x < W + 18; x += 18) { ctx.beginPath(); ctx.arc(x + 9, GROUND_Y + 12, 9, 0, Math.PI); ctx.fill(); }
+  }
+
+  function drawBird() {
+    const b = game.bird;
+    ctx.save();
+    ctx.translate(BIRD_X, b.y);
+    ctx.rotate(b.rot);
+    const body = ctx.createRadialGradient(-5, -6, 3, 0, 0, BIRD_R);
+    body.addColorStop(0, '#fff09a');
+    body.addColorStop(0.6, '#ffd23f');
+    body.addColorStop(1, '#f5a700');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#c77d00'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#fff4c8';
+    ctx.beginPath(); ctx.ellipse(3, 7, 9, 6, -0.2, 0, Math.PI * 2); ctx.fill();
+    // Tuft
+    ctx.fillStyle = '#ffb703';
+    ctx.beginPath(); ctx.ellipse(-3, -16, 3, 6, -0.4, 0, Math.PI * 2); ctx.ellipse(2, -16, 2.5, 5, 0.3, 0, Math.PI * 2); ctx.fill();
+    // Wing beats hard right after a hop, then glides.
+    const wing = b.flap < 0.3 ? Math.sin(b.flap / 0.3 * Math.PI * 2) * 0.9 : Math.sin(game.time * 8) * 0.2;
+    ctx.save();
+    ctx.translate(-5, 2);
+    ctx.rotate(wing);
+    ctx.fillStyle = '#ffe680';
+    ctx.strokeStyle = '#d99000';
+    ctx.beginPath(); ctx.ellipse(-4, 0, 9, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ff9f9f99';
+    ctx.beginPath(); ctx.arc(8, 4, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(6, -5, 5.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1d2a4a';
+    ctx.beginPath(); ctx.arc(7.6, -4.6, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(8.6, -5.8, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff8c42';
+    ctx.beginPath(); ctx.moveTo(13, -1); ctx.quadraticCurveTo(23, 1, 13, 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  const MEDAL_COLORS = { bronze: '#e39a5a', silver: '#dfe6f0', gold: '#ffd23f', platinum: '#b9f0ff' };
+
+  function outlinedText(text, x, y, size, fill) {
+    ctx.font = `900 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.18;
+    ctx.strokeStyle = '#1d2a4a';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function draw() {
+    if (!game) return;
+    const pal = paletteAt(game.skyT);
+    drawSky(pal);
+    drawPillars(pal);
+    drawGround(pal);
+    for (const p of game.particles) { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    drawBird();
+    if (game.state !== 'ready') {
+      ctx.save();
+      ctx.translate(W / 2, 78);
+      ctx.scale(1 + game.scorePop * 0.18, 1 + game.scorePop * 0.18);
+      outlinedText(String(game.score), 0, 0, 54, '#ffffff');
+      ctx.restore();
+    }
+    if (game.banner && game.state === 'play') {
+      ctx.globalAlpha = Math.min(1, (1.6 - game.banner.t) * 2);
+      outlinedText(game.banner.text, W / 2, 128 - game.banner.t * 6, 22, MEDAL_COLORS[game.banner.kind]);
+      ctx.globalAlpha = 1;
+    }
+    if (game.flash > 0) { ctx.fillStyle = `rgba(255, 255, 255, ${game.flash * 0.7})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a slow frame never moves the bird further than ~50 ms of flight.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      acc += dt;
+      while (acc >= STEP) { step(STEP); acc -= STEP; }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    tap();
+  });
+  document.addEventListener('keydown', event => {
+    if ((event.target instanceof Element && event.target.closest('button')) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ' ' && event.key !== 'ArrowUp' && event.key !== 'w' && event.key !== 'W') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (game.state === 'over') restart();
+    else tap();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', () => { if (game.state === 'ready') { begin(); hop(); } });
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

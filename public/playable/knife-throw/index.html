@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Knife Throw</title>
+<style>
+:root {
+  --bg: #1d1328;
+  --ink: #2b1d36;
+  --text: #ffffff;
+  --muted: #7a6a86;
+  --accent: #ffb238;
+  --accent-dark: #d98a10;
+  --apple: #ff4b5c;
+  --paper: #fff8ef;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #3c2448, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.hud { display: flex; gap: 6px; width: 100%; }
+.stat { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 12px; background: #ffffff14; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #c9b8d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.stage { flex: 1; min-height: 0; width: 100%; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffb23888; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 5cqh 6cqw 5cqh; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.scrim { background: linear-gradient(#1d132800 40%, #1d1328cc 75%); }
+.title { font-size: min(15cqw, 8.5cqh); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: #fff; text-shadow: 0 3px 0 var(--ink), 0 8px 24px #0008; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.title span { color: var(--accent); }
+.tagline { margin-top: 1.6cqh; max-width: 30em; font-size: max(13px, min(4cqw, 2.4cqh)); font-weight: 700; line-height: 1.4; color: var(--ink); background: #ffffffe0; padding: 6px 12px; border-radius: 12px; }
+.spacer { flex: 1; }
+.skins-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #f1e4f7; text-shadow: 0 1px 4px #000; }
+.skins { display: flex; gap: min(8px, 2cqw); margin: 1cqh 0 2.4cqh; }
+.skin { pointer-events: auto; position: relative; width: min(50px, 13cqw); height: min(70px, 11cqh); border-radius: 14px; background: #ffffff22; box-shadow: inset 0 0 0 2px #ffffff30; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 7%; }
+.skin .blade { width: 7px; height: 42%; border-radius: 6px 6px 1px 1px; background: var(--blade); }
+.skin .grip { width: 9px; height: 26%; margin-top: 2px; border-radius: 3px; background: var(--handle); box-shadow: 0 -3px 0 -1px #00000040; }
+.skin small { position: absolute; bottom: 3px; left: 0; right: 0; font-size: 10px; font-weight: 800; color: #fff; }
+.skin.locked .blade, .skin.locked .grip { opacity: .45; }
+.skin.on { background: #ffb23855; box-shadow: inset 0 0 0 3px var(--accent); }
+.cta { padding: 14px 34px; border-radius: 99px; background: var(--accent); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark), 0 10px 24px #0004; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: var(--ink); background: #ffffffd0; padding: 4px 10px; border-radius: 99px; }
+.small:empty { display: none; }
+.note { min-height: 1.4em; margin-top: 1cqh; font-size: 13px; font-weight: 800; color: #ffd27a; text-shadow: 0 1px 4px #000; }
+
+.center { justify-content: center; }
+.panel { pointer-events: auto; width: min(100%, 310px); padding: 20px 18px; border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #dcc8b4, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel .emoji { font-size: 40px; line-height: 1.1; }
+.results { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.results div { padding: 10px 6px; border-radius: 16px; background: #f4e6d6; }
+.results small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.results strong { display: block; font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.results em { display: block; font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted); }
+.earned { margin-top: 10px; font-size: 14px; font-weight: 800; color: #c2364a; }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: var(--apple); color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--accent); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="hud" id="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="bestStage"></small><strong id="best">0</strong></div>
+    <div class="stat"><small data-i18n="apples"></small><strong id="coins">0</strong></div>
+  </div>
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay scrim" id="start">
+        <h1 class="title">Knife <span>Throw</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <p class="skins-title" id="skins-title" data-i18n="knives"></p>
+        <div class="skins" id="skins" role="group" aria-labelledby="skins-title"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+        <p class="note" id="note" aria-hidden="true"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <p class="emoji" aria-hidden="true">💥</p>
+          <h2 id="over-title" data-i18n="over"></h2>
+          <div class="results">
+            <div><small data-i18n="stage"></small><strong id="final-stage">1</strong><em id="best-stage"></em></div>
+            <div><small data-i18n="score"></small><strong id="final-score">0</strong><em id="best-score"></em></div>
+          </div>
+          <p class="earned" id="earned"></p>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Throw knives into the spinning log — but never hit another knife!', controls: 'Tap, click or press Space to throw', start: 'Play', best: (s, c) => `Best stage: ${s} · 🍎 ${c}`, canvas: 'Knife Throw — tap or press Space to throw a knife at the spinning log', paused: 'Paused', resume: 'Resume', over: 'Game over', score: 'Score', stage: 'Stage', bestStage: 'Best stage', apples: 'Apples', bestSmall: n => `Best ${n}`, stageN: n => `Stage ${n}`, bossTitle: name => `Boss: ${name}`, bosses: { cheese: 'Cheese Wheel', donut: 'Giant Donut', orange: 'Orange Slice' }, stageStart: (n, k) => `Stage ${n}. Throw ${k} knives.`, cleared: n => `Stage ${n} cleared!`, bossDown: 'Boss defeated! +5 apples', clash: 'Clang! Your knife struck another knife.', final: (s, p) => `Reached stage ${s} with ${p} points.`, earned: n => `🍎 +${n} this run`, newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', knives: 'Knives', skinNames: ['Classic', 'Ocean', 'Candy', 'Jade', 'Golden'], skinLabel: (name, state) => `${name} — ${state}`, owned: 'tap to equip', equipped: 'equipped', price: n => `costs ${n} apples`, needMore: n => `You need ${n} more apples.`, unlocked: name => `${name} knife unlocked!`, go: 'Throw!' },
+    vi: { tagline: 'Phóng dao vào khúc gỗ đang xoay — nhưng tuyệt đối đừng trúng con dao khác!', controls: 'Chạm, nhấp chuột hoặc bấm Space để phóng dao', start: 'Chơi', best: (s, c) => `Màn cao nhất: ${s} · 🍎 ${c}`, canvas: 'Knife Throw — chạm hoặc bấm Space để phóng dao vào khúc gỗ đang xoay', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', score: 'Điểm', stage: 'Màn', bestStage: 'Màn cao nhất', apples: 'Táo', bestSmall: n => `Kỷ lục ${n}`, stageN: n => `Màn ${n}`, bossTitle: name => `Trùm: ${name}`, bosses: { cheese: 'Bánh phô mai', donut: 'Donut khổng lồ', orange: 'Lát cam' }, stageStart: (n, k) => `Màn ${n}. Phóng ${k} con dao.`, cleared: n => `Qua màn ${n}!`, bossDown: 'Đã hạ trùm! +5 quả táo', clash: 'Keng! Dao của bạn trúng dao khác.', final: (s, p) => `Đến màn ${s} với ${p} điểm.`, earned: n => `🍎 +${n} trong lượt này`, newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', knives: 'Bộ dao', skinNames: ['Cổ điển', 'Đại dương', 'Kẹo ngọt', 'Ngọc bích', 'Hoàng kim'], skinLabel: (name, state) => `${name} — ${state}`, owned: 'chạm để trang bị', equipped: 'đang dùng', price: n => `giá ${n} quả táo`, needMore: n => `Bạn cần thêm ${n} quả táo.`, unlocked: name => `Đã mở khóa dao ${name}!`, go: 'Phóng nào!' },
+    zh: { tagline: '把飞刀扔进旋转的木桩——千万别碰到其他飞刀！', controls: '点击屏幕或按空格键投掷', start: '开始', best: (s, c) => `最高关卡：${s} · 🍎 ${c}`, canvas: 'Knife Throw——点击或按空格键向旋转的木桩投掷飞刀', paused: '已暂停', resume: '继续', over: '游戏结束', score: '得分', stage: '关卡', bestStage: '最高关卡', apples: '苹果', bestSmall: n => `最佳 ${n}`, stageN: n => `第 ${n} 关`, bossTitle: name => `首领：${name}`, bosses: { cheese: '奶酪轮', donut: '巨型甜甜圈', orange: '橙子片' }, stageStart: (n, k) => `第 ${n} 关，投出 ${k} 把飞刀。`, cleared: n => `第 ${n} 关通过！`, bossDown: '击败首领！苹果 +5', clash: '当！飞刀撞上了另一把飞刀。', final: (s, p) => `到达第 ${s} 关，得分 ${p}。`, earned: n => `本局 🍎 +${n}`, newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', knives: '飞刀', skinNames: ['经典', '海洋', '糖果', '翡翠', '黄金'], skinLabel: (name, state) => `${name}——${state}`, owned: '点击装备', equipped: '已装备', price: n => `需要 ${n} 个苹果`, needMore: n => `还差 ${n} 个苹果。`, unlocked: name => `解锁了${name}飞刀！`, go: '投掷！' },
+    fr: { tagline: 'Lancez des couteaux dans la bûche qui tourne, sans jamais toucher un autre couteau !', controls: 'Touchez, cliquez ou appuyez sur Espace pour lancer', start: 'Jouer', best: (s, c) => `Meilleure étape : ${s} · 🍎 ${c}`, canvas: 'Knife Throw — touchez ou appuyez sur Espace pour lancer un couteau sur la bûche qui tourne', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', score: 'Score', stage: 'Étape', bestStage: 'Meilleure étape', apples: 'Pommes', bestSmall: n => `Record ${n}`, stageN: n => `Étape ${n}`, bossTitle: name => `Boss : ${name}`, bosses: { cheese: 'Meule de fromage', donut: 'Donut géant', orange: 'Tranche d’orange' }, stageStart: (n, k) => `Étape ${n}. Lancez ${k} couteaux.`, cleared: n => `Étape ${n} terminée !`, bossDown: 'Boss vaincu ! +5 pommes', clash: 'Clang ! Votre couteau a touché un autre couteau.', final: (s, p) => `Étape ${s} atteinte avec ${p} points.`, earned: n => `🍎 +${n} cette partie`, newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', knives: 'Couteaux', skinNames: ['Classique', 'Océan', 'Bonbon', 'Jade', 'Doré'], skinLabel: (name, state) => `${name} — ${state}`, owned: 'touchez pour équiper', equipped: 'équipé', price: n => `coûte ${n} pommes`, needMore: n => `Il vous manque ${n} pommes.`, unlocked: name => `Couteau ${name} débloqué !`, go: 'Lancez !' },
+    th: { tagline: 'ปามีดใส่ขอนไม้ที่หมุนอยู่ แต่ห้ามโดนมีดเล่มอื่นเด็ดขาด!', controls: 'แตะ คลิก หรือกด Space เพื่อปามีด', start: 'เล่น', best: (s, c) => `ด่านสูงสุด: ${s} · 🍎 ${c}`, canvas: 'Knife Throw — แตะหรือกด Space เพื่อปามีดใส่ขอนไม้ที่หมุนอยู่', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', score: 'คะแนน', stage: 'ด่าน', bestStage: 'ด่านสูงสุด', apples: 'แอปเปิล', bestSmall: n => `สูงสุด ${n}`, stageN: n => `ด่าน ${n}`, bossTitle: name => `บอส: ${name}`, bosses: { cheese: 'ชีสก้อนกลม', donut: 'โดนัทยักษ์', orange: 'ส้มฝาน' }, stageStart: (n, k) => `ด่าน ${n} ปามีดให้ครบ ${k} เล่ม`, cleared: n => `ผ่านด่าน ${n}!`, bossDown: 'ชนะบอสแล้ว! ได้แอปเปิล 5 ลูก', clash: 'เคร้ง! มีดของคุณชนมีดเล่มอื่น', final: (s, p) => `ไปถึงด่าน ${s} ได้ ${p} คะแนน`, earned: n => `🍎 +${n} ในรอบนี้`, newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', knives: 'มีด', skinNames: ['คลาสสิก', 'มหาสมุทร', 'ลูกกวาด', 'หยก', 'ทองคำ'], skinLabel: (name, state) => `${name} — ${state}`, owned: 'แตะเพื่อใช้', equipped: 'กำลังใช้', price: n => `ราคา ${n} แอปเปิล`, needMore: n => `ต้องการแอปเปิลอีก ${n} ลูก`, unlocked: name => `ปลดล็อกมีด${name}แล้ว!`, go: 'ปาเลย!' },
+    ja: { tagline: '回転する丸太にナイフを投げよう。ほかのナイフに当てたらアウト！', controls: 'タップ、クリック、スペースキーで投げる', start: 'スタート', best: (s, c) => `最高ステージ：${s} · 🍎 ${c}`, canvas: 'Knife Throw — タップかスペースキーで回転する丸太にナイフを投げる', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', score: 'スコア', stage: 'ステージ', bestStage: '最高ステージ', apples: 'りんご', bestSmall: n => `ベスト ${n}`, stageN: n => `ステージ ${n}`, bossTitle: name => `ボス：${name}`, bosses: { cheese: 'チーズホイール', donut: 'ジャンボドーナツ', orange: 'オレンジスライス' }, stageStart: (n, k) => `ステージ ${n}。ナイフを${k}本投げよう。`, cleared: n => `ステージ ${n} クリア！`, bossDown: 'ボス撃破！りんご +5', clash: 'カキーン！ナイフ同士がぶつかった。', final: (s, p) => `ステージ ${s} まで到達、${p} 点。`, earned: n => `今回のりんご +${n}`, newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', knives: 'ナイフ', skinNames: ['クラシック', 'オーシャン', 'キャンディ', 'ヒスイ', 'ゴールド'], skinLabel: (name, state) => `${name} — ${state}`, owned: 'タップで装備', equipped: '装備中', price: n => `りんご${n}個で解放`, needMore: n => `りんごがあと${n}個必要です。`, unlocked: name => `${name}ナイフを解放！`, go: '投げろ！' },
+    ko: { tagline: '돌아가는 통나무에 칼을 던지세요. 다른 칼에 맞으면 끝!', controls: '탭, 클릭 또는 Space로 던지기', start: '시작', best: (s, c) => `최고 스테이지: ${s} · 🍎 ${c}`, canvas: 'Knife Throw — 탭하거나 Space를 눌러 돌아가는 통나무에 칼을 던지세요', paused: '일시 정지', resume: '계속하기', over: '게임 오버', score: '점수', stage: '스테이지', bestStage: '최고 스테이지', apples: '사과', bestSmall: n => `최고 ${n}`, stageN: n => `스테이지 ${n}`, bossTitle: name => `보스: ${name}`, bosses: { cheese: '치즈 휠', donut: '왕도넛', orange: '오렌지 슬라이스' }, stageStart: (n, k) => `스테이지 ${n}. 칼 ${k}개를 던지세요.`, cleared: n => `스테이지 ${n} 클리어!`, bossDown: '보스 격파! 사과 +5', clash: '챙! 칼끼리 부딪혔어요.', final: (s, p) => `스테이지 ${s}까지 도달, ${p}점.`, earned: n => `이번 판 🍎 +${n}`, newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', knives: '칼', skinNames: ['클래식', '오션', '캔디', '비취', '골드'], skinLabel: (name, state) => `${name} — ${state}`, owned: '탭해서 장착', equipped: '장착 중', price: n => `사과 ${n}개 필요`, needMore: n => `사과가 ${n}개 더 필요해요.`, unlocked: name => `${name} 칼 잠금 해제!`, go: '던져라!' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait world, simulated in fixed 1/120 s steps.
+  const W = 360, H = 640, STEP = 1 / 120;
+  const CX = 180, CY = 236;
+  const KNIFE = 96, BLADE = 52, EMBED = 18;   // knife length, blade length, depth it sinks into the log
+  const THROW_SPEED = 2100, HAND_Y = 520, GRAVITY = 1100;
+  const HIT_DIST = 8, MIN_GAP = 0.11, APPLE_R = 13;
+  const BOSS_EVERY = 5, BOSSES = ['cheese', 'donut', 'orange'];
+  const SKINS = [
+    { blade: '#e3e9f0', shine: '#ffffff', guard: '#5b5f6e', handle: '#8a5a3c', cost: 0 },
+    { blade: '#bfe8ff', shine: '#ffffff', guard: '#1e4f8f', handle: '#2f7bd9', cost: 20 },
+    { blade: '#ffd6ea', shine: '#ffffff', guard: '#b8326f', handle: '#ff5fa2', cost: 50 },
+    { blade: '#c9f5d9', shine: '#f2fff6', guard: '#146b48', handle: '#1f9e6a', cost: 100 },
+    { blade: '#ffe28a', shine: '#fff8d6', guard: '#b07a10', handle: '#3a2a5a', cost: 200 },
+  ];
+  const KEYS = { stage: 'milaan.knifeThrow.bestStage', score: 'milaan.knifeThrow.bestScore', coins: 'milaan.knifeThrow.coins', skin: 'milaan.knifeThrow.skin', owned: 'milaan.knifeThrow.skins' };
+  const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const TAU = Math.PI * 2;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { hud: $('hud'), frame: $('frame'), start: $('start'), startBest: $('start-best'), skins: $('skins'), note: $('note'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), finalStage: $('final-stage'), finalScore: $('final-score'), bestStage: $('best-stage'), bestScore: $('best-score'), earned: $('earned'), newBest: $('new-best'), again: $('again'), score: $('score'), best: $('best'), coins: $('coins'), announcer: $('announcer') };
+
+  const read = (key, fallback = 0) => { try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+  const clamp01 = k => Math.max(0, Math.min(1, k));
+  const clamp1 = v => Math.max(-1, Math.min(1, v));
+  const angleDist = (a, b) => Math.abs(((a - b) % TAU + TAU * 1.5) % TAU - Math.PI);
+
+  const store = {
+    stage: Number(read(KEYS.stage)) || 0,
+    score: Number(read(KEYS.score)) || 0,
+    coins: Number(read(KEYS.coins)) || 0,
+    skin: Number(read(KEYS.skin)) || 0,
+    owned: String(read(KEYS.owned, '0')).split(',').map(Number).filter(i => SKINS[i]),
+  };
+  if (!store.owned.includes(0)) store.owned.unshift(0);
+  if (!store.owned.includes(store.skin)) store.skin = 0;
+
+  let game, scale = 1, acc = 0, last = performance.now();
+
+  // ---------- stages ----------
+  function motionFor(n, boss) {
+    const base = Math.min(3.3, 1.7 + n * 0.06);
+    const dir = n % 2 ? 1 : -1;
+    // Bosses mix sudden brakes, reversals and bursts of speed.
+    if (boss === 'cheese') return time => base * 1.25 * clamp1(Math.sin(time * 0.9) * 2.5) * (Math.sin(time * 4.2) > -0.3 ? 1.1 : 0.15);
+    if (boss === 'donut') return time => base * (1.5 * Math.sin(time * 0.8) + 0.7 * Math.sin(time * 2.9));
+    if (boss === 'orange') return time => base * (Math.sin(time * 0.55) > 0 ? 1 : -1) * (0.3 + 1.4 * Math.abs(Math.sin(time * 2.1)));
+    const round = Math.floor((n - 1) / BOSS_EVERY), slot = (n - 1) % BOSS_EVERY;
+    const kinds = round === 0 ? ['steady', 'steady', 'wave', 'flip'] : ['wave', 'surge', 'flip', 'stutter'];
+    const kind = kinds[(slot + round) % 4];
+    if (kind === 'steady') return () => dir * base;
+    if (kind === 'wave') return time => dir * base * (0.25 + Math.sin(time * 1.25));
+    if (kind === 'surge') return time => dir * base * (0.35 + 1.3 * Math.sin(time * 1.5) ** 2);
+    if (kind === 'flip') return time => dir * base * 1.15 * clamp1(Math.sin(time * 1.35) * 3);
+    return time => dir * base * (Math.sin(time * 3.2) > 0.2 ? 1.6 : 0.15);
+  }
+
+  function makeStage(n) {
+    const boss = n % BOSS_EVERY === 0 ? BOSSES[(n / BOSS_EVERY - 1) % BOSSES.length] : null;
+    const needed = boss ? Math.min(12, 8 + Math.floor(n / 10)) : Math.min(10, 5 + Math.floor((n - 1) / 3));
+    const pre = boss ? Math.min(3, Math.floor(n / 10)) : Math.min(4, Math.floor((n + 1) / 3));
+    const taken = [];
+    const free = gap => {
+      for (let tries = 0; tries < 60; tries++) {
+        const a = Math.random() * TAU;
+        if (taken.every(b => angleDist(a, b) > gap)) { taken.push(a); return a; }
+      }
+      return null;
+    };
+    const knives = [];
+    for (let i = 0; i < pre; i++) { const a = free(0.55); if (a !== null) knives.push({ a, pre: true, wob: 0 }); }
+    const appleCount = (Math.random() < 0.65 ? 1 : 0) + (n >= 6 && Math.random() < 0.35 ? 1 : 0) + (boss ? 1 : 0);
+    const apples = [];
+    for (let i = 0; i < appleCount; i++) { const a = free(0.45); if (a !== null) apples.push({ a }); }
+    return { n, boss, needed, knives, apples, radius: boss === 'donut' ? 80 : boss ? 78 : 72, motion: motionFor(n, boss) };
+  }
+
+  function loadStage(n) {
+    const s = makeStage(n);
+    Object.assign(game, { stageN: n, stage: s, knives: s.knives, apples: s.apples, thrown: 0, stuck: 0, stageTime: 0, pop: 0, hand: 1, flying: null });
+    game.banner = { text: s.boss ? t.bossTitle(t.bosses[s.boss]) : t.stageN(n), t: 0, boss: !!s.boss };
+    if (game.state !== 'ready') announce(`${s.boss ? t.bossTitle(t.bosses[s.boss]) + '. ' : ''}${t.stageStart(n, s.needed)}`);
+  }
+
+  function reset() {
+    game = { state: 'ready', score: 0, earned: 0, rot: 0, omega: 0, time: 0, chunks: [], loose: [], particles: [], popups: [], bounce: null, banner: null, hitFlash: 0, nudge: 0, shake: 0, flash: 0, timer: 0, overAt: 0 };
+    loadStage(1);
+    els.startBest.textContent = store.stage ? t.best(store.stage, store.coins) : '';
+    els.note.textContent = '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+    renderSkins();
+    updateHud();
+  }
+
+  function updateHud() {
+    els.score.textContent = String(game.score);
+    els.best.textContent = String(Math.max(store.stage, game.state === 'ready' ? 0 : game.stageN));
+    els.coins.textContent = String(store.coins);
+  }
+
+  function begin() {
+    game.state = 'play';
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(`${t.go} ${t.stageStart(1, game.stage.needed)}`);
+    updateHud();
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+  }
+
+  // ---------- skins ----------
+  function renderSkins(focusIndex = -1) {
+    els.skins.replaceChildren(...SKINS.map((s, i) => {
+      const b = document.createElement('button');
+      const owned = store.owned.includes(i), on = store.skin === i;
+      b.type = 'button';
+      b.className = `skin${on ? ' on' : ''}${owned ? '' : ' locked'}`;
+      b.style.setProperty('--blade', s.blade);
+      b.style.setProperty('--handle', s.handle);
+      b.innerHTML = `<i class="blade"></i><i class="grip"></i><small>${owned ? (on ? '✓' : '') : `🍎${s.cost}`}</small>`;
+      b.setAttribute('aria-label', t.skinLabel(t.skinNames[i], on ? t.equipped : owned ? t.owned : t.price(s.cost)));
+      b.setAttribute('aria-pressed', String(on));
+      b.addEventListener('click', () => pickSkin(i));
+      return b;
+    }));
+    if (focusIndex >= 0) els.skins.children[focusIndex].focus({ preventScroll: true });
+  }
+
+  function pickSkin(i) {
+    const s = SKINS[i];
+    let message = '';
+    if (!store.owned.includes(i)) {
+      if (store.coins < s.cost) message = t.needMore(s.cost - store.coins);
+      else {
+        store.coins -= s.cost;
+        store.owned.push(i);
+        write(KEYS.coins, store.coins);
+        write(KEYS.owned, store.owned.join(','));
+        message = t.unlocked(t.skinNames[i]);
+      }
+    }
+    if (store.owned.includes(i)) { store.skin = i; write(KEYS.skin, i); }
+    els.note.textContent = message;
+    announce(message || t.skinLabel(t.skinNames[i], t.equipped));
+    renderSkins(i);
+    updateHud();
+  }
+
+  // ---------- geometry ----------
+  const dirOf = angle => [Math.cos(angle), Math.sin(angle)];
+  const logRadius = () => game.stage.radius;
+
+  function knifeSegment(k) {
+    const [dx, dy] = dirOf(k.a + game.rot);
+    const r = logRadius();
+    return [CX + dx * r, CY + dy * r, CX + dx * (r - EMBED + KNIFE), CY + dy * (r - EMBED + KNIFE)];
+  }
+
+  function applePos(apple) {
+    const [dx, dy] = dirOf(apple.a + game.rot);
+    const r = logRadius() + APPLE_R - 3;
+    return [CX + dx * r, CY + dy * r];
+  }
+
+  function distToSegment(px, py, [ax, ay, bx, by]) {
+    const vx = bx - ax, vy = by - ay;
+    const k = clamp01(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy));
+    return Math.hypot(px - ax - vx * k, py - ay - vy * k);
+  }
+
+  // ---------- actions ----------
+  function throwKnife() {
+    if (game.state !== 'play' || game.flying || game.hand < 1 || game.thrown >= game.stage.needed) return;
+    game.flying = { y: HAND_Y };
+    game.thrown++;
+    game.hand = 0;
+  }
+
+  function act() {
+    if (game.state === 'ready') begin();
+    else if (game.state === 'play') throwKnife();
+    else if (game.state === 'paused') resume();
+    else if (game.state === 'over') restart();
+  }
+
+  function sliceApple(apple) {
+    const [x, y] = applePos(apple);
+    game.apples.splice(game.apples.indexOf(apple), 1);
+    store.coins += 2;
+    game.earned += 2;
+    game.score += 5;
+    write(KEYS.coins, store.coins);
+    for (const side of [-1, 1]) game.loose.push({ type: 'half', x, y, vx: side * (90 + Math.random() * 60), vy: -220, rot: 0, vr: side * 7, side });
+    burst(x, y, ['#ff4b5c', '#fff1d6'], 10);
+    game.popups.push({ text: '+2 🍎', x, y: y - 10, t: 0 });
+    updateHud();
+  }
+
+  function stick() {
+    const a = Math.PI / 2 - game.rot;
+    const clash = game.knives.find(k => angleDist(k.a, a) < MIN_GAP);
+    if (clash) return bounceOff();
+    game.knives.push({ a, pre: false, wob: 1 });
+    game.flying = null;
+    game.stuck++;
+    game.score++;
+    game.hitFlash = 1;
+    game.nudge = 1;
+    burst(CX, CY + logRadius(), ['#e3b07a', '#a8693a'], 6);
+    updateHud();
+    if (game.stuck >= game.stage.needed) clearStage();
+  }
+
+  function bounceOff() {
+    const f = game.flying;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    game.bounce = { x: CX, y: f.y + KNIFE / 2, vx: side * (120 + Math.random() * 100), vy: 360, rot: 0, vr: side * 13 };
+    game.flying = null;
+    game.state = 'dying';
+    game.timer = 1.1;
+    game.flash = 1;
+    game.shake = reducedMotion ? 0 : 1;
+    burst(CX, f.y, ['#ffffff', '#ffd27a'], 12);
+    announce(t.clash);
+  }
+
+  function clearStage() {
+    const s = game.stage, r = logRadius();
+    game.state = 'clearing';
+    game.timer = 1.25;
+    // The log bursts into four wedges and everything stuck in it flies off.
+    for (let i = 0; i < 4; i++) {
+      const mid = game.rot + i * Math.PI / 2 + Math.PI / 4;
+      game.chunks.push({ a0: i * Math.PI / 2, x: CX, y: CY, vx: Math.cos(mid) * 170, vy: Math.sin(mid) * 170 - 160, rot: game.rot, vr: (Math.random() - 0.5) * 6, type: s.boss, r });
+    }
+    for (const k of game.knives) {
+      const [dx, dy] = dirOf(k.a + game.rot);
+      game.loose.push({ type: 'knife', x: CX + dx * (r - EMBED + KNIFE / 2), y: CY + dy * (r - EMBED + KNIFE / 2), vx: dx * 220 + (Math.random() - 0.5) * 80, vy: dy * 220 - 200, rot: k.a + game.rot - Math.PI / 2, vr: (Math.random() - 0.5) * 16 });
+    }
+    for (const apple of game.apples) { const [x, y] = applePos(apple); game.loose.push({ type: 'apple', x, y, vx: (x - CX) * 3, vy: -200, rot: 0, vr: 4 }); }
+    game.knives = [];
+    game.apples = [];
+    burst(CX, CY, ['#f2c27d', '#b06f35', '#ffffff'], 20);
+    let text = t.cleared(s.n);
+    if (s.boss) {
+      store.coins += 5;
+      game.earned += 5;
+      write(KEYS.coins, store.coins);
+      text = t.bossDown;
+    }
+    game.banner = { text, t: 0, boss: false, clear: true };
+    announce(text);
+    updateHud();
+  }
+
+  function finish() {
+    game.state = 'over';
+    const stageNew = game.stageN > store.stage, scoreNew = game.score > store.score;
+    if (stageNew) { store.stage = game.stageN; write(KEYS.stage, store.stage); }
+    if (scoreNew) { store.score = game.score; write(KEYS.score, store.score); }
+    els.finalStage.textContent = String(game.stageN);
+    els.finalScore.textContent = String(game.score);
+    els.bestStage.textContent = t.bestSmall(store.stage);
+    els.bestScore.textContent = t.bestSmall(store.score);
+    els.earned.textContent = game.earned ? t.earned(game.earned) : '';
+    els.newBest.hidden = !(stageNew || scoreNew);
+    announce(`${t.over}. ${t.final(game.stageN, game.score)}${stageNew || scoreNew ? ` ${t.newBest}` : ''}`);
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    els.again.focus({ preventScroll: true });
+    updateHud();
+  }
+
+  function restart() {
+    if (game.state !== 'over' || performance.now() - game.overAt < 350) return;
+    reset();
+    begin();
+  }
+
+  function burst(x, y, colors, count) {
+    const n = reducedMotion ? Math.ceil(count / 3) : count;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, s = 60 + Math.random() * 180;
+      game.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.6, r: 1.5 + Math.random() * 2.5, color: colors[i % colors.length] });
+    }
+  }
+
+  // ---------- simulation ----------
+  function stepFlying(dt) {
+    const f = game.flying;
+    if (!f) return;
+    // Two sub-steps keep the fast knife from skipping past a handle.
+    for (let i = 0; i < 2; i++) {
+      f.y -= THROW_SPEED * dt / 2;
+      for (const apple of [...game.apples]) {
+        const [ax, ay] = applePos(apple);
+        if (Math.hypot(CX - ax, f.y - ay) < APPLE_R + 4) sliceApple(apple);
+      }
+      if (game.knives.some(k => distToSegment(CX, f.y, knifeSegment(k)) < HIT_DIST)) return bounceOff();
+      if (f.y <= CY + logRadius() - EMBED) return stick();
+    }
+  }
+
+  function step(dt) {
+    game.time += dt;
+    const live = game.state === 'play' || game.state === 'ready' || game.state === 'dying';
+    if (live) {
+      game.stageTime += dt;
+      game.omega += (game.stage.motion(game.stageTime) - game.omega) * Math.min(1, dt * 5);
+      game.rot = (game.rot + game.omega * dt) % TAU;
+    }
+    if (game.state === 'play') {
+      stepFlying(dt);
+      if (!game.flying && game.thrown < game.stage.needed) game.hand = Math.min(1, game.hand + dt * 12);
+    }
+    game.pop = Math.min(1, game.pop + dt * 4);
+    for (const k of game.knives) k.wob = Math.max(0, k.wob - dt * 4);
+    for (const c of game.chunks) { c.vy += GRAVITY * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; }
+    game.chunks = game.chunks.filter(c => c.y < H + 120);
+    for (const l of game.loose) { l.vy += GRAVITY * dt; l.x += l.vx * dt; l.y += l.vy * dt; l.rot += l.vr * dt; }
+    game.loose = game.loose.filter(l => l.y < H + 120);
+    const b = game.bounce;
+    if (b) { b.vy += GRAVITY * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vr * dt; if (b.y > H + 120) game.bounce = null; }
+    for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.life -= dt; }
+    game.particles = game.particles.filter(p => p.life > 0);
+    for (const p of game.popups) p.t += dt;
+    game.popups = game.popups.filter(p => p.t < 0.9);
+    if (game.banner && (game.banner.t += dt) > 1.4) game.banner = null;
+    game.hitFlash = Math.max(0, game.hitFlash - dt * 6);
+    game.nudge = Math.max(0, game.nudge - dt * 8);
+    game.shake = Math.max(0, game.shake - dt * 2.5);
+    game.flash = Math.max(0, game.flash - dt * 2);
+    if (game.state === 'clearing' && (game.timer -= dt) <= 0) {
+      game.state = 'play';
+      loadStage(game.stageN + 1);
+      updateHud();
+    }
+    if (game.state === 'dying' && (game.timer -= dt) <= 0) finish();
+  }
+
+  // ---------- drawing ----------
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); }
+  function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+
+  // Knife drawn in local space: tip at the origin, handle end at (0, KNIFE).
+  function drawKnife(skinIndex) {
+    const s = SKINS[skinIndex];
+    ctx.fillStyle = s.blade;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(7, 9, 7, 22);
+    ctx.lineTo(7, BLADE);
+    ctx.lineTo(-5, BLADE);
+    ctx.lineTo(-5, 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#00000022';
+    ctx.fillRect(-5, 14, 4, BLADE - 14);
+    ctx.fillStyle = s.shine;
+    ctx.fillRect(3.5, 20, 2, BLADE - 24);
+    ctx.fillStyle = s.guard;
+    rr(-9, BLADE, 18, 6, 3);
+    ctx.fillStyle = s.handle;
+    rr(-5, BLADE + 6, 10, KNIFE - BLADE - 6, 4);
+    ctx.fillStyle = s.guard;
+    circle(0, BLADE + 17, 1.8);
+    circle(0, BLADE + 30, 1.8);
+  }
+
+  function placeKnife(x, y, rot, skin = store.skin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    drawKnife(skin);
+    ctx.restore();
+  }
+
+  function drawApple(x, y, rot, half = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    if (half) {
+      ctx.beginPath(); ctx.arc(0, 0, APPLE_R, half < 0 ? Math.PI / 2 : -Math.PI / 2, half < 0 ? Math.PI * 1.5 : Math.PI / 2); ctx.closePath();
+      ctx.fillStyle = '#ff4b5c'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, APPLE_R - 3, half < 0 ? Math.PI / 2 : -Math.PI / 2, half < 0 ? Math.PI * 1.5 : Math.PI / 2); ctx.closePath();
+      ctx.fillStyle = '#fff1d6'; ctx.fill();
+      ctx.restore();
+      return;
+    }
+    ctx.fillStyle = '#ff4b5c';
+    ctx.beginPath(); ctx.arc(-4, 0, APPLE_R - 2, 0, TAU); ctx.arc(4, 0, APPLE_R - 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff66';
+    circle(-6, -4, 3);
+    // Stem and leaf point away from the log.
+    ctx.fillStyle = '#6b3d1f';
+    ctx.fillRect(-1, -APPLE_R - 4, 2.5, 7);
+    ctx.fillStyle = '#4caf50';
+    ctx.beginPath(); ctx.ellipse(5, -APPLE_R - 2, 5, 2.5, -0.5, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLogFace(type, r) {
+    if (type === 'cheese') {
+      ctx.fillStyle = '#f2a33a'; circle(0, 0, r);
+      ctx.fillStyle = '#ffd45e'; circle(0, 0, r - 7);
+      ctx.fillStyle = '#e8b23f';
+      for (const [x, y, s] of [[-24, -20, 9], [20, -30, 6], [28, 12, 10], [-10, 26, 7], [-38, 10, 5], [6, -4, 5], [40, -14, 4]]) circle(x * r / 78, y * r / 78, s);
+      return;
+    }
+    if (type === 'donut') {
+      ctx.fillStyle = '#d9914c'; circle(0, 0, r);
+      ctx.fillStyle = '#ff8fc0';
+      ctx.beginPath();
+      for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU, rr2 = r - 9 + Math.sin(i * 1.7) * 4; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
+      ctx.fill();
+      const colors = ['#ffffff', '#ffe066', '#7bdff2', '#b2f7a6', '#8d6bff'];
+      for (let i = 0; i < 26; i++) {
+        const a = i * 2.4, d = r * 0.42 + (i * 13 % 24);
+        ctx.save(); ctx.translate(Math.cos(a) * d, Math.sin(a) * d); ctx.rotate(i);
+        ctx.fillStyle = colors[i % colors.length]; ctx.fillRect(-3.5, -1.2, 7, 2.4); ctx.restore();
+      }
+      ctx.fillStyle = '#2a1a36'; circle(0, 0, r * 0.26);
+      ctx.strokeStyle = '#c47c3c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r * 0.26, 0, TAU); ctx.stroke();
+      return;
+    }
+    if (type === 'orange') {
+      ctx.fillStyle = '#ff8a1f'; circle(0, 0, r);
+      ctx.fillStyle = '#fff1d2'; circle(0, 0, r - 6);
+      ctx.fillStyle = '#ffb12e';
+      for (let i = 0; i < 10; i++) {
+        const a = i / 10 * TAU;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a + 0.05) * 6, Math.sin(a + 0.05) * 6);
+        ctx.arc(0, 0, r - 11, a + 0.06, a + TAU / 10 - 0.06);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = '#fff1d2'; circle(0, 0, 6);
+      return;
+    }
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, r);
+    g.addColorStop(0, '#f4c98a');
+    g.addColorStop(1, '#d28f4c');
+    ctx.fillStyle = g;
+    circle(0, 0, r);
+    ctx.strokeStyle = '#a8662f';
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 2;
+    for (let ring = 13; ring < r - 8; ring += 12) { ctx.beginPath(); ctx.arc(1.5, -1, ring, 0, TAU); ctx.stroke(); }
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (const a of [0.6, 2.5, 4.3]) { ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(Math.cos(a + 0.12) * (r - 16), Math.sin(a + 0.12) * (r - 16)); }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#7a4522';
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(0, 0, r - 3.5, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#8f5428';
+    circle(1.5, -1, 5);
+  }
+
+  function drawBackground() {
+    const g = ctx.createRadialGradient(CX, CY, 20, CX, CY + 80, 520);
+    g.addColorStop(0, '#5d3456');
+    g.addColorStop(1, '#1d1328');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff08';
+    for (let i = 0; i < 14; i++) circle((i * 83) % W, (i * 149) % H, 30 + (i % 4) * 14);
+    ctx.fillStyle = '#ffd27a10';
+    circle(CX, CY, 140);
+  }
+
+  function drawStageHud() {
+    const s = game.stage;
+    ctx.font = `900 21px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = s.boss ? '#ff6b7d' : '#ffffff';
+    ctx.fillText(s.boss ? t.bossTitle(t.bosses[s.boss]) : t.stageN(s.n), CX, 38, W - 40);
+    const slot = (s.n - 1) % BOSS_EVERY;
+    for (let i = 0; i < BOSS_EVERY; i++) {
+      const x = CX + (i - 2) * 24, y = 68, boss = i === BOSS_EVERY - 1;
+      ctx.fillStyle = i < slot ? '#ffb238' : i === slot ? '#ffffff' : '#ffffff33';
+      if (boss) ctx.fillStyle = i <= slot ? '#ff4b5c' : '#ff4b5c66';
+      circle(x, y, i === slot ? 7 : 5.5);
+      if (boss) {
+        ctx.fillStyle = '#ffd27a';
+        ctx.beginPath(); ctx.moveTo(x - 6, y - 7); ctx.lineTo(x - 6, y - 13); ctx.lineTo(x - 3, y - 10); ctx.lineTo(x, y - 14); ctx.lineTo(x + 3, y - 10); ctx.lineTo(x + 6, y - 13); ctx.lineTo(x + 6, y - 7); ctx.fill();
+      }
+    }
+    // Remaining knives, bottom-left: bright = still to throw.
+    const left = s.needed - game.thrown;
+    for (let i = 0; i < s.needed; i++) {
+      ctx.save();
+      ctx.translate(20, 606 - i * 25);
+      ctx.rotate(Math.PI / 4);
+      ctx.scale(0.3, 0.3);
+      ctx.globalAlpha = i < left ? 1 : 0.2;
+      drawKnife(store.skin);
+      ctx.restore();
+    }
+  }
+
+  function outlinedText(text, x, y, size, fill) {
+    ctx.font = `900 ${size}px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.2;
+    ctx.strokeStyle = '#2b1d36';
+    ctx.strokeText(text, x, y, W - 30);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y, W - 30);
+  }
+
+  function draw() {
+    if (!game) return;
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    drawBackground();
+    ctx.save();
+    if (game.shake > 0) ctx.translate((Math.random() - 0.5) * game.shake * 12, (Math.random() - 0.5) * game.shake * 12);
+    const s = game.stage, r = logRadius();
+    const showLog = game.state !== 'clearing';
+    const popScale = reducedMotion ? 1 : 1 - (1 - game.pop) ** 3;
+    const ly = CY - game.nudge * 5;
+    if (showLog) {
+      ctx.save();
+      ctx.translate(CX, ly);
+      ctx.scale(popScale, popScale);
+      ctx.translate(-CX, -ly);
+      // Stuck knives go under the log so their embedded tips stay hidden.
+      for (const k of game.knives) {
+        const angle = k.a + game.rot + Math.sin(game.time * 60) * 0.03 * k.wob;
+        const [dx, dy] = dirOf(angle);
+        placeKnife(CX + dx * (r - EMBED), ly + dy * (r - EMBED), angle - Math.PI / 2);
+      }
+      ctx.fillStyle = '#00000033';
+      circle(CX + 4, ly + 8, r);
+      ctx.save();
+      ctx.translate(CX, ly);
+      ctx.rotate(game.rot);
+      drawLogFace(s.boss, r);
+      ctx.restore();
+      if (game.hitFlash > 0) { ctx.fillStyle = `rgba(255, 255, 255, ${game.hitFlash * 0.25})`; circle(CX, ly, r); }
+      for (const apple of game.apples) { const [x, y] = applePos(apple); drawApple(x, y - (CY - ly), apple.a + game.rot + Math.PI / 2); }
+      ctx.restore();
+    }
+    for (const c of game.chunks) {
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, c.r, c.a0, c.a0 + Math.PI / 2); ctx.closePath(); ctx.clip();
+      drawLogFace(c.type, c.r);
+      ctx.restore();
+    }
+    for (const l of game.loose) {
+      if (l.type === 'knife') {
+        ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.rot); ctx.translate(0, -KNIFE / 2); drawKnife(store.skin); ctx.restore();
+      } else drawApple(l.x, l.y, l.rot, l.type === 'half' ? l.side : 0);
+    }
+    if (game.flying) placeKnife(CX, game.flying.y, 0);
+    else if (game.state === 'play' && game.thrown < s.needed) placeKnife(CX, HAND_Y + (1 - game.hand) * 70, 0);
+    const b = game.bounce;
+    if (b) { ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.translate(0, -KNIFE / 2); drawKnife(store.skin); ctx.restore(); }
+    for (const p of game.particles) { ctx.globalAlpha = clamp01(p.life * 2); ctx.fillStyle = p.color; circle(p.x, p.y, p.r); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (game.state !== 'ready') drawStageHud();
+    for (const p of game.popups) {
+      ctx.globalAlpha = 1 - clamp01((p.t - 0.5) / 0.4);
+      outlinedText(p.text, p.x, p.y - p.t * 30, 16, '#ffffff');
+    }
+    ctx.globalAlpha = 1;
+    if (game.banner && game.state !== 'ready') {
+      const k = game.banner.t;
+      ctx.globalAlpha = 1 - clamp01((k - 1.1) / 0.3);
+      const y = game.banner.clear ? CY : 400;
+      outlinedText(game.banner.text, CX, y, game.banner.boss || game.banner.clear ? 26 : 24, game.banner.boss ? '#ff8a96' : game.banner.clear ? '#ffd27a' : '#ffffff');
+      ctx.globalAlpha = 1;
+    }
+    if (game.flash > 0) { ctx.fillStyle = `rgba(255, 60, 80, ${game.flash * 0.3})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    els.hud.style.width = `${Math.min(stage.width, Math.max(W * scale, 320))}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never advances the log more than 50 ms.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      if (game.state !== 'paused') {
+        acc += dt;
+        while (acc >= STEP) { step(STEP); acc -= STEP; }
+      }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    act();
+  });
+  document.addEventListener('keydown', event => {
+    if ((event.target instanceof Element && event.target.closest('button')) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    if (!event.repeat) act();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', () => { if (game.state === 'ready') begin(); });
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

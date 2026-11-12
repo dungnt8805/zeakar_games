@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checkers</title>
+<style>
+:root {
+  --ink: #3a2618;
+  --muted: #86684f;
+  --bg: #f6ead2;
+  --paper: #fffaf0;
+  --light: #f4dfb5;
+  --dark: #9a6440;
+  --frame: #6e4227;
+  --frame-dark: #4f2d18;
+  --red: #e5483f;
+  --red-dark: #a92a24;
+  --white: #fbf5e8;
+  --white-dark: #c9b99c;
+  --green: #2f9b6c;
+  --green-dark: #1f7550;
+  --gold: #ffc542;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: repeating-linear-gradient(45deg, #f1e2c4 0 14px, transparent 14px 28px);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+:focus-visible { outline: 3px solid var(--green-dark); outline-offset: 3px; }
+svg { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 9px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(24px, 7vw, 32px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--red); }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 #dcc7a2; }
+.icon-btn svg { width: 21px; height: 21px; }
+.icon-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #dcc7a2; }
+
+.scores { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+.side { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 16px; background: #fffaf0d0; box-shadow: 0 3px 0 #e2cfab; transition: box-shadow .2s; }
+.side.top-side { flex-direction: row-reverse; text-align: right; }
+.side .dot { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; }
+.dot.red { background: radial-gradient(circle at 35% 30%, #ff8f86, var(--red) 60%, var(--red-dark)); }
+.dot.white { background: radial-gradient(circle at 35% 30%, #fff, var(--white) 55%, var(--white-dark)); box-shadow: inset 0 0 0 1px #0000001a; }
+.side div { min-width: 0; flex: 1; }
+.side small, .draws small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+.side strong, .draws strong { display: block; font-size: 20px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.side.turn { box-shadow: 0 0 0 3px var(--green), 0 3px 0 #e2cfab; }
+.draws { align-self: center; min-width: 52px; text-align: center; }
+.status { min-height: 1.3em; text-align: center; font-size: 15px; font-weight: 800; }
+.status.alert { color: var(--red-dark); }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --size: min(100cqw, 100cqh); --pad: calc(var(--size) * .035); position: relative; width: var(--size); height: var(--size); border-radius: calc(var(--size) * .035); background: linear-gradient(145deg, #87542f, var(--frame)); box-shadow: inset 0 0 0 2px #ffffff22, 0 calc(var(--size) * .018) 0 var(--frame-dark), 0 18px 40px #4f2d1840; }
+.squares, .pieces { position: absolute; inset: var(--pad); }
+.squares { display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); border-radius: calc(var(--size) * .012); overflow: hidden; touch-action: none; }
+.squares i { background: var(--light); }
+.sq { position: relative; background: var(--dark); border-radius: 0; }
+.sq:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; z-index: 1; }
+.sq.last { background: #b17a4d; }
+.sq.sel { background: #3f8a63; }
+.sq.can::after { content: ''; position: absolute; inset: 6%; border-radius: 50%; box-shadow: 0 0 0 calc(var(--size) * .006) var(--gold), 0 0 calc(var(--size) * .02) var(--gold); animation: pulse 1.2s ease-in-out infinite alternate; }
+.sq.target::before { content: ''; position: absolute; inset: 34%; border-radius: 50%; background: #8ff0c2; box-shadow: 0 0 0 calc(var(--size) * .006) #1f7550aa; }
+.sq.target { cursor: pointer; }
+@keyframes pulse { to { opacity: .45; } }
+.pieces { pointer-events: none; }
+.piece { position: absolute; left: 0; top: 0; width: 12.5%; height: 12.5%; padding: 1.4%; transform: translate(calc(var(--c) * 100%), calc(var(--r) * 100%)); transition: transform .16s ease-in-out, opacity .25s; }
+.piece b { position: relative; display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; }
+.piece.red b { background: radial-gradient(circle at 50% 50%, transparent 0 52%, #ffffff2a 53% 57%, transparent 58%), radial-gradient(circle at 35% 28%, #ff9b92, var(--red) 55%, var(--red-dark)); box-shadow: 0 calc(var(--size) * .007) 0 #7d1d18, 0 calc(var(--size) * .012) calc(var(--size) * .012) #0005; }
+.piece.white b { background: radial-gradient(circle at 50% 50%, transparent 0 52%, #00000012 53% 57%, transparent 58%), radial-gradient(circle at 35% 28%, #fff, var(--white) 55%, var(--white-dark)); box-shadow: 0 calc(var(--size) * .007) 0 #9e8c6c, 0 calc(var(--size) * .012) calc(var(--size) * .012) #0005; }
+.piece svg { width: 56%; height: 56%; fill: var(--gold); stroke: #8a5d00; stroke-width: 1.4; opacity: 0; transform: scale(.3); transition: opacity .2s, transform .25s cubic-bezier(.3, 1.6, .5, 1); }
+.piece.king svg { opacity: 1; transform: none; }
+.piece.drag { z-index: 5; transition: none; }
+.piece.drag b { transform: scale(1.12); box-shadow: 0 calc(var(--size) * .03) calc(var(--size) * .03) #0006; }
+.piece.taken { opacity: .3; }
+.piece.gone { opacity: 0; transform: translate(calc(var(--c) * 100%), calc(var(--r) * 100%)) scale(.4); transition: opacity .25s, transform .25s; }
+.board.done .piece.loser { opacity: .45; }
+.foot { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.foot strong { color: var(--ink); }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #3a261866; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #3a261855; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--red); }
+.logo { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.logo i { width: 22px; height: 22px; border-radius: 50%; background: var(--red); box-shadow: inset 0 -3px 0 #0002; }
+.logo i:nth-child(even) { background: var(--white); box-shadow: inset 0 -3px 0 #0002, 0 0 0 1px #0000001a; }
+.text { margin-top: 6px; font-size: 14px; color: var(--muted); line-height: 1.45; }
+.field { margin-top: 12px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #f1e3c7; }
+.seg button { flex: 1; min-width: 0; padding: 9px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #dcc7a2; }
+.note { margin-top: 5px; font-size: 12px; color: var(--muted); }
+.emoji { font-size: 44px; line-height: 1.2; }
+.result-score { margin-top: 10px; font-size: 17px; font-weight: 800; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--gold); color: #4a3500; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--green); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--green-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--green-dark); }
+.ghost-btn { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #f1e3c7; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #dcc7a2; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 600px) { .app { gap: 6px; } .foot { display: none; } .side { padding: 4px 8px; } }
+@media (max-height: 700px) { .panel { padding: 16px 16px; } .field { margin-top: 9px; } .cta { margin-top: 14px; padding: 12px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1>Check<span>ers</span></h1>
+    <button type="button" class="icon-btn" id="undo" data-i18n-label="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button type="button" class="icon-btn" id="settings" data-i18n-label="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg></button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="newRound">↻</button>
+  </header>
+  <div class="scores">
+    <div class="side" id="side-bottom"><i class="dot" id="dot-bottom" aria-hidden="true"></i><div><small id="name-bottom"></small><strong id="score-bottom">0</strong></div></div>
+    <div class="draws"><small data-i18n="draws"></small><strong id="score-d">0</strong></div>
+    <div class="side top-side" id="side-top"><i class="dot" id="dot-top" aria-hidden="true"></i><div><small id="name-top"></small><strong id="score-top">0</strong></div></div>
+  </div>
+  <p class="status" id="status"></p>
+  <div class="board-wrap">
+    <div class="board" id="board">
+      <div class="squares" id="squares" role="grid" data-i18n-label="board"></div>
+      <div class="pieces" id="pieces" aria-hidden="true"></div>
+    </div>
+  </div>
+  <p class="foot"><strong id="hard-wins"></strong><br><span data-i18n="hint"></span></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <h2 id="setup-title">Check<span>ers</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="cpu" data-i18n="vsCpu"></button><button type="button" data-value="pvp" data-i18n="twoP"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <div class="field" id="side-field"><p class="label" id="side-label" data-i18n="playAs"></p><div class="seg" role="group" aria-labelledby="side-label" data-key="side"><button type="button" data-value="red" data-i18n="red"></button><button type="button" data-value="white" data-i18n="white"></button></div><p class="note" data-i18n="redFirst"></p></div>
+    <div class="field"><p class="label" id="forced-label" data-i18n="forced"></p><div class="seg" role="group" aria-labelledby="forced-label" data-key="forced"><button type="button" data-value="on" data-i18n="on"></button><button type="button" data-value="off" data-i18n="off"></button></div></div>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <p class="emoji" id="result-emoji" aria-hidden="true"></p>
+    <h2 id="result-title"></h2>
+    <p class="text" id="result-text"></p>
+    <p class="result-score" id="result-score"></p>
+    <p class="badge" id="new-best" hidden></p>
+    <button type="button" class="cta" id="next-round" data-i18n="nextRound"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Classic 8×8 checkers: jump to capture, chain multi-jumps and crown your kings.', mode: 'Mode', vsCpu: 'vs Computer', twoP: '2 Players', difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', playAs: 'Play as', red: 'Red', white: 'White', redFirst: 'Red always moves first.', forced: 'Forced captures', on: 'On', off: 'Off', start: 'Start',
+      draws: 'Draws', settings: 'Settings', newRound: 'New game', undo: 'Undo', board: 'Checkers board', you: 'You', cpu: 'Computer',
+      yourTurn: 'Your turn', mustCapture: 'You must capture!', keepJumping: 'Keep jumping!', thinking: 'Computer is thinking…', turnOf: name => `${name} to move`, mustCaptureOf: name => `${name} must capture`, noProgress: n => `Draw in ${n} moves without a capture`,
+      youWin: 'You win!', cpuWins: 'Computer wins', wins: name => `${name} wins!`, draw: 'Draw', reasonPieces: 'Every opposing piece was captured.', reasonBlocked: 'The other side has no moves left.', reasonRep: 'The same position came up three times.', reason40: '40 moves each without a capture or a man moving.',
+      nextRound: 'Play again', change: 'Change settings', hardWins: n => `Wins vs Hard: ${n}`, newHardWin: n => `Win vs Hard #${n}!`,
+      hint: 'Drag or tap a piece, then a green dot · Arrow keys + Enter',
+      piece: { 1: 'red piece', 2: 'red king', '-1': 'white piece', '-2': 'white king' }, empty: 'empty', canMove: 'can move', selected: 'selected', moveHere: 'move here',
+      moved: (name, from, to, caps) => `${name}: ${from} to ${to}${caps ? `, captured ${caps}` : ''}.`, crowned: 'Crowned king!', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · Draws ${d}`,
+    },
+    vi: {
+      tagline: 'Cờ đam (checkers) 8×8 kinh điển: nhảy qua để ăn quân, ăn liên hoàn và phong vua.', mode: 'Chế độ', vsCpu: 'Đấu với máy', twoP: '2 người', difficulty: 'Độ khó', easy: 'Dễ', normal: 'Vừa', hard: 'Khó', playAs: 'Cầm quân', red: 'Đỏ', white: 'Trắng', redFirst: 'Bên Đỏ luôn đi trước.', forced: 'Bắt buộc ăn quân', on: 'Bật', off: 'Tắt', start: 'Bắt đầu',
+      draws: 'Hòa', settings: 'Cài đặt', newRound: 'Ván mới', undo: 'Đi lại', board: 'Bàn cờ đam', you: 'Bạn', cpu: 'Máy',
+      yourTurn: 'Lượt của bạn', mustCapture: 'Bạn phải ăn quân!', keepJumping: 'Nhảy tiếp đi!', thinking: 'Máy đang suy nghĩ…', turnOf: name => `Lượt bên ${name}`, mustCaptureOf: name => `Bên ${name} phải ăn quân`, noProgress: n => `Còn ${n} nước không ăn quân là hòa`,
+      youWin: 'Bạn thắng!', cpuWins: 'Máy thắng', wins: name => `Bên ${name} thắng!`, draw: 'Hòa', reasonPieces: 'Toàn bộ quân đối phương đã bị ăn.', reasonBlocked: 'Đối phương không còn nước đi.', reasonRep: 'Cùng một thế cờ lặp lại ba lần.', reason40: 'Mỗi bên đi 40 nước mà không ăn quân hay đi quân thường.',
+      nextRound: 'Chơi lại', change: 'Đổi cài đặt', hardWins: n => `Số trận thắng máy Khó: ${n}`, newHardWin: n => `Thắng máy Khó lần thứ ${n}!`,
+      hint: 'Kéo hoặc chạm vào quân, rồi chạm chấm xanh · Phím mũi tên + Enter',
+      piece: { 1: 'quân đỏ', 2: 'vua đỏ', '-1': 'quân trắng', '-2': 'vua trắng' }, empty: 'trống', canMove: 'có thể đi', selected: 'đang chọn', moveHere: 'đi tới đây',
+      moved: (name, from, to, caps) => `${name}: ${from} tới ${to}${caps ? `, ăn ${caps} quân` : ''}.`, crowned: 'Phong vua!', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · Hòa ${d}`,
+    },
+    zh: {
+      tagline: '经典 8×8 跳棋：跳吃对方棋子，连跳多子，升变为王。', mode: '模式', vsCpu: '人机对战', twoP: '双人对战', difficulty: '难度', easy: '简单', normal: '普通', hard: '困难', playAs: '执子', red: '红方', white: '白方', redFirst: '红方总是先走。', forced: '强制吃子', on: '开', off: '关', start: '开始',
+      draws: '平局', settings: '设置', newRound: '新一局', undo: '悔棋', board: '国际跳棋棋盘', you: '你', cpu: '电脑',
+      yourTurn: '轮到你了', mustCapture: '必须吃子！', keepJumping: '继续跳吃！', thinking: '电脑思考中…', turnOf: name => `轮到${name}`, mustCaptureOf: name => `${name}必须吃子`, noProgress: n => `再走 ${n} 步不吃子即判和`,
+      youWin: '你赢了！', cpuWins: '电脑获胜', wins: name => `${name}获胜！`, draw: '和棋', reasonPieces: '对方的棋子已被全部吃掉。', reasonBlocked: '对方已无路可走。', reasonRep: '同一局面重复出现了三次。', reason40: '双方各走 40 步都没有吃子或移动普通棋子。',
+      nextRound: '再来一局', change: '更改设置', hardWins: n => `战胜困难电脑：${n} 次`, newHardWin: n => `第 ${n} 次战胜困难电脑！`,
+      hint: '拖动或点击棋子，再点绿色圆点 · 方向键 + Enter',
+      piece: { 1: '红子', 2: '红王', '-1': '白子', '-2': '白王' }, empty: '空', canMove: '可走', selected: '已选中', moveHere: '走到这里',
+      moved: (name, from, to, caps) => `${name}：${from} 到 ${to}${caps ? `，吃掉 ${caps} 子` : ''}。`, crowned: '升变为王！', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · 平局 ${d}`,
+    },
+    fr: {
+      tagline: 'Les dames anglaises en 8×8 : sautez pour capturer, enchaînez les rafles et couronnez vos dames.', mode: 'Mode', vsCpu: 'Contre l’ordi', twoP: '2 joueurs', difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile', playAs: 'Jouer les', red: 'Rouges', white: 'Blancs', redFirst: 'Les rouges commencent toujours.', forced: 'Prise obligatoire', on: 'Oui', off: 'Non', start: 'Commencer',
+      draws: 'Nuls', settings: 'Réglages', newRound: 'Nouvelle partie', undo: 'Annuler', board: 'Damier', you: 'Vous', cpu: 'Ordinateur',
+      yourTurn: 'À vous de jouer', mustCapture: 'Prise obligatoire !', keepJumping: 'Continuez la rafle !', thinking: 'L’ordinateur réfléchit…', turnOf: name => `Aux ${name} de jouer`, mustCaptureOf: name => `Les ${name} doivent prendre`, noProgress: n => `Nul dans ${n} coups sans prise`,
+      youWin: 'Vous gagnez !', cpuWins: 'L’ordinateur gagne', wins: name => `Les ${name} gagnent !`, draw: 'Partie nulle', reasonPieces: 'Toutes les pièces adverses ont été prises.', reasonBlocked: 'L’adversaire n’a plus aucun coup.', reasonRep: 'La même position est revenue trois fois.', reason40: '40 coups chacun sans prise ni pion déplacé.',
+      nextRound: 'Rejouer', change: 'Changer les réglages', hardWins: n => `Victoires en Difficile : ${n}`, newHardWin: n => `Victoire n° ${n} en Difficile !`,
+      hint: 'Glissez ou touchez une pièce, puis un point vert · Flèches + Entrée',
+      piece: { 1: 'pion rouge', 2: 'dame rouge', '-1': 'pion blanc', '-2': 'dame blanche' }, empty: 'vide', canMove: 'peut jouer', selected: 'sélectionné', moveHere: 'aller ici',
+      moved: (name, from, to, caps) => `${name} : ${from} vers ${to}${caps ? `, ${caps} prise${caps > 1 ? 's' : ''}` : ''}.`, crowned: 'Pion couronné !', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · Nuls ${d}`,
+    },
+    th: {
+      tagline: 'หมากฮอสสากล 8×8 แบบคลาสสิก กระโดดกินหมาก กินต่อเนื่องหลายตัว และเลื่อนขั้นเป็นฮอส', mode: 'โหมด', vsCpu: 'เล่นกับคอม', twoP: '2 ผู้เล่น', difficulty: 'ระดับความยาก', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก', playAs: 'เล่นฝ่าย', red: 'แดง', white: 'ขาว', redFirst: 'ฝ่ายแดงเดินก่อนเสมอ', forced: 'บังคับกิน', on: 'เปิด', off: 'ปิด', start: 'เริ่ม',
+      draws: 'เสมอ', settings: 'ตั้งค่า', newRound: 'เกมใหม่', undo: 'ย้อนกลับ', board: 'กระดานหมากฮอส', you: 'คุณ', cpu: 'คอมพิวเตอร์',
+      yourTurn: 'ตาของคุณ', mustCapture: 'ต้องกินหมาก!', keepJumping: 'กระโดดกินต่อ!', thinking: 'คอมพิวเตอร์กำลังคิด…', turnOf: name => `ตาของฝ่าย${name}`, mustCaptureOf: name => `ฝ่าย${name}ต้องกินหมาก`, noProgress: n => `อีก ${n} ตาถ้าไม่มีการกินจะเสมอ`,
+      youWin: 'คุณชนะ!', cpuWins: 'คอมพิวเตอร์ชนะ', wins: name => `ฝ่าย${name}ชนะ!`, draw: 'เสมอ', reasonPieces: 'หมากของอีกฝ่ายถูกกินหมดแล้ว', reasonBlocked: 'อีกฝ่ายไม่มีตาเดินแล้ว', reasonRep: 'ตำแหน่งเดิมเกิดซ้ำสามครั้ง', reason40: 'แต่ละฝ่ายเดิน 40 ตาโดยไม่มีการกินหรือเดินเบี้ย',
+      nextRound: 'เล่นอีกครั้ง', change: 'เปลี่ยนการตั้งค่า', hardWins: n => `ชนะคอมระดับยาก: ${n} ครั้ง`, newHardWin: n => `ชนะระดับยากครั้งที่ ${n}!`,
+      hint: 'ลากหรือแตะหมาก แล้วแตะจุดสีเขียว · ปุ่มลูกศร + Enter',
+      piece: { 1: 'หมากแดง', 2: 'ฮอสแดง', '-1': 'หมากขาว', '-2': 'ฮอสขาว' }, empty: 'ว่าง', canMove: 'เดินได้', selected: 'เลือกอยู่', moveHere: 'เดินมาที่นี่',
+      moved: (name, from, to, caps) => `${name}: ${from} ไป ${to}${caps ? ` กิน ${caps} ตัว` : ''}`, crowned: 'เลื่อนขั้นเป็นฮอส!', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · เสมอ ${d}`,
+    },
+    ja: {
+      tagline: '8×8 の定番チェッカー。飛び越えて取り、連続ジャンプで一気に取り、キングに成ろう。', mode: 'モード', vsCpu: 'CPU対戦', twoP: '2人対戦', difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', playAs: '担当', red: '赤', white: '白', redFirst: '先手はいつも赤です。', forced: '取りの強制', on: 'あり', off: 'なし', start: 'スタート',
+      draws: '引き分け', settings: '設定', newRound: '新しいゲーム', undo: '一手戻す', board: 'チェッカー盤', you: 'あなた', cpu: 'CPU',
+      yourTurn: 'あなたの番', mustCapture: '取らなければいけません！', keepJumping: '続けてジャンプ！', thinking: 'CPUが考え中…', turnOf: name => `${name}の番`, mustCaptureOf: name => `${name}は取る必要があります`, noProgress: n => `あと ${n} 手取りがなければ引き分け`,
+      youWin: 'あなたの勝ち！', cpuWins: 'CPUの勝ち', wins: name => `${name}の勝ち！`, draw: '引き分け', reasonPieces: '相手の駒をすべて取りました。', reasonBlocked: '相手に動ける手がありません。', reasonRep: '同じ局面が3回現れました。', reason40: 'お互い40手、取りもマンの移動もありませんでした。',
+      nextRound: 'もう一度', change: '設定を変える', hardWins: n => `むずかしいCPUに勝った回数：${n}`, newHardWin: n => `むずかしいで ${n} 勝目！`,
+      hint: '駒をドラッグかタップして緑の点へ · 矢印キー + Enter',
+      piece: { 1: '赤の駒', 2: '赤のキング', '-1': '白の駒', '-2': '白のキング' }, empty: '空き', canMove: '動かせる', selected: '選択中', moveHere: 'ここへ移動',
+      moved: (name, from, to, caps) => `${name}：${from} から ${to}${caps ? `、${caps} 個取り` : ''}。`, crowned: 'キングに成った！', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · 引き分け ${d}`,
+    },
+    ko: {
+      tagline: '클래식 8×8 체커: 뛰어넘어 잡고, 연속 점프로 여러 개를 잡고, 킹으로 승격하세요.', mode: '모드', vsCpu: '컴퓨터 대전', twoP: '2인 플레이', difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', playAs: '내 진영', red: '빨강', white: '하양', redFirst: '항상 빨강이 먼저 둡니다.', forced: '잡기 강제', on: '켜기', off: '끄기', start: '시작',
+      draws: '무승부', settings: '설정', newRound: '새 게임', undo: '무르기', board: '체커 판', you: '나', cpu: '컴퓨터',
+      yourTurn: '내 차례', mustCapture: '반드시 잡아야 해요!', keepJumping: '계속 점프하세요!', thinking: '컴퓨터가 생각 중…', turnOf: name => `${name} 차례`, mustCaptureOf: name => `${name}은(는) 반드시 잡아야 해요`, noProgress: n => `잡기 없이 ${n}수 더 두면 무승부`,
+      youWin: '승리!', cpuWins: '컴퓨터 승리', wins: name => `${name} 승리!`, draw: '무승부', reasonPieces: '상대 말을 모두 잡았어요.', reasonBlocked: '상대가 더 이상 둘 수 없어요.', reasonRep: '같은 국면이 세 번 반복됐어요.', reason40: '양쪽 모두 40수 동안 잡기나 일반 말 이동이 없었어요.',
+      nextRound: '다시 하기', change: '설정 변경', hardWins: n => `어려움 상대 승리: ${n}회`, newHardWin: n => `어려움 ${n}번째 승리!`,
+      hint: '말을 드래그하거나 탭한 뒤 초록 점을 탭 · 방향키 + Enter',
+      piece: { 1: '빨강 말', 2: '빨강 킹', '-1': '하양 말', '-2': '하양 킹' }, empty: '빈 칸', canMove: '이동 가능', selected: '선택됨', moveHere: '여기로 이동',
+      moved: (name, from, to, caps) => `${name}: ${from}에서 ${to}${caps ? `, ${caps}개 잡음` : ''}.`, crowned: '킹 승격!', tally: (a, an, b, bn, d) => `${an} ${a} – ${b} ${bn} · 무승부 ${d}`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Board cells are indexed r * 8 + c with row 0 at the top; Red (1) starts at the bottom and moves up.
+  const RED = 1, WHITE = -1;
+  const WIN = 100000;
+  const DIRS = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  const STEP = new Int8Array(256).fill(-1), JUMP = new Int8Array(256).fill(-1);
+  const DARK = [];
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+    if ((r + c) % 2 === 0) continue;
+    const sq = r * 8 + c;
+    DARK.push(sq);
+    DIRS.forEach(([dr, dc], d) => {
+      if (r + dr >= 0 && r + dr < 8 && c + dc >= 0 && c + dc < 8) STEP[sq * 4 + d] = (r + dr) * 8 + c + dc;
+      if (r + 2 * dr >= 0 && r + 2 * dr < 8 && c + 2 * dc >= 0 && c + 2 * dc < 8) JUMP[sq * 4 + d] = (r + 2 * dr) * 8 + c + 2 * dc;
+    });
+  }
+  const DIRS_OF = { 1: [0, 1], '-1': [2, 3], 2: [0, 1, 2, 3], '-2': [0, 1, 2, 3] };
+  const AI = { easy: { depth: 2, random: 0.35 }, normal: { depth: 5, slip: 0.15 }, hard: { depth: 8, budget: 1500 } };
+  const STORE = { settings: 'milaan.checkers.settings', hardWins: 'milaan.checkers.hardWins' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), squares: $('squares'), pieces: $('pieces'), status: $('status'), announcer: $('announcer'), setup: $('setup'), result: $('result'), resultEmoji: $('result-emoji'), resultTitle: $('result-title'), resultText: $('result-text'), resultScore: $('result-score'), newBest: $('new-best'), nextRound: $('next-round'), start: $('start'), undo: $('undo'), hardWins: $('hard-wins'), levelField: $('level-field'), sideField: $('side-field') };
+
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+
+  const settings = { mode: 'cpu', level: 'normal', side: 'red', forced: 'on', ...read(STORE.settings, {}) };
+  let hardWins = Number(read(STORE.hardWins, 0)) || 0;
+  let tally = { 1: 0, '-1': 0, d: 0 };
+  let game = null, round = 0, cursor = 0, flip = false;
+  let squareEls = [], pieceEls = new Map();
+  let drag = null, suppressClick = false;
+
+  const humanSide = () => settings.side === 'white' ? WHITE : RED;
+  const isCpu = side => settings.mode === 'cpu' && side !== humanSide();
+  const colorName = side => side === RED ? t.red : t.white;
+  const nameOf = side => settings.mode === 'cpu' ? (side === humanSide() ? t.you : t.cpu) : colorName(side);
+  const coord = sq => 'abcdefgh'[sq & 7] + (8 - (sq >> 3));
+  const forced = () => settings.forced === 'on';
+
+  // ---- Rules ------------------------------------------------------------------------------
+  function initialBoard() {
+    const b = new Int8Array(64);
+    for (const sq of DARK) { const r = sq >> 3; if (r < 3) b[sq] = WHITE; else if (r > 4) b[sq] = RED; }
+    return b;
+  }
+
+  // Captured pieces are swapped for a blocker of the mover's own colour so a chain can neither jump them twice nor land on them.
+  function jumpsFrom(b, sq, piece, path, caps, out) {
+    const side = Math.sign(piece);
+    let extended = false;
+    for (const d of DIRS_OF[piece]) {
+      const mid = STEP[sq * 4 + d], land = JUMP[sq * 4 + d];
+      if (land < 0 || b[mid] * side >= 0 || b[land] !== 0) continue;
+      extended = true;
+      const taken = b[mid];
+      b[mid] = side * 5; b[sq] = 0; b[land] = piece;
+      const crown = Math.abs(piece) === 1 && (land >> 3) === (side === RED ? 0 : 7);
+      if (crown) out.push({ path: [...path, land], caps: [...caps, mid], crown });
+      else jumpsFrom(b, land, piece, [...path, land], [...caps, mid], out);
+      b[land] = 0; b[sq] = piece; b[mid] = taken;
+    }
+    if (!extended && caps.length) out.push({ path, caps, crown: false });
+  }
+
+  function genMoves(b, side, mustTake) {
+    const caps = [], quiet = [];
+    for (const sq of DARK) {
+      const piece = b[sq];
+      if (piece * side <= 0) continue;
+      jumpsFrom(b, sq, piece, [sq], [], caps);
+      for (const d of DIRS_OF[piece]) {
+        const to = STEP[sq * 4 + d];
+        if (to >= 0 && b[to] === 0) quiet.push({ path: [sq, to], caps: [], crown: Math.abs(piece) === 1 && (to >> 3) === (side === RED ? 0 : 7) });
+      }
+    }
+    return caps.length && mustTake ? caps : caps.concat(quiet);
+  }
+
+  function doMove(b, m) {
+    const from = m.path[0], to = m.path[m.path.length - 1], piece = b[from];
+    const taken = m.caps.map(sq => b[sq]);
+    b[from] = 0;
+    for (const sq of m.caps) b[sq] = 0;
+    b[to] = m.crown ? Math.sign(piece) * 2 : piece;
+    return { piece, taken };
+  }
+
+  function undoMove(b, m, u) {
+    b[m.path[m.path.length - 1]] = 0;
+    b[m.path[0]] = u.piece;
+    m.caps.forEach((sq, i) => { b[sq] = u.taken[i]; });
+  }
+
+  const posKey = (b, side) => side + DARK.map(sq => b[sq] + 2).join('');
+
+  // ---- Computer player --------------------------------------------------------------------
+  function evaluate(b) {
+    let score = 0, reds = 0, whites = 0;
+    const redKings = [], whiteKings = [], all = [];
+    for (const sq of DARK) {
+      const v = b[sq];
+      if (!v) continue;
+      const r = sq >> 3, c = sq & 7;
+      const centre = c >= 2 && c <= 5 && r >= 2 && r <= 5 ? 1 : 0;
+      if (v === 1) { score += 100 + (7 - r) * 3 + centre * 3 + (r === 7 ? 6 : 0); reds++; }
+      else if (v === 2) { score += 165 + centre * 8; reds++; redKings.push(sq); }
+      else if (v === -1) { score -= 100 + r * 3 + centre * 3 + (r === 0 ? 6 : 0); whites++; }
+      else { score -= 165 + centre * 8; whites++; whiteKings.push(sq); }
+      all.push(sq);
+    }
+    if (reds !== whites) {
+      // The side that is ahead wants to trade down and hunt the remaining pieces with its kings.
+      const lead = reds > whites ? 1 : -1;
+      score += lead * (24 - reds - whites) * 4;
+      if (reds + whites <= 10) {
+        const hunters = lead === 1 ? redKings : whiteKings;
+        for (const k of hunters) {
+          let near = 14;
+          for (const sq of all) if (b[sq] * lead < 0) near = Math.min(near, Math.max(Math.abs((sq >> 3) - (k >> 3)), Math.abs((sq & 7) - (k & 7))));
+          score -= lead * near * 3;
+        }
+      }
+    }
+    return score;
+  }
+
+  const TIMEOUT = Symbol('timeout');
+  const byForce = (a, b) => b.caps.length - a.caps.length || b.crown - a.crown;
+
+  function search(s, side, depth, alpha, beta, ply, ext) {
+    if ((++s.nodes & 2047) === 0 && performance.now() > s.deadline) throw TIMEOUT;
+    const moves = genMoves(s.b, side, s.forced);
+    if (!moves.length) return -WIN + ply;
+    if (depth <= 0) {
+      // Keep searching while captures are forced so the horizon never cuts a trade in half.
+      if (!(s.forced && moves[0].caps.length && ext < 10)) return evaluate(s.b) * side;
+      ext++;
+    }
+    moves.sort(byForce);
+    let best = -Infinity;
+    for (const m of moves) {
+      const u = doMove(s.b, m);
+      const v = -search(s, -side, depth - 1, -beta, -alpha, ply + 1, ext);
+      undoMove(s.b, m, u);
+      if (v > best) best = v;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  function rankMoves(side, cfg) {
+    const s = { b: Int8Array.from(game.board), forced: forced(), nodes: 0, deadline: performance.now() + (cfg.budget || 4000) };
+    let ranked = genMoves(s.b, side, s.forced).sort(byForce).map(m => ({ m, score: 0 }));
+    if (ranked.length < 2) return ranked;
+    for (let depth = 1; depth <= cfg.depth; depth++) {
+      const scored = [];
+      try {
+        let best = -Infinity;
+        for (const { m } of ranked) {
+          const u = doMove(s.b, m);
+          // A third repetition is an immediate draw, so score it as one.
+          const v = (game.positions.get(posKey(s.b, -side)) || 0) >= 2 ? 0 : -search(s, -side, depth - 1, -Infinity, -(best - 1), 1, 0);
+          undoMove(s.b, m, u);
+          scored.push({ m, score: v });
+          if (v > best) best = v;
+        }
+      } catch (error) {
+        if (error !== TIMEOUT) throw error;
+        break;
+      }
+      ranked = scored.sort((a, b) => b.score - a.score);
+      if (Math.abs(ranked[0].score) > WIN / 2) break;
+    }
+    return ranked;
+  }
+
+  function chooseMove(side) {
+    const cfg = AI[settings.level];
+    const ranked = rankMoves(side, cfg);
+    if (cfg.random && Math.random() < cfg.random) return ranked[Math.floor(Math.random() * ranked.length)].m;
+    const top = ranked.filter(x => x.score === ranked[0].score);
+    const second = ranked[top.length];
+    if (cfg.slip && second && Math.random() < cfg.slip && ranked[0].score - second.score < 60) return second.m;
+    return top[Math.floor(Math.random() * top.length)].m;
+  }
+
+  // ---- Round flow -------------------------------------------------------------------------
+  function newRound() {
+    clearTimeout(game?.timer);
+    round += 1;
+    flip = settings.mode === 'cpu' && humanSide() === WHITE;
+    const board = initialBoard();
+    game = { board, turn: RED, quiet: 0, positions: new Map([[posKey(board, RED), 1]]), history: [], legal: [], sel: null, last: null, over: false, busy: false, timer: 0, round };
+    els.result.hidden = true;
+    els.setup.hidden = true;
+    els.board.classList.remove('done');
+    buildSquares();
+    buildPieces();
+    cursor = DARK.map(displayIndex).sort((a, b) => b - a).find(i => (i >> 3) === 5) ?? 0;
+    nextTurn();
+  }
+
+  function nextTurn() {
+    game.legal = genMoves(game.board, game.turn, forced());
+    game.sel = null;
+    render();
+    if (isCpu(game.turn)) {
+      const at = game.round;
+      game.timer = setTimeout(() => {
+        if (game.round !== at || game.over) return;
+        // Let the "thinking" status paint before a long search blocks the main thread.
+        requestAnimationFrame(() => setTimeout(() => {
+          if (game.round !== at || game.over) return;
+          commit(chooseMove(game.turn), 0);
+        }, 0));
+      }, 320 + Math.random() * 200);
+    }
+  }
+
+  const humanTurn = () => game && !game.over && !game.busy && !isCpu(game.turn);
+  const movableFrom = sq => game.legal.some(m => m.path[0] === sq);
+  const candidates = () => game.sel ? game.legal.filter(m => game.sel.prefix.every((sq, i) => m.path[i] === sq)) : [];
+  const nextTargets = () => [...new Set(candidates().map(m => m.path[game.sel.prefix.length]).filter(sq => sq !== undefined))];
+
+  function select(sq) {
+    game.sel = { prefix: [sq] };
+    render();
+  }
+
+  function clearSelection() {
+    if (!game.sel) return;
+    const el = pieceEls.get(game.sel.prefix[0]);
+    game.sel = null;
+    if (el) place(el, el.dataset.sq);
+    for (const p of pieceEls.values()) p.classList.remove('taken');
+    render();
+  }
+
+  function stepTo(sq) {
+    const prefix = game.sel.prefix;
+    const prev = prefix[prefix.length - 1];
+    prefix.push(sq);
+    const el = pieceEls.get(prefix[0]);
+    place(el, sq);
+    if (Math.abs((sq >> 3) - (prev >> 3)) === 2) pieceEls.get((sq + prev) / 2)?.classList.add('taken');
+    const left = candidates();
+    const done = left.find(m => m.path.length === prefix.length);
+    if (done) return commit(done, prefix.length - 1);
+    render();
+    els.announcer.textContent = t.keepJumping;
+  }
+
+  function tapSquare(sq) {
+    if (!humanTurn()) return;
+    const sel = game.sel;
+    if (sel) {
+      if (nextTargets().includes(sq)) return stepTo(sq);
+      if (sel.prefix.length > 1) { if (sq === sel.prefix[0] || sq === sel.prefix[sel.prefix.length - 1]) clearSelection(); return; }
+      if (sq === sel.prefix[0]) return clearSelection();
+    }
+    if (movableFrom(sq)) return select(sq);
+    if (game.board[sq] * game.turn > 0 && game.legal[0]?.caps.length && forced()) {
+      els.status.textContent = t.mustCapture;
+      els.announcer.textContent = t.mustCapture;
+    }
+  }
+
+  // Applies the move to the board at once, then animates the hops that the player has not already made by hand.
+  function commit(m, doneHops) {
+    game.busy = true;
+    game.history.push({ board: Int8Array.from(game.board), turn: game.turn, quiet: game.quiet, positions: new Map(game.positions), last: game.last });
+    const side = game.turn;
+    const u = doMove(game.board, m);
+    const el = pieceEls.get(m.path[0]);
+    pieceEls.delete(m.path[0]);
+    const victims = m.caps.map(sq => { const v = pieceEls.get(sq); pieceEls.delete(sq); return v; });
+    const to = m.path[m.path.length - 1];
+    pieceEls.set(to, el);
+    el.dataset.sq = to;
+    game.sel = null;
+    render();
+    const at = game.round;
+    const hop = reducedMotion.matches ? 0 : 170;
+    let i = doneHops;
+    const advance = () => {
+      if (game.round !== at) return;
+      for (let k = 0; k < i; k++) victims[k]?.classList.add('gone');
+      if (i >= m.path.length - 1) {
+        setTimeout(() => victims.forEach(v => v?.remove()), 260);
+        if (m.crown) el.classList.add('king');
+        return finishMove(m, side, u.piece);
+      }
+      i++;
+      place(el, m.path[i]);
+      setTimeout(advance, hop);
+    };
+    if (doneHops === 0 && hop) setTimeout(advance, 20); else advance();
+  }
+
+  function finishMove(m, side, piece) {
+    game.busy = false;
+    game.quiet = m.caps.length || Math.abs(piece) === 1 ? 0 : game.quiet + 1;
+    game.last = m.path;
+    game.turn = -side;
+    const key = posKey(game.board, game.turn);
+    const seen = (game.positions.get(key) || 0) + 1;
+    game.positions.set(key, seen);
+    els.announcer.textContent = t.moved(nameOf(side), coord(m.path[0]), coord(m.path[m.path.length - 1]), m.caps.length) + (m.crown ? ` ${t.crowned}` : '');
+    const replies = genMoves(game.board, game.turn, forced());
+    if (!replies.length) return endRound(side, DARK.some(sq => game.board[sq] * game.turn > 0) ? t.reasonBlocked : t.reasonPieces);
+    if (seen >= 3) return endRound(null, t.reasonRep);
+    if (game.quiet >= 80) return endRound(null, t.reason40);
+    nextTurn();
+  }
+
+  function endRound(winner, reason) {
+    game.over = true;
+    game.legal = [];
+    tally[winner ?? 'd'] += 1;
+    els.board.classList.add('done');
+    for (const [sq, el] of pieceEls) el.classList.toggle('loser', winner !== null && game.board[sq] * winner < 0);
+    let newBest = false;
+    if (settings.mode === 'cpu' && settings.level === 'hard' && winner === humanSide()) {
+      hardWins += 1;
+      newBest = true;
+      write(STORE.hardWins, hardWins);
+    }
+    let title, emoji;
+    if (winner === null) { title = t.draw; emoji = '🤝'; }
+    else if (settings.mode === 'cpu') { title = winner === humanSide() ? t.youWin : t.cpuWins; emoji = winner === humanSide() ? '🏆' : '🤖'; }
+    else { title = t.wins(colorName(winner)); emoji = '👑'; }
+    els.resultEmoji.textContent = emoji;
+    els.resultTitle.textContent = title;
+    els.resultText.textContent = reason;
+    els.resultScore.textContent = tallyLine();
+    els.newBest.textContent = t.newHardWin(hardWins);
+    els.newBest.hidden = !newBest;
+    render();
+    els.status.textContent = title;
+    els.announcer.textContent = `${title} ${reason} ${els.resultScore.textContent}`;
+    const at = game.round;
+    game.timer = setTimeout(() => {
+      if (game.round !== at) return;
+      els.result.hidden = false;
+      els.nextRound.focus({ preventScroll: true });
+    }, reducedMotion.matches ? 500 : 1200);
+  }
+
+  function tallyLine() {
+    const bottom = flip ? WHITE : RED;
+    return t.tally(tally[bottom], nameOf(bottom), tally[-bottom], nameOf(-bottom), tally.d);
+  }
+
+  function canUndo() {
+    if (!game || game.over || game.busy || game.sel?.prefix.length > 1) return false;
+    return game.history.some(snap => settings.mode !== 'cpu' || snap.turn === humanSide());
+  }
+
+  function undo() {
+    if (!canUndo()) return;
+    clearTimeout(game.timer);
+    game.round = ++round;
+    let snap;
+    do snap = game.history.pop(); while (settings.mode === 'cpu' && snap.turn !== humanSide());
+    Object.assign(game, { board: snap.board, turn: snap.turn, quiet: snap.quiet, positions: snap.positions, last: snap.last });
+    buildPieces();
+    nextTurn();
+    els.announcer.textContent = t.undo;
+  }
+
+  // ---- Rendering --------------------------------------------------------------------------
+  const displayIndex = sq => flip ? 63 - sq : sq;
+  const fromDisplay = i => flip ? 63 - i : i;
+
+  function place(el, sq) {
+    const i = displayIndex(Number(sq));
+    el.style.setProperty('--r', i >> 3);
+    el.style.setProperty('--c', i & 7);
+  }
+
+  function buildSquares() {
+    squareEls = [];
+    const rows = [];
+    for (let dr = 0; dr < 8; dr++) {
+      const row = document.createElement('div');
+      row.setAttribute('role', 'row');
+      row.style.display = 'contents';
+      for (let dc = 0; dc < 8; dc++) {
+        const i = dr * 8 + dc;
+        if ((dr + dc) % 2 === 0) { const cell = document.createElement('i'); cell.setAttribute('role', 'presentation'); row.append(cell); continue; }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sq';
+        btn.setAttribute('role', 'gridcell');
+        btn.dataset.sq = fromDisplay(i);
+        btn.tabIndex = -1;
+        btn.addEventListener('focus', () => { cursor = i; syncTabStops(); });
+        squareEls[fromDisplay(i)] = btn;
+        row.append(btn);
+      }
+      rows.push(row);
+    }
+    els.squares.replaceChildren(...rows);
+  }
+
+  function buildPieces() {
+    pieceEls = new Map();
+    const nodes = [];
+    for (const sq of DARK) {
+      const v = game.board[sq];
+      if (!v) continue;
+      const el = document.createElement('div');
+      el.className = `piece ${v > 0 ? 'red' : 'white'}${Math.abs(v) === 2 ? ' king' : ''}`;
+      el.innerHTML = `<b>${CROWN}</b>`;
+      el.dataset.sq = sq;
+      place(el, sq);
+      pieceEls.set(sq, el);
+      nodes.push(el);
+    }
+    els.pieces.replaceChildren(...nodes);
+  }
+
+  function syncTabStops() {
+    for (const btn of squareEls) if (btn) btn.tabIndex = displayIndex(Number(btn.dataset.sq)) === cursor ? 0 : -1;
+  }
+
+  function render() {
+    const human = humanTurn();
+    const targets = human && game.sel ? nextTargets() : [];
+    const selAt = game.sel ? game.sel.prefix[game.sel.prefix.length - 1] : -1;
+    for (const btn of squareEls) {
+      if (!btn) continue;
+      const sq = Number(btn.dataset.sq);
+      const can = human && !game.sel && movableFrom(sq);
+      const target = targets.includes(sq);
+      btn.classList.toggle('can', can);
+      btn.classList.toggle('sel', sq === selAt);
+      btn.classList.toggle('target', target);
+      btn.classList.toggle('last', !!game.last && (game.last[0] === sq || game.last[game.last.length - 1] === sq));
+      const v = game.board[sq];
+      const shown = game.sel && sq === game.sel.prefix[0] && selAt !== sq ? 0 : v;
+      let label = `${coord(sq)}, ${shown ? t.piece[shown] : t.empty}`;
+      if (sq === selAt) label += `, ${t.selected}`;
+      else if (can) label += `, ${t.canMove}`;
+      if (target) label += `, ${t.moveHere}`;
+      btn.setAttribute('aria-label', label);
+    }
+    syncTabStops();
+
+    const bottom = flip ? WHITE : RED;
+    for (const [slot, side] of [['bottom', bottom], ['top', -bottom]]) {
+      $(`name-${slot}`).textContent = nameOf(side);
+      $(`score-${slot}`).textContent = String(tally[side]);
+      $(`dot-${slot}`).className = `dot ${side === RED ? 'red' : 'white'}`;
+      $(`side-${slot}`).classList.toggle('turn', !game.over && game.turn === side);
+    }
+    $('score-d').textContent = String(tally.d);
+
+    let status = '', alert = false;
+    if (game.over) status = els.resultTitle.textContent;
+    else if (isCpu(game.turn)) status = t.thinking;
+    else if (game.sel?.prefix.length > 1) { status = t.keepJumping; alert = true; }
+    else if (forced() && game.legal[0]?.caps.length) { status = settings.mode === 'cpu' ? t.mustCapture : t.mustCaptureOf(colorName(game.turn)); alert = true; }
+    else if (game.quiet >= 60) status = t.noProgress(Math.ceil((80 - game.quiet) / 2));
+    else status = settings.mode === 'cpu' ? t.yourTurn : t.turnOf(colorName(game.turn));
+    els.status.textContent = status;
+    els.status.classList.toggle('alert', alert);
+    els.undo.disabled = !canUndo();
+    els.hardWins.textContent = t.hardWins(hardWins);
+  }
+
+  function renderSetup() {
+    for (const group of document.querySelectorAll('.seg')) {
+      for (const btn of group.children) btn.setAttribute('aria-pressed', String(settings[group.dataset.key] === btn.dataset.value));
+    }
+    els.levelField.hidden = settings.mode !== 'cpu';
+    els.sideField.hidden = settings.mode !== 'cpu';
+  }
+
+  function openSetup() {
+    clearTimeout(game?.timer);
+    if (game && !game.over) game.round = ++round;
+    renderSetup();
+    els.result.hidden = true;
+    els.setup.hidden = false;
+    els.start.focus({ preventScroll: true });
+  }
+
+  // ---- Input ------------------------------------------------------------------------------
+  els.squares.addEventListener('click', event => {
+    const btn = event.target.closest('.sq');
+    if (suppressClick) { suppressClick = false; return; }
+    if (btn) tapSquare(Number(btn.dataset.sq));
+  });
+
+  function squareAt(x, y) {
+    const rect = els.squares.getBoundingClientRect();
+    const dc = Math.floor((x - rect.left) / rect.width * 8), dr = Math.floor((y - rect.top) / rect.height * 8);
+    if (dc < 0 || dc > 7 || dr < 0 || dr > 7 || (dr + dc) % 2 === 0) return -1;
+    return fromDisplay(dr * 8 + dc);
+  }
+
+  els.squares.addEventListener('pointerdown', event => {
+    if (!humanTurn() || event.button > 0) return;
+    const sq = squareAt(event.clientX, event.clientY);
+    const selAt = game.sel ? game.sel.prefix[game.sel.prefix.length - 1] : -1;
+    const fresh = !game.sel || game.sel.prefix.length === 1;
+    if (!(sq === selAt || (fresh && movableFrom(sq)))) return;
+    const el = pieceEls.get(game.sel ? game.sel.prefix[0] : sq);
+    if (!el) return;
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, sq, el, moved: false };
+  });
+
+  els.squares.addEventListener('pointermove', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 8) return;
+      drag.moved = true;
+      // Capture only once it is a real drag; capturing earlier would retarget the plain tap's click away from the square.
+      els.squares.setPointerCapture(event.pointerId);
+      if (!game.sel) select(drag.sq);
+      drag.el.classList.add('drag');
+    }
+    const rect = els.pieces.getBoundingClientRect();
+    const cell = rect.width / 8;
+    drag.el.style.transform = `translate(${event.clientX - rect.left - cell / 2}px, ${event.clientY - rect.top - cell / 2}px)`;
+  });
+
+  function endDrag(event, cancelled) {
+    if (!drag || drag.id !== event.pointerId) return;
+    const { el, moved } = drag;
+    drag = null;
+    if (!moved) return;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    el.classList.remove('drag');
+    el.style.transform = '';
+    if (cancelled || !humanTurn() || !game.sel) return;
+    const sq = squareAt(event.clientX, event.clientY);
+    const prefix = game.sel.prefix;
+    // Dropping on any later square of a jump chain plays every hop up to it.
+    const route = candidates().find(m => m.path.indexOf(sq, prefix.length) >= 0);
+    if (!route) return;
+    const steps = route.path.slice(prefix.length, route.path.indexOf(sq, prefix.length) + 1);
+    for (const s of steps) { if (!game.sel || game.busy) break; stepTo(s); }
+  }
+  els.squares.addEventListener('pointerup', event => endDrag(event, false));
+  els.squares.addEventListener('pointercancel', event => endDrag(event, true));
+
+  function moveCursor(dr, dc) {
+    let r = cursor >> 3, c = cursor & 7;
+    if (dc) { if (c + dc * 2 >= 0 && c + dc * 2 < 8) c += dc * 2; }
+    else if (r + dr >= 0 && r + dr < 8) { r += dr; c = c - 1 >= 0 ? c - 1 : c + 1; if ((r + c) % 2 === 0) c += 2; if (c > 7) c -= 2; }
+    cursor = r * 8 + c;
+    syncTabStops();
+    squareEls[fromDisplay(cursor)]?.focus({ preventScroll: true });
+  }
+
+  const KEYS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  const overlayOpen = () => !els.setup.hidden || !els.result.hidden;
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !game || overlayOpen()) return;
+    const dir = KEYS[event.key];
+    if (dir) {
+      event.preventDefault();
+      if (!els.squares.contains(document.activeElement)) { syncTabStops(); squareEls[fromDisplay(cursor)]?.focus({ preventScroll: true }); }
+      else moveCursor(dir[0], dir[1]);
+    } else if (event.key === 'u' || event.key === 'U') {
+      event.preventDefault();
+      undo();
+    }
+  });
+
+  for (const group of document.querySelectorAll('.seg')) {
+    group.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      settings[group.dataset.key] = btn.dataset.value;
+      renderSetup();
+    });
+  }
+
+  els.start.addEventListener('click', () => {
+    const key = `${settings.mode}/${settings.level}/${settings.side}`;
+    if (key !== els.start.dataset.key) tally = { 1: 0, '-1': 0, d: 0 };
+    els.start.dataset.key = key;
+    write(STORE.settings, settings);
+    newRound();
+  });
+  els.nextRound.addEventListener('click', newRound);
+  els.undo.addEventListener('click', undo);
+  $('change').addEventListener('click', openSetup);
+  $('settings').addEventListener('click', openSetup);
+  $('restart').addEventListener('click', newRound);
+
+  renderSetup();
+  els.start.dataset.key = `${settings.mode}/${settings.level}/${settings.side}`;
+  const board = initialBoard();
+  game = { board, turn: RED, quiet: 0, positions: new Map(), history: [], legal: [], sel: null, last: null, over: false, busy: false, timer: 0, round };
+  buildSquares();
+  buildPieces();
+  render();
+  els.start.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

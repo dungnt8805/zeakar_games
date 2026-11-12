@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parking Escape</title>
+<style>
+:root {
+  --ink: #1f2a3a;
+  --muted: #5b6b7c;
+  --mint: #8fd8c7;
+  --mint-dark: #5fb8a5;
+  --paper: #fffdf7;
+  --curb: #ece4d0;
+  --curb-dark: #cfc4a8;
+  --asphalt: #464e5e;
+  --line: #ffffff1c;
+  --yellow: #ffc93c;
+  --yellow-dark: #d9a20f;
+  --red: #ef4545;
+  --star: #f2a93b;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--mint);
+  background-image: linear-gradient(135deg, #ffffff22 25%, transparent 25%, transparent 50%, #ffffff22 50%, #ffffff22 75%, transparent 75%);
+  background-size: 36px 36px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+header { display: flex; align-items: center; gap: 10px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+h1 span { color: #c22f2f; }
+.icon-btn { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 var(--mint-dark); }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--mint-dark); }
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 6px 6px; border-radius: 14px; background: #ffffffb8; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.stat strong.over { color: #c22f2f; }
+.goal { text-align: center; font-size: 13px; font-weight: 700; color: #2d4a52; line-height: 1.3; }
+.goal b { display: inline-block; padding: 1px 8px; margin-right: 4px; border-radius: 99px; background: var(--ink); color: #fff; font-size: 11px; letter-spacing: .03em; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; overflow: hidden; }
+/* Everything on the board is measured in cells: a 6-cell lot, a quarter-cell curb and a road stub on the right. */
+.stage { --cell: min(calc(100cqw / 7.6), calc(100cqh / 6.6)); position: relative; width: calc(var(--cell) * 7.6); height: calc(var(--cell) * 6.6); }
+.yard { position: absolute; left: calc(var(--cell) * .55); top: calc(var(--cell) * .05); width: calc(var(--cell) * 6.5); height: calc(var(--cell) * 6.5); border-radius: calc(var(--cell) * .32); background: var(--curb); box-shadow: 0 calc(var(--cell) * .1) 0 var(--curb-dark), 0 14px 30px #1f2a3a33; }
+.exit { position: absolute; left: calc(var(--cell) * 6.75); top: calc(var(--cell) * 2.3); width: calc(var(--cell) * .85); height: var(--cell); border-radius: 0 calc(var(--cell) * .2) calc(var(--cell) * .2) 0; background: var(--asphalt); display: grid; place-items: center; overflow: hidden; }
+.exit span { font-size: calc(var(--cell) * .42); font-weight: 900; color: var(--yellow); letter-spacing: -.12em; animation: nudge 1.4s ease-in-out infinite; }
+@keyframes nudge { 50% { transform: translateX(calc(var(--cell) * .08)); } }
+.lot {
+  position: absolute; left: calc(var(--cell) * .8); top: calc(var(--cell) * .3); width: calc(var(--cell) * 6); height: calc(var(--cell) * 6);
+  border-radius: calc(var(--cell) * .18);
+  background-color: var(--asphalt);
+  background-image: linear-gradient(var(--line) 2px, transparent 2px), linear-gradient(90deg, var(--line) 2px, transparent 2px);
+  background-size: var(--cell) var(--cell);
+  background-position: -1px -1px;
+  touch-action: none;
+}
+.lot:focus-visible { outline: 3px solid var(--ink); outline-offset: calc(var(--cell) * .3); }
+.lane { position: absolute; left: calc(var(--cell) * .2); right: calc(var(--cell) * -.75); top: calc(var(--cell) * 2.5 - 2px); height: 4px; background: repeating-linear-gradient(90deg, #ffc93c66 0 14px, transparent 14px 26px); pointer-events: none; }
+
+.veh { position: absolute; left: 0; top: 0; width: calc(var(--w) * var(--cell)); height: calc(var(--h) * var(--cell)); padding: calc(var(--cell) * .08); transform: translate(calc(var(--x) * var(--cell)), calc(var(--y) * var(--cell))); transition: transform .16s cubic-bezier(.3, 1.3, .6, 1); z-index: 1; touch-action: none; cursor: grab; }
+.veh.dragging { transition: none; z-index: 3; cursor: grabbing; }
+.veh.leaving { transition: transform .7s cubic-bezier(.5, 0, .9, .5), opacity .3s .45s; opacity: 0; z-index: 3; }
+.veh:focus-visible { outline: 3px solid #fff; outline-offset: -1px; border-radius: calc(var(--cell) * .2); }
+.body {
+  position: relative; display: block; width: 100%; height: 100%;
+  border-radius: calc(var(--cell) * .2);
+  background: radial-gradient(circle at 30% 25%, #ffffff30, transparent 60%), var(--c);
+  box-shadow: 0 calc(var(--cell) * .06) 0 #0000004d, inset 0 0 0 calc(var(--cell) * .035) #00000026;
+}
+/* Cabin: a lighter roof framed by a big front windshield and a smaller rear window. Cars face right or up. */
+.body::after { content: ""; position: absolute; border-radius: calc(var(--cell) * .12); background: var(--c2); border: 0 solid #22324d; }
+.veh.h .body::after { left: 18%; right: 14%; top: 13%; bottom: 13%; border-width: 0 calc(var(--cell) * .26) 0 calc(var(--cell) * .17); }
+.veh.v .body::after { top: 14%; bottom: 18%; left: 13%; right: 13%; border-width: calc(var(--cell) * .26) 0 calc(var(--cell) * .17) 0; }
+.veh.truck .body { background: linear-gradient(var(--dir), var(--c) 0 25%, #00000059 25% 27.5%, var(--c2) 27.5%); }
+.veh.truck.h .body { --dir: to left; }
+.veh.truck.v .body { --dir: to bottom; }
+.veh.truck .body::after { background: #22324d; border: 0; }
+.veh.truck.h .body::after { left: auto; right: 6%; width: 9%; top: 14%; bottom: 14%; }
+.veh.truck.v .body::after { top: 6%; height: 9%; bottom: auto; left: 14%; right: 14%; }
+.veh.truck .body::before { content: ""; position: absolute; border-radius: calc(var(--cell) * .08); }
+.veh.truck.h .body::before { left: 6%; right: 32%; top: 18%; bottom: 18%; background: repeating-linear-gradient(90deg, #ffffff4d 0 3px, transparent 3px 14px); }
+.veh.truck.v .body::before { top: 32%; bottom: 6%; left: 18%; right: 18%; background: repeating-linear-gradient(0deg, #ffffff4d 0 3px, transparent 3px 14px); }
+.veh.hero .body::before { content: "★"; position: absolute; left: 50%; top: 50%; transform: translate(-60%, -50%); font-size: calc(var(--cell) * .36); line-height: 1; color: #fff; z-index: 1; }
+.veh.hero.h .body::before { left: 44%; }
+.veh.hinted .body { animation: pulse .8s ease-in-out infinite; }
+@keyframes pulse { 50% { filter: brightness(1.25); box-shadow: 0 0 0 calc(var(--cell) * .06) var(--yellow), 0 calc(var(--cell) * .06) 0 #0000004d; } }
+.ghost { position: absolute; left: 0; top: 0; width: calc(var(--w) * var(--cell)); height: calc(var(--h) * var(--cell)); transform: translate(calc(var(--x) * var(--cell)), calc(var(--y) * var(--cell))); padding: calc(var(--cell) * .08); pointer-events: none; z-index: 0; }
+.ghost::before { content: ""; display: block; width: 100%; height: 100%; border-radius: calc(var(--cell) * .2); border: 3px dashed var(--yellow); background: #ffc93c22; }
+.ghost[hidden] { display: none; }
+.lot.won .veh:not(.hero) .body { animation: hop .45s calc(var(--i) * 40ms) both; }
+@keyframes hop { 50% { transform: translateY(calc(var(--cell) * -.12)); } }
+
+.tools { display: flex; gap: 8px; }
+.tool { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px; border-radius: 16px; background: var(--paper); box-shadow: 0 4px 0 var(--mint-dark); font-size: 15px; font-weight: 800; }
+.tool span:first-child { font-size: 18px; }
+.tool span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--mint-dark); }
+.tool:disabled { opacity: .5; cursor: default; }
+.tool.hint-btn { background: var(--yellow); box-shadow: 0 4px 0 var(--yellow-dark); }
+.tool.hint-btn:active:not(:disabled) { box-shadow: 0 1px 0 var(--yellow-dark); }
+.help { text-align: center; font-size: 12px; font-weight: 700; color: #2d4a52; }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #1f2a3a73; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 28px; padding: 24px 22px; text-align: center; box-shadow: 0 20px 50px #0005; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; line-height: 1.15; }
+.panel h2 span { color: #c22f2f; }
+.panel .emoji { font-size: 46px; line-height: 1.2; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .small { font-size: 13px; }
+.stars { margin-top: 6px; font-size: 38px; letter-spacing: 4px; color: #e3d9bf; }
+.stars b { color: var(--star); }
+.result { font-size: 18px; font-weight: 700; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden], .note[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--red); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 #b52b2b; }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 #b52b2b; }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #e6dcc0; font-weight: 800; }
+.tier { margin-top: 14px; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 6px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #eef7f3; box-shadow: 0 3px 0 #bfe0d6; font-size: 17px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: var(--star); min-height: 11px; }
+.level-btn.current { background: var(--red); color: #fff; box-shadow: 0 3px 0 #b52b2b; }
+.level-btn.current small { color: #ffe9a8; }
+.level-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+
+@media (min-aspect-ratio: 4/3) { .app { max-width: 640px; } }
+@media (max-height: 560px) { .help, .goal { display: none; } }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Parking <span>Escape</span></h1>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="optimal"></small><strong id="optimal">–</strong></div>
+  </div>
+  <p class="goal" id="goal"></p>
+  <div class="board-wrap">
+    <div class="stage">
+      <div class="yard" aria-hidden="true"></div>
+      <div class="exit" aria-hidden="true"><span>›››</span></div>
+      <div class="lot" id="lot" role="group">
+        <div class="lane" aria-hidden="true"></div>
+        <div class="ghost" id="ghost" aria-hidden="true" hidden></div>
+      </div>
+    </div>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="undo"><span aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" class="tool hint-btn" id="hint"><span aria-hidden="true">💡</span><span data-i18n="hint"></span></button>
+    <button type="button" class="tool" id="restart"><span aria-hidden="true">↻</span><span data-i18n="restart"></span></button>
+  </div>
+  <p class="help" data-i18n="dragHint"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="intro">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <p class="emoji" aria-hidden="true">🚗💨</p>
+    <h2 id="intro-title">Parking <span>Escape</span></h2>
+    <p data-i18n="tagline"></p>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" class="cta" id="play"></button>
+    <button type="button" class="secondary" id="intro-levels" data-i18n="chooseLevel"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="small note" id="win-note"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div id="level-list"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const FR_F = { red: 'rouge', blue: 'bleue', green: 'verte', yellow: 'jaune', purple: 'violette', orange: 'orange', teal: 'turquoise', pink: 'rose', gray: 'grise' };
+  const FR_M = { red: 'rouge', blue: 'bleu', green: 'vert', yellow: 'jaune', purple: 'violet', orange: 'orange', teal: 'turquoise', pink: 'rose', gray: 'gris' };
+  const COLORS = {
+    en: { red: 'red', blue: 'blue', green: 'green', yellow: 'yellow', purple: 'purple', orange: 'orange', teal: 'teal', pink: 'pink', gray: 'gray' },
+    vi: { red: 'đỏ', blue: 'xanh dương', green: 'xanh lá', yellow: 'vàng', purple: 'tím', orange: 'cam', teal: 'xanh ngọc', pink: 'hồng', gray: 'xám' },
+    zh: { red: '红色', blue: '蓝色', green: '绿色', yellow: '黄色', purple: '紫色', orange: '橙色', teal: '青色', pink: '粉色', gray: '灰色' },
+    th: { red: 'แดง', blue: 'น้ำเงิน', green: 'เขียว', yellow: 'เหลือง', purple: 'ม่วง', orange: 'ส้ม', teal: 'เขียวอมฟ้า', pink: 'ชมพู', gray: 'เทา' },
+    ja: { red: '赤', blue: '青', green: '緑', yellow: '黄色', purple: '紫', orange: 'オレンジ', teal: '青緑', pink: 'ピンク', gray: 'グレー' },
+    ko: { red: '빨간', blue: '파란', green: '초록색', yellow: '노란', purple: '보라색', orange: '주황색', teal: '청록색', pink: '분홍색', gray: '회색' },
+  };
+  const I18N = {
+    en: { tagline: 'Slide the cars and trucks to clear a path, then drive the red car out of the lot.', controls: 'Vehicles only move along their own lane. Keys: Tab or arrows to pick a vehicle, arrows to slide it, U to undo, H for a hint.', dragHint: 'Drag vehicles along their lane · arrow keys work too', level: 'Level', moves: 'Moves', optimal: 'Optimal', levels: 'Levels', undo: 'Undo', hint: 'Hint', restart: 'Restart', tiers: ['Easy', 'Medium', 'Hard', 'Expert'], goal: n => `Can be solved in ${n} moves`, play: n => `Play level ${n}`, won: n => `Level ${n} cleared!`, allDone: 'You cleared every level!', result: (m, o) => `${m} moves · optimal ${o}`, perfect: 'Perfect — the shortest possible solution!', hintUsed: 'A hint was used, so 2 stars max.', newBest: 'New best!', next: 'Next level', replay: 'Replay level', chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', starsLabel: n => `${n} of 3 stars`, levelN: n => `Level ${n}`, vname: (k, truck) => `${COLORS.en[k]} ${truck ? 'truck' : 'car'}`, vehicle: (name, r, c) => `${name}, row ${r}, column ${c}`, moved: (name, dir) => `${name} moved ${dir}`, hintSay: (name, dir, n) => `Hint: move the ${name} ${dir}. ${n} ${n === 1 ? 'move' : 'moves'} to go.`, undone: 'Move undone', board: 'Parking lot, 6 by 6. The exit is on the right of row 3.', escaped: 'The red car is out!', dirs: { left: 'left', right: 'right', up: 'up', down: 'down' } },
+    vi: { tagline: 'Trượt ô tô và xe tải để mở đường, rồi đưa xe đỏ ra khỏi bãi.', controls: 'Mỗi xe chỉ đi được theo làn của nó. Bàn phím: Tab hoặc mũi tên để chọn xe, mũi tên để trượt, U để hoàn tác, H để xem gợi ý.', dragHint: 'Kéo xe dọc theo làn · dùng phím mũi tên cũng được', level: 'Màn', moves: 'Lượt', optimal: 'Tối ưu', levels: 'Chọn màn', undo: 'Hoàn tác', hint: 'Gợi ý', restart: 'Chơi lại', tiers: ['Dễ', 'Vừa', 'Khó', 'Chuyên gia'], goal: n => `Có thể giải trong ${n} lượt`, play: n => `Chơi màn ${n}`, won: n => `Hoàn thành màn ${n}!`, allDone: 'Bạn đã phá đảo tất cả các màn!', result: (m, o) => `${m} lượt · tối ưu ${o}`, perfect: 'Hoàn hảo — lời giải ngắn nhất!', hintUsed: 'Đã dùng gợi ý nên tối đa 2 sao.', newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại màn này', chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', starsLabel: n => `${n}/3 sao`, levelN: n => `Màn ${n}`, vname: (k, truck) => `${truck ? 'xe tải' : 'ô tô'} ${COLORS.vi[k]}`, vehicle: (name, r, c) => `${name}, hàng ${r}, cột ${c}`, moved: (name, dir) => `${name} đi ${dir}`, hintSay: (name, dir, n) => `Gợi ý: đưa ${name} ${dir}. Còn ${n} lượt nữa.`, undone: 'Đã hoàn tác một lượt', board: 'Bãi đỗ xe 6×6. Lối ra nằm bên phải hàng 3.', escaped: 'Xe đỏ đã thoát ra!', dirs: { left: 'sang trái', right: 'sang phải', up: 'lên trên', down: 'xuống dưới' } },
+    zh: { tagline: '移动小车和卡车让出通道，把红色小车开出停车场。', controls: '车辆只能沿自身方向前后移动。键盘：Tab 或方向键选车，方向键移动，U 撤销，H 提示。', dragHint: '沿车身方向拖动车辆 · 也可用方向键', level: '关卡', moves: '步数', optimal: '最少', levels: '选择关卡', undo: '撤销', hint: '提示', restart: '重来', tiers: ['简单', '中等', '困难', '专家'], goal: n => `最少 ${n} 步即可通关`, play: n => `开始第 ${n} 关`, won: n => `第 ${n} 关完成！`, allDone: '你已通关所有关卡！', result: (m, o) => `${m} 步 · 最少 ${o} 步`, perfect: '完美——最短解法！', hintUsed: '使用了提示，最多 2 颗星。', newBest: '新纪录！', next: '下一关', replay: '重玩本关', chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', starsLabel: n => `${n}/3 星`, levelN: n => `第 ${n} 关`, vname: (k, truck) => `${COLORS.zh[k]}${truck ? '卡车' : '小车'}`, vehicle: (name, r, c) => `${name}，第 ${r} 行第 ${c} 列`, moved: (name, dir) => `${name}向${dir}移动`, hintSay: (name, dir, n) => `提示：把${name}向${dir}移动。还需 ${n} 步。`, undone: '已撤销一步', board: '6×6 停车场，出口在第 3 行右侧。', escaped: '红色小车开出去了！', dirs: { left: '左', right: '右', up: '上', down: '下' } },
+    fr: { tagline: 'Faites glisser voitures et camions pour libérer le passage, puis sortez la voiture rouge du parking.', controls: 'Chaque véhicule avance et recule seulement dans son axe. Clavier : Tab ou flèches pour choisir, flèches pour déplacer, U pour annuler, H pour un indice.', dragHint: 'Glissez les véhicules dans leur axe · les flèches marchent aussi', level: 'Niveau', moves: 'Coups', optimal: 'Optimal', levels: 'Niveaux', undo: 'Annuler', hint: 'Indice', restart: 'Recommencer', tiers: ['Facile', 'Moyen', 'Difficile', 'Expert'], goal: n => `Faisable en ${n} coups`, play: n => `Jouer le niveau ${n}`, won: n => `Niveau ${n} réussi !`, allDone: 'Vous avez terminé tous les niveaux !', result: (m, o) => `${m} coups · optimal ${o}`, perfect: 'Parfait — la solution la plus courte !', hintUsed: 'Indice utilisé : 2 étoiles au maximum.', newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer le niveau', chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, levelN: n => `Niveau ${n}`, vname: (k, truck) => (truck ? `camion ${FR_M[k]}` : `voiture ${FR_F[k]}`), vehicle: (name, r, c) => `${name}, ligne ${r}, colonne ${c}`, moved: (name, dir) => `${name} vers ${dir}`, hintSay: (name, dir, n) => `Indice : ${name} vers ${dir}. Encore ${n} coup${n > 1 ? 's' : ''}.`, undone: 'Coup annulé', board: 'Parking de 6 × 6. La sortie est à droite de la ligne 3.', escaped: 'La voiture rouge est sortie !', dirs: { left: 'la gauche', right: 'la droite', up: 'le haut', down: 'le bas' } },
+    th: { tagline: 'เลื่อนรถเก๋งและรถบรรทุกเพื่อเปิดทาง แล้วพารถสีแดงออกจากลานจอด', controls: 'รถแต่ละคันเลื่อนได้แค่ตามแนวของตัวเอง แป้นพิมพ์: Tab หรือลูกศรเพื่อเลือกรถ ลูกศรเพื่อเลื่อน U เพื่อย้อนกลับ H เพื่อดูคำใบ้', dragHint: 'ลากรถไปตามแนวเลน · ใช้ปุ่มลูกศรก็ได้', level: 'ด่าน', moves: 'ครั้ง', optimal: 'น้อยสุด', levels: 'เลือกด่าน', undo: 'ย้อนกลับ', hint: 'คำใบ้', restart: 'เริ่มใหม่', tiers: ['ง่าย', 'ปานกลาง', 'ยาก', 'เซียน'], goal: n => `แก้ได้ใน ${n} ครั้ง`, play: n => `เล่นด่าน ${n}`, won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'คุณผ่านครบทุกด่านแล้ว!', result: (m, o) => `${m} ครั้ง · น้อยสุด ${o}`, perfect: 'สมบูรณ์แบบ — ใช้ทางที่สั้นที่สุด!', hintUsed: 'ใช้คำใบ้แล้ว ได้สูงสุด 2 ดาว', newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นด่านนี้อีกครั้ง', chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', starsLabel: n => `${n} จาก 3 ดาว`, levelN: n => `ด่าน ${n}`, vname: (k, truck) => `${truck ? 'รถบรรทุก' : 'รถเก๋ง'}สี${COLORS.th[k]}`, vehicle: (name, r, c) => `${name} แถว ${r} คอลัมน์ ${c}`, moved: (name, dir) => `เลื่อน${name}ไป${dir}`, hintSay: (name, dir, n) => `คำใบ้: เลื่อน${name}ไป${dir} เหลืออีก ${n} ครั้ง`, undone: 'ย้อนกลับแล้ว', board: 'ลานจอดรถขนาด 6×6 ทางออกอยู่ด้านขวาของแถวที่ 3', escaped: 'รถสีแดงออกไปแล้ว!', dirs: { left: 'ทางซ้าย', right: 'ทางขวา', up: 'ข้างบน', down: 'ข้างล่าง' } },
+    ja: { tagline: '車やトラックをスライドして道を空け、赤い車を駐車場から出そう。', controls: '車は向いている方向にしか動きません。キーボード：Tab か矢印キーで車を選び、矢印キーで移動、U で戻す、H でヒント。', dragHint: '車の向きに沿ってドラッグ · 矢印キーでも動かせます', level: 'レベル', moves: '手数', optimal: '最短', levels: 'レベル選択', undo: '戻す', hint: 'ヒント', restart: 'やり直し', tiers: ['かんたん', 'ふつう', 'むずかしい', '達人'], goal: n => `最短 ${n} 手で解けます`, play: n => `レベル ${n} をプレイ`, won: n => `レベル ${n} クリア！`, allDone: '全レベルクリア！', result: (m, o) => `${m}手 · 最短 ${o}手`, perfect: 'パーフェクト！最短手順です！', hintUsed: 'ヒントを使ったので星は最大 2 つです。', newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度プレイ', chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', starsLabel: n => `星 ${n}/3`, levelN: n => `レベル ${n}`, vname: (k, truck) => `${COLORS.ja[k]}の${truck ? 'トラック' : '車'}`, vehicle: (name, r, c) => `${name}、${r}行${c}列`, moved: (name, dir) => `${name}を${dir}へ移動`, hintSay: (name, dir, n) => `ヒント：${name}を${dir}へ動かそう。あと ${n} 手。`, undone: '1手戻しました', board: '6×6 の駐車場。出口は3行目の右側です。', escaped: '赤い車が脱出！', dirs: { left: '左', right: '右', up: '上', down: '下' } },
+    ko: { tagline: '승용차와 트럭을 밀어 길을 열고 빨간 차를 주차장 밖으로 빼내세요.', controls: '차량은 향한 방향으로만 움직여요. 키보드: Tab이나 방향키로 차량 선택, 방향키로 이동, U는 되돌리기, H는 힌트.', dragHint: '차량 방향을 따라 드래그 · 방향키로도 움직여요', level: '레벨', moves: '이동', optimal: '최소', levels: '레벨 선택', undo: '되돌리기', hint: '힌트', restart: '다시 시작', tiers: ['쉬움', '보통', '어려움', '전문가'], goal: n => `최소 ${n}번 이동으로 해결 가능`, play: n => `레벨 ${n} 플레이`, won: n => `레벨 ${n} 클리어!`, allDone: '모든 레벨을 클리어했어요!', result: (m, o) => `${m}번 이동 · 최소 ${o}번`, perfect: '완벽해요! 가장 짧은 해법이에요!', hintUsed: '힌트를 사용해서 별은 최대 2개예요.', newBest: '최고 기록!', next: '다음 레벨', replay: '이 레벨 다시 하기', chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', starsLabel: n => `별 ${n}/3`, levelN: n => `레벨 ${n}`, vname: (k, truck) => `${COLORS.ko[k]} ${truck ? '트럭' : '승용차'}`, vehicle: (name, r, c) => `${name}, ${r}행 ${c}열`, moved: (name, dir) => `${name} ${dir}으로 이동`, hintSay: (name, dir, n) => `힌트: ${name}, ${dir}으로 이동. ${n}번 남았어요.`, undone: '한 번 되돌렸어요', board: '6×6 주차장. 출구는 3행 오른쪽에 있어요.', escaped: '빨간 차가 탈출했어요!', dirs: { left: '왼쪽', right: '오른쪽', up: '위쪽', down: '아래쪽' } },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // 6×6 boards, row by row: 'o' is empty, 'A' the red car (always on row 3), other letters are cars (2) or trucks (3).
+  // Generated offline from random boards by BFS over each board's whole state space, keeping the state farthest from a solve;
+  // sorted so the optimal solution length rises from 2 to 41 moves. The game re-solves every board with BFS at runtime.
+  const LEVELS = [
+    'ooooooooFFBBAAoooEoCoooEoCoooooCDDoo', 'ooooooooBoooAABooCoFFEECDDDooooooooo', 'oFoooooFooDDAAoooCBooooCBoooEEBooooo', 'ooFFFoooDoooAADCoBEooCoBEooooooooooo',
+    'oooEDDoooEooAAoEooCoBBooCoFFoooooooo', 'ooooBEoooDBEAAoDFEooooFoooCCCooooooo', 'ooooDDooEoBoAAEoBoooEoooFFCCCooooooo', 'ooooooooooBEAAoFBEoooFBoooDDDooooCCo',
+    'ooooooooooECAAooECoooooCoooBBBooFFDD', 'oooooooooooFooAAEFoooBEFoooBDDooooCC', 'oooBoooooBooAAoBooFooEEoFDDDooooCCCo', 'ooooooooooGDooAAGDBFFFoDBooECCoooEoo',
+    'JIIoFFJHHHCoAAGoCoooGKKKoBDDoooBoEEo', 'oJoFBBoJoFoIAAoGHIDoKGHIDoKCCCooooEE', 'oKoooooKJHHoAAJoDGFFFoDGEooCCGEIIIBB', 'EFFHHoEooooKAAGooKooGoIJCCBBIJoooDDD',
+    'GoooooGoIIIoAADooHJJDooHKCDoBBKCEEFF', 'oDDDoooJJJFCooAAFCoIIKKCEEoBHHGGGBoo', 'oGoooooGDFoIAADFoIJJoooICKKBBBCoHHEE', 'IooooJIoGGKJAAHoKJCCHoooFDDBBoFoooEE',
+    'ooEoKKoBEoDooBAADIoCCCGIoHHoGJoooFFJ', 'ooDDDoooooIHAAooIHoCCCIJGFoEEJGFBBKK', 'JFFDDKJHHHCKAAoECooooECooooIGGoooIBB', 'ooooFFooCIIHAACooHKoCEEEKDDBooGGoBJJ',
+    'BBJJDFooooDFooIAAFooIEoooCoEHHoCKKGG', 'oIIooBoKKKoBAAoooJoEHCCJoEHDFFoGGDoo', 'BCJJGoBCEoGKAAEooKoDDDHoooFoHIooFooI', 'oIDFFEoIDKJEAACKJBooCooBoooGooHHoGoo',
+    'oCEoIIoCEoDGoFAADGoFoooHoFBBBHoKKJJo', 'oBKFFooBKHooJAAHGoJDDDGoJoCIIoEECooo', 'HNNDDDHKKLGGIAALoFIoJJoFEEBooCooBMMC', 'oEMFFHoEMDGHAACDGoIoCLJJINNLooIBBKKK',
+    'oKLLDDoKFFBGAAoCBGIIICooMHHHEEMJJJNN', 'ooGoNNBBGoIDMFAAIDMFoKKKoHHEEJoCCLLJ', 'oCNNKKoCoFFFAAoBLMHHHBLMEoIILJEGGDDJ', 'oEKKKMoEHHHMAAoDBFJGGDBFJoCNNNLLCIII',
+    'oMLLEooMCHEGAACHFGBBJJFNKooDDNKoIIIo', 'LCCFooLIIFGBLAADGBJJEDoMooENNMoKKHHo', 'FFoKNNGGGKBoAADoBIJoDEEIJoMMoCLLHHHC', 'ooIGooooIGMCAAEBMCNNEBJHLFDDJHLFoKKo',
+    'ooFLLLBBFoIHKoAAIHKEEMDDGGGMoJCCNNoJ', 'IoMMGGIooHEEAAFHoDooFNNDBKFoJCBKLLJC', 'oCGGBBoCLLDDAAHooNMMHKoNEIIKoFEoJJoF', 'JDDDBoJoCCBKAAIHBKooIHGGooEEELMMFFoL',
+    'EKoCCMEKooGMEAAJGBFFLJGBooLIIIHHDDoo', 'KFFGEoKoCGEJAACooJoBBIIJoHLLDDoHNNMM', 'KKoBoJIooBoJIAALMCDoFLMCDoFEECooHHGG', 'oEHHHIMELLDIMAAoDoFGCCDoFGBoKKJJBooo',
+    'CCoNBJEooNBJEAAoBHooLIIHMFLoGGMFKKDD', 'JBBGGMJoHEoMAAHEoooIFFFKoIooCKLLDDCo', 'FCCGGoFoBHHHAABooLoJIIKLoJDDKooEEEKo', 'oDDHHoooLIIIAALFoEooLFBEGMCCBEGMKKJJ',
+    'ooFFFooHHoCoAAEoCooJEGGooJIKBBDDIKoo', 'IFFBBoIoKDooAAKDoooLLHJJCCCHoGoEEEoG', 'oDDDBBJJEEHCAAIoHCooIFFCMKKGooMLLGoo', 'oHoKKoFHoBDDFAABEoIGGJEMIoLJEMIoLCCM',
+    'JLLLFoJoEEFoAABCGHooBCGHoooIDDoooIKK', 'ooGDDDLLGoKFECAAKFECHooIooHBBIooJJJI', 'BBooGoDoNNGIDAALGIMKCLFFMKCEEHooJJJH', 'oDDDFGNNoIFGAAoIBMCJJHBMCoEHKKLLEooo',
+  ];
+  const TIERS = [12, 30, 45, 60];
+  const N = 6, EXIT_POS = N - 2;
+  const PALETTE = [['blue', '#4f8ef7', '#7aa9fa'], ['green', '#3fbf74', '#73d39a'], ['yellow', '#ffc93c', '#ffdb7a'], ['purple', '#9b72e8', '#b89af0'], ['orange', '#ff9a3d', '#ffb877'], ['teal', '#22b8aa', '#5fd0c5'], ['pink', '#f483b5', '#f7a8cb'], ['gray', '#9aa5b6', '#bcc4d0']];
+  const STORAGE_KEY = 'milaan.parkingEscape.progress';
+  const STEP = { ArrowLeft: [0, -1, 'left'], ArrowRight: [0, 1, 'right'], ArrowUp: [-1, 0, 'up'], ArrowDown: [1, 0, 'down'] };
+
+  const $ = id => document.getElementById(id);
+  const lot = $('lot');
+  const els = { level: $('level'), moves: $('moves'), optimal: $('optimal'), goal: $('goal'), ghost: $('ghost'), undo: $('undo'), hint: $('hint'), announcer: $('announcer'), intro: $('intro'), play: $('play'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), winNote: $('win-note'), newBest: $('new-best'), next: $('next'), levels: $('levels'), levelList: $('level-list') };
+  lot.setAttribute('aria-label', t.board);
+
+  const blankProgress = () => ({ unlocked: 1, current: 1, stars: {}, best: {}, save: null });
+  const readProgress = () => { try { return { ...blankProgress(), ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return blankProgress(); } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const tierOf = level => TIERS.findIndex(last => level <= last);
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const announce = text => { els.announcer.textContent = text; };
+
+  let progress = readProgress();
+  let game;
+  let drag = null;
+
+  function parseLevel(code) {
+    const cells = {};
+    [...code].forEach((ch, i) => { if (ch !== 'o') (cells[ch] ||= []).push(i); });
+    const letters = Object.keys(cells).sort();
+    return letters.map((ch, index) => {
+      const list = cells[ch];
+      const h = Math.floor(list[0] / N) === Math.floor(list[1] / N);
+      const r = Math.floor(list[0] / N), c = list[0] % N;
+      const [key, color, light] = PALETTE[(index - 1 + PALETTE.length) % PALETTE.length];
+      return { h, len: list.length, fix: h ? r : c, start: h ? c : r, hero: ch === 'A', key: ch === 'A' ? 'red' : key, color: ch === 'A' ? '#ef4545' : color, light: ch === 'A' ? '#ff7a7a' : light };
+    });
+  }
+
+  function occupancy(pos, skip = -1) {
+    const occ = new Int8Array(N * N).fill(-1);
+    game.vehicles.forEach((v, i) => {
+      if (i === skip) return;
+      for (let k = 0; k < v.len; k++) occ[v.h ? v.fix * N + pos[i] + k : (pos[i] + k) * N + v.fix] = i;
+    });
+    return occ;
+  }
+
+  function range(i) {
+    const v = game.vehicles[i];
+    const occ = occupancy(game.pos, i);
+    const free = p => p >= 0 && p + v.len <= N && occ[v.h ? v.fix * N + (p) : p * N + v.fix] < 0 && occ[v.h ? v.fix * N + p + v.len - 1 : (p + v.len - 1) * N + v.fix] < 0;
+    let min = game.pos[i], max = game.pos[i];
+    while (free(min - 1)) min -= 1;
+    while (free(max + 1)) max += 1;
+    return [min, max];
+  }
+
+  // Breadth-first search from a position to the first state with the red car at the exit; returns the move list.
+  function solve(start) {
+    const vs = game.vehicles, n = vs.length;
+    if (start[0] === EXIT_POS) return [];
+    const keyOf = p => { let k = 0; for (let i = 0; i < n; i++) k = k * 5 + p[i]; return k; };
+    const states = [start], parent = [-1], movedV = [-1], movedTo = [-1];
+    const seen = new Set([keyOf(start)]);
+    const occ = new Int8Array(N * N);
+    for (let qi = 0; qi < states.length && states.length < 500000; qi++) {
+      const p = states[qi];
+      occ.fill(-1);
+      for (let i = 0; i < n; i++) for (let k = 0; k < vs[i].len; k++) occ[vs[i].h ? vs[i].fix * N + p[i] + k : (p[i] + k) * N + vs[i].fix] = i;
+      for (let i = 0; i < n; i++) {
+        const v = vs[i];
+        for (const d of [-1, 1]) {
+          for (let pos = p[i] + d; pos >= 0 && pos + v.len <= N; pos += d) {
+            const cell = d < 0 ? pos : pos + v.len - 1;
+            if (occ[v.h ? v.fix * N + cell : cell * N + v.fix] >= 0) break;
+            const next = p.slice();
+            next[i] = pos;
+            const key = keyOf(next);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            states.push(next); parent.push(qi); movedV.push(i); movedTo.push(pos);
+            if (i === 0 && pos === EXIT_POS) {
+              const path = [];
+              for (let s = states.length - 1; s > 0; s = parent[s]) path.unshift({ v: movedV[s], to: movedTo[s] });
+              return path;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function place(i, at = game.pos[i]) {
+    const v = game.vehicles[i], el = game.els[i];
+    el.style.setProperty('--x', v.h ? at : v.fix);
+    el.style.setProperty('--y', v.h ? v.fix : at);
+  }
+
+  function label(i) {
+    const v = game.vehicles[i];
+    const r = v.h ? v.fix : game.pos[i], c = v.h ? game.pos[i] : v.fix;
+    game.els[i].setAttribute('aria-label', t.vehicle(t.vname(v.key, v.len === 3), r + 1, c + 1));
+  }
+
+  function updateHud() {
+    els.level.textContent = `${game.level}/${LEVELS.length}`;
+    els.moves.textContent = String(game.history.length);
+    els.moves.classList.toggle('over', game.history.length > game.optimal);
+    els.optimal.textContent = String(game.optimal);
+    els.undo.disabled = !game.history.length || game.done;
+    els.hint.disabled = game.done;
+  }
+
+  function startLevel(number, restore = null) {
+    const vehicles = parseLevel(LEVELS[number - 1]);
+    game = { level: number, vehicles, pos: vehicles.map(v => v.start), history: [], hintUsed: false, done: false, els: [], optimal: 0 };
+    game.optimal = solve(game.pos.slice()).length;
+    if (restore && restore.level === number && restore.pos?.length === vehicles.length) {
+      game.pos = restore.pos.slice();
+      game.history = restore.history || [];
+      game.hintUsed = Boolean(restore.hintUsed);
+    }
+    lot.classList.remove('won');
+    lot.querySelectorAll('.veh').forEach(el => el.remove());
+    // Tab order follows reading order of the starting layout.
+    const order = vehicles.map((v, i) => i).sort((a, b) => {
+      const ra = vehicles[a].h ? vehicles[a].fix : vehicles[a].start, rb = vehicles[b].h ? vehicles[b].fix : vehicles[b].start;
+      const ca = vehicles[a].h ? vehicles[a].start : vehicles[a].fix, cb = vehicles[b].h ? vehicles[b].start : vehicles[b].fix;
+      return ra - rb || ca - cb;
+    });
+    vehicles.forEach((v, i) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = `veh ${v.h ? 'h' : 'v'}${v.len === 3 ? ' truck' : ''}${v.hero ? ' hero' : ''}`;
+      el.dataset.i = i;
+      el.style.setProperty('--w', v.h ? v.len : 1);
+      el.style.setProperty('--h', v.h ? 1 : v.len);
+      el.style.setProperty('--c', v.color);
+      el.style.setProperty('--c2', v.light);
+      el.style.setProperty('--i', i);
+      el.innerHTML = '<span class="body" aria-hidden="true"></span>';
+      game.els[i] = el;
+    });
+    lot.append(...order.map(i => game.els[i]));
+    vehicles.forEach((v, i) => { place(i); label(i); });
+    clearHint();
+    const tier = tierOf(number);
+    els.goal.innerHTML = '';
+    const pill = document.createElement('b');
+    pill.textContent = t.tiers[tier];
+    els.goal.append(pill, t.goal(game.optimal));
+    updateHud();
+    progress.current = number;
+    persist();
+    for (const overlay of [els.win, els.levels, els.intro]) overlay.hidden = true;
+  }
+
+  function persist() {
+    progress.save = game.done ? null : { level: game.level, pos: game.pos, history: game.history, hintUsed: game.hintUsed };
+    saveProgress();
+  }
+
+  function clearHint() {
+    game.els.forEach(el => el.classList.remove('hinted'));
+    els.ghost.hidden = true;
+  }
+
+  // One move is one vehicle sliding any distance, so consecutive slides of the same vehicle merge into one.
+  function commit(i, to, dirName) {
+    const from = game.pos[i];
+    if (to === from || game.done) return;
+    const last = game.history[game.history.length - 1];
+    if (last && last.v === i) {
+      last.to = to;
+      if (last.from === to) game.history.pop();
+    } else {
+      game.history.push({ v: i, from, to });
+    }
+    game.pos[i] = to;
+    place(i);
+    label(i);
+    clearHint();
+    const v = game.vehicles[i];
+    const dir = dirName || (v.h ? (to > from ? 'right' : 'left') : (to > from ? 'down' : 'up'));
+    announce(t.moved(t.vname(v.key, v.len === 3), t.dirs[dir]));
+    if (i === 0 && to === EXIT_POS) return win();
+    updateHud();
+    persist();
+  }
+
+  function undo() {
+    if (game.done || !game.history.length) return;
+    const last = game.history.pop();
+    game.pos[last.v] = last.from;
+    place(last.v);
+    label(last.v);
+    clearHint();
+    updateHud();
+    persist();
+    announce(t.undone);
+  }
+
+  function hint() {
+    if (game.done) return;
+    const path = solve(game.pos.slice());
+    if (!path || !path.length) return;
+    const { v: i, to } = path[0];
+    const v = game.vehicles[i];
+    clearHint();
+    game.hintUsed = true;
+    persist();
+    game.els[i].classList.add('hinted');
+    els.ghost.style.setProperty('--w', v.h ? v.len : 1);
+    els.ghost.style.setProperty('--h', v.h ? 1 : v.len);
+    els.ghost.style.setProperty('--x', v.h ? to : v.fix);
+    els.ghost.style.setProperty('--y', v.h ? v.fix : to);
+    els.ghost.hidden = false;
+    const dir = v.h ? (to > game.pos[i] ? 'right' : 'left') : (to > game.pos[i] ? 'down' : 'up');
+    announce(t.hintSay(t.vname(v.key, v.len === 3), t.dirs[dir], path.length));
+  }
+
+  function starsFor(moves) {
+    const o = game.optimal;
+    const stars = moves <= o ? 3 : moves <= o + Math.max(2, Math.ceil(o * 0.5)) ? 2 : 1;
+    return game.hintUsed ? Math.min(stars, 2) : stars;
+  }
+
+  function win() {
+    game.done = true;
+    updateHud();
+    const moves = game.history.length;
+    const stars = starsFor(moves);
+    const key = String(game.level);
+    const previous = progress.best[key];
+    const better = !previous || moves < previous;
+    if (better) progress.best[key] = moves;
+    progress.stars[key] = Math.max(progress.stars[key] ?? 0, stars);
+    progress.unlocked = Math.min(LEVELS.length, Math.max(progress.unlocked, game.level + 1));
+    progress.current = Math.min(LEVELS.length, game.level + 1);
+    persist();
+
+    const hero = game.els[0];
+    hero.classList.add('leaving');
+    hero.style.setProperty('--x', 8.2);
+    lot.classList.add('won');
+    announce(t.escaped);
+
+    const last = game.level === LEVELS.length;
+    els.winTitle.textContent = last ? t.allDone : t.won(game.level);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(moves, game.optimal);
+    els.winNote.textContent = game.hintUsed ? t.hintUsed : moves <= game.optimal ? t.perfect : '';
+    els.winNote.hidden = !els.winNote.textContent;
+    els.newBest.hidden = !better || !previous;
+    els.next.hidden = last;
+    setTimeout(() => {
+      if (!game.done) return;
+      els.win.hidden = false;
+      announce(`${els.winTitle.textContent} ${t.starsLabel(stars)}. ${t.result(moves, game.optimal)}`);
+      (last ? $('replay') : els.next).focus({ preventScroll: true });
+    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 850);
+  }
+
+  function openLevels() {
+    els.levelList.replaceChildren();
+    t.tiers.forEach((name, tier) => {
+      const heading = document.createElement('p');
+      heading.className = 'tier';
+      heading.textContent = name;
+      const grid = document.createElement('div');
+      grid.className = 'level-grid';
+      for (let number = (TIERS[tier - 1] ?? 0) + 1; number <= TIERS[tier]; number++) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `level-btn${number === game.level ? ' current' : ''}`;
+        const locked = number > progress.unlocked;
+        const stars = progress.stars[number] ?? 0;
+        button.disabled = locked;
+        button.innerHTML = `<span>${locked ? '🔒' : number}</span><small>${'★'.repeat(stars)}</small>`;
+        button.setAttribute('aria-label', `${t.levelN(number)}, ${locked ? t.locked : t.starsLabel(stars)}`);
+        button.addEventListener('click', () => { startLevel(number); focusHero(); });
+        grid.append(button);
+      }
+      els.levelList.append(heading, grid);
+    });
+    els.levels.hidden = false;
+    const current = els.levelList.querySelector('.current');
+    current?.focus({ preventScroll: true });
+    current?.scrollIntoView({ block: 'center' });
+  }
+
+  const focusHero = () => game.els[0].focus({ preventScroll: true });
+  const overlayOpen = () => !els.win.hidden || !els.levels.hidden || !els.intro.hidden;
+
+  // Dragging: the vehicle follows the pointer inside its free range, then snaps to the nearest cell.
+  lot.addEventListener('pointerdown', event => {
+    const el = event.target.closest('.veh');
+    if (!el || game.done || drag) return;
+    const i = Number(el.dataset.i);
+    const v = game.vehicles[i];
+    const cellPx = lot.getBoundingClientRect().width / N;
+    const [min, max] = range(i);
+    drag = { i, el, id: event.pointerId, start: v.h ? event.clientX : event.clientY, from: game.pos[i], at: game.pos[i], min, max, cellPx, moved: false };
+    el.setPointerCapture(event.pointerId);
+  });
+  lot.addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const v = game.vehicles[drag.i];
+    const delta = (v.h ? event.clientX : event.clientY) - drag.start;
+    if (!drag.moved && Math.abs(delta) < 5) return;
+    drag.moved = true;
+    drag.el.classList.add('dragging');
+    drag.at = Math.max(drag.min, Math.min(drag.max, drag.from + delta / drag.cellPx));
+    place(drag.i, drag.at);
+  });
+  function endDrag(event, cancel) {
+    if (!drag || event.pointerId !== drag.id) return;
+    const { i, el, at, moved } = drag;
+    drag = null;
+    el.classList.remove('dragging');
+    if (!moved) return;
+    if (cancel) { place(i); return; }
+    const to = Math.round(at);
+    if (to === game.pos[i]) place(i);
+    else commit(i, to);
+  }
+  lot.addEventListener('pointerup', event => endDrag(event, false));
+  lot.addEventListener('pointercancel', event => endDrag(event, true));
+
+  function focusNeighbour(i, dr, dc) {
+    // Jump to the nearest vehicle whose centre lies in the pressed direction.
+    const centre = j => {
+      const v = game.vehicles[j];
+      return v.h ? [v.fix + 0.5, game.pos[j] + v.len / 2] : [game.pos[j] + v.len / 2, v.fix + 0.5];
+    };
+    const [r0, c0] = centre(i);
+    let best = -1, bestScore = Infinity;
+    game.vehicles.forEach((v, j) => {
+      if (j === i) return;
+      const [r, c] = centre(j);
+      const along = dr ? (r - r0) * dr : (c - c0) * dc;
+      const across = dr ? Math.abs(c - c0) : Math.abs(r - r0);
+      if (along <= 0.25) return;
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = j; }
+    });
+    if (best >= 0) game.els[best].focus();
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || overlayOpen() || !game || game.done) return;
+    const key = event.key.toLowerCase();
+    if (key === 'u') { event.preventDefault(); undo(); return; }
+    if (key === 'h') { event.preventDefault(); hint(); return; }
+    const step = STEP[event.key];
+    if (!step) return;
+    const el = document.activeElement?.closest?.('.veh');
+    event.preventDefault();
+    if (!el) { focusHero(); return; }
+    const i = Number(el.dataset.i);
+    const v = game.vehicles[i];
+    const [dr, dc, dirName] = step;
+    if ((v.h && dc) || (!v.h && dr)) {
+      const to = game.pos[i] + (dr || dc);
+      const [min, max] = range(i);
+      if (to >= min && to <= max) commit(i, to, dirName);
+    } else {
+      focusNeighbour(i, dr, dc);
+    }
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', hint);
+  $('restart').addEventListener('click', () => {
+    const used = game.hintUsed;
+    startLevel(game.level);
+    game.hintUsed = used;
+    persist();
+    focusHero();
+  });
+  $('open-levels').addEventListener('click', openLevels);
+  $('intro-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => { els.levels.hidden = true; if (els.intro.dataset.seen) focusHero(); else els.play.focus(); });
+  els.next.addEventListener('click', () => { startLevel(game.level + 1); focusHero(); });
+  $('replay').addEventListener('click', () => { startLevel(game.level); focusHero(); });
+  els.play.addEventListener('click', () => { els.intro.hidden = true; els.intro.dataset.seen = '1'; focusHero(); });
+
+  const first = Math.min(Math.max(1, progress.current || 1), progress.unlocked, LEVELS.length);
+  startLevel(first, progress.save);
+  els.intro.hidden = false;
+  els.play.textContent = t.play(first);
+  els.play.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Color Gate</title>
+<style>
+:root {
+  --bg: #120f24;
+  --ink: #1b1636;
+  --text: #ffffff;
+  --muted: #6c6890;
+  --teal: #22d3c5;
+  --sun: #ffcf3a;
+  --pink: #ff4f8b;
+  --violet: #8f6bff;
+  --paper: #fbf9ff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #2a2252, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffcf3a88; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 7cqh 6cqw; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+#start { background: linear-gradient(#120f24f2, #120f24c4 42%, #120f2400 62%); }
+.title { font-size: min(15cqw, 8.5cqh); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.title span:nth-child(1) { color: var(--teal); }
+.title span:nth-child(2) { color: var(--sun); }
+.title span:nth-child(3) { color: var(--pink); }
+.title span:nth-child(4) { color: var(--violet); }
+.title span:nth-child(5) { color: #fff; }
+.tagline { margin-top: 2cqh; max-width: 30em; word-break: auto-phrase; text-wrap: balance; font-size: max(13px, min(4.2cqw, 2.5cqh)); font-weight: 700; line-height: 1.4; color: #e4e0ff; }
+.spacer { flex: 1; }
+.cta { padding: 14px 32px; border-radius: 99px; background: var(--sun); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 #d49a00, 0 10px 24px #0006; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 #d49a00; }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.4cqh; font-size: max(12px, min(3.6cqw, 2.1cqh)); font-weight: 700; color: #c9c4ee; }
+.small:empty { display: none; }
+
+.center { justify-content: center; background: #120f2466; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 22px 18px; border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #cfc6ef, 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.why { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.why:empty { display: none; }
+.scores { display: flex; justify-content: center; gap: 28px; margin-top: 14px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.scores strong.star::before { content: '★ '; color: #f5b400; font-size: .7em; vertical-align: .12em; }
+.badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 99px; background: var(--pink); color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--sun); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 #d49a00; }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 #d49a00; }
+.panel .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay" id="start">
+        <h1 class="title"><span>C</span><span>o</span><span>l</span><span>o</span><span>r</span> Gate</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" id="start-best"></p>
+      </div>
+      <div class="overlay center" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="again" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay center" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="over"></h2>
+          <p class="why" id="why"></p>
+          <div class="scores">
+            <div><small data-i18n="score"></small><strong class="star" id="final-score">0</strong></div>
+            <div><small data-i18n="bestLabel"></small><strong id="final-best">0</strong></div>
+          </div>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+          <p class="hint" data-i18n="restartHint"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Hop through the gates — but only through your own colour!', controls: 'Tap, click or press Space to hop', start: 'Tap to start', best: n => `Best: ${n}`, bestShort: 'Best', canvas: 'Color Gate — tap or press Space to hop', paused: 'Paused', resume: 'Resume', over: 'Game over', score: 'Stars', bestLabel: 'Best', newBest: 'New best!', again: 'Play again', restartHint: 'or press Space', go: 'Go!', milestone: n => `${n} stars!`, faster: 'Speed up!', final: s => `${s} stars collected.`, hit: 'Wrong colour!', fell: 'You fell!' },
+    vi: { tagline: 'Nhảy qua các cổng — nhưng chỉ qua phần cùng màu với bạn!', controls: 'Chạm, nhấp chuột hoặc bấm Space để nhảy', start: 'Chạm để bắt đầu', best: n => `Kỷ lục: ${n}`, bestShort: 'Kỷ lục', canvas: 'Color Gate — chạm hoặc bấm Space để nhảy', paused: 'Tạm dừng', resume: 'Tiếp tục', over: 'Kết thúc', score: 'Ngôi sao', bestLabel: 'Kỷ lục', newBest: 'Kỷ lục mới!', again: 'Chơi lại', restartHint: 'hoặc bấm Space', go: 'Bắt đầu!', milestone: n => `${n} ngôi sao!`, faster: 'Tăng tốc!', final: s => `Thu được ${s} ngôi sao.`, hit: 'Sai màu rồi!', fell: 'Rơi mất rồi!' },
+    zh: { tagline: '跳着穿过彩色关卡——只能从和你同色的部分通过！', controls: '点击屏幕或按空格键跳跃', start: '点击开始', best: n => `最高分：${n}`, bestShort: '最高', canvas: 'Color Gate——点击或按空格键跳跃', paused: '已暂停', resume: '继续', over: '游戏结束', score: '星星', bestLabel: '最高分', newBest: '新纪录！', again: '再玩一次', restartHint: '也可以按空格键', go: '出发！', milestone: n => `${n} 颗星星！`, faster: '加速！', final: s => `收集了 ${s} 颗星星。`, hit: '颜色不对！', fell: '掉下去了！' },
+    fr: { tagline: 'Sautez à travers les portes, mais seulement par votre couleur !', controls: 'Touchez, cliquez ou appuyez sur Espace pour sauter', start: 'Touchez pour commencer', best: n => `Record : ${n}`, bestShort: 'Record', canvas: 'Color Gate — touchez ou appuyez sur Espace pour sauter', paused: 'Pause', resume: 'Reprendre', over: 'Partie terminée', score: 'Étoiles', bestLabel: 'Record', newBest: 'Nouveau record !', again: 'Rejouer', restartHint: 'ou appuyez sur Espace', go: 'C’est parti !', milestone: n => `${n} étoiles !`, faster: 'Ça accélère !', final: s => `${s} étoile${s > 1 ? 's' : ''} ramassée${s > 1 ? 's' : ''}.`, hit: 'Mauvaise couleur !', fell: 'Vous êtes tombé !' },
+    th: { tagline: 'กระโดดผ่านประตูสี แต่ผ่านได้เฉพาะส่วนที่เป็นสีเดียวกับลูกบอล!', controls: 'แตะ คลิก หรือกด Space เพื่อกระโดด', start: 'แตะเพื่อเริ่ม', best: n => `สูงสุด: ${n}`, bestShort: 'สูงสุด', canvas: 'Color Gate — แตะหรือกด Space เพื่อกระโดด', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', over: 'จบเกม', score: 'ดาว', bestLabel: 'สูงสุด', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', restartHint: 'หรือกด Space', go: 'ไปเลย!', milestone: n => `ได้ ${n} ดาวแล้ว!`, faster: 'เร็วขึ้นแล้ว!', final: s => `เก็บได้ ${s} ดาว`, hit: 'ผิดสี!', fell: 'ตกลงไปแล้ว!' },
+    ja: { tagline: 'ジャンプでゲートをくぐろう。通れるのはボールと同じ色だけ！', controls: 'タップ、クリック、スペースキーでジャンプ', start: 'タップでスタート', best: n => `ベスト：${n}`, bestShort: 'ベスト', canvas: 'Color Gate — タップかスペースキーでジャンプ', paused: '一時停止中', resume: '再開', over: 'ゲームオーバー', score: 'スター', bestLabel: 'ベスト', newBest: '自己ベスト更新！', again: 'もう一度', restartHint: 'スペースキーでもリスタート', go: 'スタート！', milestone: n => `スター ${n} 個！`, faster: 'スピードアップ！', final: s => `スターを ${s} 個集めました。`, hit: '色がちがう！', fell: '落ちちゃった！' },
+    ko: { tagline: '점프해서 게이트를 통과하세요. 단, 공과 같은 색으로만 지나갈 수 있어요!', controls: '탭, 클릭 또는 Space로 점프', start: '탭해서 시작', best: n => `최고: ${n}`, bestShort: '최고', canvas: 'Color Gate — 탭하거나 Space를 눌러 점프', paused: '일시 정지', resume: '계속하기', over: '게임 오버', score: '별', bestLabel: '최고', newBest: '최고 기록!', again: '다시 하기', restartHint: '또는 Space를 누르세요', go: '출발!', milestone: n => `별 ${n}개!`, faster: '속도 업!', final: s => `별 ${s}개를 모았어요.`, hit: '색이 달라요!', fell: '떨어졌어요!' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×640 portrait view over an endless vertical world (y grows downward, the ball climbs toward negative y).
+  const W = 360, H = 640, STEP = 1 / 120, TAU = Math.PI * 2, Q = Math.PI / 2;
+  const BALL_X = W / 2, BALL_R = 10, GRAVITY = 1250, HOP = -420, MAX_FALL = 720;
+  const TH = 16, STAR_R = 12, ORB_R = 13;
+  const COLORS = ['#22d3c5', '#ffcf3a', '#ff4f8b', '#8f6bff'];
+  const STORAGE_KEY = 'milaan.colorGate.best';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), startBest: $('start-best'), play: $('play'), paused: $('paused'), resume: $('resume'), over: $('over'), why: $('why'), finalScore: $('final-score'), finalBest: $('final-best'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+  const mod = (a, m) => ((a % m) + m) % m;
+
+  // Seeded generator kept inside the game state so the simulation is fully reproducible.
+  function rand(g) {
+    g.seed = (g.seed + 0x6D2B79F5) | 0;
+    let x = g.seed;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  }
+  const pick = (g, list) => list[Math.floor(rand(g) * list.length)];
+  function shuffled(g) {
+    const a = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(rand(g) * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  let game, scale = 1, acc = 0, last = performance.now(), shake = 0;
+  const best = { value: readBest() };
+
+  function newState() {
+    const g = { state: 'ready', seed: (Math.random() * 2 ** 31) | 0, score: 0, time: 0, camY: -H * 0.72, ball: { y: 0, vy: 0, color: 0 }, obstacles: [], stars: [], orbs: [], particles: [], nextY: -170, events: [], dieT: 0, why: '', pop: 0, swapFx: 0, banner: null };
+    g.ball.color = Math.floor(rand(g) * 4);
+    while (g.nextY > g.camY - H) spawnObstacle(g);
+    return g;
+  }
+
+  const speedMul = score => 1 + Math.min(score, 48) * 0.025;
+
+  function spawnObstacle(g) {
+    const s = g.score + g.obstacles.length * 0.4;
+    const pool = ['ring'];
+    if (s >= 3) pool.push('bars');
+    if (s >= 5) pool.push('square');
+    if (s >= 8) pool.push('cross');
+    if (s >= 12) pool.push('ring2');
+    const kind = g.obstacles.length === 0 ? 'ring' : pick(g, pool);
+    const mul = speedMul(g.score);
+    const dir = rand(g) < 0.5 ? -1 : 1;
+    const o = { kind, cols: shuffled(g), ang: rand(g) * TAU, spd: dir * (1.15 + rand(g) * 0.35) * mul };
+    if (kind === 'ring') { o.r = 88 + rand(g) * 10; o.half = o.r + TH / 2; }
+    else if (kind === 'ring2') { o.r = 104; o.r2 = 78; o.half = o.r + TH / 2; }
+    else if (kind === 'square') { o.s = 168; o.half = o.s / 2 * Math.SQRT2 + TH / 2; o.spd *= 0.85; }
+    else if (kind === 'cross') { o.arm = 82; o.half = o.arm + TH / 2; o.spd *= 0.9; }
+    else { o.gapY = 46; o.half = o.gapY + TH / 2; o.off = rand(g) * W; o.spd = dir * (70 + rand(g) * 30) * mul; }
+    o.y = g.nextY - o.half;
+    // Crossed rotors guard the line through their hubs, so their star floats just above them.
+    const starY = kind === 'cross' ? o.y - o.half - 46 : o.y;
+    const top = kind === 'cross' ? starY - STAR_R : o.y - o.half;
+    g.obstacles.push(o);
+    g.stars.push({ y: starY, spin: rand(g) * TAU });
+    // Every gate is followed by a colour orb halfway up the gap to the next one.
+    const gap = Math.max(150, 210 - g.score * 2.5);
+    g.orbs.push({ y: top - gap / 2 });
+    g.nextY = top - gap;
+  }
+
+  // ---------- collision: which colours does the ball overlap? ----------
+  function overlapsArc(a0, a1, b0, b1) {
+    for (const o of [-TAU, 0, TAU]) if (a0 + o < b1 && a1 + o > b0) return true;
+    return false;
+  }
+
+  function ringHits(cx, cy, r, ang, cols, mirror, bx, by, out) {
+    const dx = bx - cx, dy = by - cy, d = Math.hypot(dx, dy);
+    if (Math.abs(d - r) > TH / 2 + BALL_R) return;
+    // Angular half-width the ball covers as seen from the ring centre.
+    const half = Math.asin(Math.min(1, BALL_R / Math.max(d, BALL_R)));
+    let a = Math.atan2(dy, dx);
+    if (mirror) a = Math.PI - a;
+    const u = mod(a - ang, TAU);
+    for (let k = 0; k < 4; k++) if (overlapsArc(u - half, u + half, k * Q, (k + 1) * Q)) out.add(cols[k]);
+  }
+
+  function circleRect(px, py, x0, y0, x1, y1, r) {
+    const nx = Math.max(x0, Math.min(px, x1)), ny = Math.max(y0, Math.min(py, y1));
+    return (px - nx) ** 2 + (py - ny) ** 2 < r * r;
+  }
+
+  function segDist(px, py, ax, ay, bx, by) {
+    const vx = bx - ax, vy = by - ay;
+    const k = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy)));
+    return Math.hypot(px - ax - vx * k, py - ay - vy * k);
+  }
+
+  const crossCenters = o => [BALL_X - o.arm, BALL_X + o.arm];
+  const crossArm = (o, side, k) => side === 0 ? o.ang + k * Q : Math.PI - (o.ang + k * Q);
+
+  function hitColors(o, bx, by) {
+    const out = new Set();
+    if (o.kind === 'ring') ringHits(BALL_X, o.y, o.r, o.ang, o.cols, false, bx, by, out);
+    else if (o.kind === 'ring2') { ringHits(BALL_X, o.y, o.r, o.ang, o.cols, false, bx, by, out); ringHits(BALL_X, o.y, o.r2, o.ang, o.cols, true, bx, by, out); }
+    else if (o.kind === 'square') {
+      const dx = bx - BALL_X, dy = by - o.y;
+      for (let k = 0; k < 4; k++) {
+        const a = o.ang + k * Q, c = Math.cos(a), s = Math.sin(a);
+        const lx = dx * c + dy * s, ly = -dx * s + dy * c;
+        if (circleRect(lx, ly, -o.s / 2 - TH / 2, -o.s / 2 - TH / 2, o.s / 2 - TH / 2, -o.s / 2 + TH / 2, BALL_R)) out.add(o.cols[k]);
+      }
+    } else if (o.kind === 'cross') {
+      crossCenters(o).forEach((cx, side) => {
+        for (let k = 0; k < 4; k++) {
+          const a = crossArm(o, side, k);
+          if (segDist(bx, by, cx, o.y, cx + Math.cos(a) * (o.arm - TH / 2), o.y + Math.sin(a) * (o.arm - TH / 2)) < BALL_R + TH / 2) out.add(o.cols[k]);
+        }
+      });
+    } else {
+      [[o.y - o.gapY, o.off], [o.y + o.gapY, W - o.off]].forEach(([y, off]) => {
+        const dy = Math.abs(by - y) - TH / 2;
+        if (dy >= BALL_R) return;
+        const hx = dy <= 0 ? BALL_R : Math.sqrt(BALL_R * BALL_R - dy * dy);
+        const colorAt = x => o.cols[Math.floor(mod(x - off, W) / 90)];
+        out.add(colorAt(bx - hx));
+        // Add the colour of every segment boundary the ball's chord crosses.
+        for (let m = Math.ceil((bx - hx - off) / 90); off + m * 90 < bx + hx; m++) out.add(colorAt(off + m * 90 + 0.01));
+      });
+    }
+    return out;
+  }
+
+  // ---------- simulation ----------
+  function hop(g) {
+    g.ball.vy = HOP;
+    if (!reducedMotion) for (let i = 0; i < 3; i++) g.particles.push({ x: BALL_X + (rand(g) - 0.5) * 8, y: g.ball.y + BALL_R, vx: (rand(g) - 0.5) * 60, vy: 40 + rand(g) * 60, life: 0.35, r: 2 + rand(g) * 2, color: COLORS[g.ball.color] });
+  }
+
+  function die(g, why) {
+    g.state = 'dying';
+    g.why = why;
+    g.dieT = 0;
+    const count = reducedMotion ? 8 : 26;
+    for (let i = 0; i < count; i++) {
+      const a = rand(g) * TAU, s = 90 + rand(g) * 220;
+      g.particles.push({ x: BALL_X, y: g.ball.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.9, r: 2 + rand(g) * 3, color: COLORS[i % 4] });
+    }
+    g.events.push({ k: 'die' });
+  }
+
+  function spin(g, dt) {
+    for (const o of g.obstacles) {
+      if (o.kind === 'bars') o.off = mod(o.off + o.spd * dt, W);
+      else o.ang = mod(o.ang + o.spd * dt, TAU);
+    }
+    for (const s of g.stars) s.spin += dt * 2;
+  }
+
+  function step(g, dt) {
+    g.time += dt;
+    g.pop = Math.max(0, g.pop - dt * 5);
+    g.swapFx = Math.max(0, g.swapFx - dt * 3);
+    if (g.banner && (g.banner.t += dt) > 1.4) g.banner = null;
+    for (const p of g.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt; }
+    if (g.particles.length) g.particles = g.particles.filter(p => p.life > 0);
+    if (g.state === 'paused' || g.state === 'over') return;
+    spin(g, dt);
+    const b = g.ball;
+    if (g.state === 'ready') { b.y = Math.sin(g.time * 4) * 6; return; }
+    if (g.state === 'dying') {
+      if ((g.dieT += dt) > 0.8) { g.state = 'over'; g.events.push({ k: 'over' }); }
+      return;
+    }
+    b.vy = Math.min(MAX_FALL, b.vy + GRAVITY * dt);
+    b.y += b.vy * dt;
+    // The camera only ever moves up, so falling too far drops the ball off the bottom of the screen.
+    g.camY = Math.min(g.camY, b.y - H * 0.55);
+    while (g.nextY > g.camY - H * 0.6) spawnObstacle(g);
+    if (g.obstacles.length > 6) {
+      const cut = g.camY + H + 300;
+      g.obstacles = g.obstacles.filter(o => o.y - o.half < cut);
+      g.stars = g.stars.filter(s => s.y < cut);
+      g.orbs = g.orbs.filter(o => o.y < cut);
+    }
+
+    for (const s of g.stars) {
+      if (!s.got && Math.abs(s.y - b.y) < STAR_R + BALL_R) {
+        s.got = true;
+        g.score += 1;
+        g.pop = 1;
+        g.events.push({ k: 'star' });
+        if (g.score % 10 === 0) g.banner = { text: t.milestone(g.score), t: 0 };
+        else if (g.score % 5 === 0) g.banner = { text: t.faster, t: 0 };
+      }
+    }
+    for (const o of g.orbs) {
+      if (!o.got && Math.abs(o.y - b.y) < ORB_R + BALL_R) {
+        o.got = true;
+        b.color = (b.color + 1 + Math.floor(rand(g) * 3)) % 4;
+        g.swapFx = 1;
+      }
+    }
+    for (const o of g.obstacles) {
+      if (Math.abs(o.y - b.y) > o.half + BALL_R + 2) continue;
+      for (const c of hitColors(o, BALL_X, b.y)) if (c !== b.color) return die(g, 'hit');
+    }
+    if (b.y - g.camY > H + BALL_R) die(g, 'fell');
+  }
+
+  // ---------- flow ----------
+  function reset() {
+    game = newState();
+    els.startBest.textContent = best.value ? t.best(best.value) : '';
+    els.over.hidden = true;
+    els.paused.hidden = true;
+    els.start.hidden = false;
+  }
+
+  function begin() {
+    game.state = 'play';
+    els.start.hidden = true;
+    canvas.focus({ preventScroll: true });
+    announce(t.go);
+    hop(game);
+  }
+
+  function tap() {
+    if (game.state === 'ready') begin();
+    else if (game.state === 'play') hop(game);
+    else if (game.state === 'paused') resume();
+  }
+
+  function pause() {
+    if (game.state !== 'play') return;
+    game.state = 'paused';
+    els.paused.hidden = false;
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    els.paused.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+    hop(game);
+  }
+
+  function finish() {
+    const isBest = game.score > best.value;
+    if (isBest) { best.value = game.score; writeBest(best.value); }
+    els.why.textContent = game.why === 'hit' ? t.hit : t.fell;
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = String(best.value);
+    els.newBest.hidden = !isBest;
+    announce(`${t.over}. ${t.final(game.score)}${isBest ? ` ${t.newBest}` : ''}`);
+    els.over.hidden = false;
+    game.overAt = performance.now();
+    els.again.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    // Ignore restarts right after the panel appears so frantic tapping can't skip the result.
+    if (game.state !== 'over' || els.over.hidden || performance.now() - game.overAt < 350) return;
+    reset();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function handleEvents() {
+    for (const e of game.events) {
+      if (e.k === 'star' && game.score % 10 === 0) announce(t.milestone(game.score));
+      else if (e.k === 'die') { shake = reducedMotion ? 0 : 1; announce(game.why === 'hit' ? t.hit : t.fell); }
+      else if (e.k === 'over') finish();
+    }
+    game.events.length = 0;
+  }
+
+  // ---------- drawing ----------
+  const DOTS = Array.from({ length: 46 }, (_, i) => ({ x: (i * 89) % W, y: (i * 137) % H, r: 0.6 + (i % 3) * 0.5, d: 0.15 + (i % 4) * 0.08 }));
+
+  function drawBackground(g) {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#221b45');
+    bg.addColorStop(1, '#120f24');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff';
+    for (const d of DOTS) {
+      ctx.globalAlpha = 0.25 + d.d;
+      const y = mod(d.y - g.camY * d.d, H);
+      ctx.beginPath(); ctx.arc(d.x, y, d.r, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRing(cx, cy, r, ang, cols, mirror) {
+    ctx.lineWidth = TH;
+    ctx.lineCap = 'butt';
+    for (let k = 0; k < 4; k++) {
+      ctx.strokeStyle = COLORS[cols[k]];
+      ctx.beginPath();
+      if (mirror) ctx.arc(cx, cy, r, Math.PI - ang - (k + 1) * Q, Math.PI - ang - k * Q);
+      else ctx.arc(cx, cy, r, ang + k * Q, ang + (k + 1) * Q);
+      ctx.stroke();
+    }
+  }
+
+  function drawObstacle(o) {
+    if (o.kind === 'ring') drawRing(BALL_X, o.y, o.r, o.ang, o.cols, false);
+    else if (o.kind === 'ring2') { drawRing(BALL_X, o.y, o.r, o.ang, o.cols, false); drawRing(BALL_X, o.y, o.r2, o.ang, o.cols, true); }
+    else if (o.kind === 'square') {
+      ctx.save();
+      ctx.translate(BALL_X, o.y);
+      for (let k = 0; k < 4; k++) {
+        ctx.save();
+        ctx.rotate(o.ang + k * Q);
+        ctx.fillStyle = COLORS[o.cols[k]];
+        ctx.beginPath(); ctx.roundRect(-o.s / 2 - TH / 2, -o.s / 2 - TH / 2, o.s, TH, 3); ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    } else if (o.kind === 'cross') {
+      ctx.lineWidth = TH;
+      ctx.lineCap = 'round';
+      crossCenters(o).forEach((cx, side) => {
+        for (let k = 0; k < 4; k++) {
+          const a = crossArm(o, side, k);
+          ctx.strokeStyle = COLORS[o.cols[k]];
+          ctx.beginPath(); ctx.moveTo(cx, o.y); ctx.lineTo(cx + Math.cos(a) * (o.arm - TH / 2), o.y + Math.sin(a) * (o.arm - TH / 2)); ctx.stroke();
+        }
+        ctx.fillStyle = '#f4f1ff';
+        ctx.beginPath(); ctx.arc(cx, o.y, 9, 0, TAU); ctx.fill();
+      });
+    } else {
+      [[o.y - o.gapY, o.off], [o.y + o.gapY, W - o.off]].forEach(([y, off]) => {
+        for (let k = 0; k < 4; k++) {
+          const sx = mod(off + k * 90, W);
+          ctx.fillStyle = COLORS[o.cols[k]];
+          for (const x of [sx, sx - W]) { ctx.beginPath(); ctx.roundRect(x + 1, y - TH / 2, 88, TH, 4); ctx.fill(); }
+        }
+      });
+    }
+  }
+
+  function starPath(x, y, r, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = rot - Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+
+  function drawStar(s, time) {
+    const pulse = 1 + Math.sin(time * 5 + s.spin) * 0.06;
+    ctx.fillStyle = '#ffffff';
+    starPath(BALL_X, s.y, STAR_R * pulse, Math.sin(s.spin) * 0.3);
+    ctx.fill();
+    ctx.fillStyle = '#ffd95e';
+    starPath(BALL_X, s.y, STAR_R * pulse * 0.62, Math.sin(s.spin) * 0.3);
+    ctx.fill();
+  }
+
+  function drawOrb(o, time) {
+    const a = time * 2.4;
+    for (let k = 0; k < 4; k++) {
+      ctx.fillStyle = COLORS[k];
+      ctx.beginPath(); ctx.moveTo(BALL_X, o.y); ctx.arc(BALL_X, o.y, ORB_R, a + k * Q, a + (k + 1) * Q); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = '#ffffffcc';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(BALL_X, o.y, ORB_R, 0, TAU); ctx.stroke();
+  }
+
+  function drawBall(g) {
+    const b = g.ball, color = COLORS[b.color];
+    if (g.swapFx > 0) {
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = g.swapFx;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(BALL_X, b.y, BALL_R + (1 - g.swapFx) * 22, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(BALL_X, b.y, BALL_R, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff99';
+    ctx.beginPath(); ctx.arc(BALL_X - 3, b.y - 3.5, 3.4, 0, TAU); ctx.fill();
+  }
+
+  function outlinedText(text, x, y, size, fill) {
+    ctx.font = `900 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.16;
+    ctx.strokeStyle = '#120f24';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function draw() {
+    if (!game) return;
+    const g = game;
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 8, (Math.random() - 0.5) * shake * 8);
+    drawBackground(g);
+    ctx.translate(0, -g.camY);
+    const top = g.camY - 40, bottom = g.camY + H + 40;
+    if (g.state === 'ready') {
+      ctx.fillStyle = '#ffffff22';
+      ctx.beginPath(); ctx.ellipse(BALL_X, BALL_R + 14, 26, 6, 0, 0, TAU); ctx.fill();
+    }
+    for (const o of g.obstacles) if (o.y + o.half > top && o.y - o.half < bottom) drawObstacle(o);
+    for (const s of g.stars) if (!s.got && s.y > top && s.y < bottom) drawStar(s, g.time);
+    for (const o of g.orbs) if (!o.got && o.y > top && o.y < bottom) drawOrb(o, g.time);
+    for (const p of g.particles) { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    if (g.state === 'ready' || g.state === 'play' || g.state === 'paused') drawBall(g);
+    ctx.restore();
+    if (g.state !== 'ready') {
+      ctx.save();
+      ctx.translate(W / 2, 48);
+      ctx.scale(1 + g.pop * 0.2, 1 + g.pop * 0.2);
+      outlinedText(String(g.score), 0, 0, 46, '#ffffff');
+      ctx.restore();
+      ctx.font = '800 12px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#c9c4ee';
+      ctx.fillText(`${t.bestShort} ${Math.max(best.value, g.score)}`, 14, 14);
+    }
+    if (g.banner && g.state === 'play') {
+      ctx.globalAlpha = Math.min(1, (1.4 - g.banner.t) * 2);
+      outlinedText(g.banner.text, W / 2, 96 - g.banner.t * 6, 22, '#ffd95e');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never moves the ball further than ~50 ms of flight.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      acc += dt;
+      while (acc >= STEP) { step(game, STEP); acc -= STEP; }
+      shake = Math.max(0, shake - dt * 3);
+      handleEvents();
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    tap();
+  });
+  document.addEventListener('keydown', event => {
+    if ((event.target instanceof Element && event.target.closest('button')) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ' ' && event.key !== 'ArrowUp' && event.key !== 'w' && event.key !== 'W') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (game.state === 'over') restart();
+    else tap();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+  els.play.addEventListener('click', () => { if (game.state === 'ready') begin(); });
+  els.resume.addEventListener('click', resume);
+  els.again.addEventListener('click', restart);
+
+  reset();
+  new ResizeObserver(resize).observe($('stage'));
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

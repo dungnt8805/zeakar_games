@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ball Maze</title>
+<style>
+:root {
+  --bg: #2c3b2f;
+  --ink: #3a2615;
+  --text: #fff8ec;
+  --muted: #8a6a4d;
+  --wood: #e2ad6b;
+  --leaf: #4fbf6a;
+  --leaf-dark: #2f9149;
+  --paper: #fff8ec;
+  --star: #f5b324;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #46604a, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid #ffd27a; outline-offset: 3px; }
+
+.app { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.hud { display: flex; align-items: stretch; gap: 6px; width: 100%; max-width: 520px; margin: 0 auto; }
+.stat { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 14px; background: #ffffff1c; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #d9e8d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.3; white-space: nowrap; }
+.stat strong.slow { color: #ffb4a2; }
+.goal-stars { color: var(--star); font-size: 12px; letter-spacing: 1px; }
+.icon-btn { flex: 0 0 auto; min-width: 46px; padding: 0 8px; border-radius: 14px; background: var(--paper); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 4px 0 #c79a62; }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #c79a62; }
+.icon-btn[hidden] { display: none; }
+.icon-btn[aria-pressed="true"] { background: var(--leaf); color: #fff; box-shadow: 0 4px 0 var(--leaf-dark); }
+.stage { flex: 1; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 22px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0008; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffd27a99; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6cqh 6cqw; text-align: center; background: #2a1c0f88; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 320px); max-height: 100%; overflow: auto; padding: 22px 18px; border-radius: 26px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #d9b98a, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.title { font-size: 40px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.title span { color: var(--leaf-dark); }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); word-break: auto-phrase; }
+.picker { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; }
+.picker strong { min-width: 7.5em; font-size: 18px; }
+.step-btn { width: 40px; height: 40px; border-radius: 50%; background: #f0dfc4; font-size: 18px; font-weight: 900; color: var(--ink); }
+.step-btn:disabled { opacity: .35; cursor: default; }
+.stars { margin-top: 8px; font-size: 40px; letter-spacing: 6px; color: #e6d6b8; }
+.stars b { color: var(--star); }
+.result { font-size: 17px !important; font-weight: 800; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 99px; background: var(--star); color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.primary { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--leaf); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--leaf-dark); }
+.primary:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--leaf-dark); }
+.secondary { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 14px; background: #f0dfc4; color: var(--ink); font-size: 16px; font-weight: 800; }
+.hint { font-size: 12px !important; }
+.toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 8px 16px; border-radius: 99px; background: #3a2615e6; color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; pointer-events: none; animation: rise .25s ease-out; }
+.toast[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0.0</strong></div>
+    <div class="stat"><small data-i18n="target"></small><strong><span class="goal-stars" aria-hidden="true">★★★</span> <span id="par">0</span></strong></div>
+    <button type="button" class="icon-btn" id="tilt" aria-pressed="false" data-i18n-label="tilt" hidden>📱</button>
+    <button type="button" class="icon-btn" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <p class="toast" id="toast" hidden></p>
+      <div class="overlay" id="start">
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+          <h1 class="title" id="start-title">Ball <span>Maze</span></h1>
+          <p data-i18n="tagline"></p>
+          <div class="picker">
+            <button type="button" class="step-btn" id="prev" data-i18n-label="prevLevel">◀</button>
+            <strong id="pick-level" aria-live="polite"></strong>
+            <button type="button" class="step-btn" id="next-pick" data-i18n-label="nextLevel">▶</button>
+          </div>
+          <p id="total-stars"></p>
+          <button type="button" class="primary" id="play" data-i18n="play"></button>
+          <p class="hint" data-i18n="controls"></p>
+        </div>
+      </div>
+      <div class="overlay" id="paused" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+          <h2 id="paused-title" data-i18n="paused"></h2>
+          <button type="button" class="primary" id="resume" data-i18n="resume"></button>
+        </div>
+      </div>
+      <div class="overlay" id="won" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="won-title">
+          <h2 id="won-title"></h2>
+          <div class="stars" id="stars" role="img"></div>
+          <p class="result" id="result"></p>
+          <p id="falls"></p>
+          <p class="badge" id="record" data-i18n="newRecord" hidden></p>
+          <button type="button" class="primary" id="next" data-i18n="next"></button>
+          <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Roll the ball through the maze to the green goal — and watch out for holes!', controls: 'Drag anywhere, use the arrow keys, or tilt your phone.', play: 'Play', level: 'Level', time: 'Time', target: 'Goal', levelN: n => `Level ${n}`, prevLevel: 'Previous level', nextLevel: 'Next level', totalStars: n => `★ ${n} stars collected`, restart: 'Restart level', tilt: 'Tilt controls', tiltOn: 'Tilt on — hold your phone flat', tiltOff: 'Tilt off', tiltDenied: 'Motion access was not allowed', cleared: n => `Level ${n} cleared!`, timeResult: s => `Time: ${s} s`, fallsN: n => n === 0 ? 'No falls — clean run!' : `Fell into a hole ${n} time${n > 1 ? 's' : ''}`, next: 'Next level', replay: 'Replay', fell: 'Oops — into a hole!', starsAria: n => `${n} of 3 stars`, paused: 'Paused', resume: 'Resume', canvas: 'Maze board — drag, use the arrow keys or tilt to roll the ball', go: n => `Level ${n} — go!`, newRecord: 'New best time!', holes: 'Watch out — holes ahead!' },
+    vi: { tagline: 'Lăn bóng qua mê cung tới đích màu xanh — và coi chừng các lỗ hổng!', controls: 'Kéo ở bất kỳ đâu, dùng phím mũi tên hoặc nghiêng điện thoại.', play: 'Chơi', level: 'Màn', time: 'Thời gian', target: 'Mục tiêu', levelN: n => `Màn ${n}`, prevLevel: 'Màn trước', nextLevel: 'Màn sau', totalStars: n => `★ Đã có ${n} ngôi sao`, restart: 'Chơi lại màn', tilt: 'Điều khiển bằng cách nghiêng', tiltOn: 'Đã bật nghiêng — giữ điện thoại nằm ngang', tiltOff: 'Đã tắt nghiêng', tiltDenied: 'Chưa được cấp quyền cảm biến chuyển động', cleared: n => `Hoàn thành màn ${n}!`, timeResult: s => `Thời gian: ${s} giây`, fallsN: n => n === 0 ? 'Không rơi lần nào — quá đỉnh!' : `Rơi xuống lỗ ${n} lần`, next: 'Màn tiếp theo', replay: 'Chơi lại', fell: 'Ối — rơi xuống lỗ rồi!', starsAria: n => `${n} trên 3 sao`, paused: 'Tạm dừng', resume: 'Tiếp tục', canvas: 'Bàn mê cung — kéo, dùng phím mũi tên hoặc nghiêng máy để lăn bóng', go: n => `Màn ${n} — bắt đầu!`, newRecord: 'Thời gian tốt nhất mới!', holes: 'Cẩn thận — phía trước có lỗ!' },
+    zh: { tagline: '滚动小球穿过迷宫，抵达绿色终点——小心别掉进洞里！', controls: '在任意位置拖动、使用方向键，或倾斜手机。', play: '开始', level: '关卡', time: '用时', target: '目标', levelN: n => `第 ${n} 关`, prevLevel: '上一关', nextLevel: '下一关', totalStars: n => `★ 已获得 ${n} 颗星`, restart: '重新开始本关', tilt: '重力感应操控', tiltOn: '已开启重力感应——请将手机放平', tiltOff: '已关闭重力感应', tiltDenied: '未获得运动传感器权限', cleared: n => `第 ${n} 关通过！`, timeResult: s => `用时：${s} 秒`, fallsN: n => n === 0 ? '一次都没掉——完美！' : `掉进洞里 ${n} 次`, next: '下一关', replay: '重玩', fell: '哎呀，掉进洞里了！', starsAria: n => `获得 ${n} 颗星（满分 3 颗）`, paused: '已暂停', resume: '继续', canvas: '迷宫棋盘——拖动、方向键或倾斜手机来滚动小球', go: n => `第 ${n} 关，出发！`, newRecord: '最佳用时！', holes: '小心，前方有洞！' },
+    fr: { tagline: 'Faites rouler la bille jusqu’à l’arrivée verte, en évitant les trous !', controls: 'Glissez n’importe où, utilisez les flèches ou inclinez votre téléphone.', play: 'Jouer', level: 'Niveau', time: 'Temps', target: 'Objectif', levelN: n => `Niveau ${n}`, prevLevel: 'Niveau précédent', nextLevel: 'Niveau suivant', totalStars: n => `★ ${n} étoile${n > 1 ? 's' : ''} gagnée${n > 1 ? 's' : ''}`, restart: 'Recommencer le niveau', tilt: 'Contrôle par inclinaison', tiltOn: 'Inclinaison activée : tenez le téléphone à plat', tiltOff: 'Inclinaison désactivée', tiltDenied: 'Accès aux capteurs de mouvement refusé', cleared: n => `Niveau ${n} réussi !`, timeResult: s => `Temps : ${s} s`, fallsN: n => n === 0 ? 'Aucune chute, sans faute !' : `${n} chute${n > 1 ? 's' : ''} dans un trou`, next: 'Niveau suivant', replay: 'Rejouer', fell: 'Oups, dans le trou !', starsAria: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, paused: 'Pause', resume: 'Reprendre', canvas: 'Plateau du labyrinthe : glissez, utilisez les flèches ou inclinez pour faire rouler la bille', go: n => `Niveau ${n}, c’est parti !`, newRecord: 'Meilleur temps !', holes: 'Attention, des trous !' },
+    th: { tagline: 'กลิ้งลูกบอลผ่านเขาวงกตไปให้ถึงจุดหมายสีเขียว ระวังอย่าตกหลุม!', controls: 'ลากตรงไหนก็ได้ ใช้ปุ่มลูกศร หรือเอียงโทรศัพท์', play: 'เล่น', level: 'ด่าน', time: 'เวลา', target: 'เป้าหมาย', levelN: n => `ด่าน ${n}`, prevLevel: 'ด่านก่อนหน้า', nextLevel: 'ด่านถัดไป', totalStars: n => `★ สะสมได้ ${n} ดาว`, restart: 'เริ่มด่านใหม่', tilt: 'ควบคุมด้วยการเอียง', tiltOn: 'เปิดการเอียงแล้ว ถือโทรศัพท์ให้ราบ', tiltOff: 'ปิดการเอียงแล้ว', tiltDenied: 'ไม่ได้รับอนุญาตให้ใช้เซ็นเซอร์การเคลื่อนไหว', cleared: n => `ผ่านด่าน ${n} แล้ว!`, timeResult: s => `เวลา: ${s} วินาที`, fallsN: n => n === 0 ? 'ไม่ตกหลุมเลย เยี่ยมมาก!' : `ตกหลุม ${n} ครั้ง`, next: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', fell: 'อุ๊ย ตกหลุมแล้ว!', starsAria: n => `${n} จาก 3 ดาว`, paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', canvas: 'กระดานเขาวงกต ลาก ใช้ปุ่มลูกศร หรือเอียงเพื่อกลิ้งลูกบอล', go: n => `ด่าน ${n} ไปเลย!`, newRecord: 'เวลาดีที่สุดใหม่!', holes: 'ระวัง มีหลุมข้างหน้า!' },
+    ja: { tagline: 'ボールを転がして緑のゴールへ。穴に落ちないように気をつけて！', controls: 'どこでもドラッグ、矢印キー、またはスマホを傾けて操作。', play: 'プレイ', level: 'レベル', time: 'タイム', target: '目標', levelN: n => `レベル ${n}`, prevLevel: '前のレベル', nextLevel: '次のレベル', totalStars: n => `★ 獲得スター ${n} 個`, restart: 'レベルをやり直す', tilt: '傾き操作', tiltOn: '傾き操作オン：スマホを水平に持ってね', tiltOff: '傾き操作オフ', tiltDenied: 'モーションセンサーの利用が許可されませんでした', cleared: n => `レベル ${n} クリア！`, timeResult: s => `タイム：${s} 秒`, fallsN: n => n === 0 ? '一度も落ちずにクリア！' : `穴に落ちた回数：${n} 回`, next: '次のレベル', replay: 'もう一度', fell: 'あっ、穴に落ちた！', starsAria: n => `3 つ中 ${n} つ星`, paused: '一時停止中', resume: '再開', canvas: '迷路ボード。ドラッグ、矢印キー、傾きでボールを転がします', go: n => `レベル ${n} スタート！`, newRecord: 'ベストタイム更新！', holes: '穴に注意！' },
+    ko: { tagline: '공을 굴려 초록색 골인 지점까지 가세요. 구멍에 빠지지 않게 조심!', controls: '아무 곳이나 드래그하거나, 방향키를 쓰거나, 휴대폰을 기울이세요.', play: '플레이', level: '레벨', time: '시간', target: '목표', levelN: n => `레벨 ${n}`, prevLevel: '이전 레벨', nextLevel: '다음 레벨', totalStars: n => `★ 별 ${n}개 획득`, restart: '레벨 다시 시작', tilt: '기울기 조작', tiltOn: '기울기 조작 켜짐 — 휴대폰을 평평하게 들어 주세요', tiltOff: '기울기 조작 꺼짐', tiltDenied: '동작 센서 권한이 허용되지 않았어요', cleared: n => `레벨 ${n} 클리어!`, timeResult: s => `시간: ${s}초`, fallsN: n => n === 0 ? '한 번도 안 빠졌어요 — 완벽해요!' : `구멍에 ${n}번 빠졌어요`, next: '다음 레벨', replay: '다시 하기', fell: '앗, 구멍에 빠졌어요!', starsAria: n => `별 3개 중 ${n}개`, paused: '일시 정지', resume: '계속하기', canvas: '미로 판 — 드래그, 방향키 또는 기울여서 공을 굴리세요', go: n => `레벨 ${n} 시작!`, newRecord: '최고 기록 경신!', holes: '조심하세요, 구멍이 있어요!' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Fixed 360×580 portrait board, scaled to fit; physics runs in fixed 1/120 s steps.
+  const W = 360, H = 580, MARGIN = 10, STEP = 1 / 120, TAU = Math.PI * 2;
+  const JOY_R = 46;
+  const N = 1, E = 2, S = 4, Wb = 8;
+  const DIRS = [[0, -1, N, S], [1, 0, E, Wb], [0, 1, S, N], [-1, 0, Wb, E]];
+  const LEVEL_KEY = 'milaan.ballMaze.level', STARS_KEY = 'milaan.ballMaze.stars', TIMES_KEY = 'milaan.ballMaze.times';
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), level: $('level'), time: $('time'), par: $('par'), tilt: $('tilt'), restart: $('restart'), toast: $('toast'), start: $('start'), prev: $('prev'), nextPick: $('next-pick'), pickLevel: $('pick-level'), totalStars: $('total-stars'), play: $('play'), paused: $('paused'), resume: $('resume'), won: $('won'), wonTitle: $('won-title'), stars: $('stars'), result: $('result'), falls: $('falls'), record: $('record'), next: $('next'), replay: $('replay'), announcer: $('announcer') };
+
+  const readJSON = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } };
+  const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const save = { level: Math.max(1, Number(readJSON(LEVEL_KEY, 1)) || 1), stars: readJSON(STARS_KEY, {}), times: readJSON(TIMES_KEY, {}) };
+  const announce = text => { els.announcer.textContent = text; };
+
+  function seeded(seed) {
+    let s = seed | 0;
+    return () => {
+      s = (s + 0x6D2B79F5) | 0;
+      let x = Math.imul(s ^ (s >>> 15), s | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const sizeFor = level => { const cols = Math.min(11, 4 + Math.ceil(level * 0.7)); return { cols, rows: Math.min(16, Math.round(cols * 1.5)) }; };
+
+  // Recursive backtracker (iterative, explicit stack): every cell is reachable and there is exactly one path between any two.
+  function carve(cols, rows, rnd) {
+    const walls = new Array(cols * rows).fill(N | E | S | Wb);
+    const seen = new Uint8Array(cols * rows);
+    const stack = [0];
+    seen[0] = 1;
+    while (stack.length) {
+      const cur = stack[stack.length - 1], cx = cur % cols, cy = Math.floor(cur / cols);
+      const options = [];
+      for (const [dx, dy, bit, opp] of DIRS) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx >= 0 && ny >= 0 && nx < cols && ny < rows && !seen[ny * cols + nx]) options.push([ny * cols + nx, bit, opp]);
+      }
+      if (!options.length) { stack.pop(); continue; }
+      const [next, bit, opp] = options[Math.floor(rnd() * options.length)];
+      walls[cur] &= ~bit;
+      walls[next] &= ~opp;
+      seen[next] = 1;
+      stack.push(next);
+    }
+    return walls;
+  }
+
+  function bfs(walls, cols, rows, from) {
+    const dist = new Array(cols * rows).fill(-1), parent = new Array(cols * rows).fill(-1);
+    const queue = [from];
+    dist[from] = 0;
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i], cx = cur % cols, cy = Math.floor(cur / cols);
+      for (const [dx, dy, bit] of DIRS) {
+        if (walls[cur] & bit) continue;
+        const n = (cy + dy) * cols + cx + dx;
+        if (dist[n] < 0) { dist[n] = dist[cur] + 1; parent[n] = cur; queue.push(n); }
+      }
+    }
+    return { dist, parent };
+  }
+
+  function buildLevel(level) {
+    const rnd = seeded(level * 7919 + 1013);
+    const { cols, rows } = sizeFor(level);
+    const c = Math.min((W - MARGIN * 2) / cols, (H - MARGIN * 2) / rows);
+    const ox = (W - c * cols) / 2, oy = (H - c * rows) / 2;
+    // Re-roll a few times (deterministically) so every level has a properly winding route.
+    let walls, dist, parent, goal;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const w = carve(cols, rows, rnd);
+      const r = bfs(w, cols, rows, 0);
+      // The goal is the farthest cell (by path) within the bottom rows of the board.
+      const goalScore = i => r.dist[i] + (Math.floor(i / cols) >= rows * 0.7 ? 1000 : 0);
+      let gi = 0;
+      for (let i = 1; i < r.dist.length; i++) if (goalScore(i) > goalScore(gi)) gi = i;
+      if (!walls || r.dist[gi] > dist[goal]) ({ dist, parent } = r), walls = w, goal = gi;
+      if (dist[goal] >= cols * rows * 0.4) break;
+    }
+    const path = new Set();
+    for (let i = goal; i >= 0; i = parent[i]) path.add(i);
+    const center = i => ({ x: ox + (i % cols + 0.5) * c, y: oy + (Math.floor(i / cols) + 0.5) * c });
+
+    // Merge collinear wall edges into long bars so joints don't show seams.
+    const half = Math.max(2, c * 0.07);
+    const rects = [];
+    const hasH = (x, j) => j < rows ? walls[j * cols + x] & N : walls[(j - 1) * cols + x] & S;
+    const hasV = (i, y) => i < cols ? walls[y * cols + i] & Wb : walls[y * cols + i - 1] & E;
+    for (let j = 0; j <= rows; j++) for (let x = 0; x < cols; x++) {
+      if (!hasH(x, j)) continue;
+      let end = x;
+      while (end + 1 < cols && hasH(end + 1, j)) end++;
+      rects.push({ x: ox + x * c - half, y: oy + j * c - half, w: (end - x + 1) * c + half * 2, h: half * 2 });
+      x = end;
+    }
+    for (let i = 0; i <= cols; i++) for (let y = 0; y < rows; y++) {
+      if (!hasV(i, y)) continue;
+      let end = y;
+      while (end + 1 < rows && hasV(i, end + 1)) end++;
+      rects.push({ x: ox + i * c - half, y: oy + y * c - half, w: half * 2, h: (end - y + 1) * c + half * 2 });
+      y = end;
+    }
+
+    const holes = [];
+    if (level >= 3) {
+      // Dead-end side branches next to the true path are the most tempting places to overshoot into.
+      const nearPath = i => DIRS.some(([dx, dy, bit]) => !(walls[i] & bit) && path.has(i + dy * cols + dx));
+      const candidates = [];
+      for (let i = 0; i < walls.length; i++) if (!path.has(i) && dist[i] >= 2) candidates.push({ i, w: (nearPath(i) ? 1 : 0) + rnd() });
+      candidates.sort((a, b) => b.w - a.w);
+      const count = Math.min(candidates.length, 2 + Math.floor((level - 3) * 1.5), 16);
+      for (const { i } of candidates.slice(0, count)) holes.push({ ...center(i), r: c * 0.3 });
+    }
+    if (level >= 5) {
+      // On turning path cells, a smaller hole sits in the outer corner, punishing wide racing lines.
+      const corners = [];
+      for (const i of path) {
+        if (i === 0 || i === goal) continue;
+        const open = DIRS.filter(([, , bit]) => !(walls[i] & bit)).map(d => d[2]);
+        if (open.length !== 2 || (open[0] | open[1]) === (N | S) || (open[0] | open[1]) === (E | Wb)) continue;
+        const sx = open.includes(E) ? 0.27 : 0.73, sy = open.includes(S) ? 0.27 : 0.73;
+        corners.push({ x: ox + (i % cols + sx) * c, y: oy + (Math.floor(i / cols) + sy) * c, r: c * 0.2, k: rnd() });
+      }
+      corners.sort((a, b) => a.k - b.k);
+      for (const h of corners.slice(0, Math.min(level - 4, 8))) holes.push({ x: h.x, y: h.y, r: h.r });
+    }
+    const pathLen = dist[goal];
+    return { level, cols, rows, c, ox, oy, walls, rects, holes, start: center(0), goal: center(goal), par: Math.round(pathLen / 2.6 + 3), pathLen };
+  }
+
+  let game, scale = 1, acc = 0, last = performance.now(), pickLevel = save.level;
+  const input = { keys: { up: false, down: false, left: false, right: false }, joy: null, tilt: null, tiltOn: false, tiltBase: null };
+
+  function setupLevel(level) {
+    const m = buildLevel(level);
+    game = { ...m, state: 'ready', time: 0, falls: 0, ball: { x: m.start.x, y: m.start.y, vx: 0, vy: 0, z: 1, roll: 0 }, fx: 0, sinkFrom: null };
+    els.level.textContent = String(level);
+    els.par.textContent = `${m.par}s`;
+    els.time.textContent = '0.0';
+    els.time.classList.remove('slow');
+  }
+
+  // ---------- physics ----------
+  function inputVector() {
+    let x = (input.keys.right ? 1 : 0) - (input.keys.left ? 1 : 0), y = (input.keys.down ? 1 : 0) - (input.keys.up ? 1 : 0);
+    if (input.joy) { x += input.joy.dx / JOY_R; y += input.joy.dy / JOY_R; }
+    if (input.tiltOn && input.tilt) { x += input.tilt.x; y += input.tilt.y; }
+    const len = Math.hypot(x, y);
+    return len > 1 ? { x: x / len, y: y / len } : { x, y };
+  }
+
+  function collide(b, r) {
+    for (const w of game.rects) {
+      if (b.x + r < w.x || b.x - r > w.x + w.w || b.y + r < w.y || b.y - r > w.y + w.h) continue;
+      const nx = Math.max(w.x, Math.min(b.x, w.x + w.w)), ny = Math.max(w.y, Math.min(b.y, w.y + w.h));
+      let dx = b.x - nx, dy = b.y - ny;
+      const d = Math.hypot(dx, dy);
+      if (d >= r) continue;
+      if (d < 1e-6) { dx = 0; dy = -1; } else { dx /= d; dy /= d; }
+      b.x += dx * (r - d);
+      b.y += dy * (r - d);
+      const vn = b.vx * dx + b.vy * dy;
+      if (vn < 0) {
+        // Bounce off the wall with a little energy loss.
+        b.vx -= 1.35 * vn * dx;
+        b.vy -= 1.35 * vn * dy;
+        if (-vn > game.c * 2.5) game.fx = Math.min(1, -vn / (game.c * 8));
+      }
+    }
+  }
+
+  function step(dt) {
+    const g = game, b = g.ball, c = g.c;
+    g.fx = Math.max(0, g.fx - dt * 4);
+    if (g.state === 'falling' || g.state === 'sinking') {
+      b.z -= dt * 2.4;
+      if (g.sinkFrom) { b.x += (g.sinkFrom.x - b.x) * Math.min(1, dt * 12); b.y += (g.sinkFrom.y - b.y) * Math.min(1, dt * 12); }
+      if (b.z <= 0) {
+        if (g.state === 'sinking') return win();
+        Object.assign(b, { x: g.start.x, y: g.start.y, vx: 0, vy: 0, z: 1 });
+        g.state = 'play';
+        g.sinkFrom = null;
+      }
+      if (g.state === 'falling') g.time += dt;
+      return;
+    }
+    if (g.state !== 'play') return;
+    g.time += dt;
+    const v = inputVector();
+    const acc = c * 15, maxV = c * 7.5, r = c * 0.26;
+    b.vx += v.x * acc * dt;
+    b.vy += v.y * acc * dt;
+    const damp = Math.exp(-1.3 * dt);
+    b.vx *= damp; b.vy *= damp;
+    for (const h of g.holes) {
+      // Holes have a gentle slope: the ball is pulled in once it rolls over the rim.
+      const dx = h.x - b.x, dy = h.y - b.y, d = Math.hypot(dx, dy);
+      if (d < h.r && d > 0.001) { const pull = c * 22 * (1 - d / h.r); b.vx += dx / d * pull * dt; b.vy += dy / d * pull * dt; }
+    }
+    const sp = Math.hypot(b.vx, b.vy);
+    if (sp > maxV) { b.vx *= maxV / sp; b.vy *= maxV / sp; }
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.roll += sp * dt / r;
+    collide(b, r);
+    collide(b, r);
+    for (const h of g.holes) {
+      if (Math.hypot(h.x - b.x, h.y - b.y) < h.r * 0.72) {
+        g.state = 'falling';
+        g.falls += 1;
+        g.sinkFrom = { x: h.x, y: h.y };
+        b.vx = b.vy = 0;
+        showToast(t.fell);
+        announce(t.fell);
+        return;
+      }
+    }
+    if (Math.hypot(g.goal.x - b.x, g.goal.y - b.y) < c * 0.24) {
+      g.state = 'sinking';
+      g.sinkFrom = { x: g.goal.x, y: g.goal.y };
+      b.vx = b.vy = 0;
+    }
+  }
+
+  // ---------- flow ----------
+  function updateStartPanel() {
+    els.pickLevel.textContent = t.levelN(pickLevel);
+    els.prev.disabled = pickLevel <= 1;
+    els.nextPick.disabled = pickLevel >= save.level;
+    const total = Object.values(save.stars).reduce((a, b) => a + b, 0);
+    els.totalStars.textContent = total ? t.totalStars(total) : '';
+  }
+
+  function showStart() {
+    pickLevel = save.level;
+    setupLevel(pickLevel);
+    updateStartPanel();
+    els.start.hidden = false;
+    els.won.hidden = true;
+    els.paused.hidden = true;
+    els.play.focus({ preventScroll: true });
+  }
+
+  function pick(delta) {
+    pickLevel = Math.max(1, Math.min(save.level, pickLevel + delta));
+    setupLevel(pickLevel);
+    updateStartPanel();
+  }
+
+  function begin(level) {
+    setupLevel(level);
+    els.start.hidden = true;
+    els.won.hidden = true;
+    game.state = 'play';
+    canvas.focus({ preventScroll: true });
+    announce(t.go(level));
+    showToast(game.holes.length && level >= 3 && level <= 4 ? t.holes : t.levelN(level));
+  }
+
+  function starsFor(time, par) { return time <= par ? 3 : time <= par * 1.5 ? 2 : 1; }
+
+  function win() {
+    const g = game;
+    g.state = 'won';
+    const time = Math.round(g.time * 10) / 10;
+    const stars = starsFor(time, g.par);
+    const prevTime = save.times[g.level];
+    const record = prevTime !== undefined && time < prevTime;
+    save.stars[g.level] = Math.max(save.stars[g.level] || 0, stars);
+    if (prevTime === undefined || time < prevTime) save.times[g.level] = time;
+    save.level = Math.max(save.level, g.level + 1);
+    writeJSON(STARS_KEY, save.stars);
+    writeJSON(TIMES_KEY, save.times);
+    writeJSON(LEVEL_KEY, save.level);
+    els.wonTitle.textContent = t.cleared(g.level);
+    els.stars.innerHTML = '';
+    for (let i = 0; i < 3; i++) { const s = document.createElement(i < stars ? 'b' : 'span'); s.textContent = '★'; els.stars.append(s); }
+    els.stars.setAttribute('aria-label', t.starsAria(stars));
+    els.result.textContent = t.timeResult(time.toFixed(1));
+    els.falls.textContent = t.fallsN(g.falls);
+    els.record.hidden = !record;
+    els.won.hidden = false;
+    announce(`${t.cleared(g.level)} ${t.starsAria(stars)}. ${t.timeResult(time.toFixed(1))}`);
+    els.next.focus({ preventScroll: true });
+  }
+
+  function pause() {
+    if (game.state !== 'play' && game.state !== 'falling') return;
+    game.resumeTo = game.state;
+    game.state = 'paused';
+    els.paused.hidden = false;
+    input.joy = null;
+  }
+
+  function resume() {
+    if (game.state !== 'paused') return;
+    game.state = game.resumeTo || 'play';
+    els.paused.hidden = true;
+    canvas.focus({ preventScroll: true });
+  }
+
+  function showToast(text) {
+    els.toast.textContent = text;
+    els.toast.hidden = false;
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => { els.toast.hidden = true; }, 1400);
+  }
+
+  // ---------- drawing ----------
+  function drawBoard() {
+    const g = game;
+    const wood = ctx.createLinearGradient(0, 0, W, H);
+    wood.addColorStop(0, '#e9b877');
+    wood.addColorStop(1, '#d69a57');
+    ctx.fillStyle = wood;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#b97c3f33';
+    ctx.lineWidth = 1.2;
+    for (let y = 8; y < H; y += 17) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for (let x = 0; x <= W; x += 30) ctx.lineTo(x, y + Math.sin(x / 47 + y * 0.31) * 3);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#00000014';
+    ctx.fillRect(g.ox, g.oy, g.c * g.cols, g.c * g.rows);
+  }
+
+  function drawHole(h) {
+    const grad = ctx.createRadialGradient(h.x - h.r * 0.2, h.y - h.r * 0.25, h.r * 0.1, h.x, h.y, h.r);
+    grad.addColorStop(0, '#000000');
+    grad.addColorStop(0.75, '#1d1209');
+    grad.addColorStop(1, '#5a3a1d');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#a06a35';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r, Math.PI * 0.1, Math.PI * 0.9); ctx.stroke();
+  }
+
+  function drawGoal(time) {
+    const g = game, r = g.c * 0.34;
+    ctx.fillStyle = '#4fbf6a55';
+    ctx.beginPath(); ctx.arc(g.goal.x, g.goal.y, r * (1.25 + (reducedMotion ? 0 : Math.sin(time * 4) * 0.1)), 0, TAU); ctx.fill();
+    const grad = ctx.createRadialGradient(g.goal.x, g.goal.y, 1, g.goal.x, g.goal.y, r);
+    grad.addColorStop(0, '#0d3a1a');
+    grad.addColorStop(0.8, '#1f6b34');
+    grad.addColorStop(1, '#4fbf6a');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(g.goal.x, g.goal.y, r, 0, TAU); ctx.fill();
+  }
+
+  function fillRects(color, dx, dy, maxH) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (const w of game.rects) ctx.rect(w.x + dx, w.y + dy, w.w, maxH ? Math.min(w.h, maxH) : w.h);
+    ctx.fill();
+  }
+
+  function drawFlag() {
+    const g = game, r = g.c * 0.34;
+    ctx.strokeStyle = '#fff8ec';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(g.goal.x, g.goal.y); ctx.lineTo(g.goal.x, g.goal.y - r * 1.5); ctx.stroke();
+    ctx.fillStyle = '#ff5d5d';
+    ctx.beginPath(); ctx.moveTo(g.goal.x, g.goal.y - r * 1.5); ctx.lineTo(g.goal.x + r * 0.9, g.goal.y - r * 1.25); ctx.lineTo(g.goal.x, g.goal.y - r); ctx.fill();
+  }
+
+  function drawWalls() {
+    fillRects('#00000030', 2, 3);
+    fillRects('#7b4a22', 0, 0);
+    fillRects('#a8703c', 0, 0, 2);
+  }
+
+  function drawBall() {
+    const g = game, b = g.ball, r = g.c * 0.26 * Math.max(0, b.z);
+    if (r <= 0.2) return;
+    ctx.fillStyle = '#00000038';
+    ctx.beginPath(); ctx.ellipse(b.x + r * 0.25, b.y + r * 0.35, r, r * 0.9, 0, 0, TAU); ctx.fill();
+    const grad = ctx.createRadialGradient(b.x - r * 0.35, b.y - r * 0.4, r * 0.1, b.x, b.y, r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.35, '#c9d3dc');
+    grad.addColorStop(1, '#5d6b78');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.fill();
+    // A rolling stripe sells the motion.
+    ctx.strokeStyle = '#ffffff55';
+    ctx.lineWidth = Math.max(1, r * 0.14);
+    ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.62, b.roll, b.roll + 1.2); ctx.stroke();
+  }
+
+  function drawJoystick() {
+    if (!input.joy) return;
+    const j = input.joy;
+    ctx.fillStyle = '#ffffff30';
+    ctx.strokeStyle = '#ffffff99';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(j.ox, j.oy, JOY_R, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff8ecdd';
+    ctx.beginPath(); ctx.arc(j.ox + j.dx, j.oy + j.dy, 18, 0, TAU); ctx.fill();
+  }
+
+  function draw(time = 0) {
+    if (!game) return;
+    ctx.save();
+    if (game.fx > 0 && !reducedMotion) ctx.translate((Math.random() - 0.5) * game.fx * 4, (Math.random() - 0.5) * game.fx * 4);
+    drawBoard();
+    for (const h of game.holes) drawHole(h);
+    drawGoal(time / 1000);
+    drawWalls();
+    drawFlag();
+    drawBall();
+    ctx.restore();
+    drawJoystick();
+  }
+
+  function updateHud() {
+    els.time.textContent = game.time.toFixed(1);
+    els.time.classList.toggle('slow', game.time > game.par);
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw(performance.now());
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never teleports the ball or burns the timer.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      acc += dt;
+      while (acc >= STEP) { step(STEP); acc -= STEP; }
+      if (game.state === 'play' || game.state === 'falling') updateHud();
+      draw(time);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- input ----------
+  const toWorld = event => { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale }; };
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (game.state === 'paused') return resume();
+    canvas.setPointerCapture(event.pointerId);
+    const p = toWorld(event);
+    input.joy = { id: event.pointerId, ox: p.x, oy: p.y, dx: 0, dy: 0 };
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!input.joy || input.joy.id !== event.pointerId) return;
+    const p = toWorld(event);
+    let dx = p.x - input.joy.ox, dy = p.y - input.joy.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx *= JOY_R / d; dy *= JOY_R / d; }
+    input.joy.dx = dx; input.joy.dy = dy;
+  });
+  const endJoy = event => { if (input.joy && input.joy.id === event.pointerId) input.joy = null; };
+  canvas.addEventListener('pointerup', endJoy);
+  canvas.addEventListener('pointercancel', endJoy);
+
+  const KEY_DIRS = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const dir = KEY_DIRS[event.key];
+    if (!dir || (event.target instanceof Element && event.target.closest('button'))) return;
+    event.preventDefault();
+    input.keys[dir] = true;
+    if (game.state === 'paused') resume();
+  });
+  document.addEventListener('keyup', event => { const dir = KEY_DIRS[event.key]; if (dir) input.keys[dir] = false; });
+  window.addEventListener('blur', () => { for (const k in input.keys) input.keys[k] = false; input.joy = null; });
+
+  function onOrientation(event) {
+    if (event.beta == null || event.gamma == null) return;
+    if (!input.tiltBase) input.tiltBase = { beta: event.beta, gamma: event.gamma };
+    let x = (event.gamma - input.tiltBase.gamma) / 18, y = (event.beta - input.tiltBase.beta) / 18;
+    // Rotate the tilt into screen space when the device is held sideways.
+    const angle = (screen.orientation && screen.orientation.angle) || 0;
+    if (angle === 90) [x, y] = [y, -x];
+    else if (angle === 270 || angle === -90) [x, y] = [-y, x];
+    else if (angle === 180) [x, y] = [-x, -y];
+    input.tilt = { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) };
+  }
+
+  async function toggleTilt() {
+    if (input.tiltOn) {
+      input.tiltOn = false;
+      window.removeEventListener('deviceorientation', onOrientation);
+      els.tilt.setAttribute('aria-pressed', 'false');
+      showToast(t.tiltOff);
+      return;
+    }
+    try {
+      // iOS needs an explicit permission prompt triggered by a user gesture.
+      if (typeof DeviceOrientationEvent.requestPermission === 'function' && await DeviceOrientationEvent.requestPermission() !== 'granted') throw new Error('denied');
+    } catch {
+      showToast(t.tiltDenied);
+      announce(t.tiltDenied);
+      return;
+    }
+    input.tiltOn = true;
+    input.tiltBase = null;
+    input.tilt = null;
+    window.addEventListener('deviceorientation', onOrientation);
+    els.tilt.setAttribute('aria-pressed', 'true');
+    showToast(t.tiltOn);
+    announce(t.tiltOn);
+  }
+
+  if ('DeviceOrientationEvent' in window && matchMedia('(pointer: coarse)').matches) els.tilt.hidden = false;
+  els.tilt.addEventListener('click', toggleTilt);
+  els.restart.addEventListener('click', () => { if (game.state === 'ready') return; begin(game.level); });
+  els.prev.addEventListener('click', () => pick(-1));
+  els.nextPick.addEventListener('click', () => pick(1));
+  els.play.addEventListener('click', () => begin(pickLevel));
+  els.resume.addEventListener('click', resume);
+  els.next.addEventListener('click', () => begin(game.level + 1));
+  els.replay.addEventListener('click', () => begin(game.level));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    last = performance.now();
+    acc = 0;
+  });
+
+  showStart();
+  new ResizeObserver(resize).observe($('stage'));
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

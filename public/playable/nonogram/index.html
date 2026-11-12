@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nonogram</title>
+<style>
+:root {
+  --bg: #e4efe9;
+  --bg-2: #f4f8f1;
+  --ink: #26344d;
+  --muted: #637087;
+  --accent: #f07f67;
+  --accent-dark: #c95d47;
+  --teal: #1f9e92;
+  --teal-dark: #167a70;
+  --paper: #fffdf8;
+  --line: #d3dbd9;
+  --thick: #7f8ea3;
+  --fill: #2b3a56;
+  --mark: #c98f84;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at top, var(--bg-2), transparent 70%), linear-gradient(#26344d08 1px, transparent 1px), linear-gradient(90deg, #26344d08 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 620px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { font-size: clamp(22px, 6.6vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+h1 span { color: var(--teal); }
+.chip { padding: 4px 10px; border-radius: 99px; background: #26344d14; color: var(--teal-dark); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.spacer { flex: 1; }
+.new { flex-shrink: 0; padding: 9px 13px; border-radius: 12px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 3px 0 var(--accent-dark); }
+.new:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+
+.hud { display: flex; gap: 8px; align-items: stretch; }
+.stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 14px; background: #ffffffa6; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.3; white-space: nowrap; }
+.icon-btn { flex: 0 0 auto; width: 46px; border-radius: 14px; background: var(--paper); font-size: 20px; font-weight: 900; line-height: 1; box-shadow: 0 3px 0 #c5d2cc; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #c5d2cc; }
+.icon-btn:disabled { opacity: .45; cursor: default; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; }
+.board { --cell: 28px; display: grid; grid-template-columns: var(--rw) repeat(var(--n), var(--cell)); grid-template-rows: var(--ch) repeat(var(--n), var(--cell)); touch-action: none; border-radius: 12px; }
+.board:focus-visible { outline: 3px solid #f07f6788; outline-offset: 6px; }
+.corner { display: grid; place-items: center; padding: 4px; }
+.corner canvas { width: calc(min(var(--rw), var(--ch)) - 10px); height: calc(min(var(--rw), var(--ch)) - 10px); border-radius: 4px; background: #ffffffb0; image-rendering: pixelated; }
+.cc, .rc { display: flex; gap: calc(var(--cell) * .1); font-size: var(--clue); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; color: var(--ink); transition: color .2s, opacity .2s; }
+.cc { flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: calc(var(--cell) * .18); }
+.rc { justify-content: flex-end; align-items: center; gap: calc(var(--cell) * .32); padding-right: calc(var(--cell) * .22); }
+.cc:nth-child(odd of .cc), .rc:nth-child(odd of .rc) { background: #ffffff55; }
+.cc { border-radius: 8px 8px 0 0; }
+.rc { border-radius: 8px 0 0 8px; }
+.cc.hl, .rc.hl { background: #f07f6733; }
+.cc.done, .rc.done { color: #a2acb9; }
+.board.won .cc, .board.won .rc { opacity: 0; transition-duration: .6s; }
+.cell { position: relative; background: var(--paper); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transition: background-color .08s; }
+.cell.c0 { border-left: 2px solid var(--thick); }
+.cell.r0 { border-top: 2px solid var(--thick); }
+.cell.c5 { border-right: 2px solid var(--thick); }
+.cell.r5 { border-bottom: 2px solid var(--thick); }
+.cell.f { background: var(--fill); }
+.cell.x::before, .cell.x::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: max(2px, calc(var(--cell) * .08)); margin-top: -1px; border-radius: 2px; background: var(--mark); transform: rotate(45deg); }
+.cell.x::after { transform: rotate(-45deg); }
+.cell.err { background: #fde3dc; }
+.cell.err::before, .cell.err::after { background: #e0523a; }
+.cell.err { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+.cell.hl-line { background-color: #f7efe6; }
+.cell.f.hl-line { background: #34466a; }
+.cell.cursor { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
+.board:not(.kb) .cell.cursor { outline: 0; }
+.board.won .cell { border-color: transparent; transition: background-color .35s var(--d, 0ms), border-color .4s; }
+.board.won .cell.x::before, .board.won .cell.x::after { opacity: 0; }
+.board.won .cell:not(.f) { background: transparent; }
+
+.controls { display: flex; align-items: center; gap: 8px; }
+.mode { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 16px; background: #26344d14; }
+.mode button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 8px; border-radius: 12px; font-size: 15px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.mode button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 #c5d2cc; }
+.ico-fill { width: 14px; height: 14px; border-radius: 3px; background: var(--fill); }
+.ico-x { font-size: 16px; color: var(--accent-dark); }
+.toggle { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 12px 12px; border-radius: 14px; background: #26344d14; font-size: 14px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.toggle[aria-pressed="true"] { background: var(--teal); color: #fff; }
+.tip { text-align: center; font-size: 12px; line-height: 1.35; color: var(--muted); }
+@media (max-height: 700px) { .tip { display: none; } }
+
+.overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #1b263a80; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: 100%; overflow: auto; background: var(--paper); border-radius: 26px; padding: 22px 18px; text-align: center; box-shadow: 0 20px 50px #0005; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--teal); }
+.panel .emoji { font-size: 40px; line-height: 1.2; }
+.panel p { margin-top: 6px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.panel .name { margin-top: 4px; font-size: 22px; font-weight: 900; color: var(--teal-dark); }
+.panel .result { color: var(--ink); font-size: 17px; font-weight: 800; }
+.art { display: block; width: 150px; height: 150px; margin: 12px auto 0; border-radius: 14px; background: #f3efe4; box-shadow: inset 0 0 0 1px #0000000f; }
+.tabs { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: #eef3ef; }
+.tabs button { padding: 8px 4px; border-radius: 12px; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tabs button small { display: block; font-size: 11px; font-weight: 700; }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.tabs button:disabled { opacity: .45; cursor: default; }
+.note { font-size: 12px !important; }
+.note[hidden] { display: none; }
+.grid { margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pz { position: relative; aspect-ratio: 1; display: grid; place-items: center; border-radius: 14px; background: #f1f5f2; box-shadow: 0 3px 0 #d7e1db; font-size: 18px; font-weight: 900; color: var(--muted); overflow: hidden; }
+.pz svg { position: absolute; inset: 14%; width: 72%; height: 72%; }
+.pz.solved { background: #fff6e8; box-shadow: 0 3px 0 #ecd9b8; }
+.pz.current { outline: 3px solid var(--accent); outline-offset: 1px; }
+.pz .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.pz .tick { position: absolute; right: 4px; bottom: 2px; font-size: 12px; color: var(--teal); }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: #f2a93b; color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 16px; background: var(--teal); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--teal-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--teal-dark); }
+.secondary { margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 2px solid #dfe6e2; font-weight: 800; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Nono<span>gram</span></h1>
+    <span class="chip" id="chip"></span>
+    <span class="spacer"></span>
+    <button type="button" class="new" id="open-menu" data-i18n="puzzles"></button>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="filled"></small><strong id="filled">0</strong></div>
+    <div class="stat"><small data-i18n="mistakes"></small><strong id="mistakes">—</strong></div>
+    <button type="button" class="icon-btn" id="undo" data-i18n-label="undo"><span aria-hidden="true">↶</span></button>
+    <button type="button" class="icon-btn" id="clear" data-i18n-label="clear"><span aria-hidden="true">↻</span></button>
+  </div>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" tabindex="0" role="application" data-i18n-label="board" aria-describedby="tip"></div>
+  </div>
+  <div class="controls">
+    <div class="mode" role="group" data-i18n-label="modeLabel">
+      <button type="button" id="mode-fill" aria-pressed="true"><span class="ico-fill" aria-hidden="true"></span><span data-i18n="fill"></span></button>
+      <button type="button" id="mode-mark" aria-pressed="false"><span class="ico-x" aria-hidden="true">✕</span><span data-i18n="mark"></span></button>
+    </div>
+    <button type="button" class="toggle" id="check" aria-pressed="false" data-i18n-label="checkLabel"><span aria-hidden="true">✓</span><span data-i18n="check"></span></button>
+  </div>
+  <p class="tip" id="tip" data-i18n="hint"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="menu" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <h2 id="menu-title">Nono<span>gram</span></h2>
+    <p data-i18n="tagline"></p>
+    <div class="tabs" id="tabs" role="group" data-i18n-label="sizeLabel"></div>
+    <p class="note" id="too-big" data-i18n="tooBig" hidden></p>
+    <div class="grid" id="grid"></div>
+    <button type="button" class="secondary" id="close-menu" data-i18n="close"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="name" id="win-name"></p>
+    <div id="win-art"></div>
+    <p class="result" id="result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="to-menu" data-i18n="puzzles"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Use the number clues to fill the grid and reveal a hidden picture.', time: 'Time', filled: 'Filled', mistakes: 'Mistakes', puzzles: 'Puzzles', undo: 'Undo', clear: 'Clear puzzle', board: 'Puzzle grid', modeLabel: 'Tap mode', fill: 'Fill', mark: 'Mark', check: 'Check', checkLabel: 'Show mistakes as you play', hint: 'Tap or drag to fill. Long-press, right-click or Mark mode to cross out.', sizeLabel: 'Grid size', tooBig: 'This size needs a bigger screen — try fullscreen.', close: 'Close', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `Puzzle ${n}`, solvedAs: name => `solved: ${name}`, unsolved: 'not solved yet', inProgress: 'in progress', cell: (r, c, s) => `Row ${r}, column ${c}: ${s}`, states: ['empty', 'filled', 'crossed out'], rowClue: (r, k) => `Row ${r} clue: ${k}`, colClue: (c, k) => `Column ${c} clue: ${k}`, won: 'Picture complete!', result: (s, m) => (m === null ? `Time ${s}` : `Time ${s} · ${m} mistake${m === 1 ? '' : 's'}`), newBest: 'New best time!', next: 'Next puzzle', mistake: 'Mistake — that square stays empty.', started: (n, size) => `Puzzle ${n}, ${size} by ${size}.`, cleared: 'Puzzle cleared.', names: ['Heart', 'House', 'Tree', 'Mushroom', 'Smiley', 'Cat', 'Music note', 'Umbrella', 'Moon', 'Flower', 'Fish', 'Star', 'Coffee cup', 'Kitten', 'Lucky star', 'Apple', 'Rocket', 'Ice cream', 'Sun', 'Bunny', 'Sailboat', 'Ghost', 'Panda', 'Duck', 'Butterfly', 'Whale', 'Owl', 'Cactus', 'Castle', 'Teapot', 'Frog', 'Penguin'] },
+    vi: { tagline: 'Dựa vào các con số gợi ý để tô kín ô và lộ ra bức tranh bí ẩn.', time: 'Thời gian', filled: 'Đã tô', mistakes: 'Lỗi sai', puzzles: 'Câu đố', undo: 'Hoàn tác', clear: 'Xoá hết', board: 'Lưới câu đố', modeLabel: 'Chế độ chạm', fill: 'Tô', mark: 'Đánh dấu', check: 'Kiểm tra', checkLabel: 'Báo lỗi ngay khi chơi', hint: 'Chạm hoặc kéo để tô. Nhấn giữ, chuột phải hoặc chế độ Đánh dấu để gạch chéo.', sizeLabel: 'Kích thước lưới', tooBig: 'Cỡ này cần màn hình lớn hơn — hãy thử toàn màn hình.', close: 'Đóng', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `Câu đố ${n}`, solvedAs: name => `đã giải: ${name}`, unsolved: 'chưa giải', inProgress: 'đang chơi dở', cell: (r, c, s) => `Hàng ${r}, cột ${c}: ${s}`, states: ['trống', 'đã tô', 'đã gạch chéo'], rowClue: (r, k) => `Gợi ý hàng ${r}: ${k}`, colClue: (c, k) => `Gợi ý cột ${c}: ${k}`, won: 'Bức tranh đã hoàn thành!', result: (s, m) => (m === null ? `Thời gian ${s}` : `Thời gian ${s} · ${m} lỗi`), newBest: 'Kỷ lục thời gian mới!', next: 'Câu đố tiếp theo', mistake: 'Sai rồi — ô này phải để trống.', started: (n, size) => `Câu đố ${n}, ${size}×${size}.`, cleared: 'Đã xoá câu đố.', names: ['Trái tim', 'Ngôi nhà', 'Cái cây', 'Cây nấm', 'Mặt cười', 'Con mèo', 'Nốt nhạc', 'Cái ô', 'Mặt trăng', 'Bông hoa', 'Con cá', 'Ngôi sao', 'Tách cà phê', 'Mèo con', 'Ngôi sao may mắn', 'Quả táo', 'Tên lửa', 'Kem ốc quế', 'Mặt trời', 'Thỏ con', 'Thuyền buồm', 'Con ma', 'Gấu trúc', 'Vịt con', 'Con bướm', 'Cá voi', 'Cú mèo', 'Xương rồng', 'Lâu đài', 'Ấm trà', 'Con ếch', 'Chim cánh cụt'] },
+    zh: { tagline: '根据数字提示涂满格子，揭开隐藏的图画。', time: '时间', filled: '已涂', mistakes: '错误', puzzles: '题目', undo: '撤销', clear: '清空题目', board: '谜题网格', modeLabel: '点击模式', fill: '涂色', mark: '标记', check: '检查', checkLabel: '游戏中即时提示错误', hint: '点击或拖动涂色。长按、右键或标记模式可打叉。', sizeLabel: '网格大小', tooBig: '这个尺寸需要更大的屏幕，试试全屏。', close: '关闭', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `第 ${n} 题`, solvedAs: name => `已完成：${name}`, unsolved: '未完成', inProgress: '进行中', cell: (r, c, s) => `第 ${r} 行第 ${c} 列：${s}`, states: ['空白', '已涂色', '已打叉'], rowClue: (r, k) => `第 ${r} 行提示：${k}`, colClue: (c, k) => `第 ${c} 列提示：${k}`, won: '图画完成！', result: (s, m) => (m === null ? `用时 ${s}` : `用时 ${s} · ${m} 次错误`), newBest: '最佳用时新纪录！', next: '下一题', mistake: '错了，这一格应该留空。', started: (n, size) => `第 ${n} 题，${size}×${size}。`, cleared: '已清空题目。', names: ['爱心', '房子', '小树', '蘑菇', '笑脸', '猫咪', '音符', '雨伞', '月亮', '花朵', '小鱼', '星星', '咖啡杯', '小猫', '幸运星', '苹果', '火箭', '冰淇淋', '太阳', '小兔', '帆船', '小幽灵', '熊猫', '小鸭', '蝴蝶', '鲸鱼', '猫头鹰', '仙人掌', '城堡', '茶壶', '青蛙', '企鹅'] },
+    fr: { tagline: 'Servez-vous des indices chiffrés pour remplir la grille et révéler une image cachée.', time: 'Temps', filled: 'Remplies', mistakes: 'Erreurs', puzzles: 'Grilles', undo: 'Annuler', clear: 'Effacer la grille', board: 'Grille du puzzle', modeLabel: 'Mode de toucher', fill: 'Remplir', mark: 'Croix', check: 'Vérifier', checkLabel: 'Signaler les erreurs en jouant', hint: 'Touchez ou glissez pour remplir. Appui long, clic droit ou mode Croix pour barrer.', sizeLabel: 'Taille de grille', tooBig: 'Cette taille demande un plus grand écran — essayez le plein écran.', close: 'Fermer', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `Grille ${n}`, solvedAs: name => `résolue : ${name}`, unsolved: 'pas encore résolue', inProgress: 'en cours', cell: (r, c, s) => `Ligne ${r}, colonne ${c} : ${s}`, states: ['vide', 'remplie', 'barrée'], rowClue: (r, k) => `Indice ligne ${r} : ${k}`, colClue: (c, k) => `Indice colonne ${c} : ${k}`, won: 'Image terminée !', result: (s, m) => (m === null ? `Temps ${s}` : `Temps ${s} · ${m} erreur${m > 1 ? 's' : ''}`), newBest: 'Nouveau meilleur temps !', next: 'Grille suivante', mistake: 'Erreur : cette case reste vide.', started: (n, size) => `Grille ${n}, ${size}×${size}.`, cleared: 'Grille effacée.', names: ['Cœur', 'Maison', 'Arbre', 'Champignon', 'Smiley', 'Chat', 'Note de musique', 'Parapluie', 'Lune', 'Fleur', 'Poisson', 'Étoile', 'Tasse de café', 'Chaton', 'Étoile porte-bonheur', 'Pomme', 'Fusée', 'Glace', 'Soleil', 'Lapin', 'Voilier', 'Fantôme', 'Panda', 'Canard', 'Papillon', 'Baleine', 'Hibou', 'Cactus', 'Château', 'Théière', 'Grenouille', 'Manchot'] },
+    th: { tagline: 'ใช้ตัวเลขใบ้ระบายช่องให้ครบ แล้วภาพที่ซ่อนอยู่จะปรากฏ', time: 'เวลา', filled: 'ระบายแล้ว', mistakes: 'ผิด', puzzles: 'ปริศนา', undo: 'ย้อนกลับ', clear: 'ล้างกระดาน', board: 'ตารางปริศนา', modeLabel: 'โหมดการแตะ', fill: 'ระบาย', mark: 'กากบาท', check: 'ตรวจ', checkLabel: 'แจ้งช่องที่ผิดระหว่างเล่น', hint: 'แตะหรือลากเพื่อระบาย กดค้าง คลิกขวา หรือใช้โหมดกากบาทเพื่อทำเครื่องหมาย', sizeLabel: 'ขนาดตาราง', tooBig: 'ขนาดนี้ต้องใช้หน้าจอใหญ่ขึ้น ลองเปิดเต็มจอ', close: 'ปิด', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `ปริศนา ${n}`, solvedAs: name => `ไขแล้ว: ${name}`, unsolved: 'ยังไม่ได้ไข', inProgress: 'กำลังเล่น', cell: (r, c, s) => `แถว ${r} คอลัมน์ ${c}: ${s}`, states: ['ว่าง', 'ระบายแล้ว', 'กากบาท'], rowClue: (r, k) => `ตัวใบ้แถว ${r}: ${k}`, colClue: (c, k) => `ตัวใบ้คอลัมน์ ${c}: ${k}`, won: 'ภาพเสร็จสมบูรณ์!', result: (s, m) => (m === null ? `เวลา ${s}` : `เวลา ${s} · ผิด ${m} ครั้ง`), newBest: 'ทำเวลาดีที่สุดใหม่!', next: 'ปริศนาถัดไป', mistake: 'ผิดแล้ว ช่องนี้ต้องว่าง', started: (n, size) => `ปริศนา ${n} ขนาด ${size}×${size}`, cleared: 'ล้างกระดานแล้ว', names: ['หัวใจ', 'บ้าน', 'ต้นไม้', 'เห็ด', 'หน้ายิ้ม', 'แมว', 'โน้ตดนตรี', 'ร่ม', 'พระจันทร์', 'ดอกไม้', 'ปลา', 'ดาว', 'แก้วกาแฟ', 'ลูกแมว', 'ดาวนำโชค', 'แอปเปิล', 'จรวด', 'ไอศกรีม', 'พระอาทิตย์', 'กระต่าย', 'เรือใบ', 'ผีน้อย', 'แพนด้า', 'เป็ด', 'ผีเสื้อ', 'วาฬ', 'นกฮูก', 'กระบองเพชร', 'ปราสาท', 'กาน้ำชา', 'กบ', 'เพนกวิน'] },
+    ja: { tagline: '数字のヒントをたよりにマスを塗り、隠れた絵を完成させよう。', time: 'タイム', filled: '塗り', mistakes: 'ミス', puzzles: 'パズル', undo: '元に戻す', clear: '全部消す', board: 'パズルの盤面', modeLabel: 'タップの動作', fill: '塗る', mark: 'バツ', check: 'チェック', checkLabel: 'プレイ中にミスを知らせる', hint: 'タップかドラッグで塗る。長押し・右クリック・バツモードで×印。', sizeLabel: 'サイズ', tooBig: 'このサイズはもっと大きな画面が必要です。全画面で試してください。', close: '閉じる', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `パズル ${n}`, solvedAs: name => `クリア：${name}`, unsolved: '未クリア', inProgress: 'プレイ中', cell: (r, c, s) => `${r}行${c}列：${s}`, states: ['空白', '塗り', '×印'], rowClue: (r, k) => `${r}行目のヒント：${k}`, colClue: (c, k) => `${c}列目のヒント：${k}`, won: '絵が完成！', result: (s, m) => (m === null ? `タイム ${s}` : `タイム ${s} · ミス ${m}回`), newBest: 'ベストタイム更新！', next: '次のパズル', mistake: 'ミス！ このマスは空白です。', started: (n, size) => `パズル ${n}、${size}×${size}。`, cleared: '盤面を消しました。', names: ['ハート', 'おうち', '木', 'きのこ', 'にこにこ顔', 'ねこ', '音符', 'かさ', '月', 'お花', 'さかな', '星', 'コーヒーカップ', '子ねこ', 'ラッキースター', 'りんご', 'ロケット', 'アイスクリーム', '太陽', 'うさぎ', 'ヨット', 'おばけ', 'パンダ', 'アヒル', 'ちょうちょ', 'クジラ', 'フクロウ', 'サボテン', 'お城', 'ティーポット', 'カエル', 'ペンギン'] },
+    ko: { tagline: '숫자 힌트를 보고 칸을 채워 숨은 그림을 완성하세요.', time: '시간', filled: '채움', mistakes: '실수', puzzles: '퍼즐', undo: '되돌리기', clear: '모두 지우기', board: '퍼즐 판', modeLabel: '탭 모드', fill: '채우기', mark: 'X 표시', check: '검사', checkLabel: '플레이 중 실수 알려 주기', hint: '탭하거나 드래그해서 채우세요. 길게 누르기, 오른쪽 클릭, X 표시 모드로 X를 칠 수 있어요.', sizeLabel: '판 크기', tooBig: '이 크기는 더 큰 화면이 필요해요. 전체 화면으로 해 보세요.', close: '닫기', solvedOf: (a, b) => `${a}/${b}`, puzzle: n => `퍼즐 ${n}`, solvedAs: name => `완료: ${name}`, unsolved: '아직 안 풂', inProgress: '진행 중', cell: (r, c, s) => `${r}행 ${c}열: ${s}`, states: ['빈칸', '채움', 'X 표시'], rowClue: (r, k) => `${r}행 힌트: ${k}`, colClue: (c, k) => `${c}열 힌트: ${k}`, won: '그림 완성!', result: (s, m) => (m === null ? `시간 ${s}` : `시간 ${s} · 실수 ${m}번`), newBest: '최고 기록 경신!', next: '다음 퍼즐', mistake: '실수! 이 칸은 비어 있어야 해요.', started: (n, size) => `퍼즐 ${n}, ${size}×${size}.`, cleared: '퍼즐을 지웠어요.', names: ['하트', '집', '나무', '버섯', '웃는 얼굴', '고양이', '음표', '우산', '달', '꽃', '물고기', '별', '커피잔', '아기 고양이', '행운의 별', '사과', '로켓', '아이스크림', '해', '토끼', '돛단배', '꼬마 유령', '판다', '오리', '나비', '고래', '부엉이', '선인장', '성', '찻주전자', '개구리', '펭귄'] },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Pictures: rows separated by "/", "." is empty and each letter is a colour from PALETTE.
+  // Every picture has a unique solution that row/column logic alone can reach (checked by a line solver).
+  const PUZZLES = [
+    ['heart', '.r.r./rrrrr/rrrrr/.rrr./..r..'],
+    ['house', '..r../.rrr./rrrrr/.tnt./.tnt.'],
+    ['tree', '..g../.ggg./ggggg/..n../..n..'],
+    ['mushroom', '.rrr./rwrwr/rrrrr/.ttt./.ttt.'],
+    ['smiley', '.yyy./y.y.y/yyyyy/y...y/.yyy.'],
+    ['cat', 'oo.oo/ooooo/okoko/ooooo/.ooo.'],
+    ['note', '..kk./..k.k/..k../kkk../kkk..'],
+    ['umbrella', '.vvv./vvvvv/..n../..n../.nn..'],
+    ['moon', '.yyy./yy.../yy.../yy.../.yyy.'],
+    ['flower', '.ppp./ppypp/.ppp./..g../.gg..'],
+    ['fish', '..bb./bbbbb/.bbkb/bbbbb/..bb.'],
+    ['star', '..y../.yyy./yyyyy/.yyy./.y.y.'],
+    ['cup', '...s..s.../..s..s..../...s..s.../.bbbbbbb../.bbbbbbbbb/.bbbbbbb.b/.bbbbbbb.b/.bbbbbbbbb/..bbbbbb../nnnnnnnnnn'],
+    ['kitten', '.o......o./.oo....oo./.oooooooo./.okooooko./.oooooooo./.ooopoooo./oooooooooo/..oooooo../.oo.oo.oo./.oo.oo.oo.'],
+    ['bigstar', '....yy..../....yy..../...yyyy.../yyyyyyyyyy/.yyyyyyyy./..yyyyyy../..yyyyyy../.yyyyyyyy./.yyy..yyy./yy......yy'],
+    ['apple', '.....n..../....n.ll../.rrr.n.rr./rrrrrrrrrr/rwrrrrrrrr/rwrrrrrrrr/rrrrrrrrrr/.rrrrrrrr./.rrrrrrrr./..rrr.rr..'],
+    ['rocket', '....rr..../...rrrr.../...ssss.../...sccs.../...sccs.../...ssss.../..rssssr../.rrssssrr./.r.oyyo.r./....oo....'],
+    ['icecream', '....rr..../...pppp.../..pppppp../.pppppppp./.ppppwppp./.pppppppp./.tttttttt./..tttttt../...tttt.../....tt....'],
+    ['sun', '....yy..../.y..yy..y./..yyyyyy../.yyyyyyyy./yykyyyykyy/yyyyyyyyyy/.yyykkyyy./..yyyyyy../.y..yy..y./....yy....'],
+    ['bunny', '..ss..ss../..sp..ps../..sp..ps../..ssssss../.ssssssss./.skssssks./.sssppsss./..ssssss../...ssss.../..ss..ss..'],
+    ['sailboat', '....n...../...wn...../..wwnr..../.wwwnrr.../wwwwnrrr../....n...../nnnnnnnnnn/.nnnnnnnn./..nnnnnn../bbbbbbbbbb'],
+    ['ghost', '...ssss.../..ssssss../.ssssssss./.skssssks./.skssssks./.ssssssss./.ssskksss./.ssssssss./.ssssssss./.ss.ss.ss.'],
+    ['panda', 'kk......kk/kkwwwwwwkk/.wwwwwwww./wkkwwwwkkw/wkkwwwwkkw/wwwwkkwwww/wwwkwwkwww/.wwwkkwww./..wwwwww../...wwww...'],
+    ['duck', '..yyy...../.yyyyy..../.yykyyoo../.yyyyy..../..yyy...../.yyyyyyyy./yyyyyyyyyy/yyyyyyyyy./.yyyyyyy../bbbbbbbbbb'],
+    ['butterfly', '....kk...kk..../.....k...k...../.vvv...k...vvv./vvvvv..k..vvvvv/vvpvvv.k.vvvpvv/vpppvvvkvvvpppv/vvpvvvvkvvvvpvv/.vvvvvvkvvvvvv./..vvvvvkvvvvv../..vvvvvkvvvvv../.vvyvvvkvvvyvv./.vyyyv.k.vyyyv./.vvyvv.k.vvyvv./..vvv..k..vvv../.......k.......'],
+    ['whale', '...c.c........./....c........../...ccc........./..bbbbbbb....../.bbbbbbbbbb..../bbbbkbbbbbbbb../bbbbbbbbbbbbb.b/bbbbbbbbbbbbbbb/bccccbbbbbbbbb./.cccccccbbbbb../...cccccccbb.../....cccc......./..cc....cc....c/cc..cccc..cccc./ccccccccccccccc'],
+    ['owl', '.n...........n./.nn.........nn./.nnnnnnnnnnnnn./nnwwwnnnnnwwwnn/nwwwwwnnnwwwwwn/nwwkkwwnwwkkwwn/nwwkkwwywwkkwwn/nnwwwwnynwwwwnn/nnnnnnnynnnnnnn/nntnnnnnnnnntnn/nntttnnnnnttnnn/nnttttttttttnnn/.nnttttttttnn../..nnnnnnnnnnn../..yy...y...yy..'],
+    ['cactus', '......gpg....../.....ggggg...../.....ggggg...../.g...ggggg...../ggg..ggggg..g../ggg..ggggg.ggg./ggg..ggggg.ggg./gggggggggg.ggg./.ggggggggggggg./.....gggggggg../.....ggggg...../..ooooooooooo../..ooooooooooo../...ooooooooo.../....ooooooo....'],
+    ['castle', 's.s.s..r..s.s.s/sssss..rr.sssss/sssss..n..sssss/sskss.sns.sskss/sskssssssssskss/sssssssssssssss/ss.sssssssss.ss/sssssssssssssss/sssssskkksssss./ssssskkkkksssss/ssssskkkkksssss/ssssskkkkksssss/ggggggggggggggg/.ggggggggggggg./..ggggggggggg..'],
+    ['teapot', '......nn......./.....tttt....../...tttttttt..../..tttttttttt.t./.ttrtttttrttt.t/tttrrrtrrrtttt./ttttrrrrrtttt../tttttrrrttttt../.ttttttttttt.../.ttttttttttt.../..ttttttttt..../...ttttttt...../nnnnnnnnnnnnnn./.nnnnnnnnnnnn../...............'],
+    ['frog', '..lll.....lll../.lwwwl...lwwwl./.lwkwl...lwkwl./.lwwwlllllwwwl./lllllllllllllll/lllllllllllllll/lplllllllllllpl/llkkkkkkkkkkkll/.lllllllllllll./..lllllllllll../.lllyyyyyyylll./lllyyyyyyyyylll/lllyyyyyyyyylll/.lllyyyyyyylll./lll..lllll..lll'],
+    ['penguin', '.....kkkkk...../....kkkkkkk..../...kkwkkkwkk.../...kkkoookkk.../...kkwwowwkk.../..kkwwwwwwwkk../..kkwwwwwwwkk../.kkkwwwwwwwkkk./kkkkwwwwwwwkkkk/kk.kwwwwwwwk.kk/...kwwwwwwwk.../...kwwwwwwwk.../....kwwwwwk..../.....kkkkk...../...ooo...ooo...'],
+  ];
+  const PALETTE = { k: '#34303f', w: '#ffffff', s: '#aab3c0', r: '#ef5a5a', p: '#ff9fbf', o: '#ff9f43', y: '#ffd447', n: '#9a6142', t: '#e9bf8c', g: '#45b36b', l: '#9edc6e', b: '#4a8fe7', c: '#8ad7f2', v: '#9b6bd6' };
+  const SIZES = [5, 10, 15];
+  const STORE = 'milaan.nonogram.progress';
+  const LONG_PRESS = 450;
+  const EMPTY = 0, FILLED = 1, MARKED = 2;
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), wrap: $('wrap'), chip: $('chip'), time: $('time'), filled: $('filled'), mistakes: $('mistakes'), undo: $('undo'), announcer: $('announcer'), modeFill: $('mode-fill'), modeMark: $('mode-mark'), check: $('check'), menu: $('menu'), tabs: $('tabs'), grid: $('grid'), tooBig: $('too-big'), win: $('win'), winName: $('win-name'), winArt: $('win-art'), result: $('result'), newBest: $('new-best'), next: $('next') };
+
+  const readProgress = () => { try { return { solved: {}, saves: {}, last: 0, check: false, ...JSON.parse(localStorage.getItem(STORE)) }; } catch { return { solved: {}, saves: {}, last: 0, check: false }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORE, JSON.stringify(progress)); } catch {} };
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+  const puzzles = PUZZLES.map(([id, rows], index) => {
+    const lines = rows.split('/');
+    const n = lines.length;
+    const colors = lines.join('').split('');
+    const sol = colors.map(ch => (ch === '.' ? 0 : 1));
+    const rowClues = [], colClues = [];
+    for (let i = 0; i < n; i++) {
+      rowClues.push(runs(sol.slice(i * n, i * n + n)));
+      colClues.push(runs(sol.filter((_, k) => k % n === i)));
+    }
+    return { id, index, n, colors, sol, rowClues, colClues };
+  });
+
+  function runs(line) {
+    const out = []; let run = 0;
+    for (const v of line) { if (v === 1) run++; else if (run) { out.push(run); run = 0; } }
+    if (run) out.push(run);
+    return out.length ? out : [0];
+  }
+
+  function pictureSVG(p, cells) {
+    const rects = [];
+    p.sol.forEach((v, i) => {
+      const on = cells ? cells[i] === FILLED : v;
+      if (on) rects.push(`<rect x="${i % p.n}" y="${Math.floor(i / p.n)}" width="1.02" height="1.02" fill="${cells ? '#2b3a56' : PALETTE[p.colors[i]]}"/>`);
+    });
+    return `<svg viewBox="0 0 ${p.n} ${p.n}" shape-rendering="crispEdges" aria-hidden="true">${rects.join('')}</svg>`;
+  }
+
+  let progress = readProgress();
+  let mode = 'fill';
+  let game = null;
+  let menuSize = 5;
+
+  // ---- Setup & rendering ---------------------------------------------------
+  function startPuzzle(index) {
+    const p = puzzles[index];
+    const save = progress.saves[p.id];
+    game = { p, cells: new Uint8Array(p.n * p.n), elapsed: 0, mistakes: 0, done: false, undo: [], cursor: 0, stroke: null, started: false };
+    if (save?.c?.length === p.n * p.n) {
+      game.cells = Uint8Array.from(save.c, ch => +ch);
+      game.elapsed = save.t || 0;
+      game.mistakes = save.m || 0;
+      game.started = true;
+    }
+    progress.last = index;
+    saveProgress();
+    buildBoard();
+    els.menu.hidden = true;
+    els.win.hidden = true;
+    els.chip.textContent = `${p.n}×${p.n} · #${puzzleNumber(p)}`;
+    els.time.textContent = formatTime(game.elapsed);
+    els.announcer.textContent = t.started(puzzleNumber(p), p.n);
+  }
+
+  const puzzleNumber = p => puzzles.filter(q => q.n === p.n).indexOf(p) + 1;
+
+  function buildBoard() {
+    const { p } = game;
+    const { n } = p;
+    const board = els.board;
+    board.classList.remove('won');
+    board.style.setProperty('--n', n);
+    const parts = [];
+    const corner = document.createElement('div');
+    corner.className = 'corner';
+    corner.innerHTML = '<canvas aria-hidden="true"></canvas>';
+    parts.push(corner);
+    game.colEls = p.colClues.map((clue, c) => {
+      const el = document.createElement('div');
+      el.className = 'cc';
+      el.innerHTML = clue.map(v => `<span>${v}</span>`).join('');
+      el.setAttribute('aria-label', t.colClue(c + 1, clue.join(' ')));
+      parts.push(el);
+      return el;
+    });
+    game.rowEls = [];
+    game.cellEls = [];
+    for (let r = 0; r < n; r++) {
+      const rc = document.createElement('div');
+      rc.className = 'rc';
+      rc.innerHTML = p.rowClues[r].map(v => `<span>${v}</span>`).join('');
+      rc.setAttribute('aria-label', t.rowClue(r + 1, p.rowClues[r].join(' ')));
+      game.rowEls.push(rc);
+      parts.push(rc);
+      for (let c = 0; c < n; c++) {
+        const cell = document.createElement('div');
+        const cls = ['cell'];
+        if (c === 0) cls.push('c0');
+        if (r === 0) cls.push('r0');
+        if (c % 5 === 4 || c === n - 1) cls.push('c5');
+        if (r % 5 === 4 || r === n - 1) cls.push('r5');
+        cell.className = cls.join(' ');
+        cell.id = `cell-${r * n + c}`;
+        cell.dataset.i = r * n + c;
+        cell.setAttribute('role', 'img');
+        game.cellEls.push(cell);
+        parts.push(cell);
+      }
+    }
+    board.replaceChildren(...parts);
+    game.preview = corner.firstChild;
+    game.preview.width = game.preview.height = n;
+    layout();
+    paintAll();
+    setCursor(0);
+  }
+
+  // Clue strip sizes in cell units: digits are about .3 cell wide at the clue font size.
+  const rowUnits = clues => Math.max(1.2, ...clues.map(c => c.reduce((w, v) => w + String(v).length * .3, 0) + (c.length - 1) * .32 + .45));
+  const colUnits = clues => Math.max(1.2, ...clues.map(c => c.length * .6 + .4));
+
+  function cellSizeFor(n, rw, ch) {
+    const W = els.wrap.clientWidth, H = els.wrap.clientHeight;
+    return { size: Math.floor(Math.min(W / (n + rw), H / (n + ch), 52)), rw, ch };
+  }
+
+  function layout() {
+    if (!game) return;
+    const { p } = game;
+    const { size, rw, ch } = cellSizeFor(p.n, rowUnits(p.rowClues), colUnits(p.colClues));
+    const board = els.board;
+    board.style.setProperty('--cell', `${size}px`);
+    board.style.setProperty('--rw', `${Math.ceil(rw * size)}px`);
+    board.style.setProperty('--ch', `${Math.ceil(ch * size)}px`);
+    board.style.setProperty('--clue', `${Math.max(9, Math.round(size * .5))}px`);
+  }
+
+  // 15×15 only makes sense when cells stay big enough to tap.
+  const fits = n => n < 15 || cellSizeFor(n, 3.6, 3.4).size >= 16;
+
+  function paintCell(i) {
+    const el = game.cellEls[i], v = game.cells[i];
+    el.classList.toggle('f', v === FILLED);
+    el.classList.toggle('x', v === MARKED);
+    if (v !== MARKED) el.classList.remove('err');
+    const r = Math.floor(i / game.p.n), c = i % game.p.n;
+    el.setAttribute('aria-label', t.cell(r + 1, c + 1, t.states[v]));
+  }
+
+  function paintAll() {
+    game.cells.forEach((_, i) => paintCell(i));
+    if (game.errs) for (const i of game.errs) game.cellEls[i].classList.add('err');
+    refresh();
+  }
+
+  function refresh() {
+    const { p, cells } = game;
+    const { n } = p;
+    const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    for (let r = 0; r < n; r++) game.rowEls[r].classList.toggle('done', same(runs(cells.slice(r * n, r * n + n)), p.rowClues[r]));
+    for (let c = 0; c < n; c++) game.colEls[c].classList.toggle('done', same(runs(cells.filter((_, k) => k % n === c)), p.colClues[c]));
+    const count = cells.filter(v => v === FILLED).length;
+    els.filled.textContent = `${count}/${p.sol.filter(Boolean).length}`;
+    els.mistakes.textContent = progress.check ? String(game.mistakes) : '—';
+    els.undo.disabled = !game.undo.length || game.done;
+    const ctx = game.preview.getContext('2d');
+    ctx.clearRect(0, 0, n, n);
+    ctx.fillStyle = '#2b3a56';
+    cells.forEach((v, i) => { if (v === FILLED) ctx.fillRect(i % n, Math.floor(i / n), 1, 1); });
+  }
+
+  function setCursor(i) {
+    const { n } = game.p;
+    game.cellEls[game.cursor]?.classList.remove('cursor');
+    game.cursor = i;
+    game.cellEls[i].classList.add('cursor');
+    els.board.setAttribute('aria-activedescendant', game.cellEls[i].id);
+    highlight(Math.floor(i / n), i % n);
+  }
+
+  function highlight(r, c) {
+    game.rowEls.forEach((el, k) => el.classList.toggle('hl', k === r));
+    game.colEls.forEach((el, k) => el.classList.toggle('hl', k === c));
+  }
+
+  // ---- Strokes: one tap or drag is one undoable change ---------------------
+  function targetFor(value, strokeMode) {
+    if (strokeMode === 'mark') return value === EMPTY ? MARKED : EMPTY;
+    return value === EMPTY ? FILLED : EMPTY;
+  }
+
+  function beginStroke(i, strokeMode) {
+    const from = game.cells[i];
+    game.stroke = { start: i, from, to: targetFor(from, strokeMode), axis: null, changes: new Map(), stopped: false };
+    applyTo(i);
+  }
+
+  function applyTo(i) {
+    const s = game.stroke;
+    if (s.stopped || s.changes.has(i) || game.cells[i] !== s.from) return;
+    let to = s.to;
+    if (to === FILLED && progress.check && !game.p.sol[i]) {
+      // Wrong fill: cross it out in red, count it and stop the drag there.
+      to = MARKED;
+      game.mistakes++;
+      (game.errs ||= new Set()).add(i);
+      s.stopped = true;
+      els.announcer.textContent = t.mistake;
+    }
+    s.changes.set(i, game.cells[i]);
+    game.cells[i] = to;
+    paintCell(i);
+    if (game.errs?.has(i) && to === MARKED) game.cellEls[i].classList.add('err');
+    if (!game.started) game.started = true;
+  }
+
+  function extendStroke(i) {
+    const s = game.stroke;
+    if (!s || i === s.start) return;
+    const { n } = game.p;
+    const sr = Math.floor(s.start / n), sc = s.start % n, r = Math.floor(i / n), c = i % n;
+    s.axis ||= sr === r ? 'row' : sc === c ? 'col' : Math.abs(c - sc) >= Math.abs(r - sr) ? 'row' : 'col';
+    // Locked to the first direction dragged, so a wobbly finger still paints a straight line.
+    if (s.axis === 'row') { const step = Math.sign(c - sc); for (let k = sc; k !== c + step; k += step) applyTo(sr * n + k); highlight(sr, c); }
+    else { const step = Math.sign(r - sr); for (let k = sr; k !== r + step; k += step) applyTo(k * n + sc); highlight(r, sc); }
+  }
+
+  function endStroke() {
+    const s = game.stroke;
+    game.stroke = null;
+    if (!s || !s.changes.size) return;
+    game.undo.push(s.changes);
+    if (game.undo.length > 200) game.undo.shift();
+    afterChange();
+  }
+
+  function afterChange() {
+    refresh();
+    if (isSolved()) win();
+    else save();
+  }
+
+  const isSolved = () => game.p.sol.every((v, i) => (game.cells[i] === FILLED) === (v === 1));
+
+  function save() {
+    progress.saves[game.p.id] = { c: game.cells.join(''), t: Math.floor(game.elapsed), m: game.mistakes };
+    saveProgress();
+  }
+
+  function undo() {
+    if (!game.undo.length || game.done) return;
+    const changes = game.undo.pop();
+    for (const [i, v] of changes) { game.cells[i] = v; game.errs?.delete(i); paintCell(i); }
+    afterChange();
+  }
+
+  function clearBoard() {
+    if (game.done) return;
+    const changes = new Map();
+    game.cells.forEach((v, i) => { if (v !== EMPTY) changes.set(i, v); });
+    if (!changes.size) return;
+    game.undo.push(changes);
+    game.cells.fill(EMPTY);
+    game.errs?.clear();
+    paintAll();
+    save();
+    els.announcer.textContent = t.cleared;
+  }
+
+  function win() {
+    game.done = true;
+    const { p } = game;
+    const n = p.n;
+    const prev = progress.solved[p.id];
+    const time = Math.floor(game.elapsed);
+    const better = !prev || time < prev;
+    if (better) progress.solved[p.id] = time;
+    delete progress.saves[p.id];
+    saveProgress();
+    game.cells.forEach((v, i) => {
+      const el = game.cellEls[i];
+      el.classList.remove('cursor', 'err');
+      el.style.setProperty('--d', `${(Math.floor(i / n) + (i % n)) * 22}ms`);
+      if (v === FILLED) el.style.backgroundColor = PALETTE[p.colors[i]];
+    });
+    els.board.classList.add('won');
+    highlight(-1, -1);
+    refresh();
+    const name = t.names[p.index];
+    els.winName.textContent = name;
+    els.winArt.innerHTML = pictureSVG(p).replace('<svg', '<svg class="art"');
+    els.result.textContent = t.result(formatTime(time), progress.check ? game.mistakes : null);
+    els.newBest.hidden = !better || !prev;
+    const next = nextUnsolved(p.index);
+    els.next.hidden = next < 0;
+    els.announcer.textContent = `${t.won} ${name}. ${els.result.textContent}`;
+    setTimeout(() => { if (game.p === p) { els.win.hidden = false; (next < 0 ? $('to-menu') : els.next).focus({ preventScroll: true }); } }, 2 * n * 22 + 900);
+  }
+
+  function nextUnsolved(from) {
+    for (let k = 1; k <= puzzles.length; k++) {
+      const q = puzzles[(from + k) % puzzles.length];
+      if (!progress.solved[q.id] && fits(q.n)) return q.index;
+    }
+    return -1;
+  }
+
+  // ---- Menu ----------------------------------------------------------------
+  function openMenu(size = game?.p.n ?? 5) {
+    menuSize = fits(size) ? size : 10;
+    els.tabs.replaceChildren(...SIZES.map(n => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const set = puzzles.filter(q => q.n === n);
+      const done = set.filter(q => progress.solved[q.id] !== undefined).length;
+      b.innerHTML = `${n}×${n}<small>${t.solvedOf(done, set.length)}</small>`;
+      b.setAttribute('aria-pressed', String(n === menuSize));
+      b.disabled = !fits(n);
+      b.addEventListener('click', () => openMenu(n));
+      return b;
+    }));
+    els.tooBig.hidden = fits(15);
+    els.grid.replaceChildren(...puzzles.filter(q => q.n === menuSize).map((q, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const solved = progress.solved[q.id] !== undefined;
+      const saved = progress.saves[q.id];
+      b.className = `pz${solved ? ' solved' : ''}${game?.p === q ? ' current' : ''}`;
+      b.innerHTML = solved ? `${pictureSVG(q)}<span class="tick" aria-hidden="true">✓</span>` : `<span>${k + 1}</span>${saved ? '<i class="dot" aria-hidden="true"></i>' : ''}`;
+      b.setAttribute('aria-label', `${t.puzzle(k + 1)}, ${solved ? t.solvedAs(t.names[q.index]) : saved ? t.inProgress : t.unsolved}`);
+      b.addEventListener('click', () => { startPuzzle(q.index); els.board.focus({ preventScroll: true }); });
+      return b;
+    }));
+    els.win.hidden = true;
+    els.menu.hidden = false;
+    (els.grid.querySelector('.current') || els.grid.firstChild).focus({ preventScroll: true });
+  }
+
+  function closeMenu() {
+    els.menu.hidden = true;
+    if (game.done) { const next = nextUnsolved(game.p.index); startPuzzle(next < 0 ? game.p.index : next); }
+    els.board.focus({ preventScroll: true });
+  }
+
+  // ---- Timer ---------------------------------------------------------------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    if (game && game.started && !game.done && !document.hidden && els.menu.hidden) {
+      game.elapsed += dt;
+      els.time.textContent = formatTime(game.elapsed);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  document.addEventListener('visibilitychange', () => { last = performance.now(); if (document.hidden && game && !game.done && game.started) save(); });
+
+  // ---- Pointer input -------------------------------------------------------
+  const canPlay = () => game && !game.done && els.menu.hidden && els.win.hidden;
+  let press = null;
+
+  function cellAt(x, y) {
+    const first = game.cellEls[0].getBoundingClientRect();
+    const size = first.width;
+    const c = Math.floor((x - first.left) / size), r = Math.floor((y - first.top) / size);
+    const { n } = game.p;
+    if (r < 0 || r >= n || c < 0 || c >= n) return -1;
+    return r * n + c;
+  }
+
+  els.board.addEventListener('pointerdown', event => {
+    if (!canPlay() || press) return;
+    const i = cellAt(event.clientX, event.clientY);
+    if (i < 0) return;
+    event.preventDefault();
+    els.board.classList.remove('kb');
+    try { els.board.setPointerCapture(event.pointerId); } catch {}
+    setCursor(i);
+    const strokeMode = event.button === 2 ? 'mark' : mode;
+    press = { id: event.pointerId, i, x: event.clientX, y: event.clientY, began: false, timer: 0 };
+    if (event.pointerType === 'mouse') { beginStroke(i, strokeMode); press.began = true; return; }
+    // Touch and pen wait a moment so a long-press can become a cross-out instead.
+    press.timer = setTimeout(() => {
+      if (!press || press.began) return;
+      beginStroke(press.i, 'mark');
+      press.began = true;
+      navigator.vibrate?.(15);
+    }, LONG_PRESS);
+    press.mode = strokeMode;
+  });
+
+  els.board.addEventListener('pointermove', event => {
+    if (!press || press.id !== event.pointerId) return;
+    const i = cellAt(event.clientX, event.clientY);
+    if (!press.began) {
+      if (i === press.i || i < 0) return;
+      clearTimeout(press.timer);
+      beginStroke(press.i, press.mode);
+      press.began = true;
+    }
+    if (i >= 0) extendStroke(i);
+  });
+
+  function release(event) {
+    if (!press || press.id !== event.pointerId) return;
+    clearTimeout(press.timer);
+    if (!press.began && event.type === 'pointerup') beginStroke(press.i, press.mode);
+    press = null;
+    endStroke();
+  }
+  els.board.addEventListener('pointerup', release);
+  els.board.addEventListener('pointercancel', release);
+  els.board.addEventListener('contextmenu', event => event.preventDefault());
+
+  // ---- Keyboard ------------------------------------------------------------
+  els.board.addEventListener('keydown', event => {
+    if (!canPlay() || event.altKey || event.metaKey || event.ctrlKey) return;
+    const { n } = game.p;
+    const r = Math.floor(game.cursor / n), c = game.cursor % n;
+    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    els.board.classList.add('kb');
+    if (moves[event.key]) {
+      event.preventDefault();
+      const [dr, dc] = moves[event.key];
+      const nr = Math.min(n - 1, Math.max(0, r + dr)), nc = Math.min(n - 1, Math.max(0, c + dc));
+      setCursor(nr * n + nc);
+      // Shift + arrow paints as you go, like a drag.
+      if (event.shiftKey && game.cursor !== r * n + c) {
+        if (!game.stroke) beginStroke(r * n + c, mode);
+        game.stroke.start = r * n + c; game.stroke.axis = null;
+        extendStroke(game.cursor);
+      }
+      return;
+    }
+    const keyMode = event.key === ' ' || event.key === 'Enter' ? mode : event.key === 'x' || event.key === 'X' ? 'mark' : null;
+    if (!keyMode) return;
+    event.preventDefault();
+    beginStroke(game.cursor, keyMode);
+    endStroke();
+    els.announcer.textContent = t.states[game.cells[game.cursor]];
+  });
+  els.board.addEventListener('keyup', event => { if (event.key === 'Shift' && game?.stroke && !press) endStroke(); });
+  document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z') && canPlay()) { event.preventDefault(); undo(); }
+  });
+
+  // ---- Buttons -------------------------------------------------------------
+  function setMode(next) {
+    mode = next;
+    els.modeFill.setAttribute('aria-pressed', String(next === 'fill'));
+    els.modeMark.setAttribute('aria-pressed', String(next === 'mark'));
+  }
+  els.modeFill.addEventListener('click', () => setMode('fill'));
+  els.modeMark.addEventListener('click', () => setMode('mark'));
+  els.check.addEventListener('click', () => {
+    progress.check = !progress.check;
+    els.check.setAttribute('aria-pressed', String(progress.check));
+    saveProgress();
+    refresh();
+  });
+  els.check.setAttribute('aria-pressed', String(progress.check));
+  els.undo.addEventListener('click', undo);
+  $('clear').addEventListener('click', clearBoard);
+  $('open-menu').addEventListener('click', () => openMenu());
+  $('close-menu').addEventListener('click', closeMenu);
+  $('to-menu').addEventListener('click', () => openMenu());
+  els.next.addEventListener('click', () => { startPuzzle(nextUnsolved(game.p.index)); els.board.focus({ preventScroll: true }); });
+  new ResizeObserver(() => layout()).observe(els.wrap);
+
+  const startIndex = Math.min(progress.last || 0, puzzles.length - 1);
+  startPuzzle(fits(puzzles[startIndex].n) ? startIndex : 0);
+  openMenu();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Penalty Kick</title>
+<style>
+:root {
+  --bg: #08122a;
+  --ink: #0f1c3a;
+  --muted: #5f6f8f;
+  --accent: #ffcf33;
+  --accent-dark: #d39f00;
+  --pitch: #2e9e57;
+  --paper: #f6fbff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: #fff; background: radial-gradient(ellipse at top, #1b2d5c, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.stage { width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; }
+.frame { position: relative; container-type: size; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #ffffff18, 0 20px 44px #0009; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+.frame:has(canvas:focus-visible) { outline: 3px solid #ffcf3388; outline-offset: 3px; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 7cqh 6cqw 5cqh; text-align: center; pointer-events: none; }
+.overlay[hidden] { display: none; }
+.overlay button { pointer-events: auto; }
+.shade { background: linear-gradient(#08122acc, #08122a88 45%, #08122add); }
+.dim { background: #08122a77; }
+.title { font-size: min(14cqw, 8cqh); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: #fff; text-shadow: 0 3px 0 var(--ink), 0 8px 24px #0008; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.title span { color: var(--accent); }
+.tagline { margin-top: 1.8cqh; max-width: 30em; font-size: max(13px, min(4.2cqw, 2.5cqh)); font-weight: 700; line-height: 1.4; color: #e3ecff; }
+.spacer { flex: 1; }
+.cta { padding: 14px 30px; border-radius: 99px; background: var(--accent); color: var(--ink); font-size: max(17px, min(5.4cqw, 3.2cqh)); font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark), 0 10px 24px #0005; animation: pulse 1.4s ease-in-out infinite; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.small { margin-top: 1.5cqh; max-width: 30em; font-size: max(11px, min(3.4cqw, 2cqh)); font-weight: 700; line-height: 1.45; color: #d6e2ff; }
+.small:empty { display: none; }
+.records { margin-top: 1.4cqh; display: inline-flex; gap: 12px; padding: 5px 14px; border-radius: 99px; background: #ffffff1f; font-size: 13px; font-weight: 800; color: var(--accent); }
+.records:empty { display: none; }
+
+.center { justify-content: center; }
+.panel { pointer-events: auto; width: min(100%, 300px); padding: 20px 18px; border-radius: 24px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #c3d1e6, 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.tally { margin-top: 6px; font-size: 15px; font-weight: 800; color: var(--muted); }
+.scores { display: flex; justify-content: center; gap: 22px; margin-top: 14px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stats { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.4; }
+.badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 99px; background: #ff4f6d; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.panel .again { display: block; width: 100%; margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--accent); color: var(--ink); font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.panel .again:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <div class="frame" id="frame">
+      <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+      <div class="overlay shade" id="start">
+        <h1 class="title">Penalty <span>Kick</span></h1>
+        <p class="tagline" data-i18n="tagline"></p>
+        <p class="records" id="records"></p>
+        <div class="spacer"></div>
+        <button type="button" class="cta" id="play" data-i18n="start"></button>
+        <p class="small" data-i18n="controls"></p>
+        <p class="small" data-i18n="keys"></p>
+      </div>
+      <div class="overlay center dim" id="over" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+          <h2 id="over-title" data-i18n="lost"></h2>
+          <p class="tally" id="final-tally"></p>
+          <div class="scores">
+            <div><small data-i18n="streak"></small><strong id="final-streak">0</strong></div>
+            <div><small data-i18n="score"></small><strong id="final-score">0</strong></div>
+          </div>
+          <p class="stats" id="final-best"></p>
+          <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+          <button type="button" class="again" id="again" data-i18n="again"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Win shootout after shootout. Score your kicks, then save theirs.', start: 'Kick off', controls: 'Swipe the ball toward the goal — curve your swipe to bend it. In goal, tap left, centre or right to dive.', keys: 'Keys: arrows aim, hold Space for power. In goal: ← ↓ → to dive.', records: (s, p) => `Best streak ${s} · Best score ${p}`, canvas: 'Penalty shootout. Swipe the ball to shoot; when in goal, tap a side to dive.', you: 'YOU', cpu: 'CPU', round: n => `Round ${n}`, score: 'Score', streak: 'Rounds won', yourKick: 'Your kick — swipe to shoot', yourSave: 'Your save — tap to dive', keyKick: 'Arrows aim · hold Space', keySave: '← ↓ → to dive', goal: 'GOAL!', saved: 'SAVED!', miss: 'MISSED!', post: 'POST!', bar: 'CROSSBAR!', topBin: 'Corner target +50', curl: 'Curler +25', youSaved: 'Great save! +75', theyScored: 'They scored', theyMissed: 'They missed!', suddenDeath: 'Sudden death!', roundWon: n => `Round ${n} won!`, harder: 'The keeper gets sharper…', lost: 'Shootout lost', tally: (a, b) => `You ${a} – ${b} CPU`, bestLine: (s, p) => `Best streak ${s} · Best score ${p}`, newBest: 'New best!', again: 'Play again', announceKick: (r, a, b) => `${r}. You ${a}, CPU ${b}.` },
+    vi: { tagline: 'Thắng hết loạt sút này đến loạt sút khác. Sút vào lưới, rồi cản phá cú sút của đối thủ.', start: 'Bắt đầu', controls: 'Vuốt quả bóng về phía khung thành — vuốt theo đường cong để sút xoáy. Khi bắt bóng, chạm trái, giữa hoặc phải để bay người.', keys: 'Bàn phím: phím mũi tên để ngắm, giữ Space để lấy lực. Khi bắt bóng: ← ↓ → để bay người.', records: (s, p) => `Chuỗi thắng ${s} · Điểm cao nhất ${p}`, canvas: 'Loạt sút luân lưu. Vuốt bóng để sút; khi bắt bóng, chạm một bên để bay người.', you: 'BẠN', cpu: 'MÁY', round: n => `Lượt ${n}`, score: 'Điểm', streak: 'Lượt thắng', yourKick: 'Lượt sút — vuốt để sút', yourSave: 'Lượt bắt — chạm để bay người', keyKick: 'Mũi tên để ngắm · giữ Space', keySave: '← ↓ → để bay người', goal: 'VÀO!', saved: 'CẢN PHÁ!', miss: 'TRƯỢT!', post: 'TRÚNG CỘT!', bar: 'TRÚNG XÀ!', topBin: 'Trúng góc +50', curl: 'Sút xoáy +25', youSaved: 'Cứu thua tuyệt vời! +75', theyScored: 'Đối thủ ghi bàn', theyMissed: 'Đối thủ sút hỏng!', suddenDeath: 'Loạt sút cân não!', roundWon: n => `Thắng lượt ${n}!`, harder: 'Thủ môn ngày càng xuất sắc…', lost: 'Thua loạt sút', tally: (a, b) => `Bạn ${a} – ${b} Máy`, bestLine: (s, p) => `Chuỗi thắng cao nhất ${s} · Điểm cao nhất ${p}`, newBest: 'Kỷ lục mới!', again: 'Chơi lại', announceKick: (r, a, b) => `${r}. Bạn ${a}, máy ${b}.` },
+    zh: { tagline: '一轮接一轮赢下点球大战。射进你的点球，再扑出对手的。', start: '开球', controls: '朝球门方向滑动足球——滑出弧线就能踢出弧线球。守门时，点击左、中、右来扑救。', keys: '键盘：方向键瞄准，按住空格蓄力。守门时：← ↓ → 扑救。', records: (s, p) => `最佳连胜 ${s} · 最高分 ${p}`, canvas: '点球大战。滑动足球射门；守门时点击一侧扑救。', you: '你', cpu: '电脑', round: n => `第 ${n} 轮`, score: '得分', streak: '连胜轮数', yourKick: '你来罚——滑动射门', yourSave: '你来守——点击扑救', keyKick: '方向键瞄准 · 按住空格', keySave: '← ↓ → 扑救', goal: '进球！', saved: '扑出！', miss: '射偏！', post: '击中门柱！', bar: '击中横梁！', topBin: '命中角落 +50', curl: '弧线球 +25', youSaved: '精彩扑救！+75', theyScored: '对方罚进了', theyMissed: '对方罚丢了！', suddenDeath: '突然死亡！', roundWon: n => `赢下第 ${n} 轮！`, harder: '门将越来越难对付了……', lost: '点球大战告负', tally: (a, b) => `你 ${a} – ${b} 电脑`, bestLine: (s, p) => `最佳连胜 ${s} · 最高分 ${p}`, newBest: '新纪录！', again: '再玩一次', announceKick: (r, a, b) => `${r}。你 ${a}，电脑 ${b}。` },
+    fr: { tagline: 'Enchaînez les séances de tirs au but : marquez vos tirs, puis arrêtez les leurs.', start: 'Coup d’envoi', controls: 'Glissez le ballon vers le but — courbez votre geste pour enrouler. Dans les cages, touchez à gauche, au centre ou à droite pour plonger.', keys: 'Clavier : flèches pour viser, maintenez Espace pour la puissance. Dans les cages : ← ↓ → pour plonger.', records: (s, p) => `Meilleure série ${s} · Record ${p}`, canvas: 'Séance de tirs au but. Glissez le ballon pour tirer ; dans les cages, touchez un côté pour plonger.', you: 'VOUS', cpu: 'CPU', round: n => `Manche ${n}`, score: 'Score', streak: 'Manches gagnées', yourKick: 'À vous de tirer — glissez', yourSave: 'À vous d’arrêter — touchez pour plonger', keyKick: 'Flèches pour viser · maintenez Espace', keySave: '← ↓ → pour plonger', goal: 'BUT !', saved: 'ARRÊTÉ !', miss: 'RATÉ !', post: 'POTEAU !', bar: 'TRANSVERSALE !', topBin: 'Cible en lucarne +50', curl: 'Tir enroulé +25', youSaved: 'Superbe arrêt ! +75', theyScored: 'Ils ont marqué', theyMissed: 'Ils ont raté !', suddenDeath: 'Mort subite !', roundWon: n => `Manche ${n} gagnée !`, harder: 'Le gardien s’affûte…', lost: 'Séance perdue', tally: (a, b) => `Vous ${a} – ${b} CPU`, bestLine: (s, p) => `Meilleure série ${s} · Record ${p}`, newBest: 'Nouveau record !', again: 'Rejouer', announceKick: (r, a, b) => `${r}. Vous ${a}, CPU ${b}.` },
+    th: { tagline: 'เอาชนะการดวลจุดโทษรอบแล้วรอบเล่า ยิงให้เข้า แล้วเซฟลูกของคู่แข่ง', start: 'เริ่มเตะ', controls: 'ปัดลูกบอลไปทางประตู ปัดเป็นเส้นโค้งเพื่อยิงลูกโค้ง ตอนเป็นผู้รักษาประตู แตะซ้าย กลาง หรือขวาเพื่อพุ่งเซฟ', keys: 'คีย์บอร์ด: ปุ่มลูกศรเพื่อเล็ง กด Space ค้างเพื่อเพิ่มแรง ตอนเฝ้าประตู: ← ↓ → เพื่อพุ่งเซฟ', records: (s, p) => `ชนะติดต่อกันสูงสุด ${s} · คะแนนสูงสุด ${p}`, canvas: 'การดวลจุดโทษ ปัดลูกบอลเพื่อยิง ตอนเฝ้าประตูให้แตะด้านที่จะพุ่งเซฟ', you: 'คุณ', cpu: 'CPU', round: n => `รอบ ${n}`, score: 'คะแนน', streak: 'รอบที่ชนะ', yourKick: 'ตาคุณยิง ปัดเพื่อยิง', yourSave: 'ตาคุณเซฟ แตะเพื่อพุ่ง', keyKick: 'ลูกศรเล็ง · กด Space ค้าง', keySave: '← ↓ → เพื่อพุ่งเซฟ', goal: 'เข้า!', saved: 'เซฟได้!', miss: 'พลาด!', post: 'ชนเสา!', bar: 'ชนคาน!', topBin: 'เข้าเป้ามุมประตู +50', curl: 'ลูกโค้ง +25', youSaved: 'เซฟสุดยอด! +75', theyScored: 'คู่แข่งยิงเข้า', theyMissed: 'คู่แข่งยิงพลาด!', suddenDeath: 'ดวลแบบซัดเดนเดธ!', roundWon: n => `ชนะรอบที่ ${n}!`, harder: 'ผู้รักษาประตูเก่งขึ้นเรื่อยๆ…', lost: 'แพ้การดวลจุดโทษ', tally: (a, b) => `คุณ ${a} – ${b} CPU`, bestLine: (s, p) => `ชนะติดต่อกันสูงสุด ${s} · คะแนนสูงสุด ${p}`, newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', announceKick: (r, a, b) => `${r} คุณ ${a} CPU ${b}` },
+    ja: { tagline: 'PK戦を次々に勝ち抜こう。自分のキックを決めて、相手のシュートは止めろ！', start: 'キックオフ', controls: 'ボールをゴールに向かってスワイプ。カーブを描くようにスワイプすると曲がるシュートに。キーパーの番は、左・中央・右をタップしてダイブ。', keys: 'キー操作：矢印キーで狙い、スペース長押しでパワー。キーパー時は ← ↓ → でダイブ。', records: (s, p) => `最高連勝 ${s} · ベストスコア ${p}`, canvas: 'PK戦。ボールをスワイプしてシュート。キーパーの番はダイブする方向をタップ。', you: 'あなた', cpu: 'CPU', round: n => `ラウンド ${n}`, score: 'スコア', streak: '勝ったラウンド', yourKick: 'あなたのキック：スワイプでシュート', yourSave: 'あなたのセーブ：タップでダイブ', keyKick: '矢印キーで狙い・スペース長押し', keySave: '← ↓ → でダイブ', goal: 'ゴール！', saved: 'セーブ！', miss: '外れ！', post: 'ポスト！', bar: 'クロスバー！', topBin: 'コーナーターゲット +50', curl: 'カーブシュート +25', youSaved: 'ナイスセーブ！+75', theyScored: '決められた', theyMissed: '相手が外した！', suddenDeath: 'サドンデス！', roundWon: n => `ラウンド ${n} 勝利！`, harder: 'キーパーの反応が鋭くなってきた…', lost: 'PK戦に敗れた', tally: (a, b) => `あなた ${a} – ${b} CPU`, bestLine: (s, p) => `最高連勝 ${s} · ベストスコア ${p}`, newBest: '自己ベスト更新！', again: 'もう一度', announceKick: (r, a, b) => `${r}。あなた ${a}、CPU ${b}。` },
+    ko: { tagline: '승부차기를 연달아 이겨 보세요. 내 킥은 넣고, 상대 킥은 막으세요.', start: '킥오프', controls: '공을 골대 쪽으로 스와이프하세요. 곡선으로 스와이프하면 감아 찰 수 있어요. 골키퍼일 때는 왼쪽, 가운데, 오른쪽을 탭해 다이빙하세요.', keys: '키보드: 방향키로 조준, Space를 누르고 있으면 파워. 골키퍼일 때: ← ↓ → 로 다이빙.', records: (s, p) => `최고 연승 ${s} · 최고 점수 ${p}`, canvas: '승부차기. 공을 스와이프해서 슛하고, 골키퍼일 때는 한쪽을 탭해 다이빙하세요.', you: '나', cpu: 'CPU', round: n => `라운드 ${n}`, score: '점수', streak: '이긴 라운드', yourKick: '내 킥 — 스와이프해서 슛', yourSave: '내 선방 — 탭해서 다이빙', keyKick: '방향키 조준 · Space 길게', keySave: '← ↓ → 다이빙', goal: '골!', saved: '선방!', miss: '빗나감!', post: '골대 강타!', bar: '크로스바!', topBin: '코너 타깃 +50', curl: '감아차기 +25', youSaved: '멋진 선방! +75', theyScored: '상대가 넣었어요', theyMissed: '상대가 실축했어요!', suddenDeath: '서든데스!', roundWon: n => `라운드 ${n} 승리!`, harder: '골키퍼가 점점 날카로워져요…', lost: '승부차기 패배', tally: (a, b) => `나 ${a} – ${b} CPU`, bestLine: (s, p) => `최고 연승 ${s} · 최고 점수 ${p}`, newBest: '최고 기록!', again: '다시 하기', announceKick: (r, a, b) => `${r}. 나 ${a}, CPU ${b}.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // 360×640 canvas; the world is in metres with a pinhole camera 1.6 m behind the penalty spot.
+  const W = 360, H = 640, STEP = 1 / 120;
+  const FOCAL = 465, CAM_Z = -1.6, CAM_H = 1.0, HORIZON = 253, CX = W / 2;
+  const GOAL_Z = 11, KEEPER_Z = 10.7, NET_Z = 12.5, HALF_W = 3.66, BAR = 2.44, BALL_R = 0.11, POST_R = 0.06;
+  const TARGETS = [{ x: -3.0, y: 1.98 }, { x: 3.0, y: 1.98 }, { x: -3.0, y: 0.48 }, { x: 3.0, y: 0.48 }];
+  const TARGET_R = 0.42, GRAVITY = 9.8;
+  const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const STORAGE = { streak: 'milaan.penaltyKick.bestStreak', score: 'milaan.penaltyKick.bestScore' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { frame: $('frame'), start: $('start'), play: $('play'), records: $('records'), over: $('over'), finalTally: $('final-tally'), finalStreak: $('final-streak'), finalScore: $('final-score'), finalBest: $('final-best'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readNum = key => { try { return Number(localStorage.getItem(STORAGE[key])) || 0; } catch { return 0; } };
+  const writeNum = (key, v) => { try { localStorage.setItem(STORAGE[key], String(v)); } catch {} };
+  const announce = text => { els.announcer.textContent = text; };
+
+  function proj(x, y, z) {
+    const s = FOCAL / (z - CAM_Z);
+    return { x: CX + x * s, y: HORIZON + (CAM_H - y) * s, s };
+  }
+  const SPOT = proj(0, BALL_R, 0);
+
+  // Deterministic crowd so the stands never shimmer.
+  const CROWD = [];
+  for (let row = 0; row < 9; row++) for (let i = 0; i < 30; i++) {
+    const n = (row * 131 + i * 71) % 97;
+    CROWD.push({ x: i * 12.4 + (row % 2) * 6 + (n % 5) - 2, y: 178 - row * 13 - (n % 3), c: ['#ffcf33', '#3fa7ff', '#ffffff', '#ff5d73', '#ffcf33', '#3fa7ff', '#f2f2f2', '#8ad4ff'][n % 8], p: n });
+  }
+
+  let game = null, scale = 1, acc = 0, last = performance.now();
+  let swipe = null, keyboardUsed = false;
+  const keys = { left: false, right: false, up: false, down: false };
+  const best = { streak: readNum('streak'), score: readNum('score') };
+
+  const skillFor = round => Math.min(1, 0.12 + (round - 1) * 0.17);
+
+  function newKeeper(player) {
+    return { x: 0, y: 1.0, theta: 0, player, plan: null, diving: false, progress: 0, from: null, sway: Math.random() * 6 };
+  }
+
+  function freshGame() {
+    return { state: 'intro', round: 1, score: 0, streak: 0, player: [], cpu: [], clock: 0, keeper: newKeeper(false), ball: { x: 0, y: BALL_R, z: 0, spin: 0 }, flight: null, reticle: { x: 0, y: 1.2, shown: false }, charge: null, banner: null, popups: [], cheer: 0, boot: null, runup: null, timer: 0, saves: 0, goals: 0 };
+  }
+
+  function newGame() {
+    game = freshGame();
+    game.startBest = { ...best };
+    els.start.hidden = true;
+    els.over.hidden = true;
+    startRound();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function startRound() {
+    game.player = []; game.cpu = [];
+    game.banner = { title: t.round(game.round), sub: game.round > 1 ? t.harder : '', t: 0, dur: 1.8 };
+    announce(`${t.round(game.round)}. ${game.round > 1 ? t.harder : ''}`);
+    game.state = 'banner';
+    game.timer = 1.8;
+    game.next = nextTurn;
+  }
+
+  function resetBall() {
+    game.ball = { x: 0, y: BALL_R, z: 0, spin: 0 };
+    game.flight = null;
+  }
+
+  function nextTurn() {
+    resetBall();
+    game.charge = null;
+    game.boot = null;
+    const playerTurn = game.player.length === game.cpu.length;
+    game.keeper = newKeeper(!playerTurn);
+    if (game.player.length === 5 && game.cpu.length === 5) { popup(t.suddenDeath, 150, '#ffcf33', 26); announce(t.suddenDeath); }
+    if (playerTurn) {
+      game.state = 'aim';
+      game.reticle.x = 0; game.reticle.y = 1.2;
+    } else {
+      game.state = 'runup';
+      game.runup = { t: 0, dur: rand(1.1, 1.7) };
+    }
+  }
+
+  // ---------- shots ----------
+  function kick(by, gx, gy, power, curve) {
+    if (power > 0.82) {
+      // Overhit shots lose accuracy and tend to fly high.
+      const err = (power - 0.82) / 0.18;
+      gx += rand(-0.7, 0.7) * err;
+      gy += rand(0, 1.1) * err;
+    }
+    gy = Math.max(BALL_R, gy);
+    game.flight = { by, gx, gy, curve, power, loft: 0.65 * (1 - power), T: 0.9 - 0.42 * power, t: 0, phase: 'in', outcome: null, hitTarget: false, endT: 0, vel: null };
+    game.boot = { t: 0 };
+    game.state = 'flight';
+    if (by === 'player') planCpuKeeper(gx, gy, curve);
+  }
+
+  function inFlightPos(f, u) {
+    const bend = 4 * u * (1 - u);
+    return { x: f.gx * u + f.curve * 1.3 * bend, y: BALL_R + (f.gy - BALL_R) * u + f.loft * bend, z: GOAL_Z * u };
+  }
+
+  function inFlightVel(f, u) {
+    const dBend = 4 - 8 * u;
+    return { x: (f.gx + f.curve * 1.3 * dBend) / f.T, y: (f.gy - BALL_R + f.loft * dBend) / f.T, z: GOAL_Z / f.T };
+  }
+
+  function planDive(k, tx, ty, speed, maxD, delay) {
+    const side = Math.abs(tx) < 0.75 ? 0 : Math.sign(tx);
+    let cx = tx - side * 0.75;
+    let cy = side ? ty - 0.15 : Math.max(1.0, ty - 0.75);
+    cy = clamp(cy, 0.45, 1.75);
+    const dx = cx - k.x, dy = cy - k.y, d = Math.hypot(dx, dy);
+    if (d > maxD) { cx = k.x + dx / d * maxD; cy = k.y + dy / d * maxD; }
+    k.plan = { x: cx, y: cy, theta: side ? clamp(cx / 2, -1, 1) * 1.35 : 0, speed, delay, dist: Math.hypot(cx - k.x, cy - k.y) };
+    k.from = { x: k.x, y: k.y, theta: k.theta };
+    k.diving = true;
+    k.progress = 0;
+  }
+
+  function planCpuKeeper(gx, gy, curve) {
+    const skill = skillFor(game.round);
+    const k = game.keeper;
+    let tx, ty;
+    if (Math.random() < 0.25 + 0.5 * skill - Math.abs(curve) * 0.25) {
+      tx = gx + rand(-0.9, 0.9) * (1 - skill);
+      ty = gy + rand(-0.5, 0.5) * (1 - skill);
+    } else {
+      tx = [-2.7, 0, 2.7][Math.floor(Math.random() * 3)] + rand(-0.5, 0.5);
+      ty = rand(0.5, 1.9);
+    }
+    planDive(k, tx, ty, 5 + 3.5 * skill, 2.35 + 0.6 * skill, 0.3 - 0.15 * skill);
+  }
+
+  function cpuKick() {
+    const r = game.round;
+    const k = game.keeper;
+    let side = [-1, 1, -1, 1, 0][Math.floor(Math.random() * 5)];
+    // A keeper who commits early gets punished more often in later rounds.
+    if (k.diving && k.plan && Math.abs(k.plan.x) > 0.6 && Math.random() < 0.45 + 0.08 * r) side = -Math.sign(k.plan.x);
+    let gx = side ? side * rand(1.3, 3.25) : rand(-0.9, 0.9);
+    let gy = rand(0.25, 2.15);
+    if (Math.random() < Math.max(0.06, 0.22 - 0.03 * (r - 1))) {
+      if (Math.random() < 0.5) gx += (Math.sign(gx) || 1) * rand(0.5, 1.4); else gy += rand(0.35, 0.9);
+    }
+    const power = clamp(rand(0.5, 0.8) + Math.min(0.15, r * 0.03), 0, 0.8);
+    kick('cpu', gx, gy, power, rand(-0.4, 0.4));
+  }
+
+  function playerDive(tx, ty) {
+    const k = game.keeper;
+    if (!k.player || k.diving || !(game.state === 'runup' || game.state === 'flight')) return;
+    planDive(k, clamp(tx, -3.4, 3.4), clamp(ty, 0.3, 2.3), 7.6, 2.7, 0);
+  }
+
+  function updateKeeper(k, dt) {
+    if (!k.diving) {
+      k.sway += dt;
+      k.x = Math.sin(k.sway * 2.2) * 0.22;
+      k.y = 1.0 + Math.abs(Math.sin(k.sway * 4.4)) * 0.04;
+      return;
+    }
+    const p = k.plan;
+    if (p.delay > 0) { p.delay -= dt; return; }
+    if (k.progress >= 1) return;
+    k.progress = p.dist ? Math.min(1, k.progress + p.speed * dt / p.dist) : 1;
+    const e = k.progress;
+    k.x = k.from.x + (p.x - k.from.x) * e;
+    k.y = k.from.y + (p.y - k.from.y) * e + Math.sin(e * Math.PI) * 0.18;
+    k.theta = k.from.theta + (p.theta - k.from.theta) * Math.min(1, e * 1.4);
+  }
+
+  function segDist(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    const u = l2 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+    return Math.hypot(px - ax - dx * u, py - ay - dy * u);
+  }
+
+  // The keeper is a capsule body plus arms: spread wide while set, stretched overhead once diving.
+  function keeperTouches(k, bx, by) {
+    const ax = Math.sin(k.theta), ay = Math.cos(k.theta);
+    const reachUp = k.diving && k.progress > 0.25 ? 1.15 : 0.75;
+    if (segDist(bx, by, k.x - ax * 0.95, k.y - ay * 0.95, k.x + ax * reachUp, k.y + ay * reachUp) < 0.3 + BALL_R) return true;
+    if (!(k.diving && k.progress > 0.25)) {
+      const sx = k.x + ax * 0.35, sy = k.y + ay * 0.35;
+      if (segDist(bx, by, sx - ay * 0.78, sy + ax * 0.78, sx + ay * 0.78, sy - ax * 0.78) < 0.12 + BALL_R) return true;
+    }
+    return false;
+  }
+
+  function stepFlight(dt) {
+    const f = game.flight, b = game.ball;
+    f.t += dt;
+    if (f.phase === 'in') {
+      const u0 = (f.t - dt) / f.T, u1 = f.t / f.T, uk = KEEPER_Z / GOAL_Z;
+      if (u0 < uk && u1 >= uk) {
+        const p = inFlightPos(f, uk);
+        if (keeperTouches(game.keeper, p.x, p.y)) {
+          Object.assign(b, p);
+          const v = inFlightVel(f, uk);
+          f.vel = { x: v.x * 0.25 + Math.sign(b.x - game.keeper.x || 1) * rand(2, 4), y: rand(2, 4), z: -rand(4, 7) };
+          f.phase = 'free';
+          return resolve('saved');
+        }
+      }
+      if (u1 >= 1) {
+        const p = inFlightPos(f, 1);
+        Object.assign(b, p);
+        const v = inFlightVel(f, 1);
+        f.vel = v;
+        f.phase = 'free';
+        const ax = Math.abs(p.x);
+        const postHit = Math.abs(ax - HALF_W) < POST_R + BALL_R && p.y < BAR + BALL_R;
+        const barHit = Math.abs(p.y - BAR) < POST_R + BALL_R && ax < HALF_W + BALL_R;
+        if (postHit || barHit) {
+          f.vel = { x: postHit ? -Math.sign(p.x) * rand(1.5, 3.5) : v.x * 0.3, y: barHit ? rand(-2, 2) : rand(0.5, 2), z: -v.z * 0.35 };
+          return resolve(barHit && !postHit ? 'bar' : 'post');
+        }
+        if (ax < HALF_W - BALL_R && p.y < BAR - BALL_R) {
+          f.hitTarget = TARGETS.some(tg => Math.hypot(tg.x - p.x, tg.y - p.y) <= TARGET_R);
+          return resolve('goal');
+        }
+        return resolve('miss');
+      }
+      Object.assign(b, inFlightPos(f, u1));
+      b.spin += dt * 18;
+      return;
+    }
+    // Free flight after the goal line, a save or the woodwork.
+    const v = f.vel;
+    v.y -= GRAVITY * dt;
+    b.x += v.x * dt; b.y += v.y * dt; b.z += v.z * dt;
+    b.spin += dt * 10;
+    if (b.y < BALL_R) { b.y = BALL_R; v.y = Math.abs(v.y) * 0.45; v.x *= 0.8; v.z *= 0.8; }
+    if (f.outcome === 'goal') {
+      // The net swallows the ball.
+      if (b.z > NET_Z) { b.z = NET_Z; v.z = -Math.abs(v.z) * 0.12; v.x *= 0.4; }
+      if (Math.abs(b.x) > HALF_W - BALL_R) { b.x = Math.sign(b.x) * (HALF_W - BALL_R); v.x *= -0.2; }
+      if (b.y > BAR - BALL_R) { b.y = BAR - BALL_R; v.y = -Math.abs(v.y) * 0.2; }
+    }
+  }
+
+  function popup(text, y, color, size = 22) {
+    game.popups.push({ text, y, color, size, life: 1.4 });
+  }
+
+  function resolve(outcome) {
+    const f = game.flight;
+    f.outcome = outcome;
+    f.endT = f.t;
+    game.state = 'result';
+    game.timer = 1.6;
+    const scored = outcome === 'goal';
+    const big = { goal: t.goal, saved: t.saved, miss: t.miss, post: t.post, bar: t.bar }[outcome];
+    if (f.by === 'player') {
+      game.player.push(scored);
+      if (scored) {
+        game.goals++;
+        let pts = 100;
+        if (f.hitTarget) { pts += 50; popup(t.topBin, 200, '#ffcf33', 17); }
+        if (Math.abs(f.curve) > 0.5) { pts += 25; popup(t.curl, 222, '#8ad4ff', 16); }
+        game.score += pts;
+        game.cheer = 1;
+      }
+      popup(big, 140, scored ? '#ffffff' : '#ff8a9a', 40);
+    } else {
+      game.cpu.push(scored);
+      if (outcome === 'saved') { game.score += 75; game.saves++; game.cheer = 1; popup(t.youSaved, 200, '#ffcf33', 18); }
+      popup(scored ? t.theyScored : outcome === 'saved' ? t.saved : t.theyMissed, 140, scored ? '#ff8a9a' : '#ffffff', scored ? 26 : 34);
+    }
+    const goalsP = game.player.filter(Boolean).length, goalsC = game.cpu.filter(Boolean).length;
+    announce(`${big} ${t.announceKick(t.round(game.round), goalsP, goalsC)}`);
+    game.next = afterKick;
+  }
+
+  function decided() {
+    const p = game.player, c = game.cpu;
+    const pg = p.filter(Boolean).length, cg = c.filter(Boolean).length;
+    if (p.length <= 5 && c.length <= 5) {
+      if (pg + 5 - p.length < cg) return 'lose';
+      if (cg + 5 - c.length < pg) return 'win';
+      return null;
+    }
+    if (p.length === c.length && pg !== cg) return pg > cg ? 'win' : 'lose';
+    return null;
+  }
+
+  function afterKick() {
+    const result = decided();
+    if (result === 'win') {
+      game.streak++;
+      game.score += 250 * game.round;
+      game.banner = { title: t.roundWon(game.round), sub: t.tally(game.player.filter(Boolean).length, game.cpu.filter(Boolean).length), t: 0, dur: 2 };
+      announce(`${game.banner.title} ${game.banner.sub}`);
+      game.cheer = 1;
+      game.round++;
+      game.state = 'banner';
+      game.timer = 2;
+      game.next = startRound;
+      saveBest();
+    } else if (result === 'lose') finish();
+    else nextTurn();
+  }
+
+  function saveBest() {
+    let improved = false;
+    if (game.streak > best.streak) { best.streak = game.streak; writeNum('streak', best.streak); improved = true; }
+    if (game.score > best.score) { best.score = game.score; writeNum('score', best.score); improved = true; }
+    return improved;
+  }
+
+  function finish() {
+    game.state = 'over';
+    saveBest();
+    const isBest = best.streak > game.startBest.streak || best.score > game.startBest.score;
+    const pg = game.player.filter(Boolean).length, cg = game.cpu.filter(Boolean).length;
+    els.finalTally.textContent = `${t.round(game.round)} · ${t.tally(pg, cg)}`;
+    els.finalStreak.textContent = String(game.streak);
+    els.finalScore.textContent = String(game.score);
+    els.finalBest.textContent = t.bestLine(best.streak, best.score);
+    els.newBest.hidden = !isBest;
+    announce(`${t.lost}. ${t.tally(pg, cg)}. ${t.streak}: ${game.streak}. ${t.score}: ${game.score}. ${isBest ? t.newBest : ''}`);
+    setTimeout(() => {
+      if (game.state !== 'over') return;
+      els.over.hidden = false;
+      els.again.focus({ preventScroll: true });
+    }, 900);
+  }
+
+  function step(dt) {
+    if (!game) return;
+    game.clock += dt;
+    game.cheer = Math.max(0, game.cheer - dt * 0.8);
+    for (const p of game.popups) { p.life -= dt; p.y -= 14 * dt; }
+    game.popups = game.popups.filter(p => p.life > 0);
+    if (game.banner && (game.banner.t += dt) > game.banner.dur) game.banner = null;
+    if (game.boot && (game.boot.t += dt) > 0.4) game.boot = null;
+    if (game.state === 'over') return;
+    updateKeeper(game.keeper, dt);
+    if (game.state === 'intro') return;
+    if (game.state === 'aim') {
+      const r = game.reticle, mx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), my = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+      if (mx || my) { r.shown = true; r.x = clamp(r.x + mx * 3.4 * dt, -4.6, 4.6); r.y = clamp(r.y + my * 2.4 * dt, 0.1, 3.3); }
+      if (game.charge) {
+        game.charge.p += game.charge.dir * dt / 0.9;
+        if (game.charge.p >= 1) { game.charge.p = 1; game.charge.dir = -1; }
+        if (game.charge.p <= 0) { game.charge.p = 0; game.charge.dir = 1; }
+      }
+    } else if (game.state === 'runup') {
+      game.runup.t += dt;
+      if (game.runup.t >= game.runup.dur) cpuKick();
+    } else if (game.state === 'flight' || game.state === 'result') {
+      stepFlight(dt);
+      if (game.state === 'result' && (game.timer -= dt) <= 0) game.next();
+    } else if (game.state === 'banner') {
+      if ((game.timer -= dt) <= 0) game.next();
+    }
+  }
+
+  // ---------- drawing ----------
+  function drawStadium() {
+    const sky = ctx.createLinearGradient(0, 0, 0, 120);
+    sky.addColorStop(0, '#050b1f');
+    sky.addColorStop(1, '#12234d');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, 260);
+    // Floodlight glow.
+    ctx.fillStyle = '#1a2a52';
+    ctx.fillRect(0, 66, W, 194);
+    for (let row = 0; row < 9; row++) { ctx.fillStyle = row % 2 ? '#20325f' : '#1c2c56'; ctx.fillRect(0, 182 - row * 13, W, 13); }
+    for (const x of [10, W - 10]) {
+      const g = ctx.createRadialGradient(x, 70, 2, x, 70, 130);
+      g.addColorStop(0, '#fff8d0aa');
+      g.addColorStop(1, '#fff3b000');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 130, 0, 260, 200);
+    }
+    const jump = reducedMotion ? 0 : game ? game.cheer : 0;
+    for (const c of CROWD) {
+      const dy = jump ? Math.abs(Math.sin(game.clock * 14 + c.p)) * 4 * jump : 0;
+      ctx.fillStyle = c.c;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.arc(c.x, c.y - dy, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(c.x - 3.5, c.y - dy + 2, 7, 5);
+    }
+    ctx.globalAlpha = 1;
+    // Front wall of the stand, so the goal reads clearly against a dark backdrop.
+    const wall = ctx.createLinearGradient(0, 190, 0, 256);
+    wall.addColorStop(0, '#0b1633');
+    wall.addColorStop(1, '#13224a');
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 190, W, 70);
+    ctx.fillStyle = '#ffcf3355';
+    ctx.fillRect(0, 190, W, 2);
+    // Advertising boards behind the goal.
+    const top = proj(0, 1.0, 14.5).y, bottom = proj(0, 0, 14.5).y;
+    ctx.fillStyle = '#0d1a3a';
+    ctx.fillRect(0, top - 2, W, bottom - top + 2);
+    ctx.font = `900 ${Math.round((bottom - top) * 0.6)}px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const scroll = (game ? game.clock * 22 : 0) % 120;
+    for (let x = -120 - scroll; x < W + 120; x += 120) {
+      ctx.fillStyle = (Math.round((x + scroll) / 120) % 2) ? '#ffcf33' : '#3fa7ff';
+      ctx.fillText('MILAAN', x + 60, (top + bottom) / 2 + 1);
+    }
+  }
+
+  function drawPitch() {
+    const grassTop = proj(0, 0, 14.5).y;
+    let z = 14.5, i = 0;
+    while (z > -1.2) {
+      const y0 = proj(0, 0, z).y, y1 = z - 1.5 > -1.2 ? proj(0, 0, z - 1.5).y : H;
+      ctx.fillStyle = i % 2 ? '#2a9450' : '#31a65a';
+      ctx.fillRect(0, Math.max(grassTop, y0), W, Math.min(H, y1) - Math.max(grassTop, y0) + 1);
+      z -= 1.5; i++;
+    }
+    ctx.strokeStyle = '#ffffffd0';
+    ctx.lineWidth = 2;
+    const gl = proj(0, 0, GOAL_Z).y, six = proj(0, 0, GOAL_Z - 5.5);
+    ctx.beginPath(); ctx.moveTo(0, gl); ctx.lineTo(W, gl); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, six.y); ctx.lineTo(W, six.y); ctx.stroke();
+    // Penalty spot.
+    const spot = proj(0, 0, 0);
+    ctx.fillStyle = '#ffffffd8';
+    ctx.beginPath(); ctx.ellipse(spot.x, spot.y, 0.07 * spot.s, 0.028 * spot.s, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawNet() {
+    const fl = proj(-HALF_W, 0, GOAL_Z), fr = proj(HALF_W, 0, GOAL_Z), tl = proj(-HALF_W, BAR, GOAL_Z), tr = proj(HALF_W, BAR, GOAL_Z);
+    const bl = proj(-HALF_W, 0, NET_Z + 0.4), br = proj(HALF_W, 0, NET_Z + 0.4), btl = proj(-HALF_W, BAR * 0.8, NET_Z + 0.4), btr = proj(HALF_W, BAR * 0.8, NET_Z + 0.4);
+    ctx.fillStyle = '#0a1530aa';
+    ctx.beginPath(); ctx.moveTo(btl.x, btl.y); ctx.lineTo(btr.x, btr.y); ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y); ctx.fill();
+    ctx.strokeStyle = '#ffffff55';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const u = i / 24;
+      ctx.moveTo(btl.x + (btr.x - btl.x) * u, btl.y); ctx.lineTo(bl.x + (br.x - bl.x) * u, bl.y);
+      ctx.moveTo(tl.x + (tr.x - tl.x) * u, tl.y); ctx.lineTo(btl.x + (btr.x - btl.x) * u, btl.y);
+    }
+    for (let j = 0; j <= 8; j++) {
+      const v = j / 8;
+      ctx.moveTo(btl.x, btl.y + (bl.y - btl.y) * v); ctx.lineTo(btr.x, btr.y + (br.y - btr.y) * v);
+      ctx.moveTo(tl.x, tl.y + (fl.y - tl.y) * v); ctx.lineTo(btl.x, btl.y + (bl.y - btl.y) * v);
+      ctx.moveTo(tr.x, tr.y + (fr.y - tr.y) * v); ctx.lineTo(btr.x, btr.y + (br.y - btr.y) * v);
+    }
+    ctx.stroke();
+  }
+
+  function drawFrame() {
+    const fl = proj(-HALF_W, 0, GOAL_Z), fr = proj(HALF_W, 0, GOAL_Z), tl = proj(-HALF_W, BAR, GOAL_Z), tr = proj(HALF_W, BAR, GOAL_Z);
+    const w = POST_R * 2 * fl.s;
+    ctx.fillStyle = '#00000033';
+    ctx.fillRect(fl.x - w / 2 + 3, fl.y - 2, fr.x - fl.x, 4);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(tl.x - w / 2, tl.y - w / 2, w, fl.y - tl.y + w / 2);
+    ctx.fillRect(tr.x - w / 2, tr.y - w / 2, w, fr.y - tr.y + w / 2);
+    ctx.fillRect(tl.x - w / 2, tl.y - w / 2, tr.x - tl.x + w, w);
+  }
+
+  function drawTargets() {
+    if (!game || game.keeper.player || !['aim', 'flight', 'intro'].includes(game.state)) return;
+    const pulse = reducedMotion ? 0 : Math.sin(game.clock * 4) * 0.04;
+    for (const tg of TARGETS) {
+      const p = proj(tg.x, tg.y, GOAL_Z);
+      const r = (TARGET_R + pulse) * p.s;
+      ctx.strokeStyle = '#ffcf33cc';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.55, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#ffcf3333';
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawKeeper(k) {
+    const c = proj(k.x, k.y, KEEPER_Z), s = c.s;
+    const shirt = k.player ? '#ff8a3d' : '#c6ff3d', shade = k.player ? '#d9661f' : '#93c726', glove = k.player ? '#ffffff' : '#ff4f9a';
+    // Ground shadow.
+    const g = proj(k.x, 0, KEEPER_Z);
+    ctx.fillStyle = '#00000040';
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, 0.5 * s, 0.1 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(k.theta);
+    const stretched = k.diving && k.progress > 0.25;
+    // Legs
+    ctx.fillStyle = '#1b2440';
+    ctx.beginPath(); ctx.roundRect(-0.2 * s, 0.2 * s, 0.16 * s, 0.78 * s, 0.06 * s); ctx.roundRect(0.04 * s, 0.2 * s, 0.16 * s, 0.78 * s, 0.06 * s); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-0.21 * s, 0.86 * s, 0.18 * s, 0.1 * s); ctx.fillRect(0.03 * s, 0.86 * s, 0.18 * s, 0.1 * s);
+    // Arms
+    ctx.strokeStyle = shade;
+    ctx.lineWidth = 0.13 * s;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    const hands = stretched ? [[-0.16, -1.08], [0.16, -1.08]] : [[-0.78, -0.12], [0.78, -0.12]];
+    ctx.moveTo(-0.22 * s, -0.36 * s); ctx.lineTo(hands[0][0] * s, hands[0][1] * s);
+    ctx.moveTo(0.22 * s, -0.36 * s); ctx.lineTo(hands[1][0] * s, hands[1][1] * s);
+    ctx.stroke();
+    ctx.fillStyle = glove;
+    for (const [hx, hy] of hands) { ctx.beginPath(); ctx.arc(hx * s, hy * s, 0.1 * s, 0, Math.PI * 2); ctx.fill(); }
+    // Torso and head
+    ctx.fillStyle = shirt;
+    ctx.beginPath(); ctx.roundRect(-0.28 * s, -0.48 * s, 0.56 * s, 0.74 * s, 0.14 * s); ctx.fill();
+    ctx.fillStyle = shade;
+    ctx.fillRect(-0.28 * s, -0.1 * s, 0.56 * s, 0.06 * s);
+    ctx.fillStyle = '#f2c79b';
+    ctx.beginPath(); ctx.arc(0, -0.66 * s, 0.14 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a2a20';
+    ctx.beginPath(); ctx.arc(0, -0.7 * s, 0.14 * s, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBall() {
+    const b = game.ball;
+    if (b.z > 30 || b.z < -1.4) return;
+    const p = proj(b.x, b.y, b.z), sh = proj(b.x, 0, b.z), r = BALL_R * p.s;
+    ctx.fillStyle = '#00000044';
+    ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 1.05, r * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.75, '#e9eef6');
+    g.addColorStop(1, '#aeb8c9');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.clip();
+    ctx.rotate(b.spin);
+    ctx.fillStyle = '#1b2440';
+    for (let i = 0; i < 5; i++) {
+      const a = i * Math.PI * 2 / 5;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.78, Math.sin(a) * r * 0.78, r * 0.26, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 - Math.PI / 2; ctx.lineTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3); }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBoot() {
+    const runup = game.state === 'runup' ? game.runup : null;
+    if (!runup && !game.boot) return;
+    // A stylised boot swings in from the lower left: a run-up while the CPU prepares, then the strike.
+    let u;
+    if (runup) u = Math.min(0.7, runup.t / runup.dur * 0.7);
+    else u = 0.7 + Math.min(1, game.boot.t / 0.12) * 0.3;
+    const fade = game.boot ? clamp(1 - (game.boot.t - 0.1) / 0.12, 0, 1) : 1;
+    const x = -60 + (SPOT.x - 70 + 60) * u, y = H + 30 - (H + 30 - SPOT.y - 20) * u;
+    ctx.globalAlpha = fade;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-0.5 + u * 0.3);
+    ctx.fillStyle = game.keeper.player ? '#e8364f' : '#2563eb';
+    ctx.beginPath(); ctx.roundRect(-22, -110, 44, 110, 18); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-22, -80, 44, 10);
+    ctx.fillStyle = '#111827';
+    ctx.beginPath(); ctx.roundRect(-26, -8, 70, 30, 14); ctx.fill();
+    ctx.fillStyle = '#ffcf33';
+    ctx.fillRect(-6, 12, 30, 4);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawAim() {
+    if (game.state !== 'aim') return;
+    if (swipe && swipe.points.length > 1) {
+      ctx.strokeStyle = '#ffffffaa';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (const [i, p] of swipe.points.entries()) i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+      ctx.stroke();
+    }
+    const r = game.reticle;
+    if (r.shown) {
+      const p = proj(r.x, r.y, GOAL_Z);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+      ctx.moveTo(p.x - 17, p.y); ctx.lineTo(p.x - 5, p.y); ctx.moveTo(p.x + 5, p.y); ctx.lineTo(p.x + 17, p.y);
+      ctx.moveTo(p.x, p.y - 17); ctx.lineTo(p.x, p.y - 5); ctx.moveTo(p.x, p.y + 5); ctx.lineTo(p.x, p.y + 17);
+      ctx.stroke();
+    }
+    if (game.charge) {
+      const x = 40, y = 572, w = W - 80, h = 14, p = game.charge.p;
+      ctx.fillStyle = '#00000066';
+      ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.fill();
+      ctx.fillStyle = '#7ff3a0';
+      ctx.fillRect(x + w * 0.55, y, w * 0.27, h);
+      ctx.fillStyle = p > 0.82 ? '#ff5a6e' : '#ffcf33';
+      ctx.beginPath(); ctx.roundRect(x, y, Math.max(h, w * p), h, 7); ctx.fill();
+    }
+  }
+
+  function outlined(text, x, y, size, fill) {
+    ctx.font = `900 ${size}px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, size / 6);
+    ctx.strokeStyle = '#0f1c3a';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
+  function fitText(text, maxW, size, weight = 800) {
+    let s = size;
+    ctx.font = `${weight} ${s}px ${FONT}`;
+    while (s > 10 && ctx.measureText(text).width > maxW) { s -= 1; ctx.font = `${weight} ${s}px ${FONT}`; }
+    return s;
+  }
+
+  function drawTally() {
+    ctx.fillStyle = '#08122af0';
+    ctx.beginPath(); ctx.roundRect(8, 8, W - 16, 56, 14); ctx.fill();
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 11px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#9fb2d9';
+    ctx.fillText(t.round(game.round).toUpperCase(), 18, 22);
+    ctx.textAlign = 'right';
+    ctx.fillText(t.score.toUpperCase(), W - 18, 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 20px ${FONT}`;
+    ctx.fillText(String(game.score), W - 18, 46);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffcf33';
+    ctx.fillText(`🔥 ${game.streak}`, 18, 46);
+    const n = Math.max(game.player.length, game.cpu.length, 5);
+    const start = Math.max(0, n - 5);
+    const rows = [[t.you, game.player], [t.cpu, game.cpu]];
+    for (const [ri, [label, arr]] of rows.entries()) {
+      const y = 24 + ri * 20;
+      ctx.textAlign = 'right';
+      ctx.font = `800 ${fitText(label, 40, 11)}px ${FONT}`;
+      ctx.fillStyle = '#d6e2ff';
+      ctx.fillText(label, 142, y);
+      for (let i = 0; i < 5; i++) {
+        const v = arr[start + i];
+        const x = 156 + i * 17;
+        ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+        ctx.fillStyle = v === undefined ? '#ffffff22' : v ? '#3ddc84' : '#ff4f6d';
+        ctx.fill();
+      }
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 13px ${FONT}`;
+      ctx.fillText(String(arr.filter(Boolean).length), 244, y + 1);
+    }
+  }
+
+  function drawPrompt() {
+    let text = '';
+    if (game.state === 'aim') text = game.reticle.shown || game.charge ? t.keyKick : t.yourKick;
+    else if ((game.state === 'runup' || game.state === 'flight') && game.keeper.player) text = keyboardUsed ? t.keySave : t.yourSave;
+    if (!text) return;
+    const y = game.charge ? 604 : 590;
+    const size = fitText(text, W - 40, 16);
+    ctx.fillStyle = '#08122aa8';
+    const w = Math.min(W - 24, ctx.measureText(text).width + 30);
+    ctx.beginPath(); ctx.roundRect(CX - w / 2, y - 16, w, 32, 16); ctx.fill();
+    ctx.font = `800 ${size}px ${FONT}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, CX, y + 1);
+    if (game.keeper.player && !game.keeper.diving) {
+      ctx.globalAlpha = 0.5 + (reducedMotion ? 0 : Math.sin(game.clock * 6) * 0.2);
+      ctx.font = `900 26px ${FONT}`;
+      ctx.fillText('◀', 40, 410); ctx.fillText('▶', W - 40, 410); ctx.fillText('▼', CX, 410);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    drawStadium();
+    drawPitch();
+    drawNet();
+    const b = game.ball;
+    if (b.z > GOAL_Z) drawBall();
+    drawTargets();
+    drawFrame();
+    if (b.z > KEEPER_Z && b.z <= GOAL_Z) drawBall();
+    drawKeeper(game.keeper);
+    if (b.z <= KEEPER_Z) drawBall();
+    drawBoot();
+    drawAim();
+    if (game.state !== 'intro') { drawTally(); drawPrompt(); }
+    for (const p of game.popups) { ctx.globalAlpha = clamp(p.life * 2, 0, 1); outlined(p.text, CX, p.y, fitText(p.text, W - 30, p.size, 900), p.color); }
+    ctx.globalAlpha = 1;
+    if (game.banner) {
+      const a = clamp(Math.min(game.banner.t * 4, (game.banner.dur - game.banner.t) * 4), 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#08122acc';
+      ctx.fillRect(0, 300, W, 96);
+      outlined(game.banner.title, CX, 334, fitText(game.banner.title, W - 30, 32, 900), '#ffcf33');
+      if (game.banner.sub) { ctx.font = `800 ${fitText(game.banner.sub, W - 30, 15)}px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(game.banner.sub, CX, 372); }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    scale = Math.min(stage.width / W, stage.height / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.frame.style.width = `${W * scale}px`;
+    els.frame.style.height = `${H * scale}px`;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    draw();
+  }
+
+  function frame(time) {
+    // Clamp dt so a stalled frame never advances the shot by more than 50 ms.
+    const dt = Math.min(0.05, Math.max(0, (time - last) / 1000));
+    last = time;
+    if (!document.hidden) {
+      acc += dt;
+      while (acc >= STEP) { step(STEP); acc -= STEP; }
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- input ----------
+  function toWorld(event) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale, time: event.timeStamp };
+  }
+  const screenToGoal = (sx, sy) => { const s = FOCAL / (GOAL_Z - CAM_Z); return { x: (sx - CX) / s, y: CAM_H - (sy - HORIZON) / s }; };
+
+  function releaseSwipe() {
+    const pts = swipe.points;
+    swipe = null;
+    const a = pts[0], b = pts[pts.length - 1];
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+    if (dy > -40 || len < 50) return;
+    // The swipe vector, drawn from the ball, lands where the shot is aimed.
+    const target = screenToGoal(SPOT.x + dx, SPOT.y + dy);
+    const nx = -dy / len, ny = dx / len;
+    let dev = 0;
+    for (const p of pts) { const d = (p.x - a.x) * nx + (p.y - a.y) * ny; if (Math.abs(d) > Math.abs(dev)) dev = d; }
+    const curve = Math.abs(dev) < 8 ? 0 : clamp(dev / 45, -1, 1);
+    const dur = Math.max(60, b.time - a.time);
+    const power = clamp(0.25 + len / dur * 0.45, 0.3, 1);
+    kick('player', target.x, target.y, power, curve);
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    if (!game) return;
+    event.preventDefault();
+    const p = toWorld(event);
+    if (game.state === 'aim') {
+      if (p.y < 330) return;
+      canvas.setPointerCapture(event.pointerId);
+      keyboardUsed = false;
+      swipe = { id: event.pointerId, points: [p] };
+    } else if (game.keeper.player) {
+      keyboardUsed = false;
+      // Tap in the left or right third dives that way; the middle third stays up the middle.
+      const g = screenToGoal(p.x, Math.min(p.y, proj(0, 0, GOAL_Z).y));
+      const side = p.x < W / 3 ? -1 : p.x > W * 2 / 3 ? 1 : 0;
+      playerDive(side ? side * Math.max(2.4, Math.abs(g.x)) : clamp(g.x, -0.6, 0.6), side ? clamp(g.y, 0.4, 2.2) : clamp(g.y, 1.0, 2.3));
+    }
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    swipe.points.push(toWorld(event));
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    swipe.points.push(toWorld(event));
+    if (game.state === 'aim') releaseSwipe(); else swipe = null;
+  });
+  canvas.addEventListener('pointercancel', () => { swipe = null; });
+
+  const KEY_DIRS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+  document.addEventListener('keydown', event => {
+    if (!game || game.state === 'intro' || game.state === 'over') return;
+    if ((event.target instanceof Element && event.target.closest('button')) || event.altKey || event.ctrlKey || event.metaKey) return;
+    const dir = KEY_DIRS[event.key];
+    const keeperTurn = game.keeper.player && (game.state === 'runup' || game.state === 'flight');
+    if (dir) {
+      event.preventDefault();
+      keyboardUsed = true;
+      if (keeperTurn) {
+        if (dir === 'left') playerDive(-2.9, 1.0);
+        else if (dir === 'right') playerDive(2.9, 1.0);
+        else playerDive(0, 1.9);
+      } else keys[dir] = true;
+      return;
+    }
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      keyboardUsed = true;
+      if (event.repeat) return;
+      if (keeperTurn) playerDive(0, 1.9);
+      else if (game.state === 'aim' && !game.charge && !swipe) { game.reticle.shown = true; game.charge = { p: 0, dir: 1 }; }
+    }
+  });
+  document.addEventListener('keyup', event => {
+    const dir = KEY_DIRS[event.key];
+    if (dir) keys[dir] = false;
+    if ((event.key === ' ' || event.key === 'Enter') && game && game.charge) {
+      event.preventDefault();
+      const power = game.charge.p;
+      game.charge = null;
+      if (game.state === 'aim') kick('player', game.reticle.x, game.reticle.y, clamp(power, 0.3, 1), 0);
+    }
+  });
+  window.addEventListener('blur', () => { keys.left = keys.right = keys.up = keys.down = false; swipe = null; if (game) game.charge = null; });
+
+  els.play.addEventListener('click', newGame);
+  els.again.addEventListener('click', newGame);
+
+  function showIntro() {
+    game = freshGame();
+    els.records.textContent = best.streak || best.score ? t.records(best.streak, best.score) : '';
+    els.play.focus({ preventScroll: true });
+  }
+
+  new ResizeObserver(resize).observe($('stage'));
+  showIntro();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

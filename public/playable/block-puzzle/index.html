@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Block Puzzle</title>
+<style>
+:root {
+  --bg: #070c24;
+  --board: #111a44;
+  --cell: #1b2659;
+  --text: #f3f5ff;
+  --muted: #9ba6d8;
+  --accent: #ffc94d;
+  --ok: #3ef0a1;
+  --bad: #ff5a76;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at top, #18245e, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 520px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+h1 span { color: var(--accent); }
+.stat { min-width: 66px; padding: 5px 10px; border-radius: 12px; background: var(--board); text-align: center; position: relative; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.gain { position: absolute; left: 0; right: 0; top: 4px; font-size: 15px; font-weight: 900; color: var(--accent); opacity: 0; pointer-events: none; }
+.gain.show { animation: gain .7s ease-out; }
+@keyframes gain { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-26px); } }
+.restart { align-self: stretch; padding: 0 13px; border-radius: 12px; background: var(--board); font-size: 22px; font-weight: 900; color: var(--accent); }
+.restart:active { transform: translateY(2px); }
+
+.play { flex: 1; min-height: 0; container-type: size; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; }
+/* The tray takes the spare height left by a width-limited board, within sensible bounds. */
+.board, .tray { --tray: clamp(84px, 100cqh - 100cqw - 12px, min(160px, 26cqh)); }
+.board { flex: none; --size: min(100cqw, 100cqh - var(--tray) - 12px); --u: calc(var(--size) / 8.4); --gap: calc(var(--size) * .011); --pad: calc(var(--size) * .022); position: relative; width: var(--size); height: var(--size); border-radius: calc(var(--size) * .04); background: var(--board); box-shadow: 0 0 0 1px #ffffff14, 0 18px 40px #0009; touch-action: none; }
+.board:focus-visible { outline: 2px solid #ffc94d77; outline-offset: 4px; }
+.cells, .fx { position: absolute; inset: var(--pad); display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); gap: var(--gap); }
+.fx { pointer-events: none; }
+.cells i { border-radius: 22%; background: var(--cell); transition: background-color .08s; }
+.cells i.f, .blk, .fx i { background: var(--c); box-shadow: inset 0 calc(var(--u) * -.12) 0 #0005, inset 0 calc(var(--u) * .08) 0 #ffffff59; }
+.cells i.g-ok { background: color-mix(in srgb, var(--gc) 45%, var(--cell)); box-shadow: inset 0 0 0 calc(var(--u) * .07) var(--ok), 0 0 calc(var(--u) * .2) #3ef0a155; }
+.cells i.g-bad { background: repeating-linear-gradient(45deg, #ff5a7650 0 calc(var(--u) * .12), transparent 0 calc(var(--u) * .24)), var(--cell); box-shadow: inset 0 0 0 calc(var(--u) * .07) var(--bad); }
+.cells i.f.g-bad { background: var(--c); box-shadow: inset 0 0 0 calc(var(--u) * .1) var(--bad); }
+.cells i.wc { filter: brightness(1.3) saturate(1.2); box-shadow: inset 0 calc(var(--u) * -.12) 0 #0005, inset 0 calc(var(--u) * .08) 0 #ffffff59, 0 0 calc(var(--u) * .35) var(--c); }
+.cells i.g-ok.wc { box-shadow: inset 0 0 0 calc(var(--u) * .07) var(--ok), 0 0 calc(var(--u) * .35) var(--gc); }
+.cells i.land { animation: land .22s ease-out; }
+@keyframes land { 40% { transform: scale(.86); } }
+.fx i { border-radius: 22%; animation: burst .42s ease-in var(--d) forwards; }
+@keyframes burst { 30% { transform: scale(1.12); filter: brightness(1.9); } to { transform: scale(0) rotate(25deg); opacity: 0; } }
+.float { position: absolute; z-index: 4; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font-weight: 900; font-size: calc(var(--size) * .075); line-height: 1.1; color: #fff; text-shadow: 0 2px 0 #0007, 0 0 18px var(--glow, #ffc94d); pointer-events: none; animation: rise-out 1s ease-out forwards; }
+.float small { display: block; font-size: .55em; color: var(--accent); }
+@keyframes rise-out { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } 70% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+
+.combo { position: absolute; top: calc(var(--pad) * -.2); right: var(--pad); transform: translateY(-50%); padding: 3px 10px; border-radius: 99px; background: var(--accent); color: #20160a; font-size: 12px; font-weight: 900; box-shadow: 0 4px 12px #0006; }
+.combo[hidden] { display: none; }
+
+.tray { flex: none; width: 100%; height: var(--tray); display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.slot { position: relative; container-type: size; border-radius: 16px; background: #ffffff0a; display: grid; place-items: center; touch-action: none; transition: background-color .15s, box-shadow .15s; }
+.slot:hover { background: #ffffff12; }
+.slot.sel { background: #ffffff16; box-shadow: inset 0 0 0 2px var(--accent); }
+.slot .key { position: absolute; top: 5px; left: 8px; font-size: 10px; font-weight: 800; color: var(--muted); opacity: .7; }
+.piece { --u: min(100cqw / 5.6, 100cqh / 5.6, 30px); display: grid; grid-template-columns: repeat(var(--w), var(--u)); grid-template-rows: repeat(var(--h), var(--u)); gap: calc(var(--u) * .1); transition: opacity .2s, transform .15s; }
+.piece .blk, .drag .blk { border-radius: 22%; }
+.slot.sel .piece { transform: scale(1.08); }
+.slot.lifted .piece { opacity: .15; }
+.piece.stuck { opacity: .3; filter: grayscale(.6); }
+.piece.deal { animation: deal .3s cubic-bezier(.3, 1.5, .5, 1) both; animation-delay: var(--d); }
+@keyframes deal { from { transform: scale(0); } }
+.drag { position: fixed; left: 0; top: 0; z-index: 20; display: grid; pointer-events: none; filter: drop-shadow(0 10px 14px #000a); will-change: transform; }
+
+.hint { text-align: center; font-size: 12px; line-height: 1.35; color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: #050920b3; backdrop-filter: blur(2px); }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); padding: 26px 22px; border-radius: 26px; background: #18235a; text-align: center; box-shadow: 0 0 0 1px #ffffff1c, 0 20px 50px #000a; animation: pop-in .3s ease-out; }
+@keyframes pop-in { from { transform: translateY(18px); opacity: 0; } }
+.panel .emoji { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; }
+.panel .emoji i { width: 22px; height: 22px; border-radius: 6px; background: var(--c); box-shadow: inset 0 -3px 0 #0005, inset 0 2px 0 #ffffff59; }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.result { margin-top: 10px; font-size: 18px; font-weight: 700; }
+.panel .muted { margin-top: 4px; font-size: 14px; color: var(--muted); }
+.badge { display: inline-block; margin-top: 12px; padding: 5px 14px; border-radius: 99px; background: var(--accent); color: #20160a; font-size: 13px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 16px; background: var(--accent); color: #20160a; font-size: 19px; font-weight: 800; box-shadow: 0 5px 0 #c8902a; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 #c8902a; }
+.store-link { display: inline-block; margin-top: 16px; font-size: 14px; font-weight: 700; color: #8fd8ff; text-underline-offset: 4px; line-height: 1.4; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 560px) { .hint { display: none; } .app { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Block <span>Puzzle</span></h1>
+    <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong><span class="gain" id="gain" aria-hidden="true"></span></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">0</strong></div>
+    <button type="button" class="restart" id="restart" data-i18n-label="restart">↻</button>
+  </div>
+  <div class="play">
+    <div class="board" id="board" tabindex="-1" role="application" aria-describedby="hint">
+      <div class="cells" id="cells" aria-hidden="true"></div>
+      <div class="fx" id="fx" aria-hidden="true"></div>
+      <span class="combo" id="combo" aria-hidden="true" hidden></span>
+    </div>
+    <div class="tray" id="tray"></div>
+  </div>
+  <p class="hint" id="hint" data-i18n="hint"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <p class="emoji" aria-hidden="true"><i style="--c:#ff4d6d"></i><i style="--c:#ffb020"></i><i style="--c:#2ee59d"></i><i style="--c:#3d8bff"></i><i style="--c:#a66bff"></i></p>
+    <h2 id="over-title" data-i18n="over"></h2>
+    <p class="result" id="result"></p>
+    <p class="muted" id="best-line"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=dev.lamian.games.blockblast" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { score: 'Score', best: 'Best', restart: 'New game', hint: 'Drag pieces onto the board and fill rows or columns to clear them. Keys: 1–3, arrows, Enter.', board: n => `Board, ${n} of 64 squares filled`, piece: (i, n) => `Piece ${i}, ${n} blocks`, empty: i => `Piece ${i}, placed`, at: (r, c, ok) => `Row ${r}, column ${c}: ${ok ? 'fits' : 'blocked'}`, placed: s => `Placed. Score ${s}.`, cleared: (n, p) => `${n} ${n === 1 ? 'line' : 'lines'} cleared, +${p}.`, combo: n => `Combo ×${n}`, perfect: 'Board clear!', newSet: 'Three new pieces.', milestone: s => `${s} points!`, over: 'No more space!', result: s => `Final score: ${s}`, bestLine: b => `Best: ${b}`, newBest: 'New best!', again: 'Play again', full: 'Get Blokito Puzzle: Block Blast on Google Play' },
+    vi: { score: 'Điểm', best: 'Kỷ lục', restart: 'Ván mới', hint: 'Kéo khối vào bảng, lấp đầy hàng hoặc cột để xóa. Phím: 1–3, mũi tên, Enter.', board: n => `Bảng chơi, đã lấp ${n}/64 ô`, piece: (i, n) => `Khối ${i}, ${n} ô`, empty: i => `Khối ${i}, đã đặt`, at: (r, c, ok) => `Hàng ${r}, cột ${c}: ${ok ? 'đặt được' : 'bị chặn'}`, placed: s => `Đã đặt. Điểm ${s}.`, cleared: (n, p) => `Xóa ${n} hàng/cột, +${p}.`, combo: n => `Combo ×${n}`, perfect: 'Sạch bảng!', newSet: 'Ba khối mới.', milestone: s => `${s} điểm!`, over: 'Hết chỗ rồi!', result: s => `Điểm cuối: ${s}`, bestLine: b => `Kỷ lục: ${b}`, newBest: 'Kỷ lục mới!', again: 'Chơi lại', full: 'Tải Blokito Puzzle: Block Blast trên Google Play' },
+    zh: { score: '得分', best: '最高分', restart: '新游戏', hint: '把方块拖到棋盘上，填满整行或整列即可消除。按键：1–3、方向键、回车。', board: n => `棋盘，已填 ${n}/64 格`, piece: (i, n) => `方块 ${i}，共 ${n} 格`, empty: i => `方块 ${i}，已放置`, at: (r, c, ok) => `第 ${r} 行第 ${c} 列：${ok ? '可以放置' : '放不下'}`, placed: s => `已放置，得分 ${s}。`, cleared: (n, p) => `消除 ${n} 行，+${p}。`, combo: n => `连击 ×${n}`, perfect: '全部清空！', newSet: '新的三个方块。', milestone: s => `${s} 分！`, over: '没有空间了！', result: s => `最终得分：${s}`, bestLine: b => `最高分：${b}`, newBest: '新纪录！', again: '再玩一次', full: '在 Google Play 获取 Blokito Puzzle: Block Blast' },
+    fr: { score: 'Score', best: 'Record', restart: 'Nouvelle partie', hint: 'Glissez les pièces sur la grille et complétez lignes ou colonnes pour les effacer. Touches : 1–3, flèches, Entrée.', board: n => `Grille, ${n} cases sur 64 remplies`, piece: (i, n) => `Pièce ${i}, ${n} blocs`, empty: i => `Pièce ${i}, posée`, at: (r, c, ok) => `Ligne ${r}, colonne ${c} : ${ok ? 'ça rentre' : 'bloqué'}`, placed: s => `Posée. Score ${s}.`, cleared: (n, p) => `${n} ${n === 1 ? 'ligne effacée' : 'lignes effacées'}, +${p}.`, combo: n => `Combo ×${n}`, perfect: 'Grille vidée !', newSet: 'Trois nouvelles pièces.', milestone: s => `${s} points !`, over: 'Plus de place !', result: s => `Score final : ${s}`, bestLine: b => `Record : ${b}`, newBest: 'Nouveau record !', again: 'Rejouer', full: 'Obtenir Blokito Puzzle: Block Blast sur Google Play' },
+    th: { score: 'คะแนน', best: 'สูงสุด', restart: 'เกมใหม่', hint: 'ลากบล็อกลงกระดาน เติมแถวหรือคอลัมน์ให้เต็มเพื่อเคลียร์ ปุ่ม: 1–3 ลูกศร Enter', board: n => `กระดาน เติมแล้ว ${n} จาก 64 ช่อง`, piece: (i, n) => `บล็อก ${i} มี ${n} ช่อง`, empty: i => `บล็อก ${i} วางแล้ว`, at: (r, c, ok) => `แถว ${r} คอลัมน์ ${c}: ${ok ? 'วางได้' : 'วางไม่ได้'}`, placed: s => `วางแล้ว คะแนน ${s}`, cleared: (n, p) => `เคลียร์ ${n} แถว +${p}`, combo: n => `คอมโบ ×${n}`, perfect: 'เคลียร์ทั้งกระดาน!', newSet: 'บล็อกใหม่สามชิ้น', milestone: s => `${s} คะแนน!`, over: 'ไม่มีที่ว่างแล้ว!', result: s => `คะแนนสุดท้าย: ${s}`, bestLine: b => `สูงสุด: ${b}`, newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', full: 'ดาวน์โหลด Blokito Puzzle: Block Blast บน Google Play' },
+    ja: { score: 'スコア', best: 'ベスト', restart: '新しいゲーム', hint: 'ピースを盤面にドラッグし、横か縦の列をそろえて消そう。キー：1–3・矢印・Enter', board: n => `盤面、64マス中 ${n} マス使用`, piece: (i, n) => `ピース ${i}（${n} マス）`, empty: i => `ピース ${i}、配置済み`, at: (r, c, ok) => `${r} 行 ${c} 列：${ok ? '置けます' : '置けません'}`, placed: s => `配置しました。スコア ${s}。`, cleared: (n, p) => `${n} 列消去、+${p}。`, combo: n => `コンボ ×${n}`, perfect: '盤面クリア！', newSet: '新しいピースが3つ。', milestone: s => `${s} 点達成！`, over: 'もう置けません！', result: s => `最終スコア：${s}`, bestLine: b => `ベスト：${b}`, newBest: '自己ベスト更新！', again: 'もう一度', full: 'Google Play で Blokito Puzzle: Block Blast を入手' },
+    ko: { score: '점수', best: '최고', restart: '새 게임', hint: '블록을 보드로 끌어 가로줄이나 세로줄을 채우면 사라져요. 키: 1–3, 방향키, Enter', board: n => `보드, 64칸 중 ${n}칸 채움`, piece: (i, n) => `블록 ${i}, ${n}칸`, empty: i => `블록 ${i}, 배치됨`, at: (r, c, ok) => `${r}행 ${c}열: ${ok ? '놓을 수 있음' : '놓을 수 없음'}`, placed: s => `배치 완료. 점수 ${s}.`, cleared: (n, p) => `${n}줄 제거, +${p}.`, combo: n => `콤보 ×${n}`, perfect: '보드 클리어!', newSet: '새 블록 3개.', milestone: s => `${s}점 달성!`, over: '더 이상 놓을 곳이 없어요!', result: s => `최종 점수: ${s}`, bestLine: b => `최고: ${b}`, newBest: '최고 기록!', again: '다시 하기', full: 'Google Play에서 Blokito Puzzle: Block Blast 받기' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const SIZE = 8;
+  const STORAGE_KEY = 'milaan.blockPuzzle.best';
+  const COLORS = ['#ff4d6d', '#ffb020', '#2ee59d', '#3d8bff', '#a66bff', '#22d3ee', '#ff7ac6'];
+  // [pattern, weight]: rows split by "|", "x" is a block. Every rotation of a pattern shares its weight.
+  const PATTERNS = [
+    ['x', 2], ['xx', 3], ['xxx', 3], ['xxxx', 2.2], ['xxxxx', 1.4],
+    ['xx|xx', 3], ['xxx|xxx|xxx', 1.1], ['xx|xx|xx', 1.4],
+    ['x.|x.|xx', 2], ['.x|.x|xx', 2], ['xxx|.x.', 2], ['xx.|.xx', 1.2], ['.xx|xx.', 1.2],
+    ['xx|x.', 2.6], ['xxx|x..|x..', 1.2],
+  ];
+  const SHAPES = buildShapes();
+  const LINE_POINTS = n => 10 * n * (n + 1) / 2;
+  const PERFECT_BONUS = 300;
+  const STREAK_GRACE = 3;
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), cells: $('cells'), fx: $('fx'), combo: $('combo'), tray: $('tray'), score: $('score'), gain: $('gain'), best: $('best'), over: $('over'), result: $('result'), bestLine: $('best-line'), newBest: $('new-best'), again: $('again'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+
+  function normalize(cells) {
+    const minR = Math.min(...cells.map(([r]) => r)), minC = Math.min(...cells.map(([, c]) => c));
+    return cells.map(([r, c]) => [r - minR, c - minC]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  }
+
+  function buildShapes() {
+    const shapes = [];
+    for (const [pattern, weight] of PATTERNS) {
+      let cells = [];
+      pattern.split('|').forEach((row, r) => [...row].forEach((ch, c) => { if (ch === 'x') cells.push([r, c]); }));
+      const seen = new Map();
+      for (let turn = 0; turn < 4; turn++) {
+        cells = normalize(cells);
+        seen.set(JSON.stringify(cells), cells);
+        const maxR = Math.max(...cells.map(([r]) => r));
+        cells = cells.map(([r, c]) => [c, maxR - r]);
+      }
+      for (const variant of seen.values()) {
+        shapes.push({ cells: variant, h: Math.max(...variant.map(([r]) => r)) + 1, w: Math.max(...variant.map(([, c]) => c)) + 1, weight: weight / seen.size });
+      }
+    }
+    return shapes;
+  }
+
+  const totalWeight = SHAPES.reduce((sum, s) => sum + s.weight, 0);
+  function randomShape() {
+    let roll = Math.random() * totalWeight;
+    for (const shape of SHAPES) { roll -= shape.weight; if (roll <= 0) return shape; }
+    return SHAPES[0];
+  }
+
+  let grid, tray, score, best, startBest, streak, sinceClear, selected, cursor, over, drag, keyboardMode, nextMilestone;
+  const cellEls = [];
+  const slots = [];
+
+  for (let i = 0; i < SIZE * SIZE; i++) cellEls.push(els.cells.appendChild(document.createElement('i')));
+  for (let i = 0; i < 3; i++) {
+    const slot = document.createElement('button');
+    slot.type = 'button';
+    slot.className = 'slot';
+    slot.innerHTML = `<span class="key" aria-hidden="true">${i + 1}</span>`;
+    slot.addEventListener('pointerdown', event => startDrag(i, event));
+    slot.addEventListener('pointermove', moveDrag);
+    slot.addEventListener('pointerup', endDrag);
+    slot.addEventListener('pointercancel', cancelDrag);
+    slot.addEventListener('focus', () => { if (tray[i] && !drag) select(i); });
+    slot.addEventListener('click', event => { if (event.detail === 0 && tray[i]) select(i); });
+    slots.push(slot);
+    els.tray.append(slot);
+  }
+
+  const at = (r, c) => grid[r * SIZE + c];
+  function fits(shape, r, c) {
+    if (r < 0 || c < 0 || r + shape.h > SIZE || c + shape.w > SIZE) return false;
+    return shape.cells.every(([dr, dc]) => at(r + dr, c + dc) < 0);
+  }
+  function fitsAnywhere(shape) {
+    for (let r = 0; r <= SIZE - shape.h; r++) for (let c = 0; c <= SIZE - shape.w; c++) if (fits(shape, r, c)) return true;
+    return false;
+  }
+
+  function fullLines(cells) {
+    const filled = new Set(cells);
+    const isFull = i => grid[i] >= 0 || filled.has(i);
+    const rows = [], cols = [];
+    for (let k = 0; k < SIZE; k++) {
+      let row = true, col = true;
+      for (let j = 0; j < SIZE; j++) { if (!isFull(k * SIZE + j)) row = false; if (!isFull(j * SIZE + k)) col = false; }
+      if (row) rows.push(k);
+      if (col) cols.push(k);
+    }
+    return { rows, cols };
+  }
+
+  function lineCells({ rows, cols }) {
+    const out = new Set();
+    for (const r of rows) for (let c = 0; c < SIZE; c++) out.add(r * SIZE + c);
+    for (const c of cols) for (let r = 0; r < SIZE; r++) out.add(r * SIZE + c);
+    return out;
+  }
+
+  function dealTray() {
+    // Re-roll a few times so a fresh set almost always has at least one piece that fits.
+    let pieces;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      pieces = [0, 1, 2].map(() => ({ shape: randomShape(), color: Math.floor(Math.random() * COLORS.length) }));
+      if (pieces.some(p => fitsAnywhere(p.shape))) break;
+    }
+    tray = pieces;
+    renderTray(true);
+  }
+
+  function renderBoard() {
+    let filled = 0;
+    grid.forEach((value, i) => {
+      const el = cellEls[i];
+      el.className = value >= 0 ? 'f' : '';
+      if (value >= 0) { el.style.setProperty('--c', COLORS[value]); filled++; } else el.style.removeProperty('--c');
+    });
+    els.board.setAttribute('aria-label', t.board(filled));
+  }
+
+  function pieceMarkup(piece) {
+    return piece.shape.cells.map(([r, c]) => `<i class="blk" style="grid-area:${r + 1}/${c + 1};--c:${COLORS[piece.color]}"></i>`).join('');
+  }
+
+  function renderTray(dealt = false) {
+    tray.forEach((piece, i) => {
+      const slot = slots[i];
+      slot.querySelector('.piece')?.remove();
+      slot.classList.toggle('sel', selected === i);
+      if (!piece) { slot.setAttribute('aria-label', t.empty(i + 1)); slot.setAttribute('aria-disabled', 'true'); return; }
+      slot.removeAttribute('aria-disabled');
+      slot.setAttribute('aria-label', t.piece(i + 1, piece.shape.cells.length));
+      const el = document.createElement('span');
+      el.className = `piece${dealt ? ' deal' : ''}${fitsAnywhere(piece.shape) ? '' : ' stuck'}`;
+      el.style.cssText = `--w:${piece.shape.w};--h:${piece.shape.h};--d:${i * 70}ms`;
+      el.setAttribute('aria-hidden', 'true');
+      el.innerHTML = pieceMarkup(piece);
+      slot.append(el);
+    });
+  }
+
+  function clearGhost() {
+    for (const el of cellEls) { el.classList.remove('g-ok', 'g-bad', 'wc'); el.style.removeProperty('--gc'); }
+  }
+
+  function showGhost(piece, r, c) {
+    clearGhost();
+    if (!piece || r == null) return false;
+    const ok = fits(piece.shape, r, c);
+    const cells = [];
+    for (const [dr, dc] of piece.shape.cells) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE) continue;
+      const i = rr * SIZE + cc;
+      cells.push(i);
+      cellEls[i].classList.add(ok ? 'g-ok' : 'g-bad');
+      cellEls[i].style.setProperty('--gc', COLORS[piece.color]);
+    }
+    // Preview which rows and columns this drop would clear.
+    if (ok) for (const i of lineCells(fullLines(cells))) { cellEls[i].classList.add('wc'); if (grid[i] < 0) cellEls[i].style.setProperty('--c', COLORS[piece.color]); }
+    return ok;
+  }
+
+  function setScore(value, gained = 0) {
+    score = value;
+    els.score.textContent = String(score);
+    if (score > best) { best = score; writeBest(best); }
+    els.best.textContent = String(best);
+    if (gained) {
+      els.gain.textContent = `+${gained}`;
+      els.gain.className = 'gain';
+      void els.gain.offsetWidth;
+      els.gain.className = 'gain show';
+    }
+  }
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function select(i) {
+    if (over || !tray[i]) return;
+    selected = i;
+    slots.forEach((slot, k) => slot.classList.toggle('sel', k === i));
+    const shape = tray[i].shape;
+    if (!cursor) cursor = { r: Math.floor((SIZE - shape.h) / 2), c: Math.floor((SIZE - shape.w) / 2) };
+    clampCursor();
+    if (keyboardMode) showGhost(tray[i], cursor.r, cursor.c);
+  }
+
+  function clampCursor() {
+    const shape = tray[selected].shape;
+    cursor.r = Math.max(0, Math.min(SIZE - shape.h, cursor.r));
+    cursor.c = Math.max(0, Math.min(SIZE - shape.w, cursor.c));
+  }
+
+  function selectNext() {
+    const order = [0, 1, 2].map(k => (selected + 1 + k) % 3);
+    const next = order.find(k => tray[k]);
+    selected = null;
+    if (next != null) select(next);
+  }
+
+  function floatText(html, r, c, glow) {
+    const el = document.createElement('div');
+    el.className = 'float';
+    el.innerHTML = html;
+    el.style.left = `${((c + 0.5) / SIZE) * 100}%`;
+    el.style.top = `${((r + 0.5) / SIZE) * 100}%`;
+    if (glow) el.style.setProperty('--glow', glow);
+    els.board.append(el);
+    setTimeout(() => el.remove(), 1000);
+  }
+
+  function burstCells(cells, colorOf) {
+    let k = 0;
+    for (const i of cells) {
+      const el = document.createElement('i');
+      el.style.cssText = `grid-area:${Math.floor(i / SIZE) + 1}/${(i % SIZE) + 1};--c:${colorOf(i)};--d:${(k++ % 8) * 22}ms`;
+      els.fx.append(el);
+      setTimeout(() => el.remove(), 650);
+    }
+  }
+
+  function place(slotIndex, r, c) {
+    const piece = tray[slotIndex];
+    if (over || !piece || !fits(piece.shape, r, c)) return false;
+    const placed = piece.shape.cells.map(([dr, dc]) => (r + dr) * SIZE + (c + dc));
+    for (const i of placed) grid[i] = piece.color;
+    tray[slotIndex] = null;
+
+    const lines = fullLines([]);
+    const count = lines.rows.length + lines.cols.length;
+    let gained = placed.length;
+    const messages = [];
+    if (count) {
+      streak += 1;
+      sinceClear = 0;
+      const cleared = lineCells(lines);
+      const colors = new Map([...cleared].map(i => [i, COLORS[grid[i]]]));
+      for (const i of cleared) grid[i] = -1;
+      burstCells(cleared, i => colors.get(i));
+      const linePoints = LINE_POINTS(count) * streak;
+      gained += linePoints;
+      const perfect = grid.every(v => v < 0);
+      if (perfect) gained += PERFECT_BONUS;
+      // Float the points over the middle of what was cleared.
+      const idx = [...cleared];
+      const midR = idx.reduce((s, i) => s + Math.floor(i / SIZE), 0) / idx.length;
+      const midC = idx.reduce((s, i) => s + (i % SIZE), 0) / idx.length;
+      const extra = perfect ? t.perfect : streak > 1 ? t.combo(streak) : '';
+      floatText(`+${gained}${extra ? `<small>${extra}</small>` : ''}`, Math.min(SIZE - 1.5, Math.max(0.5, midR)), Math.min(SIZE - 2, Math.max(1, midC)), COLORS[piece.color]);
+      messages.push(t.cleared(count, linePoints));
+      if (streak > 1) messages.push(t.combo(streak));
+      if (perfect) messages.push(t.perfect);
+    } else {
+      sinceClear += 1;
+      if (sinceClear >= STREAK_GRACE) streak = 0;
+    }
+    els.combo.hidden = streak < 2;
+    els.combo.textContent = t.combo(Math.max(streak, 1));
+
+    clearGhost();
+    renderBoard();
+    for (const i of placed) if (grid[i] >= 0) { cellEls[i].classList.add('land'); }
+    setScore(score + gained, gained);
+    if (score >= nextMilestone) { messages.push(t.milestone(nextMilestone)); while (nextMilestone <= score) nextMilestone += 1000; }
+
+    if (tray.every(p => !p)) { dealTray(); messages.push(t.newSet); selected = null; selectNext(); }
+    else { renderTray(); selectNext(); }
+    announce(messages.length ? messages.join(' ') : t.placed(score));
+    if (keyboardMode && selected != null) showGhost(tray[selected], cursor.r, cursor.c);
+    checkGameOver();
+    return true;
+  }
+
+  function checkGameOver() {
+    if (tray.some(p => p && fitsAnywhere(p.shape))) return;
+    over = true;
+    clearGhost();
+    const isBest = score > startBest;
+    els.result.textContent = t.result(score);
+    els.bestLine.textContent = t.bestLine(Math.max(best, score));
+    els.newBest.hidden = !isBest;
+    announce(`${t.over} ${t.result(score)}${isBest ? ` ${t.newBest}` : ''}`);
+    setTimeout(() => { if (!over) return; els.over.hidden = false; els.again.focus({ preventScroll: true }); }, 700);
+  }
+
+  function newGame() {
+    cancelDrag();
+    grid = Array(SIZE * SIZE).fill(-1);
+    best = readBest();
+    startBest = best;
+    streak = 0; sinceClear = 0; selected = null; cursor = null; over = false; nextMilestone = 1000;
+    els.fx.replaceChildren();
+    els.board.querySelectorAll('.float').forEach(el => el.remove());
+    els.combo.hidden = true;
+    els.over.hidden = true;
+    setScore(0);
+    renderBoard();
+    clearGhost();
+    dealTray();
+    select(0);
+  }
+
+  // Board geometry in client pixels, measured from the rendered cells.
+  function metrics() {
+    const a = cellEls[0].getBoundingClientRect(), b = cellEls[1].getBoundingClientRect(), d = cellEls[SIZE].getBoundingClientRect();
+    return { left: a.left, top: a.top, cell: a.width, pitchX: b.left - a.left, pitchY: d.top - a.top };
+  }
+
+  function startDrag(i, event) {
+    if (over || !tray[i] || drag || event.button > 0) return;
+    event.preventDefault();
+    keyboardMode = false;
+    select(i);
+    const piece = tray[i];
+    const m = metrics();
+    const gap = m.pitchX - m.cell;
+    const w = piece.shape.w * m.pitchX - gap, h = piece.shape.h * m.pitchY - gap;
+    const el = document.createElement('div');
+    el.className = 'drag';
+    el.style.cssText = `--u:${m.cell}px;grid-template-columns:repeat(${piece.shape.w},${m.cell}px);grid-template-rows:repeat(${piece.shape.h},${m.cell}px);gap:${gap}px;visibility:hidden`;
+    el.innerHTML = pieceMarkup(piece);
+    document.body.append(el);
+    // On touch the piece floats above the finger so it never hides under it.
+    const lift = event.pointerType === 'mouse' ? h / 2 : h + Math.max(36, m.cell * 1.1);
+    drag = { i, el, m, id: event.pointerId, x0: event.clientX, y0: event.clientY, grab: { x: w / 2, y: lift }, moved: false, anchor: null };
+    try { slots[i].setPointerCapture(event.pointerId); } catch {}
+  }
+
+  function moveDrag(event) {
+    if (!drag || event.pointerId !== drag.id) return;
+    if (!drag.moved && Math.hypot(event.clientX - drag.x0, event.clientY - drag.y0) < 6) return;
+    if (!drag.moved) { drag.moved = true; drag.el.style.visibility = ''; slots[drag.i].classList.add('lifted'); }
+    const x = event.clientX - drag.grab.x, y = event.clientY - drag.grab.y;
+    drag.el.style.transform = `translate(${x}px, ${y}px)`;
+    const { m } = drag;
+    const r = Math.round((y - m.top) / m.pitchY), c = Math.round((x - m.left) / m.pitchX);
+    const shape = tray[drag.i].shape;
+    const inside = r >= 0 && c >= 0 && r + shape.h <= SIZE && c + shape.w <= SIZE;
+    if (inside && (!drag.anchor || drag.anchor.r !== r || drag.anchor.c !== c)) { drag.anchor = { r, c }; showGhost(tray[drag.i], r, c); }
+    else if (!inside && drag.anchor) { drag.anchor = null; clearGhost(); }
+  }
+
+  function endDrag(event) {
+    if (!drag || event.pointerId !== drag.id) return;
+    const { i, anchor, moved } = drag;
+    cancelDrag();
+    if (moved && anchor && place(i, anchor.r, anchor.c)) { cursor = { ...anchor }; return; }
+    if (!moved) slots[i].focus({ preventScroll: true });
+  }
+
+  function cancelDrag() {
+    if (!drag) return;
+    drag.el.remove();
+    slots[drag.i].classList.remove('lifted');
+    drag = null;
+    clearGhost();
+  }
+
+  // Tap or click a board square to drop the selected piece centred there; mouse hover previews it.
+  function boardCellFromEvent(event) {
+    const m = metrics();
+    const r = Math.floor((event.clientY - m.top + (m.pitchY - m.cell) / 2) / m.pitchY);
+    const c = Math.floor((event.clientX - m.left + (m.pitchX - m.cell) / 2) / m.pitchX);
+    if (r < 0 || c < 0 || r >= SIZE || c >= SIZE || selected == null || !tray[selected]) return null;
+    const shape = tray[selected].shape;
+    return { r: Math.max(0, Math.min(SIZE - shape.h, r - Math.floor((shape.h - 1) / 2))), c: Math.max(0, Math.min(SIZE - shape.w, c - Math.floor((shape.w - 1) / 2))) };
+  }
+  els.board.addEventListener('pointermove', event => {
+    if (drag || over || event.pointerType !== 'mouse') return;
+    const spot = boardCellFromEvent(event);
+    keyboardMode = false;
+    if (spot) { cursor = spot; showGhost(tray[selected], spot.r, spot.c); } else clearGhost();
+  });
+  els.board.addEventListener('pointerleave', () => { if (!drag && !keyboardMode) clearGhost(); });
+  els.board.addEventListener('pointerup', event => {
+    if (drag || over) return;
+    const spot = boardCellFromEvent(event);
+    if (!spot) return;
+    cursor = spot;
+    if (!place(selected, spot.r, spot.c)) { showGhost(tray[selected], spot.r, spot.c); setTimeout(() => { if (!drag && !keyboardMode) clearGhost(); }, 500); }
+  });
+
+  const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  document.addEventListener('keydown', event => {
+    if (over || event.altKey || event.ctrlKey || event.metaKey) return;
+    const active = document.activeElement;
+    const inGame = active === document.body || active === els.board || slots.includes(active) || !active;
+    if (['1', '2', '3'].includes(event.key)) {
+      const i = Number(event.key) - 1;
+      if (!tray[i]) return;
+      event.preventDefault();
+      keyboardMode = true;
+      slots[i].focus({ preventScroll: true });
+      select(i);
+      announce(`${t.piece(i + 1, tray[i].shape.cells.length)}. ${t.at(cursor.r + 1, cursor.c + 1, fits(tray[i].shape, cursor.r, cursor.c))}`);
+      return;
+    }
+    if (selected == null || !tray[selected]) return;
+    if (ARROWS[event.key]) {
+      event.preventDefault();
+      const [dr, dc] = ARROWS[event.key];
+      if (keyboardMode) { cursor.r += dr; cursor.c += dc; clampCursor(); }
+      keyboardMode = true;
+      const ok = showGhost(tray[selected], cursor.r, cursor.c);
+      announce(t.at(cursor.r + 1, cursor.c + 1, ok));
+    } else if ((event.key === 'Enter' || event.key === ' ') && inGame) {
+      event.preventDefault();
+      if (!keyboardMode) { keyboardMode = true; showGhost(tray[selected], cursor.r, cursor.c); return; }
+      if (!place(selected, cursor.r, cursor.c)) announce(t.at(cursor.r + 1, cursor.c + 1, false));
+      else if (selected != null) slots[selected].focus({ preventScroll: true });
+    }
+  });
+  document.addEventListener('keyup', event => {
+    if (event.key === 'Tab' && slots.includes(document.activeElement)) { keyboardMode = true; if (selected != null && tray[selected]) showGhost(tray[selected], cursor.r, cursor.c); }
+  });
+
+  $('restart').addEventListener('click', newGame);
+  els.again.addEventListener('click', () => { newGame(); slots[0].focus({ preventScroll: true }); });
+  window.addEventListener('blur', cancelDrag);
+
+  newGame();
+})();
+</script>
+</body>
+</html>

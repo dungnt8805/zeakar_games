@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blob Arena</title>
+<style>
+:root {
+  --ink: #1f2537;
+  --muted: #69718a;
+  --accent: #ff7a59;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: #f7f8fc; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+canvas:focus-visible { outline: none; }
+
+.hud { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 10px; padding: 8px 12px; border-radius: 12px; background: #ffffffd9; box-shadow: 0 4px 14px #1f253714; font-size: 13px; font-weight: 700; pointer-events: none; }
+.hud strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.hud[hidden] { display: none; }
+.board { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; width: 150px; padding: 8px 10px; border-radius: 12px; background: #1f2537cc; color: #fff; font-size: 12px; pointer-events: none; }
+.board h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #ffd8cc; margin-bottom: 4px; }
+.board ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+.board li { display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; }
+.board li span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.board li.me { color: #ffcf5c; font-weight: 800; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: #f7f8fc99; backdrop-filter: blur(2px); }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 340px); padding: 26px 22px; border-radius: 26px; background: #fff; text-align: center; box-shadow: 0 20px 50px #1f253726; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.panel h1, .panel h2 { font-size: clamp(32px, 10vw, 42px); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; }
+.panel h1 span { color: var(--accent); }
+.panel h2 { font-size: 26px; }
+.panel p { margin-top: 10px; font-size: 15px; line-height: 1.5; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.blobs { display: flex; justify-content: center; align-items: end; gap: 6px; margin-bottom: 14px; }
+.blobs i { border-radius: 50%; border: 3px solid #0002; }
+.panel button { margin-top: 20px; width: 100%; padding: 15px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 5px 0 #d65a3b; }
+.panel button:active { transform: translateY(3px); box-shadow: 0 2px 0 #d65a3b; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.stats div { padding: 8px 4px; border-radius: 12px; background: #f2f4fa; }
+.stats small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stats strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 12px; padding: 5px 14px; border-radius: 99px; background: #ffcf5c; font-weight: 800; font-size: 13px; }
+.badge[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 380px) { .board { width: 124px; font-size: 11px; } }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" aria-label="Blob Arena"></canvas>
+<div class="hud" id="hud" hidden><span data-i18n="mass"></span> <strong id="mass">0</strong></div>
+<div class="board" aria-hidden="true"><h2 data-i18n="leaders"></h2><ol id="leaders"></ol></div>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <div class="blobs" aria-hidden="true"><i style="width:22px;height:22px;background:#5ac8fa"></i><i style="width:44px;height:44px;background:#ff7a59"></i><i style="width:30px;height:30px;background:#a78bfa"></i></div>
+    <h1 id="start-title">Blob <span>Arena</span></h1>
+    <p data-i18n="tagline"></p>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="dead" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dead-title">
+    <h2 id="dead-title"></h2>
+    <div class="stats">
+      <div><small data-i18n="maxMass"></small><strong id="stat-mass"></strong></div>
+      <div><small data-i18n="bestRank"></small><strong id="stat-rank"></strong></div>
+      <div><small data-i18n="time"></small><strong id="stat-time"></strong></div>
+    </div>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="small" id="best-line"></p>
+    <button type="button" id="again" data-i18n="again"></button>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Eat the dots and smaller blobs to grow. Stay away from bigger ones!', controls: 'Move with your mouse or finger, or the arrow keys.', play: 'Play', mass: 'Mass', leaders: 'Leaderboard', you: 'You', eatenBy: n => `Eaten by ${n}!`, maxMass: 'Max mass', bestRank: 'Best rank', time: 'Time', newBest: 'New best!', best: m => `Your best mass: ${m}`, again: 'Play again' },
+    vi: { tagline: 'Ăn hạt và các blob nhỏ hơn để lớn lên. Tránh xa blob to hơn!', controls: 'Di chuyển bằng chuột, ngón tay hoặc phím mũi tên.', play: 'Chơi', mass: 'Khối lượng', leaders: 'Bảng xếp hạng', you: 'Bạn', eatenBy: n => `Bị ${n} ăn mất!`, maxMass: 'Lớn nhất', bestRank: 'Hạng cao nhất', time: 'Thời gian', newBest: 'Kỷ lục mới!', best: m => `Kỷ lục của bạn: ${m}`, again: 'Chơi lại' },
+    zh: { tagline: '吃掉小点和更小的泡泡来长大，远离比你大的！', controls: '用鼠标、手指或方向键移动。', play: '开始', mass: '质量', leaders: '排行榜', you: '你', eatenBy: n => `被 ${n} 吃掉了！`, maxMass: '最大质量', bestRank: '最高排名', time: '时间', newBest: '新纪录！', best: m => `你的最佳质量：${m}`, again: '再玩一次' },
+    fr: { tagline: 'Mangez les points et les blobs plus petits pour grandir. Fuyez les plus gros !', controls: 'Déplacez-vous avec la souris, le doigt ou les flèches.', play: 'Jouer', mass: 'Masse', leaders: 'Classement', you: 'Vous', eatenBy: n => `Mangé par ${n} !`, maxMass: 'Masse max', bestRank: 'Meilleur rang', time: 'Temps', newBest: 'Nouveau record !', best: m => `Votre record : ${m}`, again: 'Rejouer' },
+    th: { tagline: 'กินจุดและบล็อบที่เล็กกว่าเพื่อโตขึ้น หนีบล็อบที่ใหญ่กว่า!', controls: 'เคลื่อนที่ด้วยเมาส์ นิ้ว หรือปุ่มลูกศร', play: 'เล่น', mass: 'มวล', leaders: 'อันดับ', you: 'คุณ', eatenBy: n => `ถูก ${n} กิน!`, maxMass: 'มวลสูงสุด', bestRank: 'อันดับดีสุด', time: 'เวลา', newBest: 'สถิติใหม่!', best: m => `มวลสูงสุดของคุณ: ${m}`, again: 'เล่นอีกครั้ง' },
+    ja: { tagline: 'ドットや小さいブロブを食べて大きくなろう。大きいブロブからは逃げて！', controls: 'マウス、指、または矢印キーで移動。', play: 'プレイ', mass: '質量', leaders: 'ランキング', you: 'あなた', eatenBy: n => `${n} に食べられた！`, maxMass: '最大質量', bestRank: '最高順位', time: 'タイム', newBest: '自己ベスト更新！', best: m => `ベスト質量：${m}`, again: 'もう一度' },
+    ko: { tagline: '점과 작은 블롭을 먹고 커지세요. 큰 블롭은 피하세요!', controls: '마우스, 손가락 또는 방향키로 이동하세요.', play: '플레이', mass: '질량', leaders: '순위', you: '나', eatenBy: n => `${n}에게 먹혔어요!`, maxMass: '최대 질량', bestRank: '최고 순위', time: '시간', newBest: '최고 기록!', best: m => `최고 질량: ${m}`, again: '다시 하기' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+
+  const WORLD = 2000;
+  const PELLETS = 520;
+  const BOTS = 16;
+  const START_MASS = 15;
+  const EAT_RATIO = 1.15;
+  const STORAGE_KEY = 'milaan.blobArena.best';
+  const COLORS = ['#ff7a59', '#5ac8fa', '#a78bfa', '#34c77b', '#ffcf5c', '#ff5c8a', '#4f7cff', '#2ec4b6', '#f59f3a', '#9ad14b'];
+  const NAMES = ['Mochi', 'Bubbles', 'Nova', 'Pixel', 'Blobby', 'Kiwi', 'Comet', 'Noodle', 'Biscuit', 'Jelly', 'Ziggy', 'Pudding', 'Taro', 'Sprout', 'Gizmo', 'Peanut', 'Luna', 'Dumpling', 'Boba', 'Waffle'];
+
+  const radius = mass => 4 * Math.sqrt(mass) + 4;
+  const speed = mass => 380 * Math.pow(mass, -0.22);
+  const rand = (min, max) => min + Math.random() * (max - min);
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = { hud: $('hud'), mass: $('mass'), leaders: $('leaders'), start: $('start'), dead: $('dead'), deadTitle: $('dead-title'), statMass: $('stat-mass'), statRank: $('stat-rank'), statTime: $('stat-time'), newBest: $('new-best'), bestLine: $('best-line'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+
+  let view = { w: 0, h: 0, dpr: 1 };
+  function resize() {
+    view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2) };
+    canvas.width = Math.round(view.w * view.dpr);
+    canvas.height = Math.round(view.h * view.dpr);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  const pellets = [];
+  const newPellet = () => ({ x: rand(10, WORLD - 10), y: rand(10, WORLD - 10), color: pick(COLORS) });
+  for (let i = 0; i < PELLETS; i++) pellets.push(newPellet());
+
+  let cells = [];
+  let player = null;
+  let run = null;
+  const usedNames = new Set();
+
+  function spawnPoint(minDistance) {
+    for (let i = 0; i < 20; i++) {
+      const x = rand(80, WORLD - 80), y = rand(80, WORLD - 80);
+      if (!player || Math.hypot(x - player.x, y - player.y) > minDistance) return { x, y };
+    }
+    return { x: rand(80, WORLD - 80), y: rand(80, WORLD - 80) };
+  }
+
+  function spawnBot() {
+    const name = pick(NAMES.filter(n => !usedNames.has(n)));
+    usedNames.add(name);
+    // Mostly small bots, with an occasional big one to keep things tense.
+    const mass = Math.random() < 0.2 ? rand(60, 160) : rand(8, 40);
+    const { x, y } = spawnPoint(700);
+    cells.push({ name, mass, x, y, color: pick(COLORS), dx: 0, dy: 0, think: 0, bold: rand(0.6, 1.2) });
+  }
+  for (let i = 0; i < BOTS; i++) spawnBot();
+
+  function startGame() {
+    const { x, y } = spawnPoint(0);
+    const safe = cells.every(cell => Math.hypot(cell.x - x, cell.y - y) > 300) ? { x, y } : { x: WORLD / 2, y: WORLD / 2 };
+    player = { name: t.you, mass: START_MASS, x: safe.x, y: safe.y, color: '#ff7a59', dx: 0, dy: 0, isPlayer: true };
+    cells.push(player);
+    run = { start: performance.now(), maxMass: START_MASS, bestRank: cells.length, best: readBest() };
+    pointer.active = false;
+    els.start.hidden = true;
+    els.dead.hidden = true;
+    els.hud.hidden = false;
+    canvas.focus({ preventScroll: true });
+  }
+
+  const pointer = { x: 0, y: 0, active: false };
+  const keys = new Set();
+
+  function steerPlayer() {
+    let dx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0);
+    let dy = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
+    if (dx || dy) { const len = Math.hypot(dx, dy); player.dx = dx / len; player.dy = dy / len; return; }
+    if (!pointer.active) { player.dx = player.dy = 0; return; }
+    // Steer toward the pointer; slow down when it sits on top of the blob.
+    const px = pointer.x - view.w / 2, py = pointer.y - view.h / 2;
+    const dist = Math.hypot(px, py);
+    const scale = Math.min(1, dist / (radius(player.mass) * camera.zoom * 1.5));
+    player.dx = dist ? (px / dist) * scale : 0;
+    player.dy = dist ? (py / dist) * scale : 0;
+  }
+
+  function think(bot) {
+    const r = radius(bot.mass);
+    const range = 320 + r * 3;
+    let threat = null, threatD = Infinity, prey = null, preyScore = 0;
+    for (const other of cells) {
+      if (other === bot) continue;
+      const d = Math.hypot(other.x - bot.x, other.y - bot.y);
+      if (d > range) continue;
+      if (other.mass > bot.mass * EAT_RATIO && d < threatD) { threat = other; threatD = d; }
+      else if (bot.mass > other.mass * EAT_RATIO) { const score = other.mass / d; if (score > preyScore) { prey = other; preyScore = score; } }
+    }
+    let tx, ty;
+    if (threat && threatD < range * 0.75 * bot.bold + radius(threat.mass)) { tx = bot.x - (threat.x - bot.x); ty = bot.y - (threat.y - bot.y); }
+    else if (prey) { tx = prey.x; ty = prey.y; }
+    else {
+      let best = null, bestD = Infinity;
+      for (const p of pellets) { const d = Math.abs(p.x - bot.x) + Math.abs(p.y - bot.y); if (d < bestD) { bestD = d; best = p; } }
+      tx = best ? best.x : rand(0, WORLD); ty = best ? best.y : rand(0, WORLD);
+    }
+    // Push away from the walls so fleeing bots do not pin themselves in a corner.
+    const margin = 150;
+    if (bot.x < margin) tx += 400; if (bot.x > WORLD - margin) tx -= 400;
+    if (bot.y < margin) ty += 400; if (bot.y > WORLD - margin) ty -= 400;
+    const len = Math.hypot(tx - bot.x, ty - bot.y) || 1;
+    bot.dx = (tx - bot.x) / len;
+    bot.dy = (ty - bot.y) / len;
+    bot.think = rand(0.18, 0.35);
+  }
+
+  function update(dt) {
+    if (player) steerPlayer();
+    for (const cell of cells) {
+      if (!cell.isPlayer && (cell.think -= dt) <= 0) think(cell);
+      const v = speed(cell.mass);
+      const r = radius(cell.mass);
+      cell.x = Math.max(r * 0.5, Math.min(WORLD - r * 0.5, cell.x + cell.dx * v * dt));
+      cell.y = Math.max(r * 0.5, Math.min(WORLD - r * 0.5, cell.y + cell.dy * v * dt));
+      // Large blobs slowly lose mass so nobody can grow forever.
+      if (cell.mass > 60) cell.mass -= cell.mass * 0.0025 * dt;
+    }
+
+    for (const cell of cells) {
+      const r = radius(cell.mass);
+      for (let i = 0; i < pellets.length; i++) {
+        const p = pellets[i];
+        if (Math.abs(p.x - cell.x) < r && Math.abs(p.y - cell.y) < r && Math.hypot(p.x - cell.x, p.y - cell.y) < r) {
+          cell.mass += 1;
+          pellets[i] = newPellet();
+        }
+      }
+    }
+
+    const eaten = new Set();
+    for (const a of cells) {
+      if (eaten.has(a)) continue;
+      for (const b of cells) {
+        if (a === b || eaten.has(b) || a.mass <= b.mass * EAT_RATIO) continue;
+        if (Math.hypot(a.x - b.x, a.y - b.y) < radius(a.mass) - radius(b.mass) * 0.35) {
+          a.mass += b.mass;
+          eaten.add(b);
+          if (b === player) die(a);
+        }
+      }
+    }
+    if (eaten.size) {
+      cells = cells.filter(cell => !eaten.has(cell));
+      for (const cell of eaten) if (!cell.isPlayer) { usedNames.delete(cell.name); setTimeout(spawnBot, rand(1500, 4000)); }
+    }
+
+    if (player) {
+      run.maxMass = Math.max(run.maxMass, player.mass);
+      run.bestRank = Math.min(run.bestRank, rank());
+    }
+  }
+
+  const rank = () => [...cells].sort((a, b) => b.mass - a.mass).indexOf(player) + 1;
+
+  function die(killer) {
+    const seconds = Math.round((performance.now() - run.start) / 1000);
+    const mass = Math.round(run.maxMass);
+    const isBest = mass > run.best;
+    if (isBest) writeBest(mass);
+    player = null;
+    els.hud.hidden = true;
+    els.deadTitle.textContent = t.eatenBy(killer.name);
+    els.statMass.textContent = String(mass);
+    els.statRank.textContent = `#${run.bestRank}`;
+    els.statTime.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    els.newBest.hidden = !isBest;
+    els.bestLine.textContent = isBest ? '' : t.best(run.best);
+    els.announcer.textContent = `${t.eatenBy(killer.name)} ${t.maxMass}: ${mass}`;
+    setTimeout(() => { els.dead.hidden = false; $('again').focus({ preventScroll: true }); }, 600);
+  }
+
+  const camera = { x: WORLD / 2, y: WORLD / 2, zoom: 1 };
+
+  function draw() {
+    const focus = player ?? cells.reduce((a, b) => (b.mass > a.mass ? b : a), cells[0]);
+    const base = Math.min(view.w, view.h) / 620;
+    const targetZoom = base * Math.max(0.42, Math.min(1.05, 48 / (radius(focus?.mass ?? 20) + 28)));
+    camera.zoom += (targetZoom - camera.zoom) * 0.08;
+    if (focus) { camera.x += (focus.x - camera.x) * 0.15; camera.y += (focus.y - camera.y) * 0.15; }
+    const z = camera.zoom;
+
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    ctx.fillStyle = '#e9ecf4';
+    ctx.fillRect(0, 0, view.w, view.h);
+    ctx.setTransform(view.dpr * z, 0, 0, view.dpr * z, view.dpr * (view.w / 2 - camera.x * z), view.dpr * (view.h / 2 - camera.y * z));
+    ctx.fillStyle = '#f7f8fc';
+    ctx.fillRect(0, 0, WORLD, WORLD);
+
+    const left = camera.x - view.w / 2 / z, right = camera.x + view.w / 2 / z;
+    const top = camera.y - view.h / 2 / z, bottom = camera.y + view.h / 2 / z;
+    ctx.strokeStyle = '#e1e5ef';
+    ctx.lineWidth = 1 / z;
+    ctx.beginPath();
+    for (let x = Math.max(0, Math.floor(left / 50) * 50); x <= Math.min(WORLD, right); x += 50) { ctx.moveTo(x, Math.max(0, top)); ctx.lineTo(x, Math.min(WORLD, bottom)); }
+    for (let y = Math.max(0, Math.floor(top / 50) * 50); y <= Math.min(WORLD, bottom); y += 50) { ctx.moveTo(Math.max(0, left), y); ctx.lineTo(Math.min(WORLD, right), y); }
+    ctx.stroke();
+    ctx.strokeStyle = '#c9cfdd';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, WORLD, WORLD);
+
+    for (const p of pellets) {
+      if (p.x < left - 6 || p.x > right + 6 || p.y < top - 6 || p.y > bottom + 6) continue;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    for (const cell of [...cells].sort((a, b) => a.mass - b.mass)) {
+      const r = radius(cell.mass);
+      if (cell.x + r < left || cell.x - r > right || cell.y + r < top || cell.y - r > bottom) continue;
+      ctx.fillStyle = cell.color;
+      ctx.strokeStyle = '#00000022';
+      ctx.lineWidth = Math.max(3, r * 0.08);
+      ctx.beginPath(); ctx.arc(cell.x, cell.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (cell.isPlayer) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cell.x, cell.y, r - ctx.lineWidth * 2, 0, Math.PI * 2); ctx.stroke(); }
+      const size = Math.max(10, r * 0.42);
+      if (size * z >= 7) {
+        ctx.font = `800 ${size}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = size * 0.18; ctx.strokeStyle = '#00000055'; ctx.fillStyle = '#fff';
+        ctx.strokeText(cell.name, cell.x, cell.y); ctx.fillText(cell.name, cell.x, cell.y);
+      }
+    }
+
+    // Minimap in the bottom-right corner.
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    const size = Math.min(110, view.w * 0.26), pad = 10, mx = view.w - size - pad, my = view.h - size - pad;
+    ctx.fillStyle = '#1f253733';
+    ctx.fillRect(mx, my, size, size);
+    for (const cell of cells) {
+      if (!cell.isPlayer && cell.mass < 40) continue;
+      ctx.fillStyle = cell.isPlayer ? '#ffffff' : cell.color;
+      ctx.beginPath(); ctx.arc(mx + (cell.x / WORLD) * size, my + (cell.y / WORLD) * size, cell.isPlayer ? 4 : 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    if (player) { ctx.strokeStyle = '#ff7a59'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + (player.x / WORLD) * size, my + (player.y / WORLD) * size, 5, 0, Math.PI * 2); ctx.stroke(); }
+  }
+
+  let lastBoard = 0;
+  function updateBoard(now) {
+    if (now - lastBoard < 250) return;
+    lastBoard = now;
+    const sorted = [...cells].sort((a, b) => b.mass - a.mass);
+    const rows = sorted.slice(0, 5).map((cell, i) => `<li class="${cell.isPlayer ? 'me' : ''}"><span>${i + 1}. ${cell.name}</span><span>${Math.round(cell.mass)}</span></li>`);
+    if (player && !sorted.slice(0, 5).includes(player)) rows.push(`<li class="me"><span>${sorted.indexOf(player) + 1}. ${player.name}</span><span>${Math.round(player.mass)}</span></li>`);
+    els.leaders.innerHTML = rows.join('');
+    if (player) els.mass.textContent = String(Math.round(player.mass));
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    draw();
+    updateBoard(now);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  canvas.addEventListener('pointermove', event => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; keys.clear(); });
+  canvas.addEventListener('pointerdown', event => { canvas.setPointerCapture(event.pointerId); pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; keys.clear(); });
+  const KEY_DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+  document.addEventListener('keydown', event => { if (KEY_DIRS[event.key] && player) { keys.add(KEY_DIRS[event.key]); event.preventDefault(); } });
+  document.addEventListener('keyup', event => { if (KEY_DIRS[event.key]) keys.delete(KEY_DIRS[event.key]); });
+  addEventListener('blur', () => keys.clear());
+  $('play').addEventListener('click', startGame);
+  $('again').addEventListener('click', startGame);
+})();
+</script>
+</body>
+</html>

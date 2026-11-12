@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Math Rush</title>
+<style>
+:root {
+  --ink: #1d2b36;
+  --muted: #5b6b77;
+  --teal: #0f9a90;
+  --teal-dark: #0b7a72;
+  --sun: #f7d86a;
+  --coral: #ef5b5b;
+  --paper: #fffdf6;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: linear-gradient(170deg, var(--sun) 0%, #a9d79a 55%, #13a59b 100%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 480px; margin: auto; display: flex; flex-direction: column; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+.screen { flex: 1; display: none; flex-direction: column; min-height: 0; }
+body[data-state="start"] .screen-start,
+body[data-state="play"] .screen-play,
+body[data-state="over"] .screen-over { display: flex; }
+
+/* Start + game over panels */
+.panel { margin: auto 0; background: var(--paper); border-radius: 28px; padding: 32px 24px; text-align: center; box-shadow: 0 18px 40px #0b5a5433; }
+.logo { font-size: clamp(40px, 13vw, 56px); font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+.logo span { color: var(--teal); }
+.symbols { display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; }
+.symbols b { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; color: #fff; background: var(--teal); transform: rotate(-6deg); }
+.symbols b:nth-child(2) { background: var(--coral); transform: rotate(5deg); }
+.symbols b:nth-child(3) { background: #f2a93b; transform: rotate(-3deg); }
+.symbols b:nth-child(4) { background: #6a6fd8; transform: rotate(7deg); }
+.tagline { margin-top: 14px; font-size: 18px; font-weight: 700; }
+.rules { margin-top: 10px; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.cta { margin-top: 24px; width: 100%; padding: 18px; border-radius: 18px; background: var(--teal); color: #fff; font-size: 20px; font-weight: 800; box-shadow: 0 6px 0 var(--teal-dark); transition: transform .08s, box-shadow .08s; }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--teal-dark); }
+.hint { margin-top: 14px; font-size: 12px; color: var(--muted); }
+@media (pointer: coarse) { .hint, .key { display: none; } }
+.store-link { display: inline-block; margin-top: 18px; font-size: 14px; font-weight: 700; color: var(--teal-dark); text-underline-offset: 4px; }
+
+/* Play */
+.hud { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.stat { min-width: 76px; padding: 8px 12px; border-radius: 14px; background: #ffffffb3; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stat strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.clock { position: relative; flex: 1; text-align: center; font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.clock.low { color: var(--coral); }
+.delta { position: absolute; left: 50%; top: -6px; font-size: 16px; font-weight: 900; opacity: 0; pointer-events: none; transform: translate(-50%, 0); }
+.delta.show { animation: float 0.9s ease-out; }
+.delta.plus { color: var(--teal-dark); }
+.delta.minus { color: var(--coral); }
+@keyframes float { 0% { opacity: 1; transform: translate(-50%, 6px); } 100% { opacity: 0; transform: translate(-50%, -22px); } }
+.timebar { height: 10px; margin-top: 12px; border-radius: 99px; background: #ffffff80; overflow: hidden; }
+.timebar i { display: block; height: 100%; width: 100%; background: var(--teal); border-radius: inherit; transform-origin: left; }
+.timebar.low i { background: var(--coral); }
+
+.question { flex: 1; min-height: 120px; margin: 16px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--paper); border-radius: 28px; box-shadow: 0 14px 30px #0b5a5426; position: relative; }
+.question p { font-size: clamp(44px, 15vw, 72px); font-weight: 900; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.question p.pop { animation: pop .22s ease-out; }
+@keyframes pop { from { transform: scale(.82); opacity: .3; } }
+.streak { position: absolute; bottom: 14px; font-size: 13px; font-weight: 800; color: #f2a93b; min-height: 1em; }
+
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.answer { position: relative; padding: clamp(16px, 5.5vh, 28px) 8px; border-radius: 20px; background: #fff; font-size: clamp(26px, 8vw, 34px); font-weight: 900; font-variant-numeric: tabular-nums; box-shadow: 0 6px 0 #0b5a5440; transition: transform .08s, box-shadow .08s, background .15s; }
+.answer:active { transform: translateY(4px); box-shadow: 0 2px 0 #0b5a5440; }
+.answer .key { position: absolute; top: 8px; left: 12px; font-size: 11px; font-weight: 800; color: #9aa6af; }
+.answer.right { background: var(--teal); color: #fff; }
+.answer.wrong { background: var(--coral); color: #fff; animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* Game over */
+.over-title { font-size: 30px; font-weight: 900; }
+.final { margin-top: 10px; font-size: 84px; font-weight: 900; line-height: 1; color: var(--teal); font-variant-numeric: tabular-nums; }
+.final-label { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.badge { display: inline-block; margin-top: 14px; padding: 6px 14px; border-radius: 99px; background: #f2a93b; color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.summary { margin-top: 12px; font-size: 15px; color: var(--muted); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body data-state="start">
+<main class="app">
+  <section class="screen screen-start" aria-labelledby="start-title">
+    <div class="panel">
+      <div class="symbols" aria-hidden="true"><b>+</b><b>−</b><b>×</b><b>÷</b></div>
+      <h1 id="start-title" class="logo">Math <span>Rush</span></h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <p class="rules" data-i18n="rules"></p>
+      <button type="button" class="cta" id="start" data-i18n="start"></button>
+      <p class="hint" data-i18n="keys"></p>
+    </div>
+  </section>
+
+  <section class="screen screen-play" aria-label="Math Rush">
+    <div class="hud">
+      <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong></div>
+      <div class="clock" id="clock" role="timer" aria-live="off">60<span class="delta" id="delta" aria-hidden="true"></span></div>
+      <div class="stat"><small data-i18n="best"></small><strong id="best-hud">0</strong></div>
+    </div>
+    <div class="timebar" id="timebar"><i id="timefill"></i></div>
+    <div class="question">
+      <p id="question" aria-live="polite"></p>
+      <span class="streak" id="streak" aria-hidden="true"></span>
+    </div>
+    <div class="answers" id="answers">
+      <button type="button" class="answer"><span class="key">1</span><span class="value"></span></button>
+      <button type="button" class="answer"><span class="key">2</span><span class="value"></span></button>
+      <button type="button" class="answer"><span class="key">3</span><span class="value"></span></button>
+      <button type="button" class="answer"><span class="key">4</span><span class="value"></span></button>
+    </div>
+  </section>
+
+  <section class="screen screen-over" aria-labelledby="over-title">
+    <div class="panel">
+      <h2 id="over-title" class="over-title" data-i18n="timeUp"></h2>
+      <p class="final" id="final">0</p>
+      <p class="final-label" data-i18n="score"></p>
+      <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+      <p class="summary" id="summary"></p>
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+      <a class="store-link" href="https://play.google.com/store/apps/details?id=com.zeakar.games.mathgame" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+    </div>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="assertive"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'How many can you solve in 60 seconds?', rules: 'Tap the right answer. A wrong answer costs 3 seconds. Every 5 in a row adds 3 seconds.', start: 'Start', keys: 'Tip: press keys 1–4 to answer', score: 'Score', best: 'Best', timeUp: "Time's up!", newBest: 'New best!', again: 'Play again', full: 'Get Math Challenge on Google Play', summary: (s, b) => `Best: ${b} · ${s} correct`, streak: n => `${n} in a row`, correct: 'Correct', wrong: a => `Wrong, the answer is ${a}` },
+    vi: { tagline: 'Bạn giải được bao nhiêu phép tính trong 60 giây?', rules: 'Chạm vào đáp án đúng. Sai một câu bị trừ 3 giây. Đúng liên tiếp 5 câu được cộng 3 giây.', start: 'Bắt đầu', keys: 'Mẹo: bấm phím 1–4 để trả lời', score: 'Điểm', best: 'Kỷ lục', timeUp: 'Hết giờ!', newBest: 'Kỷ lục mới!', again: 'Chơi lại', full: 'Tải Math Challenge trên Google Play', summary: (s, b) => `Kỷ lục: ${b} · ${s} câu đúng`, streak: n => `${n} câu liên tiếp`, correct: 'Đúng', wrong: a => `Sai, đáp án là ${a}` },
+    zh: { tagline: '60 秒内你能算对多少题？', rules: '点击正确答案。答错扣 3 秒，连续答对 5 题加 3 秒。', start: '开始', keys: '提示：按 1–4 键作答', score: '得分', best: '最高分', timeUp: '时间到！', newBest: '新纪录！', again: '再玩一次', full: '在 Google Play 获取 Math Challenge', summary: (s, b) => `最高分：${b} · 答对 ${s} 题`, streak: n => `连对 ${n} 题`, correct: '正确', wrong: a => `错误，答案是 ${a}` },
+    fr: { tagline: 'Combien de calculs en 60 secondes ?', rules: 'Touchez la bonne réponse. Une erreur coûte 3 secondes. 5 bonnes réponses d’affilée ajoutent 3 secondes.', start: 'Commencer', keys: 'Astuce : touches 1 à 4 pour répondre', score: 'Score', best: 'Record', timeUp: 'Temps écoulé !', newBest: 'Nouveau record !', again: 'Rejouer', full: 'Obtenir Math Challenge sur Google Play', summary: (s, b) => `Record : ${b} · ${s} bonnes réponses`, streak: n => `${n} d’affilée`, correct: 'Correct', wrong: a => `Faux, la réponse est ${a}` },
+    th: { tagline: 'ใน 60 วินาที คุณคิดเลขถูกได้กี่ข้อ?', rules: 'แตะคำตอบที่ถูกต้อง ตอบผิดเสีย 3 วินาที ตอบถูกติดกัน 5 ข้อได้เพิ่ม 3 วินาที', start: 'เริ่ม', keys: 'เคล็ดลับ: กดปุ่ม 1–4 เพื่อตอบ', score: 'คะแนน', best: 'สูงสุด', timeUp: 'หมดเวลา!', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', full: 'ดาวน์โหลด Math Challenge บน Google Play', summary: (s, b) => `สูงสุด: ${b} · ถูก ${s} ข้อ`, streak: n => `ถูกติดกัน ${n} ข้อ`, correct: 'ถูกต้อง', wrong: a => `ผิด คำตอบคือ ${a}` },
+    ja: { tagline: '60秒で何問解ける？', rules: '正しい答えをタップ。間違えると3秒減り、5問連続正解で3秒増えます。', start: 'スタート', keys: 'ヒント：1～4キーでも回答できます', score: 'スコア', best: 'ベスト', timeUp: 'タイムアップ！', newBest: '自己ベスト更新！', again: 'もう一度', full: 'Google Play で Math Challenge を入手', summary: (s, b) => `ベスト：${b} · 正解 ${s} 問`, streak: n => `${n}問連続`, correct: '正解', wrong: a => `不正解、答えは ${a}` },
+    ko: { tagline: '60초 동안 몇 문제를 풀 수 있을까요?', rules: '정답을 탭하세요. 틀리면 3초가 줄고, 5문제 연속 정답이면 3초가 늘어납니다.', start: '시작', keys: '팁: 1–4 키로 답할 수 있어요', score: '점수', best: '최고', timeUp: '시간 종료!', newBest: '최고 기록!', again: '다시 하기', full: 'Google Play에서 Math Challenge 받기', summary: (s, b) => `최고: ${b} · ${s}문제 정답`, streak: n => `${n}연속 정답`, correct: '정답', wrong: a => `오답, 정답은 ${a}` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+
+  const DURATION = 60_000;
+  const PENALTY = 3_000;
+  const BONUS = 3_000;
+  const STORAGE_KEY = 'milaan.mathRush.best';
+
+  const $ = id => document.getElementById(id);
+  const buttons = [...document.querySelectorAll('.answer')];
+  const els = { score: $('score'), clock: $('clock'), delta: $('delta'), bestHud: $('best-hud'), timebar: $('timebar'), timefill: $('timefill'), question: $('question'), streak: $('streak'), final: $('final'), newBest: $('new-best'), summary: $('summary'), announcer: $('announcer') };
+
+  const readBest = () => { try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; } };
+  const writeBest = value => { try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {} };
+
+  const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+
+  // Difficulty grows every 5 correct answers: bigger numbers first, then × and ÷.
+  function makeQuestion(level) {
+    const ops = level < 2 ? ['+', '−'] : level < 4 ? ['+', '−', '×'] : ['+', '−', '×', '÷'];
+    const max = [10, 20, 30, 50, 99][Math.min(level, 4)];
+    const factor = level < 5 ? 9 : 12;
+    const op = pick(ops);
+    let a, b, answer;
+    if (op === '+') { a = rand(1, max); b = rand(1, max); answer = a + b; }
+    else if (op === '−') { a = rand(2, max); b = rand(1, a - 1); answer = a - b; }
+    else if (op === '×') { a = rand(2, factor); b = rand(2, factor); answer = a * b; }
+    else { b = rand(2, factor); answer = rand(2, factor); a = b * answer; }
+
+    const choices = new Set([answer]);
+    const near = op === '×' ? [a, -a, b, -b, 1, -1, 10, -10] : [1, -1, 2, -2, 10, -10, 3, -3];
+    for (const offset of shuffle(near)) {
+      if (choices.size === 4) break;
+      if (answer + offset >= 0) choices.add(answer + offset);
+    }
+    while (choices.size < 4) choices.add(answer + rand(4, 12));
+    return { text: `${a} ${op} ${b}`, answer, choices: shuffle([...choices]) };
+  }
+
+  let state = null;
+
+  function start() {
+    state = { score: 0, streak: 0, deadline: performance.now() + DURATION, locked: false, frame: 0, pausedLeft: null, best: readBest() };
+    els.score.textContent = '0';
+    els.bestHud.textContent = String(state.best);
+    els.streak.textContent = '';
+    document.body.dataset.state = 'play';
+    nextQuestion();
+    tick();
+    buttons[0].focus({ preventScroll: true });
+  }
+
+  function nextQuestion() {
+    state.current = makeQuestion(Math.floor(state.score / 5));
+    els.question.textContent = `${state.current.text} = ?`;
+    els.question.classList.remove('pop');
+    void els.question.offsetWidth;
+    els.question.classList.add('pop');
+    buttons.forEach((button, index) => {
+      button.className = 'answer';
+      button.querySelector('.value').textContent = state.current.choices[index];
+    });
+    state.locked = false;
+  }
+
+  function timeLeft() { return Math.max(0, state.deadline - performance.now()); }
+
+  function tick() {
+    const left = timeLeft();
+    const seconds = Math.ceil(left / 1000);
+    els.clock.firstChild.textContent = String(seconds);
+    els.timefill.style.transform = `scaleX(${Math.min(1, left / DURATION)})`;
+    const low = left <= 10_000;
+    els.clock.classList.toggle('low', low);
+    els.timebar.classList.toggle('low', low);
+    if (left <= 0) return finish();
+    state.frame = requestAnimationFrame(tick);
+  }
+
+  function showDelta(ms) {
+    els.delta.textContent = `${ms > 0 ? '+' : '−'}${Math.abs(ms) / 1000}s`;
+    els.delta.className = 'delta';
+    void els.delta.offsetWidth; // restart the animation when deltas fire back to back
+    els.delta.className = `delta show ${ms > 0 ? 'plus' : 'minus'}`;
+  }
+
+  function choose(index) {
+    if (!state || state.locked || document.body.dataset.state !== 'play') return;
+    state.locked = true;
+    const button = buttons[index];
+    const value = state.current.choices[index];
+    if (value === state.current.answer) {
+      state.score += 1;
+      state.streak += 1;
+      button.classList.add('right');
+      els.score.textContent = String(state.score);
+      if (state.streak % 5 === 0) { state.deadline += BONUS; showDelta(BONUS); }
+      els.streak.textContent = state.streak >= 3 ? `🔥 ${t.streak(state.streak)}` : '';
+      els.announcer.textContent = t.correct;
+      setTimeout(nextQuestion, 160);
+    } else {
+      state.streak = 0;
+      state.deadline -= PENALTY;
+      showDelta(-PENALTY);
+      button.classList.add('wrong');
+      buttons[state.current.choices.indexOf(state.current.answer)].classList.add('right');
+      els.streak.textContent = '';
+      els.announcer.textContent = t.wrong(state.current.answer);
+      setTimeout(() => { if (document.body.dataset.state === 'play' && timeLeft() > 0) nextQuestion(); }, 650);
+    }
+  }
+
+  function finish() {
+    cancelAnimationFrame(state.frame);
+    const isBest = state.score > state.best;
+    if (isBest) writeBest(state.score);
+    const best = Math.max(state.best, state.score);
+    els.final.textContent = String(state.score);
+    els.newBest.hidden = !isBest || state.score === 0;
+    els.summary.textContent = t.summary(state.score, best);
+    document.body.dataset.state = 'over';
+    els.announcer.textContent = `${t.timeUp} ${t.score}: ${state.score}`;
+    document.getElementById('again').focus({ preventScroll: true });
+  }
+
+  // Pause the clock while the tab or iframe is hidden so no time is lost.
+  document.addEventListener('visibilitychange', () => {
+    if (!state || document.body.dataset.state !== 'play') return;
+    if (document.hidden) {
+      state.pausedLeft = timeLeft();
+      cancelAnimationFrame(state.frame);
+    } else if (state.pausedLeft !== null) {
+      state.deadline = performance.now() + state.pausedLeft;
+      state.pausedLeft = null;
+      tick();
+    }
+  });
+
+  buttons.forEach((button, index) => button.addEventListener('click', () => choose(index)));
+  document.getElementById('start').addEventListener('click', start);
+  document.getElementById('again').addEventListener('click', start);
+  document.addEventListener('keydown', event => {
+    if (document.body.dataset.state !== 'play' || event.repeat) return;
+    const index = Number(event.key) - 1;
+    if (index >= 0 && index < 4) { event.preventDefault(); choose(index); }
+  });
+})();
+</script>
+</body>
+</html>
