@@ -12,10 +12,18 @@ export interface ArcadeGame {
 	languages: readonly Locale[] | 'all';
 	/** First-party games get same-origin so their best scores can use localStorage. */
 	sandbox: string;
+	/** Portrait-only games ask phones to stay upright instead of shrinking to a strip in landscape. */
+	portraitOnly: boolean;
 }
 
 const FIRST_PARTY_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
-const game = (id: string, title: string, category: ArcadeCategory, gameId?: string): ArcadeGame => ({ id, title, category, gameId, languages: 'all', sandbox: FIRST_PARTY_SANDBOX });
+// Games drawn on a fixed tall canvas or board; on a sideways phone they would use about a fifth of the screen.
+const PORTRAIT_ONLY = new Set([
+	'air-hockey', 'ball-maze', 'bottle-flip', 'brick-breaker', 'bubble-shooter', 'candy-rope', 'chicken-cross', 'color-gate',
+	'fruit-merge', 'gold-digger', 'helix-drop', 'hoop-shot', 'jumpy-climb', 'knife-throw', 'mini-golf', 'mini-pinball',
+	'number-drop', 'paddle-duel', 'penalty-kick', 'sky-hopper', 'snake', 'stack-up', 'star-defender', 'tower-stack',
+]);
+const game = (id: string, title: string, category: ArcadeCategory, gameId?: string): ArcadeGame => ({ id, title, category, gameId, languages: 'all', sandbox: FIRST_PARTY_SANDBOX, portraitOnly: PORTRAIT_ONLY.has(id) });
 
 export const ARCADE_CATEGORIES: ArcadeCategory[] = ['puzzle', 'word', 'brain', 'board', 'skill', 'arcade', 'sports'];
 
@@ -51,6 +59,8 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	// Board & card
 	game('solitaire', 'Solitaire', 'board'),
 	game('blackjack', 'Blackjack', 'board'),
+	game('poker', 'Poker', 'board'),
+	game('draw-poker', 'Draw Poker', 'board'),
 	game('tic-tac-toe', 'Tic-Tac-Toe', 'board'),
 	game('checkers', 'Checkers', 'board'),
 	game('four-in-a-row', 'Four in a Row', 'board'),
@@ -63,6 +73,8 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('bottle-flip', 'Bottle Flip', 'skill'),
 	game('ball-maze', 'Ball Maze', 'skill'),
 	// Arcade
+	game('crowd-rush', 'Crowd Rush', 'arcade'),
+	game('hungry-hole', 'Hungry Hole', 'arcade'),
 	game('fruit-slice', 'Fruit Slice', 'arcade'),
 	game('bubble-shooter', 'Bubble Shooter', 'arcade'),
 	game('snake', 'Snake', 'arcade'),
@@ -75,7 +87,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('mini-pinball', 'Mini Pinball', 'arcade'),
 	game('gold-digger', 'Gold Digger', 'arcade'),
 	game('blob-arena', 'Blob Arena', 'arcade'),
-	{ id: 'aster-strike', title: 'Aster Strike', category: 'arcade', gameId: 'aster-strike', languages: ['en', 'vi'], sandbox: 'allow-scripts allow-popups allow-popups-to-escape-sandbox' },
+	{ id: 'aster-strike', title: 'Aster Strike', category: 'arcade', gameId: 'aster-strike', languages: ['en', 'vi'], sandbox: 'allow-scripts allow-popups allow-popups-to-escape-sandbox', portraitOnly: false },
 	// Sports
 	game('hoop-shot', 'Hoop Shot', 'sports'),
 	game('penalty-kick', 'Penalty Kick', 'sports'),

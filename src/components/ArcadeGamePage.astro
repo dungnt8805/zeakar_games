@@ -73,21 +73,27 @@ const structuredData = [
       <header class="play-head">
         <p class="section-kicker">{text.tag}</p>
         <h1 class="section-title">{heading}</h1>
-        <p class="play-intro">{content.intro}</p>
       </header>
 
       <div class="play-stage">
-        <div class="play-frame" id="play-frame">
+        <div class="play-frame" id="play-frame" data-portrait={game.portraitOnly ? '' : undefined}>
           <div class="play-bar">
             <span>{game.title}</span>
             <button type="button" id="play-exit">{a.exitFullscreen} <span aria-hidden="true">✕</span></button>
           </div>
           <iframe src={playableUrl(game, lang)} title={game.title} sandbox={game.sandbox} allow="fullscreen"></iframe>
+          {game.portraitOnly && (
+            <div class="rotate-hint" role="status">
+              <svg viewBox="0 0 48 48" width="56" height="56" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="6" width="18" height="32" rx="3"/><path d="M22 33h4"/><path d="M38 20a14 14 0 0 1-4 14m0 0v-5m0 5h-5"/></svg>
+              <p>{a.rotateHint}</p>
+            </div>
+          )}
         </div>
         <button type="button" class="play-tool" id="play-fullscreen"><span aria-hidden="true">⛶</span> {a.fullscreen}</button>
       </div>
 
       <div class="play-info">
+        <p class="play-intro">{content.intro}</p>
         <section aria-labelledby="how-to-title">
           <h2 id="how-to-title" class="play-subtitle">{a.howToTitle}</h2>
           <ol class="play-steps">{content.howTo.map(step => <li>{step}</li>)}</ol>
@@ -140,8 +146,22 @@ const structuredData = [
       document.documentElement.classList.toggle('play-locked', on);
       (on ? iframe : enter).focus({ preventScroll: true });
     };
-    enter.addEventListener('click', () => setImmersive(true));
-    exit.addEventListener('click', () => setImmersive(false));
+    // Portrait-only games: on phones, go truly fullscreen and lock the screen upright where the browser allows it (Android).
+    // iOS cannot lock orientation, so the rotate hint in CSS covers that case.
+    const lockPortrait = async () => {
+      if (!('portrait' in frame.dataset) || !matchMedia('(pointer: coarse)').matches) return;
+      try {
+        await document.documentElement.requestFullscreen?.();
+        await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('portrait');
+      } catch {}
+    };
+    enter.addEventListener('click', () => { setImmersive(true); lockPortrait(); });
+    exit.addEventListener('click', () => {
+      setImmersive(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    });
+    // Leaving real fullscreen (Android back button) also leaves immersive mode.
+    document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) setImmersive(false); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') setImmersive(false); });
     // Keys typed inside a same-origin game never reach this document, so listen there too.
     const forwardEscape = () => {
@@ -158,13 +178,13 @@ const structuredData = [
   .breadcrumb a:hover { color: #ffb454; }
   .breadcrumb [aria-current] { color: #d0d3df; }
 
-  .play-layout { display: grid; grid-template-areas: "head" "stage" "info"; gap: 24px; margin-top: 20px; }
+  .play-layout { display: grid; grid-template-areas: "head" "stage" "info"; gap: 20px; margin-top: 16px; }
   .play-head { grid-area: head; }
   .play-stage { grid-area: stage; display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .play-info { grid-area: info; display: grid; gap: 28px; align-content: start; }
-  .play-intro { margin-top: 12px; max-width: 60ch; font-size: 15px; line-height: 1.8; color: #b7bdce; }
+  .play-intro { max-width: 60ch; font-size: 15px; line-height: 1.8; color: #b7bdce; }
 
-  .play-frame { width: 100%; height: calc(100svh - 150px); min-height: 480px; max-height: 820px; display: flex; flex-direction: column; border: 1px solid #2a2f3e; border-radius: 18px; overflow: hidden; background: #0a0c14; box-shadow: 0 30px 70px #0008; }
+  .play-frame { position: relative; width: 100%; height: calc(100svh - 150px); min-height: 480px; max-height: 820px; display: flex; flex-direction: column; border: 1px solid #2a2f3e; border-radius: 18px; overflow: hidden; background: #0a0c14; box-shadow: 0 30px 70px #0008; }
   .play-frame iframe { display: block; flex: 1; width: 100%; min-height: 0; border: 0; }
   .play-bar { display: none; height: 48px; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; border-bottom: 1px solid #ffffff12; font: 700 15px var(--font-display); }
   .play-bar button { padding: 10px 12px; border-radius: 10px; font: 600 13px var(--font-sans); color: #d0d3df; }
@@ -172,6 +192,16 @@ const structuredData = [
   .play-frame.is-immersive { position: fixed; inset: 0; z-index: 100; width: 100vw; height: 100dvh; max-height: none; min-height: 0; border: 0; border-radius: 0; }
   .play-frame.is-immersive .play-bar { display: flex; }
   :global(html.play-locked) { overflow: hidden; }
+  .rotate-hint { display: none; }
+  /* Phones held sideways: portrait-only games hide (which also stops their animation loop) behind a rotate prompt. */
+  @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+    .play-frame[data-portrait] iframe { display: none; }
+    .play-frame[data-portrait] .rotate-hint { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; font: 600 16px/1.5 var(--font-sans); color: #d0d3df; }
+    .play-frame[data-portrait] .rotate-hint svg { color: #ffb454; animation: rotate-nudge 2.4s ease-in-out infinite; }
+    .play-frame[data-portrait]:not(.is-immersive) { height: min(260px, calc(100svh - 24px)); min-height: 0; }
+  }
+  @keyframes rotate-nudge { 0%, 30% { transform: rotate(90deg); } 60%, 100% { transform: rotate(0deg); } }
+  @media (prefers-reduced-motion: reduce) { .rotate-hint svg { animation: none !important; } }
   .play-tool { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #ffffff20; border-radius: 10px; font-size: 13px; color: #d0d3df; }
   .play-tool:hover { border-color: #ffb454; color: #ffb454; }
 
@@ -184,6 +214,12 @@ const structuredData = [
   .play-store { display: grid; gap: 16px; padding: 18px; border: 1px solid #ffffff13; border-radius: 16px; background: #111520; }
 
   .more-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+
+  /* Phones and small tablets held sideways: let the game fill the screen height instead of a fixed 480px minimum. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    .play-frame { height: calc(100svh - 24px); min-height: 0; max-height: none; }
+    .play-stage { scroll-margin-top: 12px; }
+  }
 
   @media (min-width: 900px) {
     .play-layout { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "stage head" "stage info"; column-gap: 48px; row-gap: 28px; }

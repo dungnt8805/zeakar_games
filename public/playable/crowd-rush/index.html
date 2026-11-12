@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crowd Rush</title>
+<style>
+:root {
+  --ink: #232650;
+  --muted: #6a6f99;
+  --paper: #ffffff;
+  --blue: #2f6fed;
+  --blue-dark: #1d4fb5;
+  --red: #ef4444;
+  --gold: #ffc531;
+  --gold-dark: #d39400;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: #7cc8ff; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.app { position: relative; height: 100%; overflow: hidden; }
+.stage { position: absolute; inset: 0; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas:focus-visible { outline: 3px solid #ffffffaa; outline-offset: -6px; }
+
+.hud { position: absolute; top: 0; left: 0; right: 0; max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); pointer-events: none; }
+.pill { flex: 0 0 auto; padding: 7px 12px; border-radius: 99px; background: #ffffffe0; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 3px 0 #23265022; }
+.pill.coins { display: flex; align-items: center; gap: 5px; }
+.pill.coins.bump { animation: bump .35s; }
+@keyframes bump { 40% { transform: scale(1.18); } }
+.progress { flex: 1; min-width: 40px; height: 12px; border-radius: 99px; background: #ffffff88; overflow: hidden; box-shadow: inset 0 1px 3px #2326502a; }
+.progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #5d97ff, var(--blue)); }
+.icon-btn { pointer-events: auto; flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: #ffffffe0; font-size: 15px; font-weight: 900; box-shadow: 0 3px 0 #23265022; }
+.icon-btn[hidden] { display: none; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #23265022; }
+
+.banner { position: absolute; left: 0; right: 0; top: 20%; text-align: center; pointer-events: none; animation: banner 1.6s ease-out both; padding: 0 16px; }
+.banner span { display: inline-block; padding: 8px 22px; border-radius: 99px; background: #232650c4; color: #fff; font-size: clamp(22px, 6.5vw, 34px); font-weight: 900; letter-spacing: -.01em; box-shadow: 0 8px 24px #23265040; }
+.banner[hidden] { display: none; }
+@keyframes banner { 0% { opacity: 0; transform: scale(.7); } 15% { opacity: 1; transform: scale(1.06); } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.hint { position: absolute; left: 0; right: 0; bottom: max(26px, env(safe-area-inset-bottom)); text-align: center; pointer-events: none; }
+.hint span { display: inline-block; padding: 9px 18px; border-radius: 99px; background: #232650cc; color: #fff; font-size: 15px; font-weight: 800; animation: nudge 1.2s ease-in-out infinite; }
+.hint[hidden] { display: none; }
+@keyframes nudge { 50% { transform: translateX(14px); } }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: #1d215044; }
+.overlay[hidden] { display: none; }
+.overlay.clear { background: linear-gradient(#1d215000 30%, #1d215055); }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; padding: 24px 20px 20px; border-radius: 28px; background: var(--paper); text-align: center; box-shadow: 0 20px 50px #1d215066; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h1 { font-size: clamp(34px, 11vw, 46px); font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--blue); }
+.panel h1 span { color: var(--red); }
+.panel h2 { font-size: 25px; font-weight: 900; line-height: 1.15; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.4; }
+.panel .emoji { margin: 0; font-size: 42px; line-height: 1.1; }
+.panel .small { font-size: 13px; }
+.stars { margin-top: 4px !important; font-size: 40px; letter-spacing: 4px; color: #e5e3f0 !important; line-height: 1.1; }
+.stars b { color: var(--gold); }
+.result { font-size: 18px; font-weight: 800; color: var(--ink) !important; }
+.earned { font-size: 24px; font-weight: 900; color: var(--gold-dark) !important; }
+.badge { display: inline-block; margin-top: 8px; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #3b2a00 !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--blue); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 6px 0 var(--blue-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--blue-dark); }
+.row { display: flex; gap: 10px; margin-top: 12px; }
+.secondary { flex: 1; min-width: 0; padding: 12px 8px; border-radius: 16px; border: 2px solid #e2e4f3; font-weight: 800; }
+.secondary:active { background: #f1f2fa; }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #eaf0ff; box-shadow: 0 3px 0 #c5d3f6; font-size: 18px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: #c9ccdf; }
+.level-btn small b { color: var(--gold); font-weight: 900; }
+.level-btn.boss { background: #ffe9e9; box-shadow: 0 3px 0 #f4c4c4; }
+.level-btn.current { background: var(--blue); color: #fff; box-shadow: 0 3px 0 var(--blue-dark); }
+.level-btn:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.shop-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 14px; padding: 12px; border-radius: 18px; background: #f3f5ff; text-align: start; }
+.shop-item .icon { font-size: 28px; }
+.shop-item strong { display: block; font-size: 16px; }
+.shop-item span { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.shop-item .lv { font-weight: 800; color: var(--blue); }
+.buy { min-width: 76px; padding: 10px 10px; border-radius: 14px; background: var(--gold); color: #3b2a00; font-weight: 900; font-variant-numeric: tabular-nums; box-shadow: 0 4px 0 var(--gold-dark); white-space: nowrap; }
+.buy:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-dark); }
+.buy:disabled { opacity: .45; cursor: default; transform: none; }
+.wallet { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: #fff4cf; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage">
+    <canvas id="canvas" tabindex="0" role="img"></canvas>
+  </div>
+  <div class="hud">
+    <div class="pill" id="level-pill"></div>
+    <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+    <div class="pill coins" id="coins-pill"><span aria-hidden="true">🪙</span><span id="coins">0</span></div>
+    <button type="button" class="icon-btn" id="pause" data-i18n-label="pause" hidden>❚❚</button>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="hint" id="hint" hidden><span><span aria-hidden="true">👆 </span><span data-i18n="steer"></span></span></div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay clear" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <h1 id="start-title">Crowd <span>Rush</span></h1>
+    <p data-i18n="tagline"></p>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" class="cta" id="play"></button>
+    <div class="row">
+      <button type="button" class="secondary" id="open-levels" data-i18n="levels"></button>
+      <button type="button" class="secondary" id="open-shop" data-i18n="upgrades"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🏆</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="earned" id="earned"></p>
+    <p class="small" id="best"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <div class="row">
+      <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+      <button type="button" class="secondary" id="win-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">💥</p>
+    <h2 id="lose-title" data-i18n="lostTitle"></h2>
+    <p id="lose-text"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <div class="row">
+      <button type="button" class="secondary" id="lose-shop" data-i18n="upgrades"></button>
+      <button type="button" class="secondary" id="lose-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <div class="row">
+      <button type="button" class="secondary" id="restart" data-i18n="restart"></button>
+      <button type="button" class="secondary" id="pause-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="chooseLevel"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <div class="row"><button type="button" class="secondary" id="close-levels" data-i18n="close"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="shop" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+    <h2 id="shop-title" data-i18n="upgrades"></h2>
+    <p class="wallet"><span aria-hidden="true">🪙 </span><span id="wallet"></span></p>
+    <div class="shop-item">
+      <span class="icon" aria-hidden="true">👥</span>
+      <div><strong data-i18n="startCrowd"></strong><span id="start-desc"></span><span class="lv" id="start-lv"></span></div>
+      <button type="button" class="buy" id="buy-start"></button>
+    </div>
+    <div class="shop-item">
+      <span class="icon" aria-hidden="true">💰</span>
+      <div><strong data-i18n="income"></strong><span id="income-desc"></span><span class="lv" id="income-lv"></span></div>
+      <button type="button" class="buy" id="buy-income"></button>
+    </div>
+    <div class="row"><button type="button" class="secondary" id="close-shop" data-i18n="close"></button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Grow the biggest crowd, pick the right gates and crush every rival!', controls: 'Drag anywhere or use ← → / A D to steer.', play: n => `Play level ${n}`, levels: 'Levels', upgrades: 'Upgrades', level: n => `Level ${n}`, pause: 'Pause', paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Menu', chooseLevel: 'Choose a level', close: 'Close', levelLabel: (n, s) => `Level ${n}, ${s} of 3 stars`, lockedLabel: n => `Level ${n}, locked`, complete: n => `Level ${n} complete!`, mult: m => `Multiplier ×${m}`, bossDown: 'Boss defeated!', earned: c => `+${c} coins`, best: c => `Best: ${c} coins`, newBest: 'New best!', next: 'Next level', replay: 'Replay', lostTitle: 'Crowd wiped out!', lostGate: 'That gate emptied your crowd. Choose wisely!', lostFight: 'The rival crowd was bigger. Grow more before the fight!', lostBoss: 'The boss was too strong. Bring a bigger crowd!', lostTrap: 'The traps got everyone. Steer around them!', retry: 'Try again', startCrowd: 'Starting crowd', startDesc: n => `Begin each level with ${n} runners`, income: 'Coin bonus', incomeDesc: p => `+${p}% coins from every level`, lv: (a, b) => `Lv ${a}/${b}`, maxed: 'Max', buyLabel: (name, c) => `Buy ${name} for ${c} coins`, bought: name => `${name} upgraded!`, steer: 'Drag to steer!', bossAhead: 'Boss level!', fightWon: n => `Rival crowd beaten! ${n} runners left.`, crowdNow: n => `Your crowd: ${n}`, canvas: 'Crowd Rush track with gates, traps and rival crowds', stars: n => `${n} of 3 stars` },
+    vi: { tagline: 'Gom đám đông thật lớn, chọn đúng cổng và đè bẹp mọi đối thủ!', controls: 'Kéo ở bất kỳ đâu hoặc dùng ← → / A D để điều khiển.', play: n => `Chơi màn ${n}`, levels: 'Chọn màn', upgrades: 'Nâng cấp', level: n => `Màn ${n}`, pause: 'Tạm dừng', paused: 'Tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', menu: 'Menu', chooseLevel: 'Chọn màn chơi', close: 'Đóng', levelLabel: (n, s) => `Màn ${n}, ${s}/3 sao`, lockedLabel: n => `Màn ${n}, chưa mở`, complete: n => `Hoàn thành màn ${n}!`, mult: m => `Hệ số ×${m}`, bossDown: 'Đã hạ gục trùm!', earned: c => `+${c} xu`, best: c => `Kỷ lục: ${c} xu`, newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại', lostTitle: 'Đám đông tan rã!', lostGate: 'Chiếc cổng đó đã lấy hết người của bạn. Hãy chọn khôn ngoan!', lostFight: 'Đối thủ đông hơn. Hãy gom thêm người trước khi giao chiến!', lostBoss: 'Trùm quá mạnh. Hãy mang theo đám đông lớn hơn!', lostTrap: 'Bẫy đã cuốn sạch mọi người. Hãy lách qua chúng!', retry: 'Thử lại', startCrowd: 'Đám đông khởi đầu', startDesc: n => `Bắt đầu mỗi màn với ${n} người`, income: 'Thưởng xu', incomeDesc: p => `+${p}% xu ở mỗi màn`, lv: (a, b) => `Cấp ${a}/${b}`, maxed: 'Tối đa', buyLabel: (name, c) => `Mua ${name} với giá ${c} xu`, bought: name => `Đã nâng cấp ${name}!`, steer: 'Kéo để điều khiển!', bossAhead: 'Màn đấu trùm!', fightWon: n => `Đã đánh bại đối thủ! Còn ${n} người.`, crowdNow: n => `Đám đông: ${n}`, canvas: 'Đường chạy Crowd Rush có cổng, bẫy và đám đông đối thủ', stars: n => `${n}/3 sao` },
+    zh: { tagline: '壮大你的人群，选对关门，击溃所有对手！', controls: '在任意位置拖动，或用 ← → / A D 控制方向。', play: n => `开始第 ${n} 关`, levels: '选择关卡', upgrades: '升级', level: n => `第 ${n} 关`, pause: '暂停', paused: '已暂停', resume: '继续', restart: '重玩', menu: '菜单', chooseLevel: '选择关卡', close: '关闭', levelLabel: (n, s) => `第 ${n} 关，${s}/3 星`, lockedLabel: n => `第 ${n} 关，未解锁`, complete: n => `第 ${n} 关完成！`, mult: m => `倍数 ×${m}`, bossDown: '击败首领！', earned: c => `+${c} 金币`, best: c => `最佳：${c} 金币`, newBest: '新纪录！', next: '下一关', replay: '重玩', lostTitle: '人群全军覆没！', lostGate: '那道门让你的人群清零了，要谨慎选择！', lostFight: '对手人数更多。交战前先壮大队伍！', lostBoss: '首领太强了，带上更多人再来！', lostTrap: '陷阱吞没了所有人，记得绕开它们！', retry: '再试一次', startCrowd: '初始人数', startDesc: n => `每关开局有 ${n} 人`, income: '金币加成', incomeDesc: p => `每关金币 +${p}%`, lv: (a, b) => `等级 ${a}/${b}`, maxed: '满级', buyLabel: (name, c) => `花费 ${c} 金币升级${name}`, bought: name => `${name}已升级！`, steer: '拖动来转向！', bossAhead: '首领关！', fightWon: n => `击败对手人群！剩余 ${n} 人。`, crowdNow: n => `你的人群：${n}`, canvas: 'Crowd Rush 跑道，设有关门、陷阱和对手人群', stars: n => `${n}/3 星` },
+    fr: { tagline: 'Faites grossir votre foule, choisissez les bonnes portes et écrasez vos rivaux !', controls: 'Glissez n’importe où ou utilisez ← → / A D pour diriger.', play: n => `Jouer le niveau ${n}`, levels: 'Niveaux', upgrades: 'Améliorations', level: n => `Niveau ${n}`, pause: 'Pause', paused: 'En pause', resume: 'Reprendre', restart: 'Recommencer', menu: 'Menu', chooseLevel: 'Choisir un niveau', close: 'Fermer', levelLabel: (n, s) => `Niveau ${n}, ${s} étoile${s > 1 ? 's' : ''} sur 3`, lockedLabel: n => `Niveau ${n}, verrouillé`, complete: n => `Niveau ${n} terminé !`, mult: m => `Multiplicateur ×${m}`, bossDown: 'Boss vaincu !', earned: c => `+${c} pièces`, best: c => `Record : ${c} pièces`, newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer', lostTitle: 'Foule anéantie !', lostGate: 'Cette porte a vidé votre foule. Choisissez mieux !', lostFight: 'La foule rivale était plus nombreuse. Grossissez avant le combat !', lostBoss: 'Le boss était trop fort. Venez avec une plus grande foule !', lostTrap: 'Les pièges ont eu tout le monde. Contournez-les !', retry: 'Réessayer', startCrowd: 'Foule de départ', startDesc: n => `Commencez chaque niveau avec ${n} coureurs`, income: 'Bonus de pièces', incomeDesc: p => `+${p} % de pièces à chaque niveau`, lv: (a, b) => `Niv. ${a}/${b}`, maxed: 'Max', buyLabel: (name, c) => `Acheter « ${name} » pour ${c} pièces`, bought: name => `Amélioration : ${name} !`, steer: 'Glissez pour diriger !', bossAhead: 'Niveau de boss !', fightWon: n => `Foule rivale battue ! Il reste ${n} coureurs.`, crowdNow: n => `Votre foule : ${n}`, canvas: 'Piste de Crowd Rush avec portes, pièges et foules rivales', stars: n => `${n} étoile${n > 1 ? 's' : ''} sur 3` },
+    th: { tagline: 'สร้างฝูงชนให้ใหญ่ที่สุด เลือกประตูให้ถูก แล้วบดขยี้คู่แข่งทุกกลุ่ม!', controls: 'ลากตรงไหนก็ได้ หรือใช้ ← → / A D เพื่อบังคับทิศทาง', play: n => `เล่นด่าน ${n}`, levels: 'เลือกด่าน', upgrades: 'อัปเกรด', level: n => `ด่าน ${n}`, pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', menu: 'เมนู', chooseLevel: 'เลือกด่าน', close: 'ปิด', levelLabel: (n, s) => `ด่าน ${n} ได้ ${s} จาก 3 ดาว`, lockedLabel: n => `ด่าน ${n} ยังไม่ปลดล็อก`, complete: n => `ผ่านด่าน ${n} แล้ว!`, mult: m => `ตัวคูณ ×${m}`, bossDown: 'โค่นบอสสำเร็จ!', earned: c => `+${c} เหรียญ`, best: c => `สถิติ: ${c} เหรียญ`, newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', lostTitle: 'ฝูงชนถูกกวาดเรียบ!', lostGate: 'ประตูนั้นทำให้ฝูงชนหมดเกลี้ยง เลือกให้ดีนะ!', lostFight: 'คู่แข่งมีคนมากกว่า เพิ่มคนให้มากขึ้นก่อนปะทะ!', lostBoss: 'บอสแข็งแกร่งเกินไป พาฝูงชนที่ใหญ่กว่านี้มา!', lostTrap: 'กับดักเก็บไปหมดทุกคน หลบให้พ้นนะ!', retry: 'ลองอีกครั้ง', startCrowd: 'ฝูงชนเริ่มต้น', startDesc: n => `เริ่มทุกด่านด้วย ${n} คน`, income: 'โบนัสเหรียญ', incomeDesc: p => `ได้เหรียญเพิ่ม ${p}% ทุกด่าน`, lv: (a, b) => `ระดับ ${a}/${b}`, maxed: 'สูงสุด', buyLabel: (name, c) => `ซื้อ${name} ราคา ${c} เหรียญ`, bought: name => `อัปเกรด${name}แล้ว!`, steer: 'ลากเพื่อบังคับ!', bossAhead: 'ด่านบอส!', fightWon: n => `ชนะฝูงชนคู่แข่ง! เหลือ ${n} คน`, crowdNow: n => `ฝูงชนของคุณ: ${n}`, canvas: 'ลู่วิ่ง Crowd Rush ที่มีประตู กับดัก และฝูงชนคู่แข่ง', stars: n => `${n} จาก 3 ดาว` },
+    ja: { tagline: '仲間を増やして正しいゲートを選び、ライバル集団を蹴散らそう！', controls: 'どこでもドラッグ、または ← → / A D キーで操作。', play: n => `レベル ${n} をプレイ`, levels: 'レベル選択', upgrades: '強化', level: n => `レベル ${n}`, pause: '一時停止', paused: '一時停止中', resume: '再開', restart: 'やり直す', menu: 'メニュー', chooseLevel: 'レベルを選ぶ', close: '閉じる', levelLabel: (n, s) => `レベル ${n}、星 ${s}/3`, lockedLabel: n => `レベル ${n}、ロック中`, complete: n => `レベル ${n} クリア！`, mult: m => `倍率 ×${m}`, bossDown: 'ボス撃破！', earned: c => `+${c} コイン`, best: c => `ベスト：${c} コイン`, newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度', lostTitle: '全滅…！', lostGate: 'あのゲートで仲間がいなくなった。よく選ぼう！', lostFight: '相手の集団のほうが多かった。戦う前に仲間を増やそう！', lostBoss: 'ボスが強すぎた。もっと大きな集団で挑もう！', lostTrap: 'トラップで全員やられた。うまくよけよう！', retry: 'リトライ', startCrowd: 'スタート人数', startDesc: n => `各レベルを ${n} 人でスタート`, income: 'コインボーナス', incomeDesc: p => `毎レベルのコイン +${p}%`, lv: (a, b) => `Lv ${a}/${b}`, maxed: '最大', buyLabel: (name, c) => `${c} コインで${name}を強化`, bought: name => `${name}を強化しました！`, steer: 'ドラッグで操作！', bossAhead: 'ボスレベル！', fightWon: n => `ライバル集団に勝利！残り ${n} 人。`, crowdNow: n => `仲間の数：${n}`, canvas: 'ゲート、トラップ、ライバル集団がある Crowd Rush のコース', stars: n => `星 ${n}/3` },
+    ko: { tagline: '무리를 키우고 올바른 게이트를 골라 라이벌 무리를 모두 무찌르세요!', controls: '아무 곳이나 드래그하거나 ← → / A D 키로 조종하세요.', play: n => `레벨 ${n} 플레이`, levels: '레벨 선택', upgrades: '업그레이드', level: n => `레벨 ${n}`, pause: '일시정지', paused: '일시정지', resume: '계속하기', restart: '다시 시작', menu: '메뉴', chooseLevel: '레벨 선택', close: '닫기', levelLabel: (n, s) => `레벨 ${n}, 별 ${s}/3`, lockedLabel: n => `레벨 ${n}, 잠김`, complete: n => `레벨 ${n} 클리어!`, mult: m => `배수 ×${m}`, bossDown: '보스 처치!', earned: c => `+${c} 코인`, best: c => `최고: ${c} 코인`, newBest: '최고 기록!', next: '다음 레벨', replay: '다시 하기', lostTitle: '무리가 전멸했어요!', lostGate: '그 게이트 때문에 무리가 사라졌어요. 신중하게 고르세요!', lostFight: '상대 무리가 더 많았어요. 싸우기 전에 무리를 더 키우세요!', lostBoss: '보스가 너무 강했어요. 더 큰 무리를 데려오세요!', lostTrap: '함정에 모두 당했어요. 잘 피해 가세요!', retry: '다시 도전', startCrowd: '시작 인원', startDesc: n => `각 레벨을 ${n}명으로 시작`, income: '코인 보너스', incomeDesc: p => `레벨마다 코인 +${p}%`, lv: (a, b) => `Lv ${a}/${b}`, maxed: '최대', buyLabel: (name, c) => `${c} 코인으로 ${name} 업그레이드`, bought: name => `${name} 업그레이드 완료!`, steer: '드래그해서 조종하세요!', bossAhead: '보스 레벨!', fightWon: n => `라이벌 무리를 물리쳤어요! ${n}명 남음.`, crowdNow: n => `내 무리: ${n}명`, canvas: '게이트, 함정, 라이벌 무리가 있는 Crowd Rush 코스', stars: n => `별 ${n}/3` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // World units: the road spans x ∈ [-RH, RH]; z runs forward from the start line; y is up.
+  const TAU = Math.PI * 2, GOLDEN = Math.PI * (3 - Math.sqrt(5));
+  const RH = 5, RAIL = 0.45, RAIL_H = 0.35, SEA_Y = -0.9, SEG = 3;
+  const CAP = 300, ENEMY_CAP = 160, SPACING = 0.36, CLUSTER_MAX = 3.4;
+  const RUN_SPEED = 11, STEER_SPEED = 9, STEP = 1 / 60, NEAR = 0.7, DRAW_DIST = 125;
+  const GATE_H = 2.5, HAMMER_PIVOT = 5.2, HAMMER_ARM = 4.7, BOSS_SCALE = 6.5;
+  const STAIRS = 20, STAIR_RISE = 0.5, STAIR_DEPTH = 1.7;
+  const MULTS = Array.from({ length: STAIRS }, (_, k) => Math.round((1.2 + 0.2 * k) * 10) / 10);
+  const MULT_LABELS = MULTS.map(m => `×${m.toFixed(1)}`);
+  const STAIR_COLORS = MULTS.map((_, k) => [`hsl(${(k * 17 + 190) % 360} 85% 62%)`, `hsl(${(k * 17 + 190) % 360} 90% 74%)`]);
+  const MILESTONES = [25, 50, 100, 200, 500, 1000];
+  const MAX_UP = 10;
+  const STORAGE_KEY = 'milaan.crowdRush.progress';
+  const CANVAS_FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const PLAYER_PAL = { leg: '#1b3f9c', body: '#2f6fed', head: '#5b93ff', bubble: '#2f6fed' };
+  const ENEMY_PAL = { leg: '#8f1d1d', body: '#e23b3b', head: '#ff6a6a', bubble: '#e23b3b' };
+  const PARTICLE_COLORS = ['#ffffff', '#4f8cff', '#ff5a5a', '#ffc531', '#1d5f86'];
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  // Phyllotaxis slots: figure i sits at radius √i, golden-angle apart, so any prefix of the list is a tidy disc.
+  const SLOT_X = new Float32Array(CAP), SLOT_Z = new Float32Array(CAP);
+  for (let i = 0; i < CAP; i++) { const r = Math.sqrt(i); SLOT_X[i] = r * Math.cos(i * GOLDEN); SLOT_Z[i] = r * Math.sin(i * GOLDEN); }
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = {
+    levelPill: $('level-pill'), progress: $('progress'), coins: $('coins'), coinsPill: $('coins-pill'), pause: $('pause'), banner: $('banner'), hint: $('hint'), announcer: $('announcer'),
+    start: $('start'), play: $('play'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), earned: $('earned'), best: $('best'), newBest: $('new-best'), next: $('next'),
+    lose: $('lose'), loseText: $('lose-text'), paused: $('paused'), levels: $('levels'), levelGrid: $('level-grid'), shop: $('shop'), wallet: $('wallet'),
+    startDesc: $('start-desc'), startLv: $('start-lv'), buyStart: $('buy-start'), incomeDesc: $('income-desc'), incomeLv: $('income-lv'), buyIncome: $('buy-income'),
+  };
+  const PANELS = [els.start, els.win, els.lose, els.paused, els.levels, els.shop];
+
+  const DEFAULT_PROGRESS = { unlocked: 1, coins: 0, stars: {}, best: {}, upStart: 0, upIncome: 0 };
+  const readProgress = () => { try { return { ...DEFAULT_PROGRESS, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { ...DEFAULT_PROGRESS, stars: {}, best: {} }; } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  let progress = readProgress();
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const startCrowdSize = () => 1 + progress.upStart * 2;
+  const incomeBonus = () => progress.upIncome * 10;
+  const startCost = u => 40 + u * 45;
+  const incomeCost = u => 60 + u * 70;
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let x = Math.imul(a ^ (a >>> 15), a | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------- Crowds: typed arrays sized once, figures drift toward their phyllotaxis slot ----------
+  function makeCrowd(cap, face) {
+    return { cap, face, n: 0, count: 0, label: '0', x: 0, y: 0, z: 0, tx: 0, s: SPACING, sTarget: SPACING, r: 0.2, zs: 1, fig: 1, pop: 0, run: 0, ox: new Float32Array(cap), oz: new Float32Array(cap), ph: new Float32Array(cap) };
+  }
+  function removeAt(c, i) {
+    const last = c.n - 1;
+    c.ox[i] = c.ox[last]; c.oz[i] = c.oz[last]; c.ph[i] = c.ph[last];
+    c.n = last;
+  }
+  function frontIndex(c) {
+    let best = 0, bestV = -Infinity;
+    for (let i = 0; i < c.n; i++) { const v = c.oz[i] * c.face; if (v > bestV) { bestV = v; best = i; } }
+    return best;
+  }
+  function setCount(c, value, front) {
+    c.count = Math.max(0, Math.round(value));
+    const target = Math.min(c.count, c.cap);
+    while (c.n > target) removeAt(c, front ? frontIndex(c) : c.n - 1);
+    while (c.n < target) {
+      const i = c.n++;
+      c.ox[i] = (Math.random() - 0.5) * 0.3; c.oz[i] = (Math.random() - 0.5) * 0.3; c.ph[i] = Math.random() * TAU;
+    }
+    c.sTarget = c.n <= 1 ? SPACING : Math.min(SPACING, CLUSTER_MAX / Math.sqrt(c.n));
+    c.label = String(c.count);
+    c.pop = 1;
+  }
+  function settle(c, dt) {
+    c.s += (c.sTarget - c.s) * Math.min(1, dt * 5);
+    const k = Math.min(1, dt * 9), s = c.s;
+    for (let i = 0; i < c.n; i++) {
+      c.ox[i] += (s * SLOT_X[i] - c.ox[i]) * k;
+      c.oz[i] += (s * SLOT_Z[i] - c.oz[i]) * k;
+    }
+    c.r = s * Math.sqrt(Math.max(0, c.n - 1)) + 0.25;
+    c.fig = clamp(s / SPACING, 0.62, 1);
+    c.pop = Math.max(0, c.pop - dt * 4);
+  }
+
+  // ---------- Level generation: seeded per level, difficulty rises with the level number ----------
+  const NICE = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 200, 250, 300, 400, 500];
+  const nice = v => NICE.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
+  const applyOp = (g, c) => (g.op === '+' ? c + g.val : g.op === '-' ? c - g.val : g.op === 'x' ? c * g.val : Math.ceil(c / g.val));
+  const isGood = g => g.op === '+' || g.op === 'x';
+  const opLabel = g => `${g.op === '+' ? '+' : g.op === '-' ? '−' : g.op === 'x' ? '×' : '÷'}${g.val}`;
+
+  function gatePair(rnd, c, d, z, pitSide = 0) {
+    const plus = () => ({ op: '+', val: nice(Math.max(6 + 6 * d + rnd() * 8, c * (0.5 + rnd() * 0.7))) });
+    const times = () => ({ op: 'x', val: c < 25 && rnd() < 0.35 ? 3 : 2 });
+    const minus = () => ({ op: '-', val: Math.min(c - 1, nice(Math.max(2, c * (0.25 + rnd() * 0.35)))) });
+    const div = () => ({ op: '/', val: d > 0.4 && rnd() < 0.35 ? 3 : 2 });
+    const good = () => (c >= 4 && c < 180 && rnd() < 0.5 ? times() : plus());
+    const bad = () => (c > 3 && rnd() < 0.55 ? minus() : div());
+    let a, b;
+    const r = rnd();
+    if (r < 0.62 - 0.3 * d || c < 5 || c > 250) { a = good(); b = bad(); }
+    else if (r < 0.92 || c < 30) { a = { op: '+', val: nice(c * (0.7 + rnd() * 0.6)) }; b = { op: 'x', val: 2 }; }
+    else { a = minus(); b = div(); }
+    if (rnd() < 0.5) [a, b] = [b, a];
+    // Never hide the better gate right behind an edge pit on the same side.
+    const betterLeft = applyOp(a, c) >= applyOp(b, c);
+    if (pitSide && (pitSide < 0) === betterLeft) [a, b] = [b, a];
+    a.label = opLabel(a); b.label = opLabel(b);
+    return { type: 'gate', z, ops: [a, b], used: -1, flash: 0, best: Math.max(applyOp(a, c), applyOp(b, c)) };
+  }
+
+  function hazard(rnd, kind, d, z, list, pits) {
+    const sign = rnd() < 0.5 ? -1 : 1;
+    if (kind === 'bar') {
+      const len = 1.5 + 0.8 * d, speed = (1.1 + 0.9 * d) * sign;
+      const x = (rnd() < 0.5 ? -1 : 1) * 2.6;
+      list.push({ type: 'bar', z, x, len, speed, a0: rnd() * TAU, a: 0, ca: 1, sa: 0, zMin: z - len, zMax: z + len });
+    } else if (kind === 'saw') {
+      const count = d > 0.7 ? 2 : 1, speed = 1.2 + d, phase = rnd() * TAU;
+      for (let i = 0; i < count; i++) list.push({ type: 'saw', z: z + i * 0.01, amp: RH - 1, speed, phase: phase + i * Math.PI, r: 0.75, x: 0, zMin: z - 0.4, zMax: z + 0.4 });
+    } else if (kind === 'hammer') {
+      list.push({ type: 'hammer', z, speed: 1.3 + 0.8 * d, phase: rnd() * TAU, th: 0, hx: 0, hy: HAMMER_PIVOT, zMin: z - 0.6, zMax: z + 0.6 });
+    } else {
+      const z0 = Math.round(z / SEG) * SEG, len = SEG * (2 + Math.round(d * 2));
+      const both = d > 0.5 && rnd() < 0.45;
+      const pit = { type: 'pit', z: z0, z0, z1: z0 + len, side: both ? 0 : sign, w: both ? 1.3 + 0.7 * d : 1.8 + 1.5 * d, zMin: z0, zMax: z0 + len };
+      list.push(pit); pits.push(pit);
+    }
+  }
+
+  function buildLevel(n) {
+    const rnd = rng(n * 7919 + 13);
+    const d = Math.min(1, (n - 1) / 24);
+    const kinds = ['bar', 'pit', 'saw', 'hammer'].filter((_, i) => n >= [2, 3, 4, 6][i]);
+    const gates = [], hazards = [], enemies = [], pits = [];
+    const sections = Math.min(14, 5 + Math.floor(n * 0.45));
+    let c = 1, z = 24;
+    for (let i = 0; i < sections; i++) {
+      if (i % 2 === 0) {
+        const lastPit = pits[pits.length - 1];
+        const g = gatePair(rnd, c, d, z, lastPit && lastPit.z1 > z - 24 ? lastPit.side : 0);
+        gates.push(g); c = g.best; z += 20;
+        continue;
+      }
+      // Traps only show up once the design crowd can afford a few losses.
+      if (c >= 3 && (!kinds.length || c < 12 || rnd() < 0.35 + 0.15 * d)) {
+        const count = Math.max(1, Math.min(Math.floor(c * 0.6), Math.round(c * (0.25 + 0.15 * d) * (0.85 + rnd() * 0.3))));
+        const crowd = makeCrowd(ENEMY_CAP, -1);
+        const shown = Math.min(count, ENEMY_CAP);
+        const radius = (shown <= 1 ? SPACING : Math.min(SPACING, CLUSTER_MAX / Math.sqrt(shown))) * Math.sqrt(Math.max(0, shown - 1)) + 0.25;
+        crowd.x = (rnd() * 2 - 1) * Math.max(0, RH - 0.5 - radius);
+        crowd.z = z;
+        setCount(crowd, count, false);
+        for (let k = 0; k < crowd.n; k++) { crowd.ox[k] = SLOT_X[k] * crowd.sTarget; crowd.oz[k] = SLOT_Z[k] * crowd.sTarget; }
+        crowd.s = crowd.sTarget; crowd.pop = 0;
+        settle(crowd, 0);
+        enemies.push({ type: 'enemy', z, crowd, alive: true });
+        c -= count;
+      } else if (kinds.length) {
+        hazard(rnd, kinds[Math.floor(rnd() * kinds.length)], d, z, hazards, pits);
+        c = Math.ceil(c * 0.85);
+      } else {
+        const g = gatePair(rnd, c, d, z);
+        gates.push(g); c = g.best;
+      }
+      if (d > 0.45 && kinds.length && c >= 20 && rnd() < 0.35) {
+        hazard(rnd, kinds[Math.floor(rnd() * kinds.length)], d, z + 10, hazards, pits);
+        c = Math.ceil(c * 0.85);
+        z += 8;
+      }
+      z += 20;
+    }
+    const finishZ = z + 4;
+    const boss = n % 5 === 0 ? { z: finishZ + 16, hp: Math.max(4, Math.round(c * (0.35 + 0.15 * d))), maxHp: 0, hit: 0, swing: 0, fall: 0 } : null;
+    if (boss) boss.maxHp = boss.hp;
+    const stairsZ = finishZ + 5;
+    const stepCost = Math.max(1, Math.round(c / 15));
+    const roadEnd = boss ? boss.z + 9 : stairsZ;
+    hazards.sort((a, b) => a.zMin - b.zMin);
+    // Everything that stands up off the road, sorted near → far for painter's-order drawing.
+    const props = [...gates, ...hazards.filter(h => h.type !== 'pit'), ...enemies, { type: 'finish', z: finishZ }];
+    if (boss) props.push({ type: 'boss', z: boss.z });
+    else props.push({ type: 'stairs', z: stairsZ });
+    props.sort((a, b) => a.z - b.z);
+    return { n, d, gates, hazards, enemies, pits, props, finishZ, boss, stairsZ, stepCost, roadEnd, design: Math.max(1, c) };
+  }
+
+  // ---------- Game state ----------
+  const player = makeCrowd(CAP, 1);
+  let def = buildLevel(progress.unlocked);
+  const game = { state: 'ready', paused: false, clock: 0, speed: 0, enemy: null, fightRate: 0, fightAcc: 0, stepIdx: 0, paid: new Int16Array(STAIRS), endTimer: 0, loseReason: '', shake: 0, tint: 0, tintColor: '#fff', lossWindow: 0, hintTimer: 0, milestone: 0 };
+
+  function resetPlayer() {
+    player.n = 0; player.run = 0; player.x = 0; player.tx = 0; player.y = 0; player.z = 0; player.zs = 1; player.s = SPACING;
+    setCount(player, startCrowdSize(), false);
+    for (let i = 0; i < player.n; i++) { player.ox[i] = SLOT_X[i] * player.sTarget; player.oz[i] = SLOT_Z[i] * player.sTarget; }
+    player.s = player.sTarget;
+    settle(player, 0);
+  }
+
+  function prepareLevel(n) {
+    def = buildLevel(n);
+    resetPlayer();
+    Object.assign(game, { state: 'ready', paused: false, clock: 0, speed: 0, enemy: null, stepIdx: 0, endTimer: 0, shake: 0, tint: 0, lossWindow: 0, hintTimer: 0, milestone: 0 });
+    game.paid.fill(0);
+    for (let i = 0; i < MILESTONES.length && player.count >= MILESTONES[i]; i++) game.milestone = i + 1;
+    particleCount = 0;
+    snapCamera();
+    updateHud();
+    canvas.setAttribute('aria-label', `${t.canvas}. ${t.level(n)}. ${t.crowdNow(player.count)}`);
+  }
+
+  function startLevel(n) {
+    prepareLevel(n);
+    hidePanels();
+    game.state = 'run';
+    els.pause.hidden = false;
+    showBanner(def.boss ? `${t.level(n)} · ${t.bossAhead}` : t.level(n));
+    if (n <= 2) { els.hint.hidden = false; game.hintTimer = 3; }
+    canvas.focus({ preventScroll: true });
+  }
+
+  // ---------- Particles: a fixed ring buffer, world-space ----------
+  const P_MAX = 700;
+  const PX_ = new Float32Array(P_MAX), PY_ = new Float32Array(P_MAX), PZ_ = new Float32Array(P_MAX), PVX = new Float32Array(P_MAX), PVY = new Float32Array(P_MAX), PVZ = new Float32Array(P_MAX), PLIFE = new Float32Array(P_MAX), PCOL = new Uint8Array(P_MAX);
+  let particleHead = 0, particleCount = 0;
+  function spawn(x, y, z, spread, up, color, life) {
+    const i = particleHead;
+    particleHead = (particleHead + 1) % P_MAX;
+    particleCount = Math.min(P_MAX, particleCount + 1);
+    PX_[i] = x; PY_[i] = y; PZ_[i] = z;
+    PVX[i] = (Math.random() - 0.5) * spread; PVZ[i] = (Math.random() - 0.5) * spread; PVY[i] = up * (0.5 + Math.random());
+    PLIFE[i] = life; PCOL[i] = color;
+  }
+  function poof(x, y, z, color) { for (let k = 0; k < 4; k++) spawn(x, y + 0.3, z, 4, 3, k ? color : 0, 0.45); }
+  function stepParticles(dt) {
+    for (let i = 0; i < particleCount; i++) {
+      if (PLIFE[i] <= 0) continue;
+      PLIFE[i] -= dt;
+      PX_[i] += PVX[i] * dt; PY_[i] += PVY[i] * dt; PZ_[i] += PVZ[i] * dt;
+      PVY[i] -= 12 * dt;
+    }
+  }
+
+  // ---------- Simulation ----------
+  function updateHazards() {
+    const time = game.clock;
+    for (const h of def.hazards) {
+      if (h.type === 'bar') { h.a = h.a0 + time * h.speed; h.ca = Math.cos(h.a); h.sa = Math.sin(h.a); }
+      else if (h.type === 'saw') h.x = h.amp * Math.sin(time * h.speed + h.phase);
+      else if (h.type === 'hammer') { h.th = 1.05 * Math.sin(time * h.speed + h.phase); h.hx = HAMMER_ARM * Math.sin(h.th); h.hy = HAMMER_PIVOT - HAMMER_ARM * Math.cos(h.th); }
+    }
+  }
+
+  function hits(h, fx, fz) {
+    if (h.type === 'bar') {
+      const dx = fx - h.x, dz = fz - h.z;
+      const along = clamp(dx * h.ca + dz * h.sa, -h.len, h.len);
+      const px = dx - along * h.ca, pz = dz - along * h.sa;
+      return px * px + pz * pz < 0.1;
+    }
+    if (h.type === 'saw') return Math.abs(fz - h.z) < 0.3 && Math.abs(fx - h.x) < h.r * 0.85;
+    if (h.type === 'hammer') return h.hy < 1 && Math.abs(fz - h.z) < 0.5 && Math.abs(fx - h.hx) < 0.65;
+    return fz > h.z0 && fz < h.z1 && (h.side === 0 ? Math.abs(fx) > RH - h.w : fx * h.side > RH - h.w);
+  }
+
+  function trapStep() {
+    const p = player;
+    let lost = 0;
+    for (const h of def.hazards) {
+      if (h.zMin > p.z + p.r + 0.5) break;
+      if (h.zMax < p.z - p.r - 0.5) continue;
+      for (let i = p.n - 1; i >= 0; i--) {
+        const fx = p.x + p.ox[i], fz = p.z + p.oz[i] * p.zs;
+        if (!hits(h, fx, fz)) continue;
+        const take = p.count > p.n ? Math.round(p.count / p.n) : 1;
+        p.count -= take; lost += take;
+        if (h.type === 'pit') for (let k = 0; k < 3; k++) spawn(fx, 0, fz, 1, -2, k ? 1 : 4, 0.6);
+        else poof(fx, 0, fz, 1);
+        removeAt(p, i);
+      }
+    }
+    if (!lost) return;
+    setCount(p, p.count, false);
+    game.lossWindow += lost;
+    if (game.lossWindow >= Math.max(6, p.count * 0.15)) { addShake(0.5); game.lossWindow = 0; }
+    if (p.count <= 0) lose('trap');
+  }
+
+  function passGates(prevZ) {
+    const p = player;
+    for (const g of def.gates) {
+      if (g.used >= 0 || prevZ >= g.z || p.z < g.z) continue;
+      g.used = p.x < 0 ? 0 : 1;
+      g.flash = 1;
+      const op = g.ops[g.used];
+      const before = p.count;
+      setCount(p, applyOp(op, before), op.op === '-' || op.op === '/');
+      game.tint = 1; game.tintColor = isGood(op) ? '#4f8cff' : '#ff4d4d';
+      if (p.count < before) {
+        for (let k = 0; k < 10; k++) spawn(p.x + (Math.random() - 0.5) * p.r * 2, 0.5, g.z, 3, 4, 2, 0.5);
+        if (before - p.count >= Math.max(6, before * 0.3)) addShake(0.6);
+      } else {
+        for (let k = 0; k < 10; k++) spawn(p.x + (Math.random() - 0.5) * p.r * 2, 0.5, g.z, 3, 4, 1, 0.5);
+      }
+      announceMilestone();
+      if (p.count <= 0) lose('gate');
+    }
+  }
+
+  function checkEnemies() {
+    const p = player;
+    for (const e of def.enemies) {
+      if (!e.alive) continue;
+      const c = e.crowd;
+      const dz = c.z - p.z;
+      if (dz > p.r + c.r + 0.5 || dz < -p.r - c.r) continue;
+      if (Math.hypot(c.x - p.x, dz) < p.r + c.r + 0.25) {
+        game.state = 'fight';
+        game.enemy = e;
+        const pairs = Math.min(p.count, c.count);
+        game.fightRate = pairs / clamp(0.35 + pairs / 80, 0.45, 1.6);
+        game.fightAcc = 0;
+        game.speed = 3;
+        c.run = 1;
+        return;
+      }
+    }
+  }
+
+  function fightStep(dt) {
+    const p = player, c = game.enemy.crowd;
+    const gap = (p.r + c.r) * 0.45;
+    if (c.z - p.z > gap) { p.z += 3 * dt; c.z -= 2 * dt; }
+    c.x += (p.x - c.x) * Math.min(1, dt * 2);
+    game.fightAcc += game.fightRate * dt;
+    let k = Math.floor(game.fightAcc);
+    if (!k) return;
+    game.fightAcc -= k;
+    k = Math.min(k, p.count, c.count);
+    setCount(p, p.count - k, true);
+    setCount(c, c.count - k, true);
+    const mz = (p.z + p.r * 0.5 + c.z - c.r * 0.5) / 2;
+    for (let j = 0; j < Math.min(k, 3); j++) {
+      const x = (p.x + c.x) / 2 + (Math.random() - 0.5) * Math.min(p.r, c.r) * 1.6;
+      spawn(x, 0.4, mz, 4, 3.5, 1, 0.4); spawn(x, 0.4, mz, 4, 3.5, 2, 0.4);
+    }
+    if (p.count <= 0) { lose('fight'); return; }
+    if (c.count <= 0) {
+      game.enemy.alive = false;
+      game.enemy = null;
+      game.state = 'run';
+      announce(t.fightWon(p.count));
+    }
+  }
+
+  function bossStep(dt) {
+    const p = player, b = def.boss;
+    b.swing += dt * 7;
+    b.hit = Math.max(0, b.hit - dt * 5);
+    const front = b.z - 1.6 - p.r * p.zs;
+    if (p.z < front) { p.z = Math.min(front, p.z + 6 * dt); return; }
+    if (!game.fightRate) { const pairs = Math.min(p.count, b.hp); game.fightRate = pairs / clamp(0.6 + pairs / 70, 0.8, 2.2); game.fightAcc = 0; }
+    game.fightAcc += game.fightRate * dt;
+    let k = Math.floor(game.fightAcc);
+    if (!k) return;
+    game.fightAcc -= k;
+    k = Math.min(k, p.count, b.hp);
+    setCount(p, p.count - k, true);
+    b.hp -= k; b.hit = 1;
+    for (let j = 0; j < Math.min(k, 3); j++) { const x = (Math.random() - 0.5) * 2; spawn(x, 0.6, b.z - 1.2, 5, 4, 1, 0.45); spawn(x, 0.6, b.z - 1.2, 5, 4, 2, 0.45); }
+    if (Math.random() < 0.08) addShake(0.25);
+    if (p.count <= 0) { lose('boss'); return; }
+    if (b.hp <= 0) {
+      for (let j = 0; j < 40; j++) spawn((Math.random() - 0.5) * 4, 3, b.z, 8, 6, 3, 1.1);
+      addShake(0.7);
+      finish();
+    }
+  }
+
+  function stairsStep(dt) {
+    const p = player;
+    p.tx = 0;
+    p.zs += (0.3 - p.zs) * Math.min(1, dt * 3);
+    p.y += (game.stepIdx * STAIR_RISE - p.y) * Math.min(1, dt * 10);
+    if (game.stepIdx >= STAIRS || p.count <= 0) return finish();
+    const edge = def.stairsZ + game.stepIdx * STAIR_DEPTH;
+    if (p.z < edge - 0.3) { p.z += 8 * dt; return; }
+    if (p.count < def.stepCost) return finish();
+    game.paid[game.stepIdx] = def.stepCost;
+    setCount(p, p.count - def.stepCost, false);
+    game.stepIdx++;
+    const top = game.stepIdx * STAIR_RISE;
+    for (let j = 0; j < 4; j++) spawn((Math.random() - 0.5) * RH * 1.6, top, edge + STAIR_DEPTH / 2, 3, 3, 3, 0.5);
+    if (p.count <= 0) finish();
+  }
+
+  function step(dt) {
+    const p = player;
+    if (game.state === 'ready') { settle(p, dt); return; }
+    game.clock += dt;
+    updateHazards();
+    const st = game.state;
+    if (st === 'run' || st === 'toBoss') {
+      game.speed = Math.min(RUN_SPEED, game.speed + RUN_SPEED * 1.6 * dt);
+      p.run = 1;
+      const limit = Math.max(0, RH - 0.25 - p.r);
+      if (st === 'run') {
+        p.tx = clamp(p.tx + keyDir() * STEER_SPEED * dt, -limit, limit);
+      } else p.tx = 0;
+      p.x += (clamp(p.tx, -limit, limit) - p.x) * Math.min(1, dt * 12);
+      const prevZ = p.z;
+      p.z += game.speed * dt;
+      if (st === 'run') {
+        passGates(prevZ);
+        if (game.state === 'run') trapStep();
+        if (game.state === 'run') checkEnemies();
+        if (game.state === 'run' && p.z >= def.finishZ) {
+          game.state = def.boss ? 'toBoss' : 'stairs';
+          game.fightRate = 0;
+        }
+      } else if (p.z >= def.boss.z - 1.6 - p.r - 2) game.state = 'boss';
+    } else if (st === 'fight') { p.run = 1; fightStep(dt); }
+    else if (st === 'boss') { p.run = 1; bossStep(dt); }
+    else if (st === 'stairs') { p.run = 1; p.x += (0 - p.x) * Math.min(1, dt * 4); stairsStep(dt); }
+    else if (st === 'won' || st === 'lost') {
+      p.run = 0;
+      if (def.boss && st === 'won') def.boss.fall = Math.min(1, def.boss.fall + dt * 1.6);
+      game.endTimer -= dt;
+      if (game.endTimer <= 0 && game.endTimer > -1) { game.endTimer = -2; st === 'won' ? showWin() : showLose(); }
+    }
+    settle(p, dt);
+    for (const e of def.enemies) if (e.alive && Math.abs(e.crowd.z - p.z) < DRAW_DIST) settle(e.crowd, dt);
+    for (const g of def.gates) g.flash = Math.max(0, g.flash - dt * 2.5);
+    stepParticles(dt);
+    stepSpeedLines(dt);
+    game.tint = Math.max(0, game.tint - dt * 3);
+    game.shake = Math.max(0, game.shake - dt * 1.8);
+    game.lossWindow = Math.max(0, game.lossWindow - dt * 20);
+    if (game.hintTimer > 0) { game.hintTimer -= dt; if (game.hintTimer <= 0) els.hint.hidden = true; }
+    updateCamera(dt);
+    updateProgress();
+  }
+
+  function addShake(amount) { if (!reducedMotion.matches) game.shake = Math.max(game.shake, amount); }
+
+  function announce(text) { els.announcer.textContent = text; }
+  function announceMilestone() {
+    while (game.milestone < MILESTONES.length && player.count >= MILESTONES[game.milestone]) {
+      announce(t.crowdNow(player.count));
+      game.milestone++;
+    }
+    canvas.setAttribute('aria-label', `${t.canvas}. ${t.level(def.n)}. ${t.crowdNow(player.count)}`);
+  }
+
+  // ---------- Results ----------
+  function finish() {
+    const p = player, n = def.n;
+    game.state = 'won';
+    game.endTimer = def.boss ? 1.5 : 1.1;
+    const income = 1 + incomeBonus() / 100;
+    const base = 12 + n * 3;
+    let coins, stars, mult = 0;
+    if (def.boss) {
+      const ratio = p.count / Math.max(1, def.design - def.boss.maxHp);
+      coins = Math.round(base * (2.5 + Math.min(2, ratio * 2)) * income);
+      stars = ratio >= 0.6 ? 3 : ratio >= 0.25 ? 2 : 1;
+    } else {
+      mult = game.stepIdx ? MULTS[game.stepIdx - 1] : 1;
+      coins = Math.round(base * mult * income);
+      stars = mult >= 3.4 ? 3 : mult >= 2 ? 2 : 1;
+      for (let j = 0; j < 24; j++) spawn((Math.random() - 0.5) * 4, p.y + 1, p.z, 6, 6, 3, 1);
+    }
+    const prevBest = progress.best[n] || 0;
+    game.result = { coins, stars, mult, newBest: coins > prevBest, prevBest };
+    progress.coins += coins;
+    progress.unlocked = Math.max(progress.unlocked, n + 1);
+    progress.stars[n] = Math.max(progress.stars[n] || 0, stars);
+    progress.best[n] = Math.max(prevBest, coins);
+    saveProgress();
+    els.pause.hidden = true;
+  }
+
+  function lose(reason) {
+    if (game.state === 'won' || game.state === 'lost') return;
+    game.state = 'lost';
+    game.loseReason = reason;
+    game.endTimer = 0.9;
+    player.count = 0; player.label = '0';
+    for (let i = 0; i < player.n; i++) poof(player.x + player.ox[i], player.y, player.z + player.oz[i] * player.zs, 1);
+    player.n = 0;
+    addShake(0.6);
+    els.pause.hidden = true;
+  }
+
+  // ---------- Camera & projection ----------
+  let W = 360, H = 640, scale = 1, dpr = 1, F = 230, horizonY = 236;
+  let camX = 0, camY = 6, camZ = -6.5, camDist = 6.5;
+  let PX = 0, PY = 0, PS = 0;
+  let skyGrad = null, seaGrad = null;
+
+  function project(x, y, z) {
+    let dz = z - camZ;
+    if (dz < NEAR) dz = NEAR;
+    PS = F / dz;
+    PX = W / 2 + (x - camX) * PS;
+    PY = horizonY + (camY - y) * PS;
+  }
+
+  function cameraTarget() {
+    const st = game.state;
+    return 6.2 + player.r * 1.25 + (st === 'toBoss' || st === 'boss' || (st === 'won' && def.boss) ? 4 : 0) + (st === 'stairs' || (st === 'won' && !def.boss) ? 2 : 0);
+  }
+  function snapCamera() {
+    camDist = cameraTarget();
+    camZ = player.z - camDist; camX = player.x * 0.45; camY = player.y + camDist * 0.92;
+  }
+  function updateCamera(dt) {
+    camDist += (cameraTarget() - camDist) * Math.min(1, dt * 2.5);
+    camZ = player.z - camDist;
+    camX += (player.x * 0.45 - camX) * Math.min(1, dt * 6);
+    camY += (player.y + camDist * 0.92 - camY) * Math.min(1, dt * 6);
+  }
+
+  function resize() {
+    const rect = $('stage').getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    // At least 360×640 logical units are always visible; the extra space widens or deepens the view.
+    scale = Math.min(rect.width / 360, rect.height / 640);
+    W = rect.width / scale; H = rect.height / scale;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    F = 230 * clamp(W / 420, 1, 1.25);
+    horizonY = H * 0.7 - 0.92 * F;
+    skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+    skyGrad.addColorStop(0, '#6fc0ff'); skyGrad.addColorStop(1, '#dff3ff');
+    seaGrad = ctx.createLinearGradient(0, horizonY, 0, H);
+    seaGrad.addColorStop(0, '#8fdcf2'); seaGrad.addColorStop(1, '#2a9fd0');
+    initSpeedLines();
+  }
+
+  // ---------- Speed lines ----------
+  const LINES = 18;
+  const LA = new Float32Array(LINES), LD = new Float32Array(LINES);
+  function initSpeedLines() { for (let i = 0; i < LINES; i++) { LA[i] = Math.random() * TAU; LD[i] = Math.random(); } }
+  function stepSpeedLines(dt) {
+    const k = game.speed / RUN_SPEED;
+    for (let i = 0; i < LINES; i++) { LD[i] += dt * 1.6 * k; if (LD[i] > 1) { LD[i] -= 1; LA[i] = Math.random() * TAU; } }
+  }
+
+  // ---------- Drawing ----------
+  const CLOUDS = [[0.1, 0.25, 1], [0.45, 0.12, 1.3], [0.8, 0.3, 0.9], [1.15, 0.18, 1.1], [1.4, 0.35, 0.8]];
+  const ISLANDS = [[-28, 3.2, '#7dd3a8'], [-12, 1.8, '#94dfb6'], [17, 2.6, '#7dd3a8'], [34, 2, '#94dfb6']];
+
+  function drawBackground(time) {
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(-30, -30, W + 60, horizonY + 31);
+    ctx.fillStyle = '#fff6c9';
+    ctx.beginPath(); ctx.arc(W * 0.8 - camX * 2, horizonY * 0.38, 24, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffffd9';
+    const span = W * 1.6 + 160;
+    ctx.beginPath();
+    for (const [cx, cy, sz] of CLOUDS) {
+      const x = ((cx * span - time * 6 * sz - camX * 3) % span + span) % span - 80, y = horizonY * cy + 10, r = 16 * sz;
+      ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU);
+      ctx.moveTo(x + r * 2.2, y + 4); ctx.arc(x + r * 1.2, y + 4, r * 1.0, 0, TAU);
+      ctx.moveTo(x - r * 0.3, y + 6); ctx.arc(x - r * 1.1, y + 6, r * 0.8, 0, TAU);
+    }
+    ctx.fill();
+    for (const [ix, ih, col] of ISLANDS) {
+      const x = W / 2 + (ix - camX * 0.3) * F / 60;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.ellipse(x, horizonY + 1, ih * F / 30, ih * F / 70, 0, Math.PI, TAU); ctx.fill();
+    }
+    ctx.fillStyle = seaGrad;
+    ctx.fillRect(-30, horizonY, W + 60, H - horizonY + 30);
+    // Glints on the water scroll past to sell the speed.
+    ctx.strokeStyle = '#ffffff66'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    const z0 = Math.ceil((camZ + 2) / 4) * 4;
+    for (let z = z0; z < camZ + 70; z += 4) {
+      const k = ((z / 4) | 0) & 7;
+      for (let side = -1; side <= 1; side += 2) {
+        const x = side * (RH + 2.5 + k * 1.3);
+        project(x, SEA_Y, z); const ax = PX, ay = PY;
+        project(x + 1.2, SEA_Y, z);
+        ctx.moveTo(ax, ay); ctx.lineTo(PX, PY);
+      }
+    }
+    ctx.stroke();
+  }
+
+  function quad(x0, x1, y, za, zb) {
+    project(x0, y, za); ctx.moveTo(PX, PY);
+    project(x1, y, za); ctx.lineTo(PX, PY);
+    project(x1, y, zb); ctx.lineTo(PX, PY);
+    project(x0, y, zb); ctx.lineTo(PX, PY);
+    ctx.closePath();
+  }
+  function wall(x, y0, y1, za, zb) {
+    project(x, y0, za); ctx.moveTo(PX, PY);
+    project(x, y1, za); ctx.lineTo(PX, PY);
+    project(x, y1, zb); ctx.lineTo(PX, PY);
+    project(x, y0, zb); ctx.lineTo(PX, PY);
+    ctx.closePath();
+  }
+  function railBlocked(side, za) {
+    for (const p of def.pits) if ((p.side === 0 || p.side === side) && za >= p.z0 - 0.01 && za < p.z1 - 0.01) return true;
+    return false;
+  }
+
+  function drawRoad() {
+    const zNear = camZ + NEAR, zFar = Math.min(camZ + DRAW_DIST, def.roadEnd);
+    if (zFar <= zNear) return;
+    const zStart = Math.floor(zNear / SEG) * SEG;
+    for (let parity = 0; parity < 2; parity++) {
+      ctx.fillStyle = parity ? '#efe7d6' : '#fbf6ec';
+      ctx.beginPath();
+      for (let z = zStart; z < zFar; z += SEG) {
+        if ((Math.round(z / SEG) & 1) !== parity) continue;
+        quad(-RH, RH, 0, Math.max(z, zNear), Math.min(z + SEG, zFar));
+      }
+      ctx.fill();
+    }
+    ctx.fillStyle = '#8b6fe6';
+    ctx.beginPath();
+    for (let z = zStart; z < zFar; z += SEG) {
+      const za = Math.max(z, zNear), zb = Math.min(z + SEG, zFar);
+      if (!railBlocked(-1, z)) wall(-RH, 0, RAIL_H, za, zb);
+      if (!railBlocked(1, z)) wall(RH, 0, RAIL_H, za, zb);
+    }
+    ctx.fill();
+    ctx.fillStyle = '#b29cff';
+    ctx.beginPath();
+    for (let z = zStart; z < zFar; z += SEG) {
+      const za = Math.max(z, zNear), zb = Math.min(z + SEG, zFar);
+      if (!railBlocked(-1, z)) quad(-RH - RAIL, -RH, RAIL_H, za, zb);
+      if (!railBlocked(1, z)) quad(RH, RH + RAIL, RAIL_H, za, zb);
+    }
+    ctx.fill();
+    for (const p of def.pits) {
+      if (p.z1 < zNear || p.z0 > zFar) continue;
+      const za = Math.max(p.z0, zNear), zb = Math.min(p.z1, zFar);
+      for (let side = -1; side <= 1; side += 2) {
+        if (p.side !== 0 && p.side !== side) continue;
+        const inner = side * (RH - p.w), outer = side * (RH + RAIL + 0.05);
+        const x0 = Math.min(inner, outer), x1 = Math.max(inner, outer);
+        ctx.fillStyle = '#1e6e98'; ctx.beginPath(); quad(x0, x1, 0, za, zb); ctx.fill();
+        if (zb === p.z1) { ctx.fillStyle = '#145a7e'; ctx.beginPath(); project(x0, 0, zb); const ax = PX, ay = PY; project(x1, SEA_Y, zb); ctx.rect(ax, ay, PX - ax, PY - ay); ctx.fill(); }
+        // Warning stripe along the lip of the hole.
+        ctx.strokeStyle = '#ffc531'; ctx.lineWidth = Math.max(2, 0.12 * F / Math.max(NEAR, (za + zb) / 2 - camZ));
+        ctx.beginPath(); project(inner, 0.01, za); ctx.moveTo(PX, PY); project(inner, 0.01, zb); ctx.lineTo(PX, PY); ctx.stroke();
+      }
+    }
+    if (def.finishZ > zNear && def.finishZ < zFar) {
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); quad(-RH, RH, 0.005, def.finishZ, def.finishZ + 1.2); ctx.fill();
+      ctx.fillStyle = '#2b2d42'; ctx.beginPath();
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 10; c++) if ((r + c) & 1) quad(-RH + c, -RH + c + 1, 0.01, def.finishZ + r * 0.6, def.finishZ + r * 0.6 + 0.6);
+      ctx.fill();
+    }
+  }
+
+  const SXB = new Float32Array(CAP), SYB = new Float32Array(CAP), SSB = new Float32Array(CAP);
+  function drawCrowd(c, pal, time) {
+    const n = c.n;
+    if (!n) return;
+    project(c.x, c.y, c.z - c.r * c.zs); const yNear = PY;
+    project(c.x, c.y, c.z + c.r * c.zs); const yFar = PY;
+    project(c.x, c.y, c.z);
+    const sMid = PS * c.fig;
+    ctx.fillStyle = '#1b2a6614';
+    ctx.beginPath(); ctx.ellipse(PX, (yNear + yFar) / 2, c.r * PS, Math.max(3, (yNear - yFar) / 2), 0, 0, TAU); ctx.fill();
+    for (let i = 0; i < n; i++) {
+      const wz = c.z + c.oz[i] * c.zs;
+      if (wz - camZ < NEAR) { SSB[i] = 0; continue; }
+      project(c.x + c.ox[i], c.y, wz);
+      SXB[i] = PX; SYB[i] = PY; SSB[i] = PS * c.fig;
+    }
+    const legT = time * 15, still = c.run ? 0 : 1;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = pal.leg; ctx.lineWidth = Math.max(1, sMid * 0.075);
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const s = SSB[i];
+      if (!s) continue;
+      const x = SXB[i], y = SYB[i];
+      const sw = still ? 0 : Math.sin(legT + c.ph[i]) * 0.12 * s;
+      const hip = y - 0.3 * s, sh = y - 0.48 * s;
+      ctx.moveTo(x - 0.05 * s, hip); ctx.lineTo(x - 0.05 * s + sw, y);
+      ctx.moveTo(x + 0.05 * s, hip); ctx.lineTo(x + 0.05 * s - sw, y);
+      ctx.moveTo(x - 0.12 * s, sh); ctx.lineTo(x - 0.2 * s - sw * 0.6, sh + 0.17 * s);
+      ctx.moveTo(x + 0.12 * s, sh); ctx.lineTo(x + 0.2 * s + sw * 0.6, sh + 0.17 * s);
+    }
+    ctx.stroke();
+    ctx.fillStyle = pal.body;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const s = SSB[i];
+      if (!s) continue;
+      const bob = still ? Math.sin(time * 3 + c.ph[i]) * 0.02 * s : Math.abs(Math.sin(legT + c.ph[i])) * 0.03 * s;
+      const cy = SYB[i] - 0.42 * s - bob;
+      ctx.moveTo(SXB[i] + 0.14 * s, cy); ctx.arc(SXB[i], cy, 0.14 * s, 0, TAU);
+    }
+    ctx.fill();
+    ctx.fillStyle = pal.head;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const s = SSB[i];
+      if (!s) continue;
+      const bob = still ? Math.sin(time * 3 + c.ph[i]) * 0.02 * s : Math.abs(Math.sin(legT + c.ph[i])) * 0.03 * s;
+      const cy = SYB[i] - 0.66 * s - bob;
+      ctx.moveTo(SXB[i] + 0.115 * s, cy); ctx.arc(SXB[i], cy, 0.115 * s, 0, TAU);
+    }
+    ctx.fill();
+  }
+
+  function drawBubble(c, color) {
+    if (!c.n && c.count <= 0) return;
+    project(c.x, c.y + 0.95, c.z + c.r * c.zs * 0.6);
+    if (c.z - camZ < NEAR) return;
+    const size = clamp(PS * 0.5, 12, 19) * (1 + c.pop * 0.35);
+    ctx.font = `900 ${size.toFixed(1)}px ${CANVAS_FONT}`;
+    const w = ctx.measureText(c.label).width + size * 1.1, h = size * 1.45;
+    const x = PX, y = PY - h / 2 - 8;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 5, y + h / 2 - 1); ctx.lineTo(x + 5, y + h / 2 - 1); ctx.lineTo(x, y + h / 2 + 6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(c.label, x, y + 1);
+  }
+
+  function drawGate(g) {
+    for (let side = 0; side < 2; side++) {
+      const op = g.ops[side];
+      const x0 = side ? 0.12 : -RH + 0.12, x1 = side ? RH - 0.12 : -0.12;
+      project(x0, 0, g.z); const left = PX, bottom = PY;
+      project(x1, GATE_H, g.z); const right = PX, top = PY, s = PS;
+      const good = isGood(op);
+      const faded = g.used >= 0 && g.used !== side;
+      ctx.globalAlpha = faded ? 0.25 : 1;
+      ctx.fillStyle = good ? '#3d8bff8c' : '#ff4d4d8c';
+      ctx.fillRect(left, top, right - left, bottom - top);
+      if (g.used === side && g.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${(g.flash * 0.7).toFixed(2)})`; ctx.fillRect(left, top, right - left, bottom - top); }
+      ctx.fillStyle = good ? '#1d5fe0' : '#d42a2a';
+      ctx.fillRect(left, top, right - left, Math.max(2, 0.22 * s));
+      ctx.fillStyle = '#fff';
+      ctx.font = `900 ${Math.max(8, 0.95 * s).toFixed(1)}px ${CANVAS_FONT}`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(op.label, (left + right) / 2, (top + bottom) / 2 + 0.1 * s);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffffff';
+    for (let x = -RH; x <= RH; x += RH) {
+      project(x, 0, g.z); const bx = PX, by = PY, s = PS;
+      project(x, GATE_H + 0.15, g.z);
+      ctx.fillRect(bx - 0.09 * s, PY, 0.18 * s, by - PY);
+    }
+  }
+
+  function drawBar(h) {
+    project(h.x, 0, h.z); const bx = PX, by = PY, s = PS;
+    ctx.fillStyle = '#5b4a9e'; ctx.fillRect(bx - 0.18 * s, by - 0.75 * s, 0.36 * s, 0.75 * s);
+    project(h.x - h.len * h.ca, 0.5, h.z - h.len * h.sa); const ax = PX, ay = PY, as = PS;
+    project(h.x + h.len * h.ca, 0.5, h.z + h.len * h.sa);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#c94a10'; ctx.lineWidth = 0.34 * (as + PS) / 2;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(PX, PY); ctx.stroke();
+    ctx.strokeStyle = '#ff8a3d'; ctx.lineWidth = 0.22 * (as + PS) / 2;
+    ctx.beginPath(); ctx.moveTo(ax, ay - 0.04 * as); ctx.lineTo(PX, PY - 0.04 * PS); ctx.stroke();
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(bx, by - 0.5 * s, 0.22 * s, 0, TAU); ctx.fill();
+  }
+
+  function drawSaw(h, time) {
+    project(-RH + 0.4, 0, h.z); const ax = PX, ay = PY, s = PS;
+    project(RH - 0.4, 0, h.z);
+    ctx.strokeStyle = '#3c3f5c'; ctx.lineCap = 'round'; ctx.lineWidth = 0.16 * s;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(PX, PY); ctx.stroke();
+    project(h.x, h.r * 0.75, h.z);
+    const r = h.r * PS, rot = time * 9;
+    ctx.fillStyle = '#c6cedb';
+    ctx.beginPath();
+    for (let k = 0; k < 24; k++) {
+      const a = rot + (k / 24) * TAU, rr = k & 1 ? r * 0.8 : r;
+      k ? ctx.lineTo(PX + Math.cos(a) * rr, PY + Math.sin(a) * rr) : ctx.moveTo(PX + Math.cos(a) * rr, PY + Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8994a8'; ctx.beginPath(); ctx.arc(PX, PY, r * 0.55, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff5a5a'; ctx.beginPath(); ctx.arc(PX, PY, r * 0.18, 0, TAU); ctx.fill();
+  }
+
+  function drawHammer(h) {
+    const top = HAMMER_PIVOT + 0.4;
+    ctx.fillStyle = '#5b4a9e';
+    for (let side = -1; side <= 1; side += 2) {
+      const x = side * (RH + 0.2);
+      project(x, 0, h.z); const bx = PX, by = PY, s = PS;
+      project(x, top + 0.3, h.z);
+      ctx.fillRect(bx - 0.15 * s, PY, 0.3 * s, by - PY);
+    }
+    project(-RH - 0.2, top, h.z); const lx = PX, ly = PY, s = PS;
+    project(RH + 0.2, top, h.z);
+    ctx.fillRect(lx, ly - 0.15 * s, PX - lx, 0.3 * s);
+    project(0, HAMMER_PIVOT, h.z); const px = PX, py = PY;
+    project(h.hx, h.hy + 0.45, h.z);
+    ctx.strokeStyle = '#3c3f5c'; ctx.lineWidth = 0.14 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(PX, PY); ctx.stroke();
+    ctx.save();
+    ctx.translate(PX, PY); ctx.rotate(-h.th);
+    ctx.fillStyle = '#e23b3b'; ctx.beginPath(); ctx.roundRect(-0.75 * s, -0.45 * s, 1.5 * s, 0.9 * s, 0.18 * s); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-0.45 * s, -0.45 * s, 0.22 * s, 0.9 * s); ctx.fillRect(0.23 * s, -0.45 * s, 0.22 * s, 0.9 * s);
+    ctx.restore();
+  }
+
+  function drawFinishArch() {
+    ctx.fillStyle = '#ffffff';
+    for (let side = -1; side <= 1; side += 2) {
+      const x = side * (RH + 0.2);
+      project(x, 0, def.finishZ); const bx = PX, by = PY, s = PS;
+      project(x, 3.4, def.finishZ);
+      ctx.fillRect(bx - 0.13 * s, PY, 0.26 * s, by - PY);
+    }
+    project(-RH - 0.2, 3.4, def.finishZ); const lx = PX, ly = PY, s = PS;
+    project(RH + 0.2, 2.7, def.finishZ);
+    ctx.fillStyle = '#ffc531'; ctx.fillRect(lx, ly, PX - lx, PY - ly);
+    ctx.fillStyle = '#2b2d42';
+    for (let k = 0; k < 14; k += 2) ctx.fillRect(lx + (PX - lx) * k / 14, ly, (PX - lx) / 14, 0.18 * s);
+    ctx.font = `900 ${(0.5 * s).toFixed(1)}px ${CANVAS_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🏁', (lx + PX) / 2, (ly + PY) / 2 + 0.08 * s);
+  }
+
+  function drawStairs() {
+    const z0 = def.stairsZ;
+    for (let k = STAIRS - 1; k >= 0; k--) {
+      const za = z0 + k * STAIR_DEPTH, zb = za + STAIR_DEPTH;
+      if (za - camZ > DRAW_DIST || zb - camZ < NEAR) continue;
+      const yTop = (k + 1) * STAIR_RISE;
+      ctx.fillStyle = STAIR_COLORS[k][1]; ctx.beginPath(); quad(-RH, RH, yTop, za, zb); ctx.fill();
+      project(-RH, k * STAIR_RISE, za); const lx = PX, by = PY;
+      project(RH, yTop, za); const rx = PX, ty = PY;
+      ctx.fillStyle = STAIR_COLORS[k][0]; ctx.fillRect(lx, ty, rx - lx, by - ty);
+      project(0, yTop, za + STAIR_DEPTH * 0.35);
+      if (PS > 9) {
+        ctx.font = `900 ${(0.62 * PS).toFixed(1)}px ${CANVAS_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#00000026'; ctx.fillText(MULT_LABELS[k], PX, PY + 0.05 * PS);
+        ctx.fillStyle = '#ffffff'; ctx.fillText(MULT_LABELS[k], PX, PY);
+      }
+      const paid = game.paid[k];
+      if (paid) {
+        const shown = Math.min(paid, 9);
+        ctx.fillStyle = PLAYER_PAL.body;
+        ctx.beginPath();
+        for (let j = 0; j < shown; j++) {
+          project(-RH + 0.7 + (j + 0.5) * (2 * RH - 1.4) / shown, yTop, za + STAIR_DEPTH * 0.8);
+          ctx.moveTo(PX + 0.15 * PS, PY - 0.42 * PS); ctx.arc(PX, PY - 0.42 * PS, 0.15 * PS, 0, TAU);
+          ctx.moveTo(PX + 0.12 * PS, PY - 0.68 * PS); ctx.arc(PX, PY - 0.68 * PS, 0.12 * PS, 0, TAU);
+          ctx.rect(PX - 0.08 * PS, PY - 0.3 * PS, 0.16 * PS, 0.3 * PS);
+        }
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawBoss() {
+    const b = def.boss, z = b.z;
+    // Castle behind the boss.
+    const cz = z + 7;
+    project(-6.5, 0, cz); const lx = PX, by = PY, s = PS;
+    project(6.5, 4.6, cz); const rx = PX, ty = PY;
+    ctx.fillStyle = '#efe2ff'; ctx.fillRect(lx, ty, rx - lx, by - ty);
+    ctx.fillStyle = '#d6c2fb';
+    for (const tx of [-7.6, 5.2]) {
+      project(tx, 0, cz); const tl = PX;
+      project(tx + 2.4, 6.6, cz);
+      ctx.fillRect(tl, PY, PX - tl, by - PY);
+      for (let k = 0; k < 3; k++) ctx.fillRect(tl + (PX - tl) * k / 2.5, PY - 0.5 * s, (PX - tl) / 5, 0.5 * s);
+      ctx.fillStyle = '#e23b3b';
+      ctx.beginPath(); ctx.moveTo((tl + PX) / 2, PY - 0.5 * s); ctx.lineTo((tl + PX) / 2, PY - 2 * s); ctx.lineTo((tl + PX) / 2 + 0.9 * s, PY - 1.7 * s); ctx.lineTo((tl + PX) / 2, PY - 1.4 * s); ctx.fill();
+      ctx.strokeStyle = '#5b4a9e'; ctx.lineWidth = 0.08 * s; ctx.beginPath(); ctx.moveTo((tl + PX) / 2, PY - 0.5 * s); ctx.lineTo((tl + PX) / 2, PY - 2 * s); ctx.stroke();
+      ctx.fillStyle = '#d6c2fb';
+    }
+    for (let k = 0; k < 7; k++) ctx.fillRect(lx + (rx - lx) * k / 6.5, ty - 0.45 * s, (rx - lx) / 13, 0.45 * s);
+    ctx.fillStyle = '#5b3f8c';
+    project(-1.3, 0, cz); const dl = PX;
+    project(1.3, 2.6, cz);
+    ctx.beginPath(); ctx.roundRect(dl, PY, PX - dl, by - PY, [(PX - dl) / 2, (PX - dl) / 2, 0, 0]); ctx.fill();
+    // The giant.
+    project(0, 0, z);
+    const fx = PX, fy = PY, gs = PS * BOSS_SCALE;
+    const shake = b.hit * 0.03 * gs;
+    ctx.save();
+    ctx.translate(fx + (Math.random() - 0.5) * shake, fy);
+    ctx.rotate(b.fall * 1.35);
+    ctx.globalAlpha = 1 - b.fall * 0.5;
+    const arm = Math.sin(b.swing) * 0.5;
+    ctx.lineCap = 'round'; ctx.strokeStyle = '#8f1d1d'; ctx.lineWidth = 0.09 * gs;
+    ctx.beginPath();
+    ctx.moveTo(-0.06 * gs, -0.3 * gs); ctx.lineTo(-0.1 * gs, 0);
+    ctx.moveTo(0.06 * gs, -0.3 * gs); ctx.lineTo(0.1 * gs, 0);
+    ctx.moveTo(-0.13 * gs, -0.5 * gs); ctx.lineTo(-0.25 * gs, -0.36 * gs + arm * 0.2 * gs);
+    ctx.moveTo(0.13 * gs, -0.5 * gs); ctx.lineTo(0.25 * gs, -0.36 * gs - arm * 0.2 * gs);
+    ctx.stroke();
+    ctx.fillStyle = b.hit > 0.5 ? '#ff8a8a' : '#d62839';
+    ctx.beginPath(); ctx.arc(0, -0.43 * gs, 0.16 * gs, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff6a6a'; ctx.beginPath(); ctx.arc(0, -0.68 * gs, 0.12 * gs, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(-0.04 * gs, -0.69 * gs, 0.025 * gs, 0, TAU); ctx.arc(0.04 * gs, -0.69 * gs, 0.025 * gs, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2b2d42';
+    ctx.fillRect(-0.075 * gs, -0.725 * gs, 0.07 * gs, 0.015 * gs); ctx.fillRect(0.005 * gs, -0.725 * gs, 0.07 * gs, 0.015 * gs);
+    ctx.fillStyle = '#ffc531';
+    ctx.beginPath(); ctx.moveTo(-0.09 * gs, -0.77 * gs); ctx.lineTo(-0.1 * gs, -0.88 * gs); ctx.lineTo(-0.045 * gs, -0.82 * gs); ctx.lineTo(0, -0.9 * gs); ctx.lineTo(0.045 * gs, -0.82 * gs); ctx.lineTo(0.1 * gs, -0.88 * gs); ctx.lineTo(0.09 * gs, -0.77 * gs); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBossBar() {
+    const b = def.boss;
+    if (!b || b.fall >= 1) return;
+    project(0, BOSS_SCALE * 0.95, b.z);
+    if (b.z - camZ > DRAW_DIST) return;
+    const w = 130, h = 16, x = PX - w / 2, y = Math.max(52, PY - 26);
+    ctx.fillStyle = '#23265099'; ctx.beginPath(); ctx.roundRect(x - 3, y - 3, w + 6, h + 6, 10); ctx.fill();
+    ctx.fillStyle = '#ffffff33'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(x, y, Math.max(0, w * b.hp / b.maxHp), h, 8); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = `900 12px ${CANVAS_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`♥ ${b.hp}`, PX, y + h / 2 + 1);
+  }
+
+  function drawProp(it, time) {
+    const dz = it.z - camZ;
+    if (it.type === 'stairs') { drawStairs(); return; }
+    if (dz > DRAW_DIST + 10 || dz < NEAR - 4) return;
+    if (it.type === 'gate') drawGate(it);
+    else if (it.type === 'enemy') { if (it.alive) drawCrowd(it.crowd, ENEMY_PAL, time); }
+    else if (it.type === 'bar') drawBar(it);
+    else if (it.type === 'saw') drawSaw(it, time);
+    else if (it.type === 'hammer') drawHammer(it);
+    else if (it.type === 'finish') drawFinishArch();
+    else if (it.type === 'boss') drawBoss();
+  }
+
+  function drawParticles() {
+    let color = -1;
+    for (let i = 0; i < particleCount; i++) {
+      if (PLIFE[i] <= 0 || PZ_[i] - camZ < NEAR) continue;
+      if (PCOL[i] !== color) { color = PCOL[i]; ctx.fillStyle = PARTICLE_COLORS[color]; }
+      project(PX_[i], PY_[i], PZ_[i]);
+      const r = Math.max(1.2, 0.1 * PS);
+      ctx.globalAlpha = Math.min(1, PLIFE[i] * 3);
+      ctx.fillRect(PX - r, PY - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSpeedLines() {
+    if (reducedMotion.matches || game.speed < 1 || (game.state !== 'run' && game.state !== 'toBoss')) return;
+    const cx = W / 2, cy = horizonY + 40, reach = Math.hypot(W, H) * 0.6;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    for (let i = 0; i < LINES; i++) {
+      const d = LD[i], r0 = reach * (0.35 + d * 0.8), r1 = r0 + reach * 0.12;
+      ctx.globalAlpha = 0.35 * d * (game.speed / RUN_SPEED);
+      const ca = Math.cos(LA[i]), sa = Math.sin(LA[i]);
+      ctx.beginPath(); ctx.moveTo(cx + ca * r0, cy + sa * r0 * 0.7); ctx.lineTo(cx + ca * r1, cy + sa * r1 * 0.7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(time) {
+    let sx = 0, sy = 0;
+    if (game.shake > 0) { const a = game.shake * 9; sx = (Math.random() - 0.5) * a; sy = (Math.random() - 0.5) * a; }
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, sx * scale * dpr, sy * scale * dpr);
+    drawBackground(time);
+    drawRoad();
+    // Painter's order: far props first, the player's crowd slots in at its depth.
+    let playerDrawn = false;
+    const props = def.props;
+    for (let i = props.length - 1; i >= 0; i--) {
+      const it = props[i];
+      if (!playerDrawn && it.z < player.z && it.type !== 'stairs') { drawCrowd(player, PLAYER_PAL, time); playerDrawn = true; }
+      drawProp(it, time);
+    }
+    if (!playerDrawn) drawCrowd(player, PLAYER_PAL, time);
+    drawParticles();
+    for (const e of def.enemies) if (e.alive && e.crowd.z - camZ < 70 && e.crowd.z - camZ > NEAR + 1) drawBubble(e.crowd, ENEMY_PAL.bubble);
+    if (game.state !== 'lost') drawBubble(player, PLAYER_PAL.bubble);
+    drawBossBar();
+    drawSpeedLines();
+    if (game.tint > 0) { ctx.globalAlpha = game.tint * 0.16; ctx.fillStyle = game.tintColor; ctx.fillRect(-20, -20, W + 40, H + 40); ctx.globalAlpha = 1; }
+  }
+
+  // ---------- HUD & panels ----------
+  let lastProgress = -1;
+  function updateProgress() {
+    const v = Math.round(clamp(player.z / def.finishZ, 0, 1) * 100);
+    if (v !== lastProgress) { lastProgress = v; els.progress.style.width = `${v}%`; }
+  }
+  function updateHud() {
+    els.levelPill.textContent = t.level(def.n);
+    els.coins.textContent = String(progress.coins);
+    els.coinsPill.setAttribute('aria-label', `🪙 ${progress.coins}`);
+    els.play.textContent = t.play(progress.unlocked);
+    lastProgress = -1;
+    updateProgress();
+  }
+
+  function showBanner(text) {
+    els.banner.innerHTML = '<span></span>';
+    els.banner.firstChild.textContent = text;
+    els.banner.hidden = true;
+    void els.banner.offsetWidth;
+    els.banner.hidden = false;
+    announce(text);
+    clearTimeout(showBanner.timer);
+    showBanner.timer = setTimeout(() => { els.banner.hidden = true; }, 1700);
+  }
+
+  function hidePanels() { for (const p of PANELS) p.hidden = true; }
+  function openPanel(panel, focusEl) {
+    hidePanels();
+    panel.hidden = false;
+    els.hint.hidden = true;
+    (focusEl || panel.querySelector('button')).focus({ preventScroll: true });
+  }
+
+  function showWin() {
+    const r = game.result, n = def.n;
+    els.winTitle.textContent = t.complete(n);
+    els.stars.innerHTML = `<b>${'★'.repeat(r.stars)}</b>${'★'.repeat(3 - r.stars)}`;
+    els.stars.setAttribute('aria-label', t.stars(r.stars));
+    els.result.textContent = def.boss ? t.bossDown : t.mult(r.mult.toFixed(1));
+    els.earned.textContent = t.earned(r.coins);
+    els.best.textContent = t.best(Math.max(r.prevBest, r.coins));
+    els.newBest.hidden = !(r.newBest && r.prevBest > 0);
+    updateHud();
+    els.coinsPill.classList.remove('bump'); void els.coinsPill.offsetWidth; els.coinsPill.classList.add('bump');
+    openPanel(els.win, els.next);
+    announce(`${t.complete(n)} ${t.stars(r.stars)}. ${els.result.textContent}. ${t.earned(r.coins)}`);
+  }
+
+  function showLose() {
+    const text = { gate: t.lostGate, fight: t.lostFight, boss: t.lostBoss, trap: t.lostTrap }[game.loseReason];
+    els.loseText.textContent = text;
+    openPanel(els.lose, $('retry'));
+    announce(`${t.lostTitle} ${text}`);
+  }
+
+  function showStart() {
+    prepareLevel(progress.unlocked);
+    els.pause.hidden = true;
+    updateHud();
+    openPanel(els.start, els.play);
+  }
+
+  function pauseGame() {
+    if (!isPlaying() || game.paused) return;
+    game.paused = true;
+    openPanel(els.paused, $('resume'));
+  }
+  function resumeGame() {
+    game.paused = false;
+    hidePanels();
+    lastTime = performance.now();
+    canvas.focus({ preventScroll: true });
+  }
+  const isPlaying = () => ['run', 'fight', 'toBoss', 'boss', 'stairs'].includes(game.state);
+
+  function renderLevels() {
+    const total = Math.min(99, Math.max(30, progress.unlocked));
+    els.levelGrid.textContent = '';
+    for (let n = 1; n <= total; n++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'level-btn' + (n % 5 === 0 ? ' boss' : '') + (n === progress.unlocked ? ' current' : '');
+      const stars = progress.stars[n] || 0;
+      btn.innerHTML = `${n}<small><b>${'★'.repeat(stars)}</b>${'★'.repeat(3 - stars)}</small>`;
+      btn.disabled = n > progress.unlocked;
+      btn.setAttribute('aria-label', btn.disabled ? t.lockedLabel(n) : t.levelLabel(n, stars));
+      btn.addEventListener('click', () => startLevel(n));
+      els.levelGrid.append(btn);
+    }
+  }
+
+  function renderShop() {
+    const c = progress.coins;
+    els.wallet.textContent = String(c);
+    const rows = [
+      [progress.upStart, startCost, els.startDesc, els.startLv, els.buyStart, t.startDesc(startCrowdSize()), t.startCrowd],
+      [progress.upIncome, incomeCost, els.incomeDesc, els.incomeLv, els.buyIncome, t.incomeDesc(incomeBonus()), t.income],
+    ];
+    for (const [lv, costFn, desc, lvEl, btn, text, name] of rows) {
+      desc.textContent = text;
+      lvEl.textContent = t.lv(lv, MAX_UP);
+      const maxed = lv >= MAX_UP, cost = costFn(lv);
+      btn.textContent = maxed ? t.maxed : `🪙 ${cost}`;
+      btn.disabled = maxed || c < cost;
+      btn.setAttribute('aria-label', maxed ? `${name}: ${t.maxed}` : t.buyLabel(name, cost));
+    }
+  }
+
+  function buy(kind) {
+    const key = kind === 'start' ? 'upStart' : 'upIncome';
+    const cost = (kind === 'start' ? startCost : incomeCost)(progress[key]);
+    if (progress[key] >= MAX_UP || progress.coins < cost) return;
+    progress.coins -= cost;
+    progress[key] += 1;
+    saveProgress();
+    renderShop();
+    updateHud();
+    if (game.state === 'ready') prepareLevel(def.n);
+    announce(t.bought(kind === 'start' ? t.startCrowd : t.income));
+  }
+
+  let shopReturn = null;
+  function openShop(from) { shopReturn = from; renderShop(); openPanel(els.shop); }
+  function closeShop() { if (shopReturn === els.lose) openPanel(els.lose, $('retry')); else showStart(); }
+
+  // ---------- Input ----------
+  const keys = { left: false, right: false };
+  const keyDir = () => (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  let dragId = null, dragX = 0;
+  canvas.addEventListener('pointerdown', event => {
+    if (!isPlaying() || game.paused) return;
+    dragId = event.pointerId; dragX = event.clientX;
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (event.pointerId !== dragId) return;
+    // Convert CSS pixels to world units at the crowd's depth so the crowd tracks the finger.
+    const dx = (event.clientX - dragX) / scale / (F / camDist) * 1.1;
+    dragX = event.clientX;
+    if (game.state === 'run' && !game.paused) {
+      const limit = Math.max(0, RH - 0.25 - player.r);
+      player.tx = clamp(player.tx + dx, -limit, limit);
+      if (game.hintTimer > 0 && Math.abs(dx) > 0.02) game.hintTimer = Math.min(game.hintTimer, 0.4);
+    }
+  });
+  const endDrag = event => { if (event.pointerId === dragId) dragId = null; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  const KEY_DIRS = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (KEY_DIRS[event.key] && isPlaying() && !game.paused) {
+      keys[KEY_DIRS[event.key]] = true; event.preventDefault();
+      if (game.hintTimer > 0) game.hintTimer = Math.min(game.hintTimer, 0.4);
+    }
+    if ((event.key === 'p' || event.key === 'P') && isPlaying()) { event.preventDefault(); game.paused ? resumeGame() : pauseGame(); }
+  });
+  document.addEventListener('keyup', event => { if (KEY_DIRS[event.key]) keys[KEY_DIRS[event.key]] = false; });
+  window.addEventListener('blur', () => { keys.left = keys.right = false; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pauseGame();
+    lastTime = performance.now();
+  });
+
+  els.play.addEventListener('click', () => startLevel(progress.unlocked));
+  $('open-levels').addEventListener('click', () => { renderLevels(); openPanel(els.levels, els.levelGrid.querySelector('.current') || els.levelGrid.querySelector('button:not(:disabled)')); });
+  $('close-levels').addEventListener('click', showStart);
+  $('open-shop').addEventListener('click', () => openShop(els.start));
+  $('lose-shop').addEventListener('click', () => openShop(els.lose));
+  $('close-shop').addEventListener('click', closeShop);
+  els.buyStart.addEventListener('click', () => buy('start'));
+  els.buyIncome.addEventListener('click', () => buy('income'));
+  els.next.addEventListener('click', () => startLevel(def.n + 1));
+  $('replay').addEventListener('click', () => startLevel(def.n));
+  $('retry').addEventListener('click', () => startLevel(def.n));
+  $('win-menu').addEventListener('click', showStart);
+  $('lose-menu').addEventListener('click', showStart);
+  els.pause.addEventListener('click', pauseGame);
+  $('resume').addEventListener('click', resumeGame);
+  $('restart').addEventListener('click', () => startLevel(def.n));
+  $('pause-menu').addEventListener('click', showStart);
+
+  // ---------- Main loop: fixed 60 Hz simulation, render every frame ----------
+  let lastTime = performance.now(), acc = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
+    lastTime = now;
+    if (!game.paused) {
+      acc += dt;
+      let steps = 0;
+      while (acc >= STEP && steps < 4) { step(STEP); acc -= STEP; steps++; }
+      if (steps === 4) acc = 0;
+    }
+    draw(now / 1000);
+  }
+
+  new ResizeObserver(resize).observe($('stage'));
+  resize();
+  showStart();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

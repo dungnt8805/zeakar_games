@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hungry Hole</title>
+<style>
+:root {
+  --ink: #241f47;
+  --muted: #6d6890;
+  --accent: #7b61ff;
+  --accent-dark: #5638e0;
+  --gold: #ffc93c;
+  --gold-dark: #d99a00;
+  --panel: #ffffff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: #46516a; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+canvas:focus-visible { outline: none; }
+
+.hud { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); display: grid; gap: 6px; justify-items: start; pointer-events: none; }
+.hud[hidden], .board[hidden], .goal[hidden] { display: none; }
+.clock { display: flex; align-items: center; gap: 8px; padding: 5px 5px 5px 12px; border-radius: 14px; background: #241f47e0; color: #fff; box-shadow: 0 4px 14px #0003; pointer-events: auto; }
+.clock strong { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; min-width: 54px; }
+.clock strong.low { color: #ff8f8f; }
+.pause { width: 34px; height: 34px; border-radius: 10px; background: #ffffff22; display: grid; place-items: center; }
+.pause svg { width: 14px; height: 14px; fill: #fff; }
+.me { padding: 6px 12px 8px; border-radius: 14px; background: #ffffffeb; box-shadow: 0 4px 14px #0002; width: 138px; }
+.me small, .goal small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me strong { display: block; font-size: 21px; font-weight: 900; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.lvl { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.lvl b { font-size: 11px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+.meter { position: relative; flex: 1; height: 7px; border-radius: 9px; background: #241f471a; }
+.meter > i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); transition: width .2s; }
+.board { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 150px; padding: 7px 10px 8px; border-radius: 14px; background: #241f47d9; color: #fff; font-size: 12px; box-shadow: 0 4px 14px #0003; pointer-events: none; }
+.board h2 { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #cfc6ff; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board ol { list-style: none; padding: 0; display: grid; gap: 1px; }
+.board li { display: flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 1.45; }
+.board li i { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.board li span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.board li b { font-variant-numeric: tabular-nums; }
+.board li.you { color: var(--gold); font-weight: 800; }
+.goal { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 158px; padding: 6px 12px 10px; border-radius: 14px; background: #ffffffeb; box-shadow: 0 4px 14px #0002; pointer-events: none; }
+.goal strong { display: block; font-size: 21px; font-weight: 900; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.goal .meter { height: 9px; margin-top: 4px; }
+.goal .meter > i { background: linear-gradient(90deg, var(--accent), #ff6fb5); }
+.goal .meter em { position: absolute; top: 50%; transform: translate(-50%, -50%); font-style: normal; font-size: 13px; line-height: 1; color: #c9c4dc; text-shadow: 0 1px 0 #fff; }
+.goal .meter em.on { color: var(--gold); text-shadow: 0 1px 2px #a8730088; }
+
+.toast { position: fixed; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 178px); transform: translateX(-50%); padding: 8px 16px; border-radius: 99px; background: #241f47e6; color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: 0; }
+.toast.show { animation: toast 1.6s ease-out both; }
+.toast.gold { background: var(--gold); color: #3a2a00; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 12%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+@media (min-width: 640px) { .toast { top: calc(max(10px, env(safe-area-inset-top)) + 8px); } }
+.notice { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); width: min(86vw, 340px); padding: 16px 18px; border-radius: 20px; background: #241f47e6; color: #fff; text-align: center; pointer-events: none; }
+.notice[hidden] { display: none; }
+.notice strong { display: block; font-size: 19px; font-weight: 900; }
+.notice span { display: block; margin-top: 4px; font-size: 15px; color: #cfc6ff; font-variant-numeric: tabular-nums; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); background: #241f4766; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 372px); padding: 20px 18px 18px; border-radius: 26px; background: var(--panel); text-align: center; box-shadow: 0 24px 60px #12102a59; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.logo { display: block; width: 132px; height: 62px; margin: 0 auto 4px; }
+.panel h1 { font-size: clamp(32px, 10vw, 40px); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; }
+.panel h1 span { color: var(--accent); }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.panel h3 { margin: 14px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.maps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.map { position: relative; padding: 8px 4px 7px; border-radius: 14px; background: #f1effa; border: 2px solid transparent; display: grid; justify-items: center; gap: 1px; min-width: 0; }
+.map .ico { font-size: 24px; line-height: 1.15; }
+.map b { font-size: 13px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map small { font-size: 12px; color: var(--gold-dark); letter-spacing: 1px; white-space: nowrap; }
+.map[aria-checked="true"] { border-color: var(--accent); background: #ece7ff; }
+.map.locked { opacity: .6; cursor: not-allowed; }
+.map.locked small { color: var(--muted); letter-spacing: 0; font-size: 11px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.mode { padding: 12px 6px 11px; border-radius: 16px; background: var(--accent); color: #fff; box-shadow: 0 5px 0 var(--accent-dark); display: grid; gap: 2px; min-width: 0; }
+.mode b { font-size: 19px; font-weight: 900; }
+.mode small { font-size: 12px; font-weight: 700; opacity: .9; }
+.mode.solo { background: var(--gold); color: #3a2a00; box-shadow: 0 5px 0 var(--gold-dark); }
+.mode:active, .btn:active { transform: translateY(3px); box-shadow: none; }
+.best { margin-top: 12px !important; font-weight: 700; }
+.ranking { list-style: none; padding: 0; margin-top: 12px; display: grid; gap: 4px; text-align: left; }
+.ranking li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: #f4f2fb; font-size: 15px; }
+.ranking li .pos { flex: none; width: 22px; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ranking li i { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.ranking li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.ranking li b { font-variant-numeric: tabular-nums; }
+.ranking li.you { background: #ece7ff; outline: 2px solid var(--accent); }
+.stars { margin-top: 10px; font-size: 40px; letter-spacing: 6px; line-height: 1.1; color: #dcd8ea; }
+.stars .on { color: var(--gold); text-shadow: 0 2px 0 var(--gold-dark); }
+.badge { display: inline-block; margin-top: 10px !important; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #3a2a00 !important; font-weight: 800; font-size: 13px !important; }
+.badge[hidden] { display: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.btn { flex: 1 1 120px; padding: 13px 10px; border-radius: 14px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 var(--accent-dark); }
+.btn.alt { background: var(--gold); color: #3a2a00; box-shadow: 0 4px 0 var(--gold-dark); }
+.btn.ghost { background: #f1effa; color: var(--ink); box-shadow: 0 4px 0 #d8d3ee; }
+.btn[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 640px) { .logo { display: none; } .panel { padding-top: 16px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .toast.show { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" role="img"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="clock"><strong id="clock">2:00</strong><button type="button" class="pause" id="pause-btn"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" rx="1.2"/><rect x="8.4" y="1" width="3.6" height="12" rx="1.2"/></svg></button></div>
+  <div class="me"><small data-i18n="score"></small><strong id="score">0</strong><div class="lvl"><b id="level"></b><div class="meter"><i id="level-bar"></i></div></div></div>
+</div>
+<div class="board" id="board" hidden aria-hidden="true"><h2 data-i18n="leaders"></h2><ol id="leaders"></ol></div>
+<div class="goal" id="goal" hidden><small data-i18n="eaten"></small><strong id="pct">0%</strong><div class="meter" id="goal-meter"><i id="pct-bar"></i></div></div>
+<div class="toast" id="toast" aria-hidden="true"></div>
+<div class="notice" id="notice" hidden><strong id="notice-title"></strong><span id="notice-text"></span></div>
+
+<div class="overlay" id="menu">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <svg class="logo" viewBox="0 0 132 62" aria-hidden="true">
+      <ellipse cx="66" cy="44" rx="58" ry="16" fill="#7b61ff"/>
+      <ellipse cx="66" cy="44" rx="52" ry="13" fill="#15122b"/>
+      <ellipse cx="66" cy="38" rx="44" ry="7" fill="#2c2752"/>
+      <g transform="rotate(-24 50 30)"><rect x="38" y="16" width="26" height="14" rx="4" fill="#ff5d73"/><rect x="44" y="10" width="14" height="8" rx="3" fill="#ffd7de"/></g>
+      <g transform="rotate(18 88 26)"><rect x="82" y="4" width="14" height="30" rx="2" fill="#74c0fc"/><rect x="85" y="8" width="8" height="3" fill="#fff8"/><rect x="85" y="15" width="8" height="3" fill="#fff8"/></g>
+      <circle cx="70" cy="22" r="7" fill="#51cf66"/>
+    </svg>
+    <h1 id="menu-title">Hungry <span>Hole</span></h1>
+    <p data-i18n="tagline"></p>
+    <h3 data-i18n="map"></h3>
+    <div class="maps" id="maps" role="radiogroup"></div>
+    <div class="modes">
+      <button type="button" class="mode" id="play-battle"><b data-i18n="battle"></b><small data-i18n="battleInfo"></small></button>
+      <button type="button" class="mode solo" id="play-solo"><b data-i18n="solo"></b><small data-i18n="soloInfo"></small></button>
+    </div>
+    <p class="small best" id="menu-best"></p>
+    <p class="small" data-i18n="controls"></p>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <div class="actions"><button type="button" class="btn" id="resume" data-i18n="resume"></button><button type="button" class="btn ghost" id="quit" data-i18n="menu"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="end-title">
+    <h2 id="end-title"></h2>
+    <p id="end-sub"></p>
+    <div class="stars" id="end-stars" aria-hidden="true"></div>
+    <ol class="ranking" id="ranking"></ol>
+    <p class="small" id="end-note"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="badge" id="unlocked" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn" id="again" data-i18n="again"></button>
+      <button type="button" class="btn alt" id="next" data-i18n="next" hidden></button>
+      <button type="button" class="btn ghost" id="to-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Swallow the city! Anything smaller than your hole falls in, and you keep growing.', controls: 'Drag anywhere to steer, or use the arrow keys / WASD. P pauses.',
+      battle: 'Battle', battleInfo: '2 min · 6 rivals', solo: 'Solo', soloInfo: 'Eat the map · stars', map: 'Map',
+      maps: { city: 'City', park: 'Park', farm: 'Farm' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}, ${s} of 3 stars`, mapLocked: (m, n) => `${m}, locked: earn ${n} stars in Solo`,
+      bestLine: (b, s) => `Battle best: ${b} · Stars: ${s}/9`,
+      score: 'Score', eaten: 'Eaten', size: n => `Size ${n}`, leaders: 'Leaderboard', you: 'You',
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', menu: 'Menu', go: 'Go! Eat everything!',
+      sizeUp: n => `Size up! ${n}`, rankUp: n => `Up to #${n}!`, rankDown: n => `Down to #${n}`,
+      ateHole: n => `You swallowed ${n}!`, eatenBy: n => `${n} swallowed you!`, respawn: s => `Back in ${s}…`,
+      timeUp: 'Time’s up!', winner: 'You win!', place: n => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} place`,
+      yourScore: s => `Your score: ${s}`, eatenPct: p => `You ate ${p}% of the map.`, starGoal: p => `Eat ${p}% to earn a star.`,
+      nextGoal: p => `Next star at ${p}%.`, cleared: 'Map cleared!', great: 'Well eaten!', newBest: 'New best!',
+      again: 'Play again', next: 'Next map', unlocked: m => `${m} unlocked!`,
+      canvas: 'Hungry Hole game area: a city seen from above where holes swallow everything smaller than themselves',
+    },
+    vi: {
+      tagline: 'Nuốt cả thành phố! Thứ gì nhỏ hơn cái hố đều rơi xuống, và bạn cứ thế lớn dần.', controls: 'Kéo ở bất kỳ đâu để điều khiển, hoặc dùng phím mũi tên / WASD. Bấm P để tạm dừng.',
+      battle: 'Đối kháng', battleInfo: '2 phút · 6 đối thủ', solo: 'Một mình', soloInfo: 'Ăn sạch bản đồ · sao', map: 'Bản đồ',
+      maps: { city: 'Thành phố', park: 'Công viên', farm: 'Nông trại' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}, ${s}/3 sao`, mapLocked: (m, n) => `${m}, đang khóa: cần ${n} sao ở chế độ Một mình`,
+      bestLine: (b, s) => `Kỷ lục đối kháng: ${b} · Sao: ${s}/9`,
+      score: 'Điểm', eaten: 'Đã ăn', size: n => `Cỡ ${n}`, leaders: 'Bảng xếp hạng', you: 'Bạn',
+      pause: 'Tạm dừng', paused: 'Đang tạm dừng', resume: 'Tiếp tục', menu: 'Menu', go: 'Bắt đầu! Ăn sạch mọi thứ!',
+      sizeUp: n => `Lớn hơn rồi! Cỡ ${n}`, rankUp: n => `Lên hạng ${n}!`, rankDown: n => `Tụt xuống hạng ${n}`,
+      ateHole: n => `Bạn đã nuốt ${n}!`, eatenBy: n => `${n} đã nuốt bạn!`, respawn: s => `Quay lại sau ${s}…`,
+      timeUp: 'Hết giờ!', winner: 'Bạn thắng!', place: n => `Hạng ${n}`,
+      yourScore: s => `Điểm của bạn: ${s}`, eatenPct: p => `Bạn đã ăn ${p}% bản đồ.`, starGoal: p => `Ăn ${p}% để nhận một sao.`,
+      nextGoal: p => `Sao tiếp theo ở mốc ${p}%.`, cleared: 'Sạch bách bản đồ!', great: 'Ăn giỏi lắm!', newBest: 'Kỷ lục mới!',
+      again: 'Chơi lại', next: 'Bản đồ tiếp', unlocked: m => `Đã mở khóa ${m}!`,
+      canvas: 'Khu vực chơi Hungry Hole: thành phố nhìn từ trên cao, nơi các cái hố nuốt mọi thứ nhỏ hơn chúng',
+    },
+    zh: {
+      tagline: '吞掉整座城市！比洞小的东西都会掉进去，你会越变越大。', controls: '在任意位置拖动来控制方向，或使用方向键 / WASD。按 P 暂停。',
+      battle: '对战', battleInfo: '2 分钟 · 6 个对手', solo: '单人', soloInfo: '吞光地图 · 拿星', map: '地图',
+      maps: { city: '城市', park: '公园', farm: '农场' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}，已获得 ${s}/3 颗星`, mapLocked: (m, n) => `${m}，未解锁：需在单人模式获得 ${n} 颗星`,
+      bestLine: (b, s) => `对战最高分：${b} · 星星：${s}/9`,
+      score: '得分', eaten: '已吞', size: n => `尺寸 ${n}`, leaders: '排行榜', you: '你',
+      pause: '暂停', paused: '已暂停', resume: '继续', menu: '菜单', go: '开吃！把一切都吞掉！',
+      sizeUp: n => `变大了！尺寸 ${n}`, rankUp: n => `升至第 ${n} 名！`, rankDown: n => `降至第 ${n} 名`,
+      ateHole: n => `你吞掉了 ${n}！`, eatenBy: n => `你被 ${n} 吞掉了！`, respawn: s => `${s} 秒后复活…`,
+      timeUp: '时间到！', winner: '你赢了！', place: n => `第 ${n} 名`,
+      yourScore: s => `你的得分：${s}`, eatenPct: p => `你吞掉了地图的 ${p}%。`, starGoal: p => `吞掉 ${p}% 即可获得一颗星。`,
+      nextGoal: p => `下一颗星：${p}%。`, cleared: '地图清空！', great: '吃得漂亮！', newBest: '新纪录！',
+      again: '再玩一次', next: '下一张地图', unlocked: m => `已解锁${m}！`,
+      canvas: 'Hungry Hole 游戏区域：俯瞰城市，洞会吞掉比自己小的一切',
+    },
+    fr: {
+      tagline: 'Avalez la ville ! Tout ce qui est plus petit que votre trou tombe dedans, et vous grandissez.', controls: 'Glissez n’importe où pour diriger, ou utilisez les flèches / WASD. P pour la pause.',
+      battle: 'Duel', battleInfo: '2 min · 6 rivaux', solo: 'Solo', soloInfo: 'Avalez tout · étoiles', map: 'Carte',
+      maps: { city: 'Ville', park: 'Parc', farm: 'Ferme' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}, ${s} étoile${s > 1 ? 's' : ''} sur 3`, mapLocked: (m, n) => `${m}, verrouillée : gagnez ${n} étoiles en Solo`,
+      bestLine: (b, s) => `Record en duel : ${b} · Étoiles : ${s}/9`,
+      score: 'Score', eaten: 'Avalé', size: n => `Taille ${n}`, leaders: 'Classement', you: 'Vous',
+      pause: 'Pause', paused: 'En pause', resume: 'Reprendre', menu: 'Menu', go: 'C’est parti ! Avalez tout !',
+      sizeUp: n => `Plus gros ! Taille ${n}`, rankUp: n => `Vous passez ${n === 1 ? '1er' : `${n}e`} !`, rankDown: n => `Vous reculez ${n}e`,
+      ateHole: n => `Vous avez avalé ${n} !`, eatenBy: n => `${n} vous a avalé !`, respawn: s => `Retour dans ${s}…`,
+      timeUp: 'Temps écoulé !', winner: 'Victoire !', place: n => (n === 1 ? '1re place' : `${n}e place`),
+      yourScore: s => `Votre score : ${s}`, eatenPct: p => `Vous avez avalé ${p} % de la carte.`, starGoal: p => `Avalez ${p} % pour gagner une étoile.`,
+      nextGoal: p => `Étoile suivante à ${p} %.`, cleared: 'Carte nettoyée !', great: 'Bien mangé !', newBest: 'Nouveau record !',
+      again: 'Rejouer', next: 'Carte suivante', unlocked: m => `${m} débloquée !`,
+      canvas: 'Zone de jeu Hungry Hole : une ville vue d’en haut où les trous avalent tout ce qui est plus petit qu’eux',
+    },
+    th: {
+      tagline: 'กลืนทั้งเมือง! อะไรที่เล็กกว่าหลุมจะร่วงลงไป แล้วหลุมของคุณจะใหญ่ขึ้นเรื่อย ๆ', controls: 'ลากที่ไหนก็ได้เพื่อบังคับ หรือใช้ปุ่มลูกศร / WASD กด P เพื่อหยุดชั่วคราว',
+      battle: 'ประลอง', battleInfo: '2 นาที · คู่แข่ง 6', solo: 'เดี่ยว', soloInfo: 'กินทั้งแผนที่ · ดาว', map: 'แผนที่',
+      maps: { city: 'เมือง', park: 'สวน', farm: 'ฟาร์ม' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m} ได้ ${s} จาก 3 ดาว`, mapLocked: (m, n) => `${m} ยังล็อกอยู่: เก็บ ${n} ดาวในโหมดเดี่ยว`,
+      bestLine: (b, s) => `สถิติประลอง: ${b} · ดาว: ${s}/9`,
+      score: 'คะแนน', eaten: 'กินไป', size: n => `ขนาด ${n}`, leaders: 'อันดับ', you: 'คุณ',
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', go: 'เริ่ม! กินให้หมด!',
+      sizeUp: n => `ใหญ่ขึ้น! ขนาด ${n}`, rankUp: n => `ขึ้นเป็นอันดับ ${n}!`, rankDown: n => `ตกไปอันดับ ${n}`,
+      ateHole: n => `คุณกลืน ${n} แล้ว!`, eatenBy: n => `${n} กลืนคุณแล้ว!`, respawn: s => `กลับมาใน ${s}…`,
+      timeUp: 'หมดเวลา!', winner: 'คุณชนะ!', place: n => `อันดับที่ ${n}`,
+      yourScore: s => `คะแนนของคุณ: ${s}`, eatenPct: p => `คุณกินไป ${p}% ของแผนที่`, starGoal: p => `กินให้ได้ ${p}% เพื่อรับดาว`,
+      nextGoal: p => `ดาวถัดไปที่ ${p}%`, cleared: 'กินเกลี้ยงแผนที่!', great: 'กินเก่งมาก!', newBest: 'สถิติใหม่!',
+      again: 'เล่นอีกครั้ง', next: 'แผนที่ถัดไป', unlocked: m => `ปลดล็อก${m}แล้ว!`,
+      canvas: 'พื้นที่เกม Hungry Hole: เมืองมุมสูงที่หลุมกลืนทุกอย่างที่เล็กกว่าตัวเอง',
+    },
+    ja: {
+      tagline: '街ごと飲み込もう！穴より小さいものは何でも落ちて、どんどん大きくなります。', controls: 'どこでもドラッグして操作、または矢印キー / WASD。P で一時停止。',
+      battle: 'バトル', battleInfo: '2分 · ライバル6人', solo: 'ソロ', soloInfo: 'マップ制覇 · 星', map: 'マップ',
+      maps: { city: 'シティ', park: 'パーク', farm: 'ファーム' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}、星 ${s}/3`, mapLocked: (m, n) => `${m}、ロック中：ソロで星を ${n} 個集めると解放`,
+      bestLine: (b, s) => `バトル最高：${b} · 星：${s}/9`,
+      score: 'スコア', eaten: '飲み込み率', size: n => `サイズ ${n}`, leaders: 'ランキング', you: 'あなた',
+      pause: '一時停止', paused: '一時停止中', resume: '再開', menu: 'メニュー', go: 'スタート！全部飲み込め！',
+      sizeUp: n => `サイズアップ！${n}`, rankUp: n => `${n}位に浮上！`, rankDown: n => `${n}位に後退`,
+      ateHole: n => `${n} を飲み込んだ！`, eatenBy: n => `${n} に飲み込まれた！`, respawn: s => `${s} 秒後に復活…`,
+      timeUp: 'タイムアップ！', winner: '優勝！', place: n => `${n}位`,
+      yourScore: s => `あなたのスコア：${s}`, eatenPct: p => `マップの ${p}% を飲み込みました。`, starGoal: p => `${p}% 飲み込むと星がもらえます。`,
+      nextGoal: p => `次の星は ${p}%。`, cleared: 'マップ完全制覇！', great: 'いい食べっぷり！', newBest: '自己ベスト更新！',
+      again: 'もう一度', next: '次のマップ', unlocked: m => `${m}が解放されました！`,
+      canvas: 'Hungry Hole のプレイエリア：自分より小さいものを何でも飲み込む穴がいる街を上から見た様子',
+    },
+    ko: {
+      tagline: '도시를 통째로 삼키세요! 구멍보다 작은 건 모두 빠지고, 구멍은 점점 커져요.', controls: '아무 곳이나 드래그해서 조종하거나 방향키 / WASD를 쓰세요. P로 일시 정지.',
+      battle: '배틀', battleInfo: '2분 · 라이벌 6명', solo: '솔로', soloInfo: '맵 삼키기 · 별', map: '맵',
+      maps: { city: '도시', park: '공원', farm: '농장' }, needStars: n => `🔒 ${n} ★`,
+      mapLabel: (m, s) => `${m}, 별 ${s}/3`, mapLocked: (m, n) => `${m}, 잠김: 솔로에서 별 ${n}개 필요`,
+      bestLine: (b, s) => `배틀 최고: ${b} · 별: ${s}/9`,
+      score: '점수', eaten: '삼킨 비율', size: n => `크기 ${n}`, leaders: '순위', you: '나',
+      pause: '일시 정지', paused: '일시 정지됨', resume: '계속하기', menu: '메뉴', go: '시작! 전부 삼키세요!',
+      sizeUp: n => `커졌어요! 크기 ${n}`, rankUp: n => `${n}위로 올라섰어요!`, rankDown: n => `${n}위로 밀려났어요`,
+      ateHole: n => `${n}을(를) 삼켰어요!`, eatenBy: n => `${n}에게 삼켜졌어요!`, respawn: s => `${s}초 후 복귀…`,
+      timeUp: '시간 종료!', winner: '우승!', place: n => `${n}위`,
+      yourScore: s => `내 점수: ${s}`, eatenPct: p => `맵의 ${p}%를 삼켰어요.`, starGoal: p => `${p}%를 삼키면 별을 받아요.`,
+      nextGoal: p => `다음 별은 ${p}%.`, cleared: '맵을 싹 비웠어요!', great: '잘 먹었어요!', newBest: '최고 기록!',
+      again: '다시 하기', next: '다음 맵', unlocked: m => `${m} 맵이 열렸어요!`,
+      canvas: 'Hungry Hole 게임 화면: 구멍이 자기보다 작은 것을 모두 삼키는 도시를 위에서 본 모습',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+
+  // World units: the ground plane is squashed by T and heights rise by HK to fake a 3/4 camera.
+  const T = 0.8, HK = 0.8, LEAN = 0.26;
+  const STEP = 1 / 60, ROUND = 120, RESPAWN = 3;
+  const BLOCK = 280, ROAD = 60, N = 7, SW = 16, IS = BLOCK - SW * 2;
+  const WORLD = N * (BLOCK + ROAD) + ROAD;
+  const CELL = 128, GN = Math.ceil(WORLD / CELL);
+  const START_R = 13, EDIBLE = 0.9, HOLE_EAT = 1.2;
+  const LEVELS = [0, 4, 12, 30, 65, 130, 240, 420, 700, 1100, 1700, 2500, 3600, 5000, 7000];
+  const STORE = 'milaan.hungryHole.';
+  const MAPS = ['city', 'park', 'farm'];
+  const MAP_ICON = { city: '🏙️', park: '🌳', farm: '🚜' };
+  const UNLOCK = { city: 0, park: 2, farm: 4 };
+  const GOALS = { city: [35, 60, 85], park: [30, 55, 75], farm: [35, 60, 80] };
+  const SEEDS = { city: 7, park: 23, farm: 41 };
+  const PLAYER_COLOR = '#7b61ff';
+  const RIVALS = [['Mochi', '#ff5d73'], ['Boba', '#ffa41b'], ['Kiwi', '#2bc48a'], ['Nova', '#2f9bff'], ['Taro', '#e05cd6'], ['Pixel', '#16b8c9'], ['Noodle', '#ff7b3d'], ['Waffle', '#9a6b4f']];
+  const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+  const radiusFor = score => START_R + 2.5 * Math.sqrt(score);
+  const speedFor = r => Math.min(380, 150 + r * 1.3);
+  const levelFor = score => { let l = 0; while (l + 1 < LEVELS.length && score >= LEVELS[l + 1]) l++; return l; };
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const roadLine = i => ROAD / 2 + i * (BLOCK + ROAD);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // w × d footprint and h height in world units; pts is the score for swallowing it.
+  const KINDS = {
+    person: { w: 8, d: 8, h: 17, pts: 1, shape: 'person', round: 4 },
+    chicken: { w: 9, d: 7, h: 10, pts: 1, shape: 'chicken', round: 4 },
+    cone: { w: 9, d: 9, h: 13, pts: 1, shape: 'cone', round: 4 },
+    lamp: { w: 6, d: 6, h: 42, pts: 1, shape: 'lamp', round: 2 },
+    bin: { w: 8, d: 8, h: 11, pts: 1, shape: 'bin', round: 4 },
+    bench: { w: 24, d: 10, h: 11, pts: 2, shape: 'bench' },
+    fence: { w: 40, d: 5, h: 11, pts: 2, shape: 'fence' },
+    bush: { w: 18, d: 18, h: 15, pts: 2, shape: 'bush', round: 8 },
+    sheep: { w: 16, d: 11, h: 14, pts: 2, shape: 'sheep', round: 6 },
+    hay: { w: 18, d: 18, h: 13, pts: 2, shape: 'hay', round: 9 },
+    tree: { w: 30, d: 30, h: 44, pts: 3, shape: 'tree', round: 12 },
+    cart: { w: 22, d: 13, h: 27, pts: 4, shape: 'cart' },
+    cow: { w: 28, d: 13, h: 20, pts: 5, shape: 'cow' },
+    car: { w: 40, d: 20, h: 17, pts: 5, shape: 'car' },
+    tractor: { w: 36, d: 20, h: 26, pts: 7, shape: 'tractor' },
+    bus: { w: 84, d: 26, h: 30, pts: 12, shape: 'bus' },
+    tram: { w: 90, d: 24, h: 26, pts: 12, shape: 'bus' },
+    truck: { w: 70, d: 26, h: 30, pts: 12, shape: 'truck' },
+    fountain: { w: 64, d: 64, h: 24, pts: 18, shape: 'fountain', round: 30 },
+    house: { w: 62, d: 56, h: 44, pts: 20, shape: 'house' },
+    gazebo: { w: 68, d: 68, h: 54, pts: 22, shape: 'gazebo', round: 32 },
+    building: { w: 96, d: 90, h: 92, pts: 50, shape: 'building' },
+    barn: { w: 96, d: 80, h: 70, pts: 45, shape: 'house', barn: true },
+    silo: { w: 84, d: 84, h: 130, pts: 80, shape: 'silo', round: 40 },
+    tower: { w: 116, d: 116, h: 210, pts: 120, shape: 'tower' },
+  };
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = {
+    hud: $('hud'), clock: $('clock'), score: $('score'), level: $('level'), levelBar: $('level-bar'), board: $('board'), leaders: $('leaders'),
+    goal: $('goal'), goalMeter: $('goal-meter'), pct: $('pct'), pctBar: $('pct-bar'), toast: $('toast'), notice: $('notice'), noticeTitle: $('notice-title'), noticeText: $('notice-text'),
+    menu: $('menu'), maps: $('maps'), menuBest: $('menu-best'), paused: $('paused'), end: $('end'), endTitle: $('end-title'), endSub: $('end-sub'), endStars: $('end-stars'),
+    ranking: $('ranking'), endNote: $('end-note'), newBest: $('new-best'), unlocked: $('unlocked'), again: $('again'), next: $('next'), announcer: $('announcer'),
+  };
+  canvas.setAttribute('aria-label', t.canvas);
+  $('pause-btn').setAttribute('aria-label', t.pause);
+
+  const load = (name, fallback) => { try { const v = localStorage.getItem(STORE + name); return v === null ? fallback : JSON.parse(v) ?? fallback; } catch { return fallback; } };
+  const save = (name, value) => { try { localStorage.setItem(STORE + name, JSON.stringify(value)); } catch {} };
+  const stars = load('stars', {});
+  const bestSolo = load('bestSolo', {});
+  let bestBattle = Number(load('bestBattle', 0)) || 0;
+  const totalStars = () => MAPS.reduce((sum, m) => sum + (Number(stars[m]) || 0), 0);
+  const isUnlocked = m => totalStars() >= UNLOCK[m];
+  let selectedMap = load('map', 'city');
+  if (!MAPS.includes(selectedMap) || !isUnlocked(selectedMap)) selectedMap = 'city';
+
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6d2b79f5) >>> 0; let x = Math.imul(a ^ (a >>> 15), 1 | a); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  const shadeCache = new Map();
+  function shade(hex, f) {
+    const key = hex + f;
+    let out = shadeCache.get(key);
+    if (!out) {
+      const n = parseInt(hex.slice(1), 16);
+      const mix = c => Math.round(f < 0 ? c * (1 + f) : c + (255 - c) * f);
+      out = `rgb(${mix(n >> 16)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+      shadeCache.set(key, out);
+    }
+    return out;
+  }
+
+  // ---------- World generation ----------
+  let world = null;
+
+  function newWorld(map) {
+    const rnd = seeded(SEEDS[map]);
+    const w = { map, rnd, objects: [], movers: [], blocks: [], grid: Array.from({ length: GN * GN }, () => []), total: 0, small: 0, spots: [] };
+    const pick = list => list[Math.floor(rnd() * list.length)];
+    const jit = s => (rnd() - 0.5) * 2 * s;
+    const add = (kind, x, y, extra = {}) => {
+      const k = KINDS[kind];
+      const o = { kind, k, x, y, w: k.w, d: k.d, h: k.h, pts: k.pts, alive: true, wob: 0, ph: rnd() * 6, dir: 1, vert: false, cell: -1, ...extra };
+      if (extra.hMul) o.h = Math.round(k.h * extra.hMul);
+      if (o.vert) { o.w = k.d; o.d = k.w; }
+      o.size = Math.max(Math.sqrt(k.w * k.d) / 2, o.h * 0.28);
+      paint(o, pick);
+      w.objects.push(o);
+      w.total += o.pts;
+      if (o.mv) w.movers.push(o);
+      return o;
+    };
+    const ctxGen = { rnd, pick, jit, add, w };
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const b = { x: ROAD + i * (BLOCK + ROAD), y: ROAD + j * (BLOCK + ROAD), i, j, type: '', deco: [] };
+      b.cx = b.x + BLOCK / 2; b.cy = b.y + BLOCK / 2;
+      THEMES[map].block(b, ctxGen, Math.max(Math.abs(i - 3), Math.abs(j - 3)));
+      w.blocks.push(b);
+      w.spots.push([b.x + 8, b.y + 8, b]);
+    }
+    addVehicles(ctxGen, THEMES[map].vehicles);
+    world = w;
+    for (const o of w.objects) gridAdd(o);
+    w.small = w.objects.filter(o => o.pts <= 1).length;
+    return w;
+  }
+
+  const PAL = {
+    shirt: ['#ff6b6b', '#4dabf7', '#ffd43b', '#51cf66', '#cc5de8', '#ff922b', '#f783ac', '#20c997'],
+    skin: ['#f6d0b1', '#e0ac85', '#a8714f', '#ffe0c4', '#c68a62'],
+    car: ['#ff5d5d', '#3fa9ff', '#ffd23f', '#2ec4b6', '#f8f9fa', '#ff8fab', '#7b61ff', '#495057'],
+    wall: ['#ffe8cc', '#fff3bf', '#e7f5ff', '#f3d9fa', '#ffe3e3', '#e6fcf5'],
+    roof: ['#e8590c', '#c2255c', '#1971c2', '#5f3dc4', '#2b8a3e', '#d9480f'],
+    building: ['#a5d8ff', '#ffc9c9', '#d0bfff', '#b2f2bb', '#ffec99', '#ffd8a8', '#c5f6fa'],
+    glass: ['#74c0fc', '#63e6be', '#b197fc', '#91a7ff', '#66d9e8'],
+    tree: ['#51cf66', '#40c057', '#69db7c', '#37b24d', '#82c91e'],
+    cart: ['#ff8fab', '#74c0fc', '#ffd43b', '#b197fc'],
+    tram: ['#ff6b6b', '#20c997', '#fab005'],
+    tractor: ['#2f9e44', '#e8590c', '#1c7ed6'],
+    truck: ['#f8f9fa', '#ffd43b', '#4dabf7'],
+  };
+
+  function paint(o, pick) {
+    const map = { person: 'shirt', car: 'car', house: 'wall', building: 'building', tower: 'glass', tree: 'tree', bush: 'tree', cart: 'cart', tram: 'tram', bus: null, tractor: 'tractor', truck: 'truck' };
+    let c = '#cccccc';
+    if (o.kind === 'bus') c = '#ffc93c';
+    else if (o.kind === 'barn') c = '#d9443a';
+    else if (o.kind === 'silo') c = '#ced4da';
+    else if (map[o.kind]) c = pick(PAL[map[o.kind]]);
+    if (o.museum) c = '#f1f3f5';
+    if (o.clock) c = '#e9c46a';
+    o.c = c; o.cf = shade(c, -0.18); o.cs = shade(c, -0.32);
+    if (o.kind === 'person') o.c2 = pick(PAL.skin);
+    if (o.kind === 'house') { o.c2 = pick(PAL.roof); o.c3 = shade(o.c2, -0.25); }
+    if (o.kind === 'barn') { o.c2 = '#7a5f4c'; o.c3 = '#4a3a2f'; }
+    if (o.kind === 'tree' || o.kind === 'bush') o.c2 = shade(c, 0.22);
+    if (o.kind === 'building') o.c2 = shade(c, 0.45);
+  }
+
+  function walker(add, b, kind, rnd, speed, inset = 8) {
+    // Pedestrians loop around the sidewalk ring of their block (or a smaller ring inside it).
+    const loop = { x0: b.x + inset, y0: b.y + inset, x1: b.x + BLOCK - inset, y1: b.y + BLOCK - inset };
+    loop.per = 2 * (loop.x1 - loop.x0 + loop.y1 - loop.y0);
+    const o = add(kind, 0, 0, { mv: 'loop', loop, s: rnd() * loop.per, sp: speed * (0.75 + rnd() * 0.5), cw: rnd() < 0.5 ? 1 : -1 });
+    loopPos(o);
+    return o;
+  }
+
+  function wanderer(add, b, kind, rnd, speed, inset = SW + 14) {
+    const box = { x0: b.x + inset, y0: b.y + inset, x1: b.x + BLOCK - inset, y1: b.y + BLOCK - inset };
+    return add(kind, box.x0 + rnd() * (box.x1 - box.x0), box.y0 + rnd() * (box.y1 - box.y0), { mv: 'wander', box, sp: speed * (0.8 + rnd() * 0.4), tx: 0, ty: 0, wait: rnd() * 2 });
+  }
+
+  function quadrants(b, jitter, jit) {
+    const q = IS / 4;
+    return [[-q, -q], [q, -q], [-q, q], [q, q]].map(([dx, dy]) => [b.cx + dx + jit(jitter), b.cy + dy + jit(jitter)]);
+  }
+
+  function sidewalk(b, g, lamps, trees) {
+    for (const [x, y] of [[b.cx + 24, b.y + 8], [b.cx - 24, b.y + BLOCK - 8], [b.x + 8, b.cy + 24], [b.x + BLOCK - 8, b.cy - 24]]) if (g.rnd() < 0.8) g.add('bin', x, y);
+    if (lamps) for (const [x, y] of [[b.x + 8, b.y + 8], [b.x + BLOCK - 8, b.y + 8], [b.x + 8, b.y + BLOCK - 8], [b.x + BLOCK - 8, b.y + BLOCK - 8]]) g.add('lamp', x, y);
+    if (trees) for (const s of [-1, 1]) {
+      if (g.rnd() < 0.7) g.add('tree', b.cx + s * 70, b.y + 8, { hMul: 0.85 });
+      if (g.rnd() < 0.7) g.add('tree', b.cx + s * 70, b.y + BLOCK - 8, { hMul: 0.85 });
+    }
+  }
+
+  function genCity(b, g, ring) {
+    const r = g.rnd();
+    b.type = ring === 0 ? 'tower'
+      : ring === 1 ? (r < 0.4 ? 'tower' : r < 0.8 ? 'office' : 'park')
+      : ring === 2 ? (r < 0.35 ? 'office' : r < 0.6 ? 'mixed' : r < 0.75 ? 'park' : r < 0.87 ? 'parking' : 'homes')
+      : (r < 0.5 ? 'homes' : r < 0.68 ? 'park' : r < 0.84 ? 'parking' : 'mixed');
+    const { add, rnd, jit } = g;
+    const quads = quadrants(b, 10, jit);
+    const plaza = (x, y) => { add('bench', x, y - 26); add('tree', x - 30, y + 14); add('tree', x + 30, y + 14); add('cone', x + jit(10), y + 40); };
+    if (b.type === 'tower') {
+      add('tower', b.cx, b.cy, { hMul: 0.85 + rnd() * 0.4 });
+      for (const [dx, dy] of [[-96, -96], [96, -96], [-96, 96], [96, 96]]) add(rnd() < 0.5 ? 'lamp' : 'bush', b.cx + dx, b.cy + dy);
+      add('bench', b.cx, b.cy + 98); add('bench', b.cx, b.cy - 98);
+    } else if (b.type === 'office') {
+      const skip = rnd() < 0.4 ? Math.floor(rnd() * 4) : -1;
+      quads.forEach(([x, y], q) => (q === skip ? plaza(x, y) : add('building', x, y, { hMul: 0.7 + rnd() * 0.6 })));
+    } else if (b.type === 'mixed') {
+      add('building', quads[0][0], quads[0][1], { hMul: 0.7 + rnd() * 0.5 });
+      add('house', quads[1][0], quads[1][1]); add('house', quads[2][0], quads[2][1]);
+      plaza(quads[3][0], quads[3][1]);
+    } else if (b.type === 'homes') {
+      for (const [x, y] of quads) add('house', x, y, { hMul: 0.85 + rnd() * 0.35 });
+      add('tree', b.cx, b.cy); add('bush', b.cx - 60, b.cy + jit(8)); add('bush', b.cx + 60, b.cy + jit(8));
+      if (rnd() < 0.5) add('car', quads[3][0] + 52, quads[3][1] + 30, { vert: true });
+    } else if (b.type === 'park') {
+      add('fountain', b.cx, b.cy);
+      for (let a = 0; a < 8; a++) add('tree', b.cx + Math.cos(a * Math.PI / 4 + 0.39) * 92, b.cy + Math.sin(a * Math.PI / 4 + 0.39) * 92);
+      add('bench', b.cx, b.cy - 52); add('bench', b.cx, b.cy + 52);
+      add('bench', b.cx - 54, b.cy, { vert: true }); add('bench', b.cx + 54, b.cy, { vert: true });
+      for (let k = 0; k < 4; k++) add('bush', b.cx + jit(110), b.cy + (k < 2 ? -1 : 1) * (110 + jit(6)));
+      for (let k = 0; k < 2; k++) walker(add, b, 'person', rnd, 16, 34);
+    } else {
+      for (const row of [-58, 58]) for (let k = 0; k < 7; k++) if (rnd() < 0.75) add('car', b.cx - 96 + k * 32, b.cy + row, { vert: true });
+      if (rnd() < 0.6) add('bus', b.cx, b.cy, {}); else for (let k = 0; k < 4; k++) add('cone', b.cx - 60 + k * 40, b.cy + jit(4));
+    }
+    sidewalk(b, g, true, b.type !== 'parking');
+    for (let k = 0; k < 5; k++) walker(add, b, 'person', rnd, 22);
+    if (rnd() < 0.3) {
+      const x = roadLine(b.i + 1), y = b.cy + jit(80);
+      for (let k = 0; k < 4; k++) add('cone', x - 22 + jit(3), y - 30 + k * 20);
+    }
+  }
+
+  function genPark(b, g, ring) {
+    const r = g.rnd();
+    b.type = ring === 0 ? 'clock'
+      : ring === 1 ? (r < 0.4 ? 'museum' : r < 0.7 ? 'plaza' : 'gazebo')
+      : (r < 0.3 ? 'grove' : r < 0.5 ? 'pond' : r < 0.68 ? 'gazebo' : r < 0.84 ? 'plaza' : 'lawn');
+    const { add, rnd, jit } = g;
+    const flowers = (x, y) => b.deco.push({ t: 'flowers', x, y, r: 16 + rnd() * 10, c: g.pick(['#ff8fab', '#ffd43b', '#b197fc', '#ff922b']) });
+    if (b.type === 'clock') {
+      add('tower', b.cx, b.cy, { clock: true, hMul: 0.9 });
+      for (const [dx, dy] of [[-96, -96], [96, -96], [-96, 96], [96, 96]]) { add('tree', b.cx + dx, b.cy + dy); flowers(b.cx + dx * 0.55, b.cy + dy * 0.55); }
+    } else if (b.type === 'museum') {
+      add('building', b.cx - 40, b.cy - 40, { museum: true, hMul: 0.7 });
+      add('fountain', b.cx + 62, b.cy + 62);
+      for (let k = 0; k < 3; k++) add('tree', b.cx - 90 + k * 50, b.cy + 90);
+      add('bench', b.cx + 70, b.cy - 20, { vert: true }); add('cart', b.cx - 20, b.cy + 50);
+    } else if (b.type === 'plaza') {
+      add('fountain', b.cx, b.cy);
+      for (const [dx, dy] of [[0, -60], [0, 60]]) add('bench', b.cx + dx, b.cy + dy);
+      for (const [dx, dy] of [[-60, 0], [60, 0]]) add('bench', b.cx + dx, b.cy + dy, { vert: true });
+      for (const [dx, dy] of [[-90, -90], [90, -90], [-90, 90], [90, 90]]) add(rnd() < 0.5 ? 'cart' : 'lamp', b.cx + dx, b.cy + dy);
+      for (let k = 0; k < 4; k++) flowers(b.cx + jit(100), b.cy + jit(100));
+    } else if (b.type === 'gazebo') {
+      add('gazebo', b.cx, b.cy);
+      for (let a = 0; a < 6; a++) add('bush', b.cx + Math.cos(a * 1.047) * 70, b.cy + Math.sin(a * 1.047) * 70);
+      for (const [dx, dy] of [[-96, -96], [96, -96], [-96, 96], [96, 96]]) add('tree', b.cx + dx, b.cy + dy);
+    } else if (b.type === 'pond') {
+      b.deco.push({ t: 'pond', x: b.cx, y: b.cy, rx: 82, ry: 64 });
+      for (const [dx, dy] of [[-100, -100], [100, -100], [-100, 100], [100, 100]]) add('tree', b.cx + dx, b.cy + dy);
+      add('bench', b.cx, b.cy - 96); add('bench', b.cx, b.cy + 96); add('bush', b.cx - 106, b.cy); add('bush', b.cx + 106, b.cy);
+    } else if (b.type === 'grove') {
+      for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 3; gx++) add(rnd() < 0.8 ? 'tree' : 'bush', b.cx - 76 + gx * 76 + jit(10), b.cy - 76 + gy * 76 + jit(10), { hMul: 0.85 + rnd() * 0.3 });
+    } else {
+      for (let k = 0; k < 5; k++) flowers(b.cx + jit(90), b.cy + jit(90));
+      for (let k = 0; k < 3; k++) add('bench', b.cx + jit(80), b.cy + jit(80));
+      add('cart', b.cx + jit(40), b.cy + jit(40));
+      for (let k = 0; k < 4; k++) walker(add, b, 'person', rnd, 14, 40 + k * 14);
+    }
+    sidewalk(b, g, b.type !== 'grove', false);
+    for (let k = 0; k < 5; k++) walker(add, b, 'person', rnd, 20);
+  }
+
+  function genFarm(b, g, ring) {
+    const r = g.rnd();
+    b.type = ring <= 1 ? (r < 0.35 ? 'silo' : r < 0.7 ? 'yard' : r < 0.85 ? 'pasture' : 'field')
+      : (r < 0.35 ? 'field' : r < 0.62 ? 'pasture' : r < 0.8 ? 'orchard' : 'yard');
+    const { add, rnd, jit } = g;
+    if (b.type === 'field') {
+      b.deco.push({ t: 'rows', c: g.pick(['#e4c65b', '#7fb04e', '#c9a46c']) });
+      for (let k = 0; k < 8; k++) add('hay', b.cx + jit(100), b.cy + jit(100));
+      add('person', b.cx + jit(60), b.cy + jit(60));
+    } else if (b.type === 'pasture') {
+      const e = IS / 2 - 6;
+      for (let k = 0; k < 6; k++) {
+        const p = -e + 20 + k * 40;
+        if (k !== 2) { add('fence', b.cx + p, b.cy - e); add('fence', b.cx + p, b.cy + e); }
+        add('fence', b.cx - e, b.cy + p, { vert: true }); add('fence', b.cx + e, b.cy + p, { vert: true });
+      }
+      for (let k = 0; k < 3; k++) wanderer(add, b, 'cow', rnd, 9);
+      for (let k = 0; k < 5; k++) wanderer(add, b, 'sheep', rnd, 11);
+    } else if (b.type === 'yard') {
+      b.deco.push({ t: 'dirt' });
+      add('house', b.cx - 56, b.cy - 62); add('barn', b.cx + 52, b.cy - 50);
+      add('tractor', b.cx - 60, b.cy + 40); add('hay', b.cx + 30, b.cy + 50); add('hay', b.cx + 52, b.cy + 50);
+      for (let k = 0; k < 7; k++) wanderer(add, b, 'chicken', rnd, 18, 60);
+      add('tree', b.cx + 96, b.cy + 96);
+    } else if (b.type === 'silo') {
+      b.deco.push({ t: 'dirt' });
+      add('silo', b.cx - 52, b.cy - 50, { hMul: 0.9 + rnd() * 0.3 }); add('barn', b.cx + 52, b.cy + 44);
+      for (let k = 0; k < 3; k++) add('hay', b.cx - 80 + k * 22, b.cy + 70);
+      add('truck', b.cx + 40, b.cy - 74);
+      for (let k = 0; k < 4; k++) wanderer(add, b, 'chicken', rnd, 18, 40);
+    } else {
+      for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 4; gx++) add('tree', b.cx - 87 + gx * 58 + jit(4), b.cy - 87 + gy * 58 + jit(4), { hMul: 0.75 + rnd() * 0.2 });
+    }
+    for (let k = 0; k < 2; k++) if (rnd() < 0.7) walker(add, b, 'person', rnd, 16);
+    for (let k = 0; k < 3; k++) wanderer(add, b, 'chicken', rnd, 16, 8);
+    if (rnd() < 0.5) add('lamp', b.x + 8, b.y + 8);
+  }
+
+  function addVehicles(g, list) {
+    const { add, rnd } = g;
+    for (const [kind, count, speed, big] of list) {
+      for (let made = 0; made < count;) {
+        const span = big ? 3 + Math.floor(rnd() * 4) : 1 + Math.floor(rnd() * 3);
+        const i0 = Math.floor(rnd() * (N + 1 - span)), j0 = Math.floor(rnd() * (N + 1 - span));
+        const cw = rnd() < 0.5 ? 1 : -1;
+        // Drive on the right: clockwise loops sit inside the road ring, anticlockwise ones outside.
+        const lane = 14 * cw;
+        const loop = { x0: roadLine(i0) + lane, y0: roadLine(j0) + lane, x1: roadLine(i0 + span) - lane, y1: roadLine(j0 + span) - lane };
+        loop.per = 2 * (loop.x1 - loop.x0 + loop.y1 - loop.y0);
+        const n = Math.min(count - made, 1 + Math.floor(rnd() * 2));
+        for (let k = 0; k < n; k++) {
+          const o = add(kind, 0, 0, { mv: 'loop', loop, s: (k / n) * loop.per + rnd() * 30, sp: speed * (0.85 + rnd() * 0.3), cw });
+          loopPos(o);
+        }
+        made += n;
+      }
+    }
+  }
+
+  function loopPos(o) {
+    const L = o.loop, w = L.x1 - L.x0, h = L.y1 - L.y0;
+    let s = o.s, vert, dir;
+    if (s < w) { o.x = L.x0 + s; o.y = L.y0; vert = false; dir = 1; }
+    else if ((s -= w) < h) { o.x = L.x1; o.y = L.y0 + s; vert = true; dir = 1; }
+    else if ((s -= h) < w) { o.x = L.x1 - s; o.y = L.y1; vert = false; dir = -1; }
+    else { s -= w; o.x = L.x0; o.y = L.y1 - s; vert = true; dir = -1; }
+    o.dir = dir * o.cw;
+    if (vert !== o.vert) { o.vert = vert; o.w = vert ? o.k.d : o.k.w; o.d = vert ? o.k.w : o.k.d; }
+  }
+
+  // ---------- Spatial grid ----------
+  const cellOf = (x, y) => clamp(Math.floor(y / CELL), 0, GN - 1) * GN + clamp(Math.floor(x / CELL), 0, GN - 1);
+  function gridAdd(o) { o.cell = cellOf(o.x, o.y); world.grid[o.cell].push(o); }
+  function gridRemove(o) {
+    const list = world.grid[o.cell];
+    const i = list.indexOf(o);
+    if (i >= 0) { list[i] = list[list.length - 1]; list.pop(); }
+    o.cell = -1;
+  }
+  function gridMove(o) {
+    const c = cellOf(o.x, o.y);
+    if (c !== o.cell) { gridRemove(o); o.cell = c; world.grid[c].push(o); }
+  }
+  function query(x0, y0, x1, y1, out) {
+    out.length = 0;
+    const cx0 = clamp(Math.floor(x0 / CELL), 0, GN - 1), cx1 = clamp(Math.floor(x1 / CELL), 0, GN - 1);
+    const cy0 = clamp(Math.floor(y0 / CELL), 0, GN - 1), cy1 = clamp(Math.floor(y1 / CELL), 0, GN - 1);
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+      const list = world.grid[cy * GN + cx];
+      for (let i = 0; i < list.length; i++) out.push(list[i]);
+    }
+    return out;
+  }
+
+  // ---------- Round state ----------
+  let run = null, player = null;
+  const cam = { x: WORLD / 2, y: WORLD / 2, z: 0.6 };
+  const view = { w: 0, h: 0, dpr: 1, m: 1 };
+  const input = { keys: new Set(), stick: null };
+  let rafId = 0, lastTime = 0, acc = 0, clockNow = 0;
+
+  function makeHole(name, color, isPlayer, x, y) {
+    return { name, color, isPlayer, x, y, vx: 0, vy: 0, r: START_R, score: 0, alive: true, respawn: 0, guard: 1.5, falling: [], level: 0, think: 0, tx: x, ty: y, dx: 0, dy: 0, ai: null };
+  }
+
+  function intersections() {
+    const list = [];
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) list.push([roadLine(i), roadLine(j)]);
+    return list;
+  }
+
+  function startRound(mode) {
+    newWorld(selectedMap);
+    run = { mode, time: ROUND, holes: [], eaten: 0, over: false, paused: false, popups: [], rings: [], shrinks: [], rank: 0, wobbly: new Set(), hudT: 0, elapsed: 0, refill: 0, lastPopup: null };
+    const spots = intersections();
+    if (mode === 'battle') {
+      // Spread the seven holes around the map so nobody starts next to a rival.
+      const rnd = Math.random;
+      const chosen = [];
+      for (let tries = 0; chosen.length < 7 && tries < 400; tries++) {
+        const s = spots[Math.floor(rnd() * spots.length)];
+        if (chosen.every(c => Math.hypot(c[0] - s[0], c[1] - s[1]) > 560 - tries)) chosen.push(s);
+      }
+      const rivals = [...RIVALS].sort(() => rnd() - 0.5).slice(0, 6);
+      player = makeHole(t.you, PLAYER_COLOR, true, chosen[0][0], chosen[0][1]);
+      run.holes.push(player);
+      rivals.forEach(([name, color], i) => {
+        const h = makeHole(name, color, false, chosen[i + 1][0], chosen[i + 1][1]);
+        h.ai = { speed: 0.8 + rnd() * 0.12, aggro: 0.25 + rnd() * 0.4, nerve: 0.6 + rnd() * 0.5, focus: 0.3 + rnd() * 0.35, lazy: 0.08 + rnd() * 0.12 };
+        run.holes.push(h);
+      });
+    } else {
+      player = makeHole(t.you, PLAYER_COLOR, true, roadLine(1), roadLine(N - 1));
+      run.holes.push(player);
+    }
+    cam.x = player.x; cam.y = player.y; cam.z = zoomFor(player.r); clampCamera();
+    input.stick = null; input.keys.clear();
+    els.menu.hidden = true; els.end.hidden = true; els.paused.hidden = true; els.notice.hidden = true;
+    els.hud.hidden = false;
+    els.board.hidden = mode !== 'battle';
+    els.goal.hidden = mode !== 'solo';
+    if (mode === 'solo') buildGoalMeter();
+    if (mode === 'battle') buildBoard();
+    updateHud(true);
+    toast(t.go, true);
+    announce(`${mode === 'battle' ? t.battle : t.solo} · ${t.maps[selectedMap]}. ${t.go}`);
+    canvas.focus({ preventScroll: true });
+    resume();
+  }
+
+  function clampCamera() {
+    // Keep the view over the map; only a thin strip of the outskirts may show at the edges.
+    const m = 70, hw = view.w / 2 / cam.z, hh = view.h / 2 / (cam.z * T);
+    cam.x = hw * 2 > WORLD + m * 2 ? WORLD / 2 : clamp(cam.x, hw - m, WORLD - hw + m);
+    cam.y = hh * 2 > WORLD + m * 2 ? WORLD / 2 : clamp(cam.y, hh - m, WORLD - hh + m);
+  }
+
+  function zoomFor(r) {
+    const span = 300 + r * 7;
+    return Math.min(2, Math.sqrt(view.w * view.h) / span);
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    run.elapsed += dt;
+    run.time -= dt;
+    steerPlayer();
+    for (const h of run.holes) {
+      if (!h.alive) {
+        if ((h.respawn -= dt) <= 0) respawn(h);
+        continue;
+      }
+      if (h.ai && (h.think -= dt) <= 0) think(h);
+      moveHole(h, dt);
+      h.guard = Math.max(0, h.guard - dt);
+    }
+    for (const o of world.movers) if (o.alive) moveObject(o, dt);
+    for (const h of run.holes) if (h.alive) eatAround(h);
+    if (run.mode === 'battle') holeFights();
+    for (const h of run.holes) {
+      h.r += (radiusFor(h.score) - h.r) * Math.min(1, dt * 5);
+      for (const f of h.falling) f.t += dt;
+      if (h.falling.length && h.falling[0].t >= h.falling[0].dur) h.falling = h.falling.filter(f => f.t < f.dur);
+    }
+    for (const o of run.wobbly) if ((o.wob -= dt) <= 0 || !o.alive) { o.wob = 0; run.wobbly.delete(o); }
+    for (const p of run.popups) p.t += dt;
+    run.popups = run.popups.filter(p => p.t < 0.9);
+    for (const r of run.rings) r.t += dt;
+    run.rings = run.rings.filter(r => r.t < 0.7);
+    for (const s of run.shrinks) s.t += dt;
+    run.shrinks = run.shrinks.filter(s => s.t < 0.45);
+    if (run.mode === 'battle' && (run.refill -= dt) <= 0) refill();
+
+    const target = player.alive ? player : null;
+    if (target) {
+      cam.x += (target.x - cam.x) * Math.min(1, dt * 7);
+      cam.y += (target.y - cam.y) * Math.min(1, dt * 7);
+    }
+    cam.z += (zoomFor(player.r) - cam.z) * Math.min(1, dt * 1.6);
+    clampCamera();
+
+    if ((run.hudT -= dt) <= 0) { run.hudT = 0.2; updateHud(false); }
+    if (run.time <= 0 || (run.mode === 'solo' && run.eaten >= world.total)) endRound();
+  }
+
+  function steerPlayer() {
+    if (!player.alive) return;
+    let dx = (input.keys.has('right') ? 1 : 0) - (input.keys.has('left') ? 1 : 0);
+    let dy = (input.keys.has('down') ? 1 : 0) - (input.keys.has('up') ? 1 : 0);
+    if (dx || dy) { const len = Math.hypot(dx, dy); player.dx = dx / len; player.dy = dy / len; return; }
+    const s = input.stick;
+    if (!s) { player.dx = player.dy = 0; return; }
+    const sx = s.x - s.ox, sy = s.y - s.oy, len = Math.hypot(sx, sy);
+    const power = len < 6 ? 0 : Math.min(1, len / 48);
+    player.dx = len ? (sx / len) * power : 0;
+    // Screen y is squashed, so a vertical drag maps to the same ground distance as a horizontal one.
+    player.dy = len ? (sy / len) * power : 0;
+  }
+
+  function moveHole(h, dt) {
+    const sp = speedFor(h.r) * (h.ai ? h.ai.speed : 1);
+    h.vx += (h.dx * sp - h.vx) * Math.min(1, dt * 9);
+    h.vy += (h.dy * sp - h.vy) * Math.min(1, dt * 9);
+    h.x = clamp(h.x + h.vx * dt, h.r * 0.6, WORLD - h.r * 0.6);
+    h.y = clamp(h.y + h.vy * dt, h.r * 0.6, WORLD - h.r * 0.6);
+  }
+
+  function moveObject(o, dt) {
+    o.ph += dt * 9;
+    if (o.mv === 'loop') {
+      o.s = (o.s + o.sp * dt * o.cw + o.loop.per) % o.loop.per;
+      loopPos(o);
+    } else {
+      if (o.wait > 0) { o.wait -= dt; o.ph -= dt * 9; return; }
+      if (!o.tx || Math.hypot(o.tx - o.x, o.ty - o.y) < 4) {
+        const b = o.box, rnd = Math.random;
+        o.tx = b.x0 + rnd() * (b.x1 - b.x0); o.ty = b.y0 + rnd() * (b.y1 - b.y0);
+        o.wait = rnd() < 0.5 ? 0.5 + rnd() * 2 : 0;
+        const vert = Math.abs(o.ty - o.y) > Math.abs(o.tx - o.x);
+        o.dir = Math.sign(vert ? o.ty - o.y : o.tx - o.x) || 1;
+        if (vert !== o.vert) { o.vert = vert; o.w = vert ? o.k.d : o.k.w; o.d = vert ? o.k.w : o.k.d; }
+        return;
+      }
+      const dx = o.tx - o.x, dy = o.ty - o.y, len = Math.hypot(dx, dy);
+      o.x += dx / len * o.sp * dt; o.y += dy / len * o.sp * dt;
+    }
+    gridMove(o);
+  }
+
+  const near = [];
+  function eatAround(h) {
+    const r = h.r, reach = r + 70;
+    query(h.x - reach, h.y - reach, h.x + reach, h.y + reach, near);
+    const edible = r * EDIBLE;
+    for (let i = 0; i < near.length; i++) {
+      const o = near[i];
+      const dx = o.x - h.x, dy = o.y - h.y, d2 = dx * dx + dy * dy;
+      if (o.size < edible) { if (d2 < r * r) swallow(h, o, dx, dy); }
+      else if (d2 < (r + o.size * 0.7) ** 2) { o.wob = 0.35; run.wobbly.add(o); }
+    }
+  }
+
+  function swallow(h, o, dx, dy) {
+    gridRemove(o);
+    o.alive = false;
+    h.falling.push({ o, ox: dx, oy: dy, t: 0, dur: 0.38 + o.size * 0.009, spin: (dx >= 0 ? 1 : -1) * (0.5 + Math.random() * 0.7) });
+    if (run.mode === 'solo') run.eaten += o.pts;
+    addScore(h, o.pts, o.x, o.y);
+  }
+
+  function addScore(h, pts, x, y) {
+    h.score += pts;
+    const lvl = levelFor(h.score);
+    if (lvl > h.level) {
+      h.level = lvl;
+      if (!reduced) run.rings.push({ h, t: 0 });
+      if (h.isPlayer) { toast(t.sizeUp(lvl + 1), true); announce(t.sizeUp(lvl + 1)); }
+    }
+    if (!h.isPlayer) return;
+    // Merge rapid swallows into one popup so a crowd does not spam the screen.
+    const last = run.lastPopup;
+    if (last && last.t < 0.18) { last.n += pts; last.t = 0; last.x = x; last.y = y; }
+    else { run.lastPopup = { x, y, n: pts, t: 0 }; run.popups.push(run.lastPopup); }
+  }
+
+  function holeFights() {
+    const holes = run.holes;
+    for (const a of holes) {
+      if (!a.alive) continue;
+      for (const b of holes) {
+        if (a === b || !b.alive || b.guard > 0 || a.r < b.r * HOLE_EAT) continue;
+        if (Math.hypot(a.x - b.x, a.y - b.y) < a.r - b.r * 0.4) swallowHole(a, b);
+      }
+    }
+  }
+
+  function swallowHole(a, b) {
+    const gain = Math.round(b.score * 0.4) + 5;
+    b.score = Math.round(b.score * 0.6);
+    b.level = levelFor(b.score);
+    b.alive = false; b.respawn = RESPAWN; b.falling = [];
+    run.shrinks.push({ x: b.x, y: b.y, r: b.r, color: b.color, a, t: 0 });
+    addScore(a, gain, b.x, b.y);
+    if (a.isPlayer) { toast(t.ateHole(b.name), true); announce(t.ateHole(b.name)); }
+    if (b.isPlayer) {
+      input.stick = null;
+      els.noticeTitle.textContent = t.eatenBy(a.name);
+      els.notice.hidden = false;
+      announce(t.eatenBy(a.name));
+    }
+  }
+
+  function respawn(h) {
+    // Come back somewhere quiet, far from any hole that could eat us straight away.
+    const spots = intersections();
+    let best = spots[0], bestD = -1;
+    for (let k = 0; k < 24; k++) {
+      const s = spots[Math.floor(Math.random() * spots.length)];
+      let d = Infinity;
+      for (const o of run.holes) if (o !== h && o.alive) d = Math.min(d, Math.hypot(o.x - s[0], o.y - s[1]) - o.r);
+      if (d > bestD) { bestD = d; best = s; }
+    }
+    h.x = best[0]; h.y = best[1]; h.vx = h.vy = 0; h.r = radiusFor(h.score) * 0.6; h.alive = true; h.guard = 2;
+    if (!h.ai) { h.dx = h.dy = 0; els.notice.hidden = true; cam.x = h.x; cam.y = h.y; }
+    if (!reduced) run.rings.push({ h, t: 0 });
+  }
+
+  function refill() {
+    // In battle, new pedestrians keep wandering in so small holes always have something to eat.
+    run.refill = 0.6;
+    const alive = world.objects.reduce((n, o) => n + (o.alive && o.pts <= 1 && o.mv ? 1 : 0), 0);
+    if (alive > world.small * 0.5) return;
+    const [, , b] = world.spots[Math.floor(Math.random() * world.spots.length)];
+    const o = walker((kind, x, y, extra) => {
+      const k = KINDS[kind];
+      const obj = { kind, k, x, y, w: k.w, d: k.d, h: k.h, pts: k.pts, alive: true, wob: 0, ph: 0, dir: 1, vert: false, cell: -1, ...extra };
+      obj.size = Math.max(Math.sqrt(k.w * k.d) / 2, k.h * 0.28);
+      paint(obj, list => list[Math.floor(Math.random() * list.length)]);
+      return obj;
+    }, b, world.map === 'farm' ? 'chicken' : 'person', Math.random, 22);
+    if (run.holes.some(h => h.alive && Math.hypot(h.x - o.x, h.y - o.y) < h.r + 40)) return;
+    world.objects.push(o); world.movers.push(o); gridAdd(o);
+    if (world.movers.length > 900) world.movers = world.movers.filter(m => m.alive);
+  }
+
+  // ---------- AI ----------
+  const scan = [];
+  function think(h) {
+    const ai = h.ai;
+    h.think = 0.3 + Math.random() * 0.35;
+    let threat = null, threatD = Infinity, prey = null, preyD = Infinity;
+    for (const o of run.holes) {
+      if (o === h || !o.alive) continue;
+      const d = Math.hypot(o.x - h.x, o.y - h.y);
+      if (o.r > h.r * 1.12 && d - o.r < 170 * ai.nerve + h.r && d < threatD) { threat = o; threatD = d; }
+      if (h.r > o.r * (HOLE_EAT + 0.08) && o.guard <= 0 && d < 260 + h.r * 2 && d < preyD) { prey = o; preyD = d; }
+    }
+    let tx, ty;
+    if (threat) {
+      const ax = h.x - threat.x, ay = h.y - threat.y, len = Math.hypot(ax, ay) || 1;
+      tx = h.x + ax / len * 300 + (WORLD / 2 - h.x) * 0.25;
+      ty = h.y + ay / len * 300 + (WORLD / 2 - h.y) * 0.25;
+    } else if (prey && Math.random() < ai.aggro) {
+      tx = prey.x + prey.vx * 0.3; ty = prey.y + prey.vy * 0.3;
+    } else if (Math.random() < ai.lazy) {
+      // Rivals sometimes wander off instead of playing perfectly.
+      [tx, ty] = roamTarget(h);
+    } else {
+      [tx, ty] = bestFood(h);
+    }
+    const dx = tx - h.x, dy = ty - h.y, len = Math.hypot(dx, dy);
+    if (len < 2) { h.dx = h.dy = 0; return; }
+    // A little steering noise keeps rivals from moving like robots.
+    const wob = (Math.random() - 0.5) * ai.focus;
+    const c = Math.cos(wob), s = Math.sin(wob);
+    const nx = dx / len, ny = dy / len;
+    const power = Math.min(1, len / 30);
+    h.dx = (nx * c - ny * s) * power; h.dy = (nx * s + ny * c) * power;
+  }
+
+  function bestFood(h) {
+    const range = 260 + h.r * 2.5;
+    const edible = h.r * EDIBLE;
+    const cx0 = clamp(Math.floor((h.x - range) / CELL), 0, GN - 1), cx1 = clamp(Math.floor((h.x + range) / CELL), 0, GN - 1);
+    const cy0 = clamp(Math.floor((h.y - range) / CELL), 0, GN - 1), cy1 = clamp(Math.floor((h.y + range) / CELL), 0, GN - 1);
+    let best = null, bestV = 0;
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+      const list = world.grid[cy * GN + cx];
+      // Value a cell by its total edible points; then head for the closest morsel inside it.
+      let sum = 0, closest = null, closeD = Infinity;
+      for (const o of list) if (o.size < edible) {
+        sum += o.pts;
+        const d = Math.hypot(o.x - h.x, o.y - h.y);
+        if (d < closeD) { closeD = d; closest = o; }
+      }
+      if (!sum) continue;
+      const v = sum / (closeD + 140);
+      if (v > bestV) { bestV = v; best = [closest.x, closest.y]; }
+    }
+    return best || roamTarget(h);
+  }
+
+  function roamTarget(h) {
+    if (!h.roam || Math.hypot(h.roam[0] - h.x, h.roam[1] - h.y) < 60) h.roam = [200 + Math.random() * (WORLD - 400), 200 + Math.random() * (WORLD - 400)];
+    return h.roam;
+  }
+
+  // ---------- Rendering helpers ----------
+  function ridge(ax, ay, bx, by, color) {
+    if (!detail) return;
+    ctx.strokeStyle = shade(color, 0.3); ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+  function quad(ax, ay, bx, by, cx, cy, dx, dy) { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.fill(); }
+  function tri(ax, ay, bx, by, cx, cy) { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.fill(); }
+
+  // Extruded box: footprint centred on (x, y), from height z up by h. lx/hk are the per-object lean.
+  function box(x, y, w, d, z, h, top, front, side, lx, hk) {
+    const x0 = x - w / 2 + z * lx, x1 = x0 + w;
+    const yS = (y + d / 2) * T - z * hk, yN = yS - d * T;
+    const ox = h * lx, oy = -h * hk;
+    if (side && Math.abs(ox) > 0.3) { const sx = ox > 0 ? x0 : x1; ctx.fillStyle = side; quad(sx, yN, sx, yS, sx + ox, yS + oy, sx + ox, yN + oy); }
+    ctx.fillStyle = front; quad(x0, yS, x1, yS, x1 + ox, yS + oy, x0 + ox, yS + oy);
+    ctx.fillStyle = top; ctx.fillRect(x0 + ox, yN + oy, w, d * T);
+  }
+
+  function cyl(x, y, r, z, h, top, side, lx, hk) {
+    const cx = x + z * lx, cy = y * T - z * hk, ry = r * T, ox = h * lx, oy = -h * hk;
+    ctx.fillStyle = side;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(cx + r + ox, cy + oy);
+    ctx.ellipse(cx + ox, cy + oy, r, ry, 0, 0, Math.PI, true);
+    ctx.closePath();
+    ctx.fill();
+    if (top) { ctx.fillStyle = top; ctx.beginPath(); ctx.ellipse(cx + ox, cy + oy, r, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  function ball(x, y, r, z, color, lx, hk) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x + z * lx, y * T - z * hk, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const gradCache = new Map();
+  function sideGrad(r, color) {
+    const key = r + color;
+    let g = gradCache.get(key);
+    if (!g) {
+      g = ctx.createLinearGradient(-r, 0, r, 0);
+      g.addColorStop(0, shade(color, -0.25)); g.addColorStop(0.35, shade(color, 0.15)); g.addColorStop(1, shade(color, -0.4));
+      gradCache.set(key, g);
+    }
+    return g;
+  }
+
+  let detail = true;
+  const along = (o, dist) => (o.vert ? [0, o.dir * dist] : [o.dir * dist, 0]);
+
+  const SHAPES = {
+    person(o, lx, hk) {
+      const bob = o.mv ? Math.abs(Math.sin(o.ph)) * 1.6 : 0;
+      cyl(0, 0, 3.2, bob, 10, o.c, o.cf, lx, hk);
+      ball(0, 0, 3.3, 13.5 + bob, o.c2, lx, hk);
+    },
+    chicken(o, lx, hk) {
+      const bob = Math.abs(Math.sin(o.ph * 1.4)) * 1.2;
+      const [hx, hy] = along(o, 3.5);
+      ball(0, 0, 4.2, 4 + bob, '#f8f9fa', lx, hk);
+      ball(hx, hy, 2.6, 8 + bob, '#ffffff', lx, hk);
+      ball(hx, hy, 1.2, 10.4 + bob, '#e03131', lx, hk);
+    },
+    cone(o, lx, hk) {
+      box(0, 0, 9, 9, 0, 1.5, '#ff922b', '#d9480f', '#e8590c', lx, hk);
+      const bx = 1.5 * lx, by = -1.5 * hk, ax = 13 * lx, ay = -13 * hk;
+      ctx.fillStyle = '#ff7a1a'; tri(-3.8 + bx, by, 3.8 + bx, by, ax, ay);
+      ctx.fillStyle = '#fff';
+      const p = (s, side) => [side * 3.8 * (1 - s) + bx + (ax - bx) * s, by + (ay - by) * s];
+      const [a, b, c, d] = [p(0.4, -1), p(0.4, 1), p(0.6, 1), p(0.6, -1)];
+      quad(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]);
+    },
+    bin(o, lx, hk) {
+      cyl(0, 0, 3.8, 0, 10, '#2b8a3e', sideGrad(3.8, '#40c057'), lx, hk);
+      ctx.fillStyle = '#1b5e2a'; ctx.beginPath(); ctx.ellipse(10 * lx, -10 * hk, 2.6, 2.6 * T, 0, 0, Math.PI * 2); ctx.fill();
+    },
+    lamp(o, lx, hk) {
+      cyl(0, 0, 1.4, 0, 40, null, '#4d5566', lx, hk);
+      if (detail) { ctx.globalAlpha = 0.28; ball(0, 0, 7.5, 41, '#ffe066', lx, hk); ctx.globalAlpha = 1; }
+      ball(0, 0, 3.6, 41, '#fff3bf', lx, hk);
+    },
+    bench(o, lx, hk) {
+      box(0, 0, o.w, o.d, 3, 2.5, '#d08c52', '#9a5b2c', '#a8673a', lx, hk);
+      if (o.vert) box(-o.w / 2 + 1, 0, 2, o.d, 3, 8, '#b06c38', '#8a4f25', '#8a4f25', lx, hk);
+      else box(0, -o.d / 2 + 1, o.w, 2, 3, 8, '#b06c38', '#8a4f25', '#8a4f25', lx, hk);
+    },
+    fence(o, lx, hk) {
+      const long = o.vert ? o.d : o.w;
+      for (const p of [-0.45, 0, 0.45]) box(o.vert ? 0 : p * long, o.vert ? p * long : 0, 3, 3, 0, 11, '#e9d3b0', '#a47148', '#8d5f3a', lx, hk);
+      box(0, 0, o.w, o.d, 5, 2, '#f1e3c8', '#b98455', '#a47148', lx, hk);
+      box(0, 0, o.w, o.d, 9, 2, '#f1e3c8', '#b98455', '#a47148', lx, hk);
+    },
+    bush(o, lx, hk) {
+      ball(-4, 2, 7, 5, o.cf, lx, hk);
+      ball(4, 0, 6.5, 6, o.c, lx, hk);
+      ball(0, -1, 6, 9, o.c2, lx, hk);
+    },
+    tree(o, lx, hk) {
+      const s = o.h / 44;
+      cyl(0, 0, 2.8, 0, 16 * s, null, '#7b4a2b', lx, hk);
+      ball(0, 0, 13 * s, 24 * s, o.cf, lx, hk);
+      ball(-1.5, -1.5, 11 * s, 28 * s, o.c, lx, hk);
+      if (detail) ball(-3.5, -3, 5.5 * s, 34 * s, o.c2, lx, hk);
+    },
+    sheep(o, lx, hk) {
+      const [hx, hy] = along(o, 8);
+      ball(-hx * 0.4, -hy * 0.4, 5.2, 7, '#e9ecef', lx, hk);
+      ball(hx * 0.2, hy * 0.2, 5.6, 8, '#f8f9fa', lx, hk);
+      ball(hx, hy, 3.2, 9, '#343a40', lx, hk);
+    },
+    hay(o, lx, hk) {
+      cyl(0, 0, 9, 0, 13, '#ffe08a', sideGrad(9, '#f5c542'), lx, hk);
+      if (detail) { ctx.strokeStyle = '#d9a400'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(13 * lx, -13 * hk, 5, 5 * T, 0, 0, Math.PI * 2); ctx.stroke(); }
+    },
+    cart(o, lx, hk) {
+      box(0, 0, o.w, o.d, 3, 12, '#ffffff', '#e9ecef', '#dee2e6', lx, hk);
+      cyl(0, 0, 0.9, 15, 9, null, '#868e96', lx, hk);
+      ctx.fillStyle = o.c; ctx.beginPath(); ctx.ellipse(25 * lx, -25 * hk, 13, 13 * T, 0, 0, Math.PI * 2); ctx.fill();
+      if (detail) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(25 * lx, -25 * hk, 13, 13 * T, 0, -0.5, 0.5); ctx.lineTo(25 * lx, -25 * hk); ctx.fill(); ctx.beginPath(); ctx.ellipse(25 * lx, -25 * hk, 13, 13 * T, 0, 2.6, 3.6); ctx.lineTo(25 * lx, -25 * hk); ctx.fill(); }
+    },
+    cow(o, lx, hk) {
+      const legs = o.vert ? [[-4, -8], [4, -8], [-4, 8], [4, 8]] : [[-9, -4], [9, -4], [-9, 4], [9, 4]];
+      for (const [x, y] of legs) box(x, y, 3, 3, 0, 7, '#495057', '#343a40', '#343a40', lx, hk);
+      const bw = o.vert ? 13 : 24, bd = o.vert ? 24 : 13;
+      box(0, 0, bw, bd, 7, 10, '#ffffff', '#e9ecef', '#dee2e6', lx, hk);
+      if (detail) { ctx.fillStyle = '#343a40'; ctx.beginPath(); ctx.ellipse(17 * lx - 3, -17 * hk - 1, 4, 2.6, 0.3, 0, Math.PI * 2); ctx.ellipse(17 * lx + 5, -17 * hk + 2, 3, 2, 0, 0, Math.PI * 2); ctx.fill(); }
+      const [hx, hy] = along(o, 13);
+      box(hx, hy, 8, 8, 10, 8, '#f8f9fa', '#ced4da', '#adb5bd', lx, hk);
+      if (detail) ball(hx + (o.vert ? 0 : o.dir * 3), hy + (o.vert ? o.dir * 4 : 0), 2.2, 12, '#ffa8a8', lx, hk);
+    },
+    car(o, lx, hk) {
+      box(0, 0, o.w, o.d, 2, 7, o.c, o.cf, o.cs, lx, hk);
+      const v = o.vert, shift = -o.dir * (v ? o.d : o.w) * 0.06;
+      box(v ? 0 : shift, v ? shift : 0, v ? o.w * 0.84 : o.w * 0.5, v ? o.d * 0.5 : o.d * 0.84, 9, 6, shade(o.c, 0.2), '#34405a', '#2a3449', lx, hk);
+      if (detail) {
+        const [hx, hy] = along(o, (v ? o.d : o.w) / 2 - 1);
+        ctx.fillStyle = '#fff59d';
+        if (v) { if (o.dir > 0) { ctx.fillRect(-o.w / 2 + 2 + 4 * lx, hy * T - 5 * hk, 3, 2); ctx.fillRect(o.w / 2 - 5 + 4 * lx, hy * T - 5 * hk, 3, 2); } }
+        else ctx.fillRect(hx - 1.5 + 4 * lx, (o.d / 2) * T - 6 * hk, 3, 2);
+      }
+    },
+    bus(o, lx, hk) {
+      const h = o.h - 4;
+      box(0, 0, o.w, o.d, 2, h, shade(o.c, 0.25), o.cf, o.cs, lx, hk);
+      if (!detail) return;
+      ctx.fillStyle = '#2f3b55';
+      const x0 = -o.w / 2, x1 = o.w / 2, yS = (o.d / 2) * T;
+      const z0 = 2 + h * 0.5, z1 = 2 + h * 0.82;
+      quad(x0 + 3 + z0 * lx, yS - z0 * hk, x1 - 3 + z0 * lx, yS - z0 * hk, x1 - 3 + z1 * lx, yS - z1 * hk, x0 + 3 + z1 * lx, yS - z1 * hk);
+      const sx = lx > 0 ? x0 : x1;
+      if (Math.abs(lx) > 0.02) quad(sx + z0 * lx, (-o.d / 2 + 3) * T - z0 * hk, sx + z0 * lx, (o.d / 2 - 3) * T - z0 * hk, sx + z1 * lx, (o.d / 2 - 3) * T - z1 * hk, sx + z1 * lx, (-o.d / 2 + 3) * T - z1 * hk);
+      ctx.fillStyle = o.c;
+      const tz = 2 + h;
+      if (o.vert) ctx.fillRect(-o.w / 2 + 4 + tz * lx, (-o.d / 2 + 6) * T - tz * hk, o.w - 8, (o.d - 12) * T);
+      else ctx.fillRect(-o.w / 2 + 6 + tz * lx, (-o.d / 2 + 4) * T - tz * hk, o.w - 12, (o.d - 8) * T);
+    },
+    truck(o, lx, hk) {
+      const v = o.vert, L = v ? o.d : o.w;
+      const [cx, cy] = along(o, L / 2 - 9);
+      const [bx, by] = along(o, -9);
+      box(bx, by, v ? o.w : o.w - 20, v ? o.d - 20 : o.d, 3, o.h - 3, '#f1f3f5', '#ced4da', '#adb5bd', lx, hk);
+      box(cx, cy, v ? o.w - 2 : 16, v ? 16 : o.d - 2, 2, o.h - 10, o.c, o.cf, o.cs, lx, hk);
+    },
+    tractor(o, lx, hk) {
+      const v = o.vert, L = v ? o.d : o.w;
+      const [rx, ry] = along(o, -L * 0.22);
+      const [fx, fy] = along(o, L * 0.3);
+      box(fx * 0.5, fy * 0.5, v ? o.w * 0.7 : o.w * 0.75, v ? o.d * 0.75 : o.d * 0.7, 5, 9, o.c, o.cf, o.cs, lx, hk);
+      box(rx, ry, v ? o.w * 0.75 : 14, v ? 14 : o.d * 0.75, 13, 12, '#f1f3f5', '#9fd3ff', '#7fb8e6', lx, hk);
+      const wy = v ? 0 : o.d / 2;
+      ctx.fillStyle = '#212529';
+      ctx.beginPath(); ctx.arc(rx + 7 * lx, (ry + wy) * T - 7 * hk, 7.5, 0, Math.PI * 2); ctx.moveTo(fx + 8.5 * lx + 4.5, (fy + wy) * T - 4 * hk); ctx.arc(fx + 4 * lx, (fy + wy) * T - 4 * hk, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd43b';
+      ctx.beginPath(); ctx.arc(rx + 7 * lx, (ry + wy) * T - 7 * hk, 3, 0, Math.PI * 2); ctx.fill();
+    },
+    fountain(o, lx, hk) {
+      cyl(0, 0, 30, 0, 8, '#dee2e6', '#adb5bd', lx, hk);
+      ctx.fillStyle = '#74c0fc'; ctx.beginPath(); ctx.ellipse(8 * lx, -8 * hk, 25, 25 * T, 0, 0, Math.PI * 2); ctx.fill();
+      cyl(0, 0, 4, 8, 13, '#f1f3f5', '#ced4da', lx, hk);
+      if (detail) { ctx.globalAlpha = 0.65; ball(0, 0, 7, 23 + Math.sin(clockNow * 6) * 1.5, '#e7f5ff', lx, hk); ctx.globalAlpha = 1; }
+    },
+    gazebo(o, lx, hk) {
+      cyl(0, 0, 32, 0, 4, '#f8f9fa', '#ced4da', lx, hk);
+      for (const [x, y] of [[-22, -18], [22, -18], [-22, 18], [22, 18]]) cyl(x, y, 1.8, 4, 30, null, '#f1f3f5', lx, hk);
+      const cx = 34 * lx, cy = -34 * hk, ax = 54 * lx, ay = -54 * hk;
+      ctx.fillStyle = shade(o.c === '#cccccc' ? '#e64980' : o.c, -0.15);
+      ctx.beginPath(); ctx.ellipse(cx, cy, 37, 37 * T, 0, Math.PI, 0, true); ctx.lineTo(ax, ay); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f06595';
+      ctx.beginPath(); ctx.moveTo(cx - 37, cy); ctx.lineTo(ax, ay); ctx.lineTo(cx, cy + 37 * T); ctx.closePath(); ctx.fill();
+    },
+    house(o, lx, hk) {
+      const barn = o.k.barn, wallH = o.h * (barn ? 0.55 : 0.55);
+      box(0, 0, o.w, o.d, 0, wallH, o.c, o.cf, o.cs, lx, hk);
+      const yS = (o.d / 2) * T;
+      if (detail) {
+        if (barn) {
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+          const dx = 12, dz = wallH * 0.7, x0 = -dx + 2 * lx, y0 = yS - 1, y1 = yS - dz * hk;
+          ctx.beginPath(); ctx.rect(x0, y1, dx * 2, y0 - y1); ctx.moveTo(x0, y1); ctx.lineTo(x0 + dx * 2, y0); ctx.moveTo(x0 + dx * 2, y1); ctx.lineTo(x0, y0); ctx.stroke();
+        } else {
+          ctx.fillStyle = '#8d5a3b'; ctx.fillRect(-4 + 3 * lx, yS - 13 * hk, 8, 13 * hk);
+          ctx.fillStyle = '#a5d8ff';
+          ctx.beginPath(); ctx.rect(-o.w / 4 - 5 + 12 * lx, yS - 18 * hk, 10, 7 * hk); ctx.rect(o.w / 4 - 5 + 12 * lx, yS - 18 * hk, 10, 7 * hk); ctx.fill();
+        }
+      }
+      const H = o.h, ov = 3, zx = wallH * lx, zy = -wallH * hk, rx = H * lx, ry = -H * hk;
+      if (o.w >= o.d) {
+        const xa = -o.w / 2 - ov, xb = o.w / 2 + ov, yb = (-o.d / 2 - ov) * T, yf = (o.d / 2 + ov) * T;
+        ctx.fillStyle = o.c3; quad(xa + zx, yb + zy, xb + zx, yb + zy, xb + rx, ry, xa + rx, ry);
+        const xs = lx > 0 ? -o.w / 2 : o.w / 2;
+        ctx.fillStyle = o.cs; tri(xs + zx, -o.d / 2 * T + zy, xs + zx, o.d / 2 * T + zy, xs + rx, ry);
+        ctx.fillStyle = o.c2; quad(xa + zx, yf + zy, xb + zx, yf + zy, xb + rx, ry, xa + rx, ry);
+        ridge(xa + rx, ry, xb + rx, ry, o.c2);
+      } else {
+        const ya = (-o.d / 2 - ov) * T, yb = (o.d / 2 + ov) * T, xl = -o.w / 2 - ov, xr = o.w / 2 + ov;
+        const first = lx > 0 ? xr : xl, second = lx > 0 ? xl : xr;
+        ctx.fillStyle = o.c3; quad(first + zx, ya + zy, first + zx, yb + zy, rx, yb + ry, rx, ya + ry);
+        ctx.fillStyle = o.c2; quad(second + zx, ya + zy, second + zx, yb + zy, rx, yb + ry, rx, ya + ry);
+        ctx.fillStyle = o.cf; tri(-o.w / 2 + zx, yS + zy, o.w / 2 + zx, yS + zy, rx, yS + ry);
+        ridge(rx, ya + ry, rx, yb + ry, o.c2);
+      }
+    },
+    building(o, lx, hk) {
+      box(0, 0, o.w, o.d, 0, o.h, o.c, o.cf, o.cs, lx, hk);
+      const ox = o.h * lx, oy = -o.h * hk;
+      ctx.fillStyle = shade(o.c, -0.08);
+      ctx.fillRect(-o.w / 2 + 6 + ox, (-o.d / 2 + 6) * T + oy, o.w - 12, (o.d - 12) * T);
+      if (!detail) return;
+      ctx.fillStyle = o.museum ? '#ced4da' : '#2f3b55';
+      ctx.globalAlpha = o.museum ? 1 : 0.75;
+      ctx.beginPath();
+      const yS = (o.d / 2) * T;
+      if (o.museum) {
+        for (let x = -o.w / 2 + 8; x < o.w / 2 - 4; x += 14) ctx.rect(x, yS - (o.h - 8) * hk, 5, (o.h - 10) * hk);
+        ctx.fill(); ctx.globalAlpha = 1;
+        return;
+      }
+      for (let z = 10; z < o.h - 8; z += 15) for (let x = -o.w / 2 + 8; x < o.w / 2 - 8; x += 14) ctx.rect(x + z * lx, yS - (z + 8) * hk, 8, 8 * hk);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      box(o.w / 5, -o.d / 6, 18, 14, o.h, 7, '#e9ecef', '#adb5bd', '#868e96', lx, hk);
+    },
+    tower(o, lx, hk) {
+      const glass = o.c;
+      box(0, 0, o.w, o.d, 0, o.h, shade(glass, 0.15), glass, shade(glass, -0.2), lx, hk);
+      if (detail) {
+        ctx.strokeStyle = shade(glass, 0.45); ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        const yS = (o.d / 2) * T, yN = (-o.d / 2) * T;
+        const sx = lx > 0 ? -o.w / 2 : o.w / 2;
+        for (let z = 12; z < o.h; z += 12) {
+          ctx.moveTo(-o.w / 2 + z * lx, yS - z * hk); ctx.lineTo(o.w / 2 + z * lx, yS - z * hk);
+          if (Math.abs(lx) > 0.02) { ctx.moveTo(sx + z * lx, yS - z * hk); ctx.lineTo(sx + z * lx, yN - z * hk); }
+        }
+        for (let x = -o.w / 2 + 19; x < o.w / 2; x += 19) { ctx.moveTo(x, yS); ctx.lineTo(x + o.h * lx, yS - o.h * hk); }
+        ctx.stroke();
+      }
+      if (o.clock) {
+        box(0, 0, o.w * 0.7, o.d * 0.7, o.h, 18, '#c2410c', '#9a3412', '#7c2d12', lx, hk);
+        const z = o.h * 0.82;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(z * lx, (o.d / 2) * T - z * hk, 16, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#343a40'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(z * lx, (o.d / 2) * T - z * hk); ctx.lineTo(z * lx, (o.d / 2) * T - z * hk - 11); ctx.moveTo(z * lx, (o.d / 2) * T - z * hk); ctx.lineTo(z * lx + 8, (o.d / 2) * T - z * hk); ctx.stroke();
+        return;
+      }
+      box(0, 0, o.w * 0.55, o.d * 0.55, o.h, 14, '#f1f3f5', '#ced4da', '#adb5bd', lx, hk);
+      const az = o.h + 14;
+      ctx.strokeStyle = '#868e96'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(az * lx, -az * hk); ctx.lineTo((az + 30) * lx, -(az + 30) * hk); ctx.stroke();
+      ball(0, 0, 3, az + 31, Math.sin(clockNow * 4) > 0 ? '#ff6b6b' : '#c92a2a', lx, hk);
+    },
+    silo(o, lx, hk) {
+      const r = o.w / 2 - 4, h = o.h - r * 0.6;
+      cyl(0, 0, r, 0, h, null, sideGrad(r, '#ced4da'), lx, hk);
+      if (detail) {
+        ctx.strokeStyle = '#868e96'; ctx.lineWidth = 1.5; ctx.beginPath();
+        for (let z = 18; z < h; z += 18) { ctx.moveTo(-r + z * lx, -z * hk); ctx.ellipse(z * lx, -z * hk, r, r * T, 0, Math.PI, 0, true); }
+        ctx.stroke();
+      }
+      const cx = h * lx, cy = -h * hk;
+      ctx.fillStyle = sideGrad(r, '#e64949');
+      ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.6 * hk + r * T * 0.4, 0, Math.PI, 0); ctx.ellipse(cx, cy, r, r * T, 0, 0, Math.PI); ctx.fill();
+    },
+  };
+
+  // ---------- Ground ----------
+  const THEMES = {
+    city: { outside: '#3a4256', road: '#5d6579', block: genCity, vehicles: [['car', 34, 70], ['bus', 6, 46, true]], ground: groundCity },
+    park: { outside: '#4f9150', road: '#ead7a6', block: genPark, vehicles: [['cart', 12, 30], ['tram', 4, 40, true]], ground: groundPark },
+    farm: { outside: '#7aa84a', road: '#c9a46c', block: genFarm, vehicles: [['tractor', 12, 38], ['truck', 6, 52, true]], ground: groundFarm },
+  };
+  const CITY_INNER = { tower: '#e7e3da', office: '#e7e3da', mixed: '#cfe8b8', homes: '#a8d98a', park: '#97d17a', parking: '#7d8597' };
+
+  function visibleBlocks(x0, y0, x1, y1, fn) {
+    for (const b of world.blocks) if (b.x < x1 && b.x + BLOCK > x0 && b.y < y1 && b.y + BLOCK > y0) fn(b);
+  }
+
+  function drawDeco(b) {
+    for (const d of b.deco) {
+      if (d.t === 'pond') {
+        ctx.fillStyle = '#5fb0e8'; ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx + 6, d.ry + 6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8fd0ff'; ctx.beginPath(); ctx.ellipse(d.x - 6, d.y - 6, d.rx - 6, d.ry - 8, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (d.t === 'flowers') {
+        ctx.fillStyle = '#6fbf5a'; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = d.c; ctx.beginPath();
+        for (let k = 0; k < 7; k++) { const a = k * 0.9, rr = d.r * 0.55; ctx.moveTo(d.x + Math.cos(a) * rr + 3, d.y + Math.sin(a) * rr); ctx.arc(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr, 3, 0, Math.PI * 2); }
+        ctx.fill();
+      }
+    }
+  }
+
+  function groundCity(x0, y0, x1, y1) {
+    visibleBlocks(x0, y0, x1, y1, b => {
+      ctx.fillStyle = '#d5dae4'; ctx.fillRect(b.x, b.y, BLOCK, BLOCK);
+      ctx.fillStyle = '#a9b1c2'; ctx.fillRect(b.x, b.y + BLOCK - 5, BLOCK, 5);
+      ctx.fillStyle = CITY_INNER[b.type]; ctx.fillRect(b.x + SW, b.y + SW, IS, IS);
+      if (b.type === 'parking') {
+        ctx.fillStyle = '#e9ecef';
+        for (const row of [-58, 58]) for (let k = 0; k <= 7; k++) ctx.fillRect(b.cx - 112 + k * 32, b.cy + row - 22, 2, 44);
+      } else if (b.type === 'tower' || b.type === 'office') {
+        ctx.strokeStyle = '#d6d0c4'; ctx.lineWidth = 2; ctx.strokeRect(b.x + SW + 10, b.y + SW + 10, IS - 20, IS - 20);
+      }
+    });
+    ctx.strokeStyle = '#f1f3f5'; ctx.lineWidth = 3; ctx.setLineDash([20, 18]);
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const c = roadLine(i);
+      if (c > x0 - ROAD && c < x1 + ROAD) for (let j = 0; j < N; j++) { ctx.moveTo(c, ROAD + j * (BLOCK + ROAD) + 4); ctx.lineTo(c, ROAD + j * (BLOCK + ROAD) + BLOCK - 4); }
+      if (c > y0 - ROAD && c < y1 + ROAD) for (let j = 0; j < N; j++) { ctx.moveTo(ROAD + j * (BLOCK + ROAD) + 4, c); ctx.lineTo(ROAD + j * (BLOCK + ROAD) + BLOCK - 4, c); }
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#eef0f4';
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+      const cx = roadLine(i), cy = roadLine(j);
+      if (cx < x0 - ROAD || cx > x1 + ROAD || cy < y0 - ROAD || cy > y1 + ROAD) continue;
+      for (let k = 0; k < 6; k++) {
+        const p = -ROAD / 2 + 5 + k * 9;
+        if (j > 0) ctx.fillRect(cx + p, cy - ROAD / 2 - 14, 5, 12);
+        if (j < N) ctx.fillRect(cx + p, cy + ROAD / 2 + 2, 5, 12);
+        if (i > 0) ctx.fillRect(cx - ROAD / 2 - 14, cy + p, 12, 5);
+        if (i < N) ctx.fillRect(cx + ROAD / 2 + 2, cy + p, 12, 5);
+      }
+    }
+  }
+
+  function groundPark(x0, y0, x1, y1) {
+    visibleBlocks(x0, y0, x1, y1, b => {
+      ctx.fillStyle = '#d9c38c'; ctx.fillRect(b.x - 3, b.y - 3, BLOCK + 6, BLOCK + 6);
+      ctx.fillStyle = '#8fd06e'; ctx.fillRect(b.x, b.y, BLOCK, BLOCK);
+      ctx.fillStyle = '#9bd87b'; ctx.fillRect(b.x + SW, b.y + SW, IS, IS);
+      drawDeco(b);
+    });
+  }
+
+  function groundFarm(x0, y0, x1, y1) {
+    visibleBlocks(x0, y0, x1, y1, b => {
+      ctx.fillStyle = '#9ccc65'; ctx.fillRect(b.x, b.y, BLOCK, BLOCK);
+      const rows = b.deco.find(d => d.t === 'rows'), dirt = b.deco.some(d => d.t === 'dirt');
+      if (rows) {
+        ctx.fillStyle = shade(rows.c, -0.12); ctx.fillRect(b.x + SW, b.y + SW, IS, IS);
+        ctx.fillStyle = rows.c;
+        for (let k = 0; k < 12; k++) ctx.fillRect(b.x + SW, b.y + SW + 4 + k * 20.5, IS, 11);
+      } else if (dirt) {
+        ctx.fillStyle = '#dcc08a'; ctx.fillRect(b.x + SW, b.y + SW, IS, IS);
+      } else {
+        ctx.fillStyle = '#a9d672'; ctx.fillRect(b.x + SW, b.y + SW, IS, IS);
+      }
+    });
+    ctx.strokeStyle = '#b48c55'; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const c = roadLine(i);
+      for (const off of [-10, 10]) {
+        if (c > x0 - ROAD && c < x1 + ROAD) { ctx.moveTo(c + off, 0); ctx.lineTo(c + off, WORLD); }
+        if (c > y0 - ROAD && c < y1 + ROAD) { ctx.moveTo(0, c + off); ctx.lineTo(WORLD, c + off); }
+      }
+    }
+    ctx.stroke();
+  }
+
+  // ---------- Render ----------
+  const visible = [], drawList = [];
+  function render() {
+    if (!world) return;
+    const { w: vw, h: vh, dpr } = view, Z = cam.z;
+    const holes = run ? run.holes : [];
+    const theme = THEMES[world.map];
+    clockNow = performance.now() / 1000;
+    detail = Z > 0.42;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = theme.outside; ctx.fillRect(0, 0, vw, vh);
+    const ox = vw / 2 - cam.x * Z, oy = vh / 2 - cam.y * Z * T;
+    const x0 = cam.x - vw / 2 / Z, x1 = cam.x + vw / 2 / Z, y0 = cam.y - vh / 2 / (Z * T), y1 = cam.y + vh / 2 / (Z * T);
+    const worldMatrix = () => ctx.setTransform(Z * dpr, 0, 0, Z * T * dpr, ox * dpr, oy * dpr);
+    worldMatrix();
+    ctx.fillStyle = theme.road; ctx.fillRect(0, 0, WORLD, WORLD);
+    theme.ground(x0, y0, x1, y1);
+
+    query(x0 - 70, y0 - 70, x1 + 70, y1 + 300, visible);
+
+    // All shadows go into one path so overlapping shadows do not darken each other.
+    ctx.beginPath();
+    for (const o of visible) shadowPath(o);
+    ctx.fillStyle = 'rgba(36, 31, 71, 0.2)';
+    ctx.fill();
+
+    for (const h of holes) if (h.alive) drawHole(h);
+    for (const s of run ? run.shrinks : []) {
+      const p = s.t / 0.45, x = s.x + (s.a.x - s.x) * p, y = s.y + (s.a.y - s.y) * p;
+      ctx.fillStyle = '#0d0b1c'; ctx.beginPath(); ctx.arc(x, y, s.r * (1 - p), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = s.color; ctx.lineWidth = 3 / Z; ctx.stroke();
+    }
+
+    drawList.length = 0;
+    for (const o of visible) drawList.push(o);
+    for (const h of holes) if (h.falling.length) drawList.push(h);
+    drawList.sort((a, b) => sortKey(a) - sortKey(b));
+    const vm = view.m;
+    for (const item of drawList) {
+      if (item.falling) { drawFalling(item, Z, ox, oy, worldMatrix); continue; }
+      const o = item, sx = ox + o.x * Z, sy = oy + o.y * Z * T;
+      const rot = o.wob > 0 ? Math.sin(clockNow * 32 + o.x) * 0.07 * (o.wob / 0.35) * (reduced ? 0.3 : 1) : 0;
+      drawObject(o, sx, sy, rot, 0, 1, vm);
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (run) drawOverlay(Z, ox, oy);
+  }
+
+  const sortKey = item => (item.falling ? item.y + 0.5 : item.y + item.d / 2);
+
+  function drawObject(o, sx, sy, rot, sink, sc, vm) {
+    const lx = (sx - view.w / 2) / vm * LEAN, hk = HK - (sy - view.h / 2) / vm * LEAN;
+    const k = cam.z * view.dpr * sc, dpr = view.dpr;
+    if (rot) { const c = Math.cos(rot) * k, s = Math.sin(rot) * k; ctx.setTransform(c, s, -s, c, sx * dpr, (sy + sink) * dpr); }
+    else ctx.setTransform(k, 0, 0, k, sx * dpr, (sy + sink) * dpr);
+    SHAPES[o.k.shape](o, lx, hk);
+  }
+
+  function shadowPath(o) {
+    const len = o.h * 0.42, dx = len * 0.85, dy = len * 0.3;
+    const rr = o.k.round;
+    if (rr) {
+      const a = Math.atan2(dy, dx), cx = o.x, cy = o.y;
+      ctx.moveTo(cx + Math.cos(a + Math.PI / 2) * rr, cy + Math.sin(a + Math.PI / 2) * rr);
+      ctx.arc(cx, cy, rr, a + Math.PI / 2, a - Math.PI / 2);
+      ctx.arc(cx + dx, cy + dy, rr, a - Math.PI / 2, a + Math.PI / 2);
+      ctx.closePath();
+    } else {
+      const xa = o.x - o.w / 2, xb = o.x + o.w / 2, ya = o.y - o.d / 2, yb = o.y + o.d / 2;
+      ctx.moveTo(xa, ya); ctx.lineTo(xb, ya); ctx.lineTo(xb + dx, ya + dy); ctx.lineTo(xb + dx, yb + dy); ctx.lineTo(xa + dx, yb + dy); ctx.lineTo(xa, yb); ctx.closePath();
+    }
+  }
+
+  function drawHole(h) {
+    const r = h.r, Z = cam.z;
+    ctx.fillStyle = 'rgba(20, 16, 44, 0.25)';
+    ctx.beginPath(); ctx.arc(h.x, h.y, r * 1.07, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = shade(h.color, -0.55); ctx.fillRect(h.x - r, h.y - r, r * 2, r * 2);
+    const g = ctx.createRadialGradient(h.x, h.y + r * 0.3, 0, h.x, h.y + r * 0.3, r);
+    g.addColorStop(0, '#05040b'); g.addColorStop(0.8, '#0d0b1c'); g.addColorStop(1, '#1b1736');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(h.x, h.y + r * 0.3, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    const blink = h.guard > 0 && Math.sin(clockNow * 18) > 0;
+    ctx.strokeStyle = blink ? '#ffffff' : h.color;
+    ctx.lineWidth = Math.max(3 / Z, r * 0.09);
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function drawFalling(h, Z, ox, oy, worldMatrix) {
+    ctx.save();
+    worldMatrix();
+    // Clip to the hole plus the open air above it, so objects disappear behind the front rim.
+    ctx.beginPath();
+    ctx.moveTo(h.x - h.r, h.y);
+    ctx.arc(h.x, h.y, h.r * 0.98, Math.PI, 0, true);
+    ctx.lineTo(h.x + h.r, h.y - 4000);
+    ctx.lineTo(h.x - h.r, h.y - 4000);
+    ctx.closePath();
+    ctx.clip();
+    for (const f of h.falling) {
+      const p = Math.min(1, f.t / f.dur), e = p * p;
+      const o = f.o;
+      const wx = h.x + f.ox * (1 - Math.min(1, p * 1.6)), wy = h.y + f.oy * (1 - Math.min(1, p * 1.6));
+      const sx = ox + wx * Z, sy = oy + wy * Z * T;
+      const sink = e * (o.h * HK + o.d * T + 14) * Z * 1.15;
+      drawObject(o, sx, sy, f.spin * p * 1.2, sink, 1 - 0.3 * p, view.m);
+    }
+    ctx.restore();
+  }
+
+  function drawOverlay(Z, ox, oy) {
+    const dpr = view.dpr;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const r of run.rings) {
+      const p = r.t / 0.7, h = r.h;
+      ctx.setTransform(Z * dpr, 0, 0, Z * T * dpr, ox * dpr, oy * dpr);
+      ctx.globalAlpha = 1 - p;
+      ctx.strokeStyle = h.color; ctx.lineWidth = (6 * (1 - p) + 1) / Z;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r * (1 + p * 0.9), 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (run.mode === 'battle') {
+      const leader = rankList()[0];
+      ctx.font = `800 13px ${FONT}`;
+      ctx.lineJoin = 'round';
+      for (const h of run.holes) {
+        if (!h.alive) continue;
+        const sx = ox + h.x * Z, sy = oy + (h.y - h.r) * Z * T - 12;
+        const label = (h === leader && h.score > 0 ? '👑 ' : '') + h.name;
+        ctx.lineWidth = 4; ctx.strokeStyle = '#241f47cc'; ctx.strokeText(label, sx, sy);
+        ctx.fillStyle = h.isPlayer ? '#ffe28a' : '#ffffff'; ctx.fillText(label, sx, sy);
+      }
+    }
+    ctx.font = `900 18px ${FONT}`;
+    for (const p of run.popups) {
+      const sx = ox + p.x * Z, sy = oy + p.y * Z * T - 20 - p.t * 46;
+      ctx.globalAlpha = Math.min(1, (0.9 - p.t) * 3);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#241f47'; ctx.strokeText(`+${p.n}`, sx, sy);
+      ctx.fillStyle = '#ffe28a'; ctx.fillText(`+${p.n}`, sx, sy);
+    }
+    ctx.globalAlpha = 1;
+    const s = input.stick;
+    if (s && player.alive) {
+      const dx = s.x - s.ox, dy = s.y - s.oy, len = Math.hypot(dx, dy), k = len > 48 ? 48 / len : 1;
+      ctx.fillStyle = '#ffffff33'; ctx.strokeStyle = '#ffffff99'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.ox, s.oy, 48, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffffcc'; ctx.beginPath(); ctx.arc(s.ox + dx * k, s.oy + dy * k, 20, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ---------- HUD ----------
+  const fmtTime = s => { const v = Math.max(0, Math.ceil(s)); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
+  const rankList = () => [...run.holes].sort((a, b) => b.score - a.score);
+  const pctEaten = () => (world.total ? Math.min(100, Math.floor(run.eaten / world.total * 100)) : 0);
+
+  function buildBoard() {
+    els.leaders.replaceChildren(...run.holes.map(() => { const li = document.createElement('li'); li.innerHTML = '<i></i><span></span><b></b>'; return li; }));
+  }
+
+  function buildGoalMeter() {
+    for (const em of els.goalMeter.querySelectorAll('em')) em.remove();
+    for (const g of GOALS[selectedMap]) { const em = document.createElement('em'); em.textContent = '★'; em.style.left = `${g}%`; els.goalMeter.append(em); }
+  }
+
+  function updateHud() {
+    els.clock.textContent = fmtTime(run.time);
+    els.clock.classList.toggle('low', run.time <= 10);
+    els.score.textContent = String(player.score);
+    const l = player.level, lo = LEVELS[l], hi = LEVELS[l + 1] ?? lo * 1.5;
+    els.level.textContent = t.size(l + 1);
+    els.levelBar.style.width = `${Math.min(100, (player.score - lo) / (hi - lo) * 100)}%`;
+    if (!player.alive) els.noticeText.textContent = t.respawn(Math.ceil(player.respawn));
+    if (run.mode === 'solo') {
+      const p = pctEaten();
+      els.pct.textContent = `${p}%`;
+      els.pctBar.style.width = `${p}%`;
+      els.goalMeter.querySelectorAll('em').forEach((em, i) => em.classList.toggle('on', p >= GOALS[selectedMap][i]));
+      return;
+    }
+    const list = rankList();
+    list.forEach((h, i) => {
+      const li = els.leaders.children[i];
+      li.className = h.isPlayer ? 'you' : '';
+      li.children[0].style.background = h.color;
+      li.children[1].textContent = `${i + 1}. ${h.name}`;
+      li.children[2].textContent = String(h.score);
+    });
+    const rank = list.indexOf(player) + 1;
+    if (run.rank && rank !== run.rank && run.elapsed > 3) {
+      const msg = rank < run.rank ? t.rankUp(rank) : t.rankDown(rank);
+      toast(msg, rank < run.rank);
+      announce(msg);
+    }
+    run.rank = rank;
+  }
+
+  function toast(text, gold) {
+    els.toast.textContent = text;
+    els.toast.className = 'toast';
+    void els.toast.offsetWidth;
+    els.toast.className = `toast show${gold ? ' gold' : ''}`;
+  }
+  const announce = text => { els.announcer.textContent = text; };
+
+  // ---------- Round end ----------
+  function endRound() {
+    run.over = true;
+    cancelAnimationFrame(rafId); rafId = 0;
+    input.stick = null;
+    els.notice.hidden = true;
+    render();
+    els.newBest.hidden = true; els.unlocked.hidden = true; els.next.hidden = true;
+    els.ranking.replaceChildren(); els.endStars.replaceChildren(); els.endNote.textContent = '';
+    if (run.mode === 'battle') {
+      const list = rankList(), place = list.indexOf(player) + 1;
+      els.endTitle.textContent = place === 1 ? `🏆 ${t.winner}` : t.place(place);
+      els.endSub.textContent = `${t.timeUp} ${t.yourScore(player.score)}`;
+      els.endStars.hidden = true;
+      els.ranking.hidden = false;
+      list.forEach((h, i) => {
+        const li = document.createElement('li');
+        if (h.isPlayer) li.className = 'you';
+        li.innerHTML = '<span class="pos"></span><i></i><span></span><b></b>';
+        li.children[0].textContent = String(i + 1);
+        li.children[1].style.background = h.color;
+        li.children[2].textContent = h.name;
+        li.children[3].textContent = String(h.score);
+        els.ranking.append(li);
+      });
+      if (player.score > bestBattle) { bestBattle = player.score; save('bestBattle', bestBattle); els.newBest.hidden = false; }
+      announce(`${els.endTitle.textContent}. ${els.endSub.textContent}`);
+    } else {
+      const pct = run.eaten >= world.total ? 100 : pctEaten();
+      const goals = GOALS[selectedMap];
+      const got = goals.filter(g => pct >= g).length;
+      const before = totalStars();
+      const unlockedBefore = MAPS.filter(isUnlocked);
+      if (got > (Number(stars[selectedMap]) || 0)) { stars[selectedMap] = got; save('stars', stars); }
+      if (pct > (Number(bestSolo[selectedMap]) || 0)) { bestSolo[selectedMap] = pct; save('bestSolo', bestSolo); els.newBest.hidden = false; }
+      const fresh = MAPS.filter(m => isUnlocked(m) && !unlockedBefore.includes(m));
+      if (fresh.length && totalStars() > before) { els.unlocked.textContent = t.unlocked(t.maps[fresh[0]]); els.unlocked.hidden = false; }
+      els.endTitle.textContent = pct >= 100 ? t.cleared : got ? t.great : t.timeUp;
+      els.endSub.textContent = t.eatenPct(pct);
+      els.endStars.hidden = false;
+      els.ranking.hidden = true;
+      for (let i = 0; i < 3; i++) { const s = document.createElement('span'); s.textContent = '★'; if (i < got) s.className = 'on'; els.endStars.append(s); }
+      els.endNote.textContent = got === 0 ? t.starGoal(goals[0]) : got < 3 ? t.nextGoal(goals[got]) : '';
+      const nextMap = MAPS[MAPS.indexOf(selectedMap) + 1];
+      els.next.hidden = !(nextMap && isUnlocked(nextMap));
+      announce(`${els.endTitle.textContent} ${els.endSub.textContent} ${got}/3 ★`);
+    }
+    els.hud.hidden = true; els.board.hidden = true; els.goal.hidden = true;
+    els.end.hidden = false;
+    els.again.focus({ preventScroll: true });
+  }
+
+  // ---------- Loop / pause ----------
+  function frame(time) {
+    rafId = 0;
+    if (!run || run.paused || run.over) return;
+    // Fixed physics step; a stalled frame is clamped so nothing teleports.
+    acc += Math.min(0.05, Math.max(0, (time - lastTime) / 1000));
+    lastTime = time;
+    while (acc >= STEP && !run.over) { update(STEP); acc -= STEP; }
+    if (run.over) return;
+    render();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function resume() {
+    if (!run || run.over) return;
+    run.paused = false;
+    els.paused.hidden = true;
+    lastTime = performance.now(); acc = 0;
+    if (!rafId) rafId = requestAnimationFrame(frame);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function pause() {
+    if (!run || run.over || run.paused) return;
+    run.paused = true;
+    cancelAnimationFrame(rafId); rafId = 0;
+    input.stick = null; input.keys.clear();
+    els.paused.hidden = false;
+    $('resume').focus({ preventScroll: true });
+    announce(t.paused);
+  }
+
+  function showMenu() {
+    if (run) { run.over = true; cancelAnimationFrame(rafId); rafId = 0; }
+    run = null;
+    els.hud.hidden = true; els.board.hidden = true; els.goal.hidden = true; els.end.hidden = true; els.paused.hidden = true; els.notice.hidden = true;
+    buildMaps();
+    previewMap();
+    els.menu.hidden = false;
+    $('play-battle').focus({ preventScroll: true });
+  }
+
+  function previewMap() {
+    newWorld(selectedMap);
+    cam.x = WORLD / 2; cam.y = WORLD / 2 + 120; cam.z = Math.min(1, Math.sqrt(view.w * view.h) / 900);
+    render();
+  }
+
+  function buildMaps() {
+    els.maps.replaceChildren(...MAPS.map(m => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'map'; b.setAttribute('role', 'radio');
+      const open = isUnlocked(m), s = Number(stars[m]) || 0;
+      b.setAttribute('aria-checked', String(m === selectedMap));
+      b.innerHTML = '<span class="ico" aria-hidden="true"></span><b></b><small aria-hidden="true"></small>';
+      b.children[0].textContent = MAP_ICON[m];
+      b.children[1].textContent = t.maps[m];
+      b.children[2].textContent = open ? '★★★'.slice(0, s) + '☆☆☆'.slice(0, 3 - s) : t.needStars(UNLOCK[m]);
+      b.setAttribute('aria-label', open ? t.mapLabel(t.maps[m], s) : t.mapLocked(t.maps[m], UNLOCK[m]));
+      if (!open) { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); }
+      b.addEventListener('click', () => {
+        if (!open || m === selectedMap) return;
+        selectedMap = m; save('map', m);
+        for (const el of els.maps.children) el.setAttribute('aria-checked', String(el === b));
+        previewMap();
+      });
+      return b;
+    }));
+    els.menuBest.textContent = t.bestLine(bestBattle, totalStars());
+  }
+
+  // ---------- Input ----------
+  canvas.addEventListener('pointerdown', event => {
+    if (!run || run.over || run.paused) return;
+    canvas.setPointerCapture(event.pointerId);
+    input.stick = { id: event.pointerId, ox: event.clientX, oy: event.clientY, x: event.clientX, y: event.clientY };
+  });
+  canvas.addEventListener('pointermove', event => {
+    const s = input.stick;
+    if (!s || s.id !== event.pointerId) return;
+    s.x = event.clientX; s.y = event.clientY;
+    // Drag the joystick origin along when the finger goes far past the rim, so reversing is instant.
+    const dx = s.x - s.ox, dy = s.y - s.oy, len = Math.hypot(dx, dy);
+    if (len > 70) { s.ox = s.x - dx / len * 70; s.oy = s.y - dy / len * 70; }
+  });
+  const endStick = event => { if (input.stick && input.stick.id === event.pointerId) input.stick = null; };
+  canvas.addEventListener('pointerup', endStick);
+  canvas.addEventListener('pointercancel', endStick);
+
+  const KEY_DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!run || run.over) return;
+    if (event.key === 'p' || event.key === 'P') { event.preventDefault(); run.paused ? resume() : pause(); return; }
+    const dir = KEY_DIRS[event.key];
+    if (!dir || run.paused) return;
+    event.preventDefault();
+    input.keys.add(dir);
+  });
+  document.addEventListener('keyup', event => { const dir = KEY_DIRS[event.key]; if (dir) input.keys.delete(dir); });
+  window.addEventListener('blur', () => { input.keys.clear(); input.stick = null; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  $('play-battle').addEventListener('click', () => startRound('battle'));
+  $('play-solo').addEventListener('click', () => startRound('solo'));
+  $('pause-btn').addEventListener('click', pause);
+  $('resume').addEventListener('click', resume);
+  $('quit').addEventListener('click', showMenu);
+  $('to-menu').addEventListener('click', showMenu);
+  els.again.addEventListener('click', () => startRound(run ? run.mode : 'battle'));
+  els.next.addEventListener('click', () => {
+    const nextMap = MAPS[MAPS.indexOf(selectedMap) + 1];
+    if (nextMap && isUnlocked(nextMap)) { selectedMap = nextMap; save('map', nextMap); }
+    startRound('solo');
+  });
+
+  function resize() {
+    view.w = innerWidth; view.h = innerHeight; view.dpr = Math.min(devicePixelRatio || 1, 2);
+    view.m = Math.max(view.w, view.h) / 2;
+    canvas.width = Math.round(view.w * view.dpr);
+    canvas.height = Math.round(view.h * view.dpr);
+    gradCache.clear();
+    if (!run || run.paused || run.over) render();
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // Read-only hook for automated tests.
+  window.__hungryHole = () => run && { mode: run.mode, time: run.time, over: run.over, paused: run.paused, pct: pctEaten(), map: world.map, objects: world.objects.filter(o => o.alive).length, holes: run.holes.map(h => ({ name: h.name, x: Math.round(h.x), y: Math.round(h.y), r: Math.round(h.r), score: h.score, alive: h.alive, player: h.isPlayer })), food: player.alive ? bestFood(player) : null };
+
+  showMenu();
+})();
+</script>
+</body>
+</html>
