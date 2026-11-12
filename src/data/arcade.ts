@@ -50,6 +50,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('reaction-test', 'Reaction Test', 'brain'),
 	// Board & card
 	game('solitaire', 'Solitaire', 'board'),
+	game('blackjack', 'Blackjack', 'board'),
 	game('tic-tac-toe', 'Tic-Tac-Toe', 'board'),
 	game('checkers', 'Checkers', 'board'),
 	game('four-in-a-row', 'Four in a Row', 'board'),
