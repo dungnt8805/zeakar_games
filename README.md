@@ -39,7 +39,7 @@ The target repository `dungnt8805/zeakar_games` currently uses **master** as its
 
 1. Put this project's **source files at the root of the existing repository** on `master`, including `.github/`, `src/`, `scripts/`, `public/`, `legacy/`, `docs/ui-review/*manifest.json`, `package.json`, `package-lock.json` and Astro/TypeScript configuration. Do not upload only the old deployment ZIP for this workflow: it contains compiled output, not the source required to build. Do not commit `node_modules/` or `dist/`.
 2. In the repository's **Settings → Pages → Build and deployment → Source**, select **GitHub Actions**.
-3. Retain **game.lamian.dev** under Custom domain and retain the existing DNS records. Keep Enforce HTTPS enabled once available. The Astro configuration uses this domain at the root; do not set a `/zeakar_games` base path.
+3. Set **lamian.dev** under Custom domain and point the Cloudflare apex CNAME to `dungnt8805.github.io`. Keep `game.lamian.dev` proxied and redirect it to the apex with the same path and query string. Keep Enforce HTTPS enabled once available. The Astro configuration uses this domain at the root; do not set a `/zeakar_games` base path.
 4. Push the source/workflow to `master`, or run the workflow manually. If an environment protection rule requests approval, approve the `github-pages` deployment in Actions.
 5. Check `/`, `/en/`, `/policies/`, the seven original app policy URLs below, and `/app-ads.txt` after the deployment succeeds.
 
@@ -60,7 +60,7 @@ Use a checkout with the playable assets available through Git LFS. Commit the re
 
 The site builds a static `/sitemap.xml` with the seven homepages and all localized game pages. Each game has an English URL at `/games/{game-id}/` and a localized URL at `/{locale}/games/{game-id}/`. The sitemap lists the canonical marketing pages. Legacy aliases and legal documents stay accessible at their existing URLs.
 
-1. In [Google Search Console](https://search.google.com/search-console), add the URL-prefix property `https://game.lamian.dev/` and select **HTML tag**.
+1. In [Google Search Console](https://search.google.com/search-console), add the URL-prefix property `https://lamian.dev/` and select **HTML tag**.
 2. Copy the value inside the tag's `content` attribute into the GitHub repository variable `GOOGLE_SITE_VERIFICATION` under **Settings → Secrets and variables → Actions → Variables**.
 3. Deploy the site, click **Verify** in Search Console, then submit `sitemap.xml` under **Sitemaps**. Keep the variable set for future builds.
 
@@ -106,3 +106,13 @@ Workflow references: [Astro on GitHub Pages](https://docs.astro.build/en/guides/
 ## Policy presentation
 
 `npm run build` builds Astro and applies the shared legal-document layout to the 20 original HTML policy/terms routes. Styling is added as marked, removable HTML wrappers; the source documents in `public/` and `legacy/` remain untouched. The build verifier removes only those presentation wrappers and checks the original payload against its preserved SHA-256 value. Translated policy pages use the same stylesheet, semantic section headings, desktop contents navigation and a collapsible mobile contents menu. Presentation changes preserve policy text, dates, contacts and app URLs. Owner-authorized content revisions are tracked separately in the manifest and policy revision notes.
+
+## Website analytics and domain migration (2026-11-12)
+
+GA4 web stream: **Lamian Website**, Measurement ID `G-VGWV9V79S8`, URL `https://lamian.dev`. The website property is separate from the Aster Strike app property (under the existing Aster Strike Analytics account). `src/components/Analytics.astro` and `src/lib/analytics.ts` load Google Analytics only after the visitor opts in. The Analytics button lets visitors decline later. Advertising consent is separate. Local previews do not send analytics.
+
+Pageviews and enhanced measurement use GA4. Custom events: `store_click` (`store`, `app_id`), `demo_open` (`game_id`), `game_fullscreen` (`game_id`), and `game_frame_load` (`game_id`); each includes `site_language`. Frame load is a browser load event, not proof of successful game initialization or active gameplay. Store clicks are not app installs. Legacy app privacy payloads and standalone game iframe assets do not have GA4 injected.
+
+Cloudflare redirect specification: match `(http.host eq "game.lamian.dev")`, redirect dynamically to `concat("https://lamian.dev", http.request.uri.path)`, status **301**, **Preserve query string** enabled. This preserves old app policy URLs through redirects. Do not redirect unrelated subdomains.
+
+Previous apex CNAME: `ec2-47-129-174-142.ap-southeast-1.compute.amazonaws.com` (proxied). Previous GitHub Pages custom domain: `game.lamian.dev`. Keep these values for rollback. Historical manifests still record the original game domain and published app policy URLs.

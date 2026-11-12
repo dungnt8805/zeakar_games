@@ -47,7 +47,7 @@ for (const asset of mediaManifest.assets) {
 for (const route of ['index.html', 'en/index.html', 'policies/index.html', 'en/policies/index.html']) await access(resolve(root, 'dist', route));
 await access(resolve(root, 'dist/.nojekyll'));
 for (const id of Object.keys(JSON.parse(await read('src/i18n/messages.json')).en.arcade.games)) await access(resolve(root, 'dist/playable', id, 'index.html'));
-assert.equal((await read('dist/CNAME')).toString().trim(), 'game.lamian.dev');
+assert.equal((await read('dist/CNAME')).toString().trim(), 'lamian.dev');
 const messages = JSON.parse(await read('src/i18n/messages.json'));
 const translatedPolicies = JSON.parse(await read('src/data/privacy-translations.json'));
 const locales = ['en', 'vi', 'zh', 'fr', 'th', 'ja', 'ko'];

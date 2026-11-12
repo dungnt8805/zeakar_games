@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://game.lamian.dev',
+  site: 'https://lamian.dev',
   i18n: {
     defaultLocale: 'en',
     locales: ['en', 'vi', 'zh', 'fr', 'th', 'ja', 'ko'],
