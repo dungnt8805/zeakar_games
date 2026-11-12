@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { GAMES } from '../data/games';
 import { ARCADE_GAMES } from '../data/arcade';
+import PRIVACY from '../data/privacy-translations.json';
 import { LOCALES, localizedArcadePath, localizedGamePath, localizedPath } from '../i18n/ui';
 
 export const GET: APIRoute = ({ site }) => {
@@ -8,6 +9,9 @@ export const GET: APIRoute = ({ site }) => {
     localizedPath(lang),
     localizedArcadePath(lang),
     ...ARCADE_GAMES.map(game => localizedArcadePath(lang, game.id)),
+    localizedPath(lang, '/play/privacy/'),
+    localizedPath(lang, '/policies/'),
+    ...Object.keys(PRIVACY).map(id => localizedPath(lang, `/policies/${id}/`)),
     ...GAMES.map(game => localizedGamePath(lang, game.id)),
   ]);
   const entries = paths.map(path => `  <url><loc>${new URL(path, site).href}</loc></url>`);

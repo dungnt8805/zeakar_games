@@ -3,21 +3,33 @@ import Layout from '../layouts/Layout.astro';
 import Navbar from './Navbar.astro';
 import Footer from './Footer.astro';
 import ArcadeCard from './ArcadeCard.astro';
+import AdSlot from './AdSlot.astro';
+import { hasAd } from '../data/ads';
 import { ARCADE_CATEGORIES, ARCADE_GAMES } from '../data/arcade';
-import { UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+import { HTML_LANG, localizedArcadePath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+import { metaDescription } from '../lib/seo';
 
 interface Props { lang: Locale; }
 const { lang } = Astro.props;
 const a = UI_TRANSLATIONS[lang].arcade;
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: a.metaTitle,
+  description: a.description,
+  url: new URL(localizedArcadePath(lang), Astro.site).href,
+  inLanguage: HTML_LANG[lang],
+  mainEntity: {
+    '@type': 'ItemList',
+    numberOfItems: ARCADE_GAMES.length,
+    itemListElement: ARCADE_GAMES.map((game, index) => ({ '@type': 'ListItem', position: index + 1, name: game.title, url: new URL(localizedArcadePath(lang, game.id), Astro.site).href })),
+  },
+};
 const sections = ARCADE_CATEGORIES.map(category => ({ category, games: ARCADE_GAMES.filter(game => game.category === category) }));
 ---
 
-<Layout lang={lang} title={`${a.metaTitle} | Milaan Games`} description={a.description}>
-  <Fragment slot="head">
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content={`${a.metaTitle} | Milaan Games`} />
-    <meta property="og:description" content={a.description} />
-  </Fragment>
+<Layout lang={lang} title={`${a.metaTitle} | Milaan Games`} description={metaDescription(`${a.description} ${Object.values(a.categories).join(', ')}.`)} image="/media/arcade/tower-stack.jpg" ads={hasAd('arcadeIndex')}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   <Navbar lang={lang} />
 
   <main id="main-content" tabindex="-1" class="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16">
@@ -31,15 +43,19 @@ const sections = ARCADE_CATEGORIES.map(category => ({ category, games: ARCADE_GA
       {sections.map(({ category, games }) => <a href={`#${category}`}>{a.categories[category]} <span>{games.length}</span></a>)}
     </nav>
 
-    {sections.map(({ category, games }) => (
-      <section id={category} class="mt-12" aria-labelledby={`${category}-title`}>
-        <h2 id={`${category}-title`} class="arcade-section-title">{a.categories[category]}</h2>
-        <ul class="arcade-grid mt-6" role="list">
-          {games.map(game => <ArcadeCard lang={lang} game={game} heading="h3" />)}
-        </ul>
-      </section>
+    {sections.map(({ category, games }, index) => (
+      <>
+        <section id={category} class="mt-12" aria-labelledby={`${category}-title`}>
+          <h2 id={`${category}-title`} class="arcade-section-title">{a.categories[category]}</h2>
+          <ul class="arcade-grid mt-6" role="list">
+            {games.map(game => <ArcadeCard lang={lang} game={game} heading="h3" />)}
+          </ul>
+        </section>
+        {/* Two units in the catalogue: after the first section and after the middle one. */}
+        {(index === 0 || index === 3) && <AdSlot lang={lang} placement="arcadeIndex" class="mt-12" />}
+      </>
     ))}
-    <p class="mt-10 text-xs text-slate-400">{a.tip}</p>
+    <p class="mt-10 text-xs text-slate-400">{a.tip} · <a href={localizedArcadePath(lang, 'privacy')} class="underline underline-offset-4 hover:text-amber-400">{UI_TRANSLATIONS[lang].footer.privacy}</a></p>
   </main>
 
   <Footer lang={lang} />

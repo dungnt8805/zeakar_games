@@ -8,7 +8,7 @@ export function preparePolicyHtml(html) {
     return `<h2 id="${id}">${title}</h2>`;
   };
   const content = html.replace(/<p>\s*<strong>([^<]+)<\/strong>\s*<\/p>|<strong>([^<]+)<\/strong>/g, (match, block, inline) => heading(match, block ?? inline));
-  return { html: content, sections };
+  return { html: content.replace(/<(\/?)h1\b/g, '<$1h2'), sections };
 }
 
 export function stripLegacyPresentation(html) {

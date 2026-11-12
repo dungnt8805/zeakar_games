@@ -6,30 +6,73 @@ import AsterPlayable from './AsterPlayable.astro';
 import { StoreButtons } from './StoreButtons';
 import type { Game } from '../data/games';
 import { ARCADE_GAMES } from '../data/arcade';
-import { localizedArcadePath, localizedPath, localizedPolicyPath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+import { HTML_LANG, localizedArcadePath, localizedGamePath, localizedPath, localizedPolicyPath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+import { metaDescription, withBrand } from '../lib/seo';
 
 interface Props { lang: Locale; game: Game; }
 const { lang, game } = Astro.props;
 const t = UI_TRANSLATIONS[lang];
-const title = `${game.title} | Milaan Games`;
+const title = withBrand(t.page.gameTitle.replace('{game}', game.title));
+// Short store blurbs get the tagline and first features so every locale has a useful snippet.
+const blurb = [game.description, game.tagline !== game.description ? game.tagline : '', ...game.features.slice(0, 2), t.page.freeOnPlay]
+  .filter(Boolean)
+  .reduce((text, part) => {
+    if (text.length >= 140) return text;
+    const cjk = lang === 'zh' || lang === 'ja';
+    const ended = /[.!?。！？]$/.test(text);
+    return `${text}${cjk ? (ended ? '' : '。') : lang === 'th' ? ' ' : ended ? ' ' : '. '}${part}`;
+  });
+const description = metaDescription(blurb);
+const pageUrl = new URL(localizedGamePath(lang, game.id), Astro.site).href;
+const absolute = (path: string) => new URL(path, Astro.site).href;
+const structuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'MobileApplication',
+    name: game.title,
+    description: game.description,
+    url: pageUrl,
+    installUrl: game.googlePlayUrl,
+    sameAs: game.googlePlayUrl,
+    image: absolute(game.icon),
+    screenshot: game.screenshots.slice(0, 5).map(absolute),
+    operatingSystem: 'ANDROID',
+    applicationCategory: 'GameApplication',
+    genre: game.categoryLabel,
+    contentRating: game.ageRating,
+    inLanguage: HTML_LANG[lang],
+    offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
+    publisher: { '@type': 'Organization', name: 'Milaan Games', url: absolute('/') },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Milaan Games', item: absolute(localizedPath(lang)) },
+      { '@type': 'ListItem', position: 2, name: t.nav.games, item: `${absolute(localizedPath(lang))}#games` },
+      { '@type': 'ListItem', position: 3, name: game.title, item: pageUrl },
+    ],
+  },
+];
 const screenshots = [...new Set([game.banner, ...game.screenshots])];
 // Aster Strike has its own inline player below; other games link to their arcade version.
 const miniGame = game.id === 'aster-strike' ? undefined : ARCADE_GAMES.find(entry => entry.gameId === game.id);
 ---
 
-<Layout lang={lang} title={title} description={game.description}>
-  <Fragment slot="head">
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={game.description} />
-    <meta property="og:image" content={new URL(game.banner, Astro.site).href} />
-  </Fragment>
+<Layout lang={lang} title={title} description={description} image={game.banner}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   <Navbar lang={lang} />
 
   <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl space-y-10 px-5 py-10 sm:px-8 sm:py-14">
-    <a href={`${localizedPath(lang)}#games`} class="inline-flex items-center gap-2 text-sm font-semibold text-amber-400 hover:underline">
-      <span aria-hidden="true">←</span> {t.nav.games}
-    </a>
+    <nav aria-label="Breadcrumb">
+      <ol class="flex flex-wrap gap-2 text-xs text-slate-400">
+        <li><a href={localizedPath(lang)} class="hover:text-amber-400">{t.page.home}</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href={`${localizedPath(lang)}#games`} class="hover:text-amber-400">{t.nav.games}</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page" class="text-slate-200">{game.title}</li>
+      </ol>
+    </nav>
 
     <header class="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-8">
       <div class="flex flex-wrap items-center gap-4 sm:gap-6">

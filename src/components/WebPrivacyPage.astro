@@ -1,0 +1,57 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from './Navbar.astro';
+import Footer from './Footer.astro';
+import POLICY from '../i18n/web-privacy.json';
+import { localizedArcadePath, localizedPath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+import { metaDescription, withBrand } from '../lib/seo';
+
+interface Props { lang: Locale; }
+const { lang } = Astro.props;
+type Policy = { title: string; description: string; sections: { h: string; p: string[] }[] };
+const policy = ((POLICY as unknown as Record<string, Policy>)[lang] ?? POLICY.en) as Policy;
+const t = UI_TRANSLATIONS[lang];
+const date = new Intl.DateTimeFormat(lang, { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${POLICY.effective}T00:00:00Z`));
+
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// Paragraphs carry markdown-style [text](url) links; site paths are localized, outside links open in a new tab.
+const render = (text: string) => escape(text).replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) => {
+  if (url.startsWith('/')) return `<a href="${localizedPath(lang, url)}">${label}</a>`;
+  const external = /^https?:/.test(url) ? ' target="_blank" rel="noopener noreferrer"' : '';
+  return `<a href="${url}"${external}>${label}</a>`;
+});
+---
+
+<Layout lang={lang} title={withBrand(policy.title)} description={metaDescription(policy.description)} type="article">
+  <Navbar lang={lang} />
+  <main id="main-content" tabindex="-1" class="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
+    <nav aria-label="Breadcrumb">
+      <ol class="flex flex-wrap gap-2 text-xs text-slate-400">
+        <li><a href={localizedPath(lang)} class="hover:text-amber-400">{t.page.home}</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href={localizedArcadePath(lang)} class="hover:text-amber-400">{t.nav.arcade}</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page" class="text-slate-200">{policy.title}</li>
+      </ol>
+    </nav>
+    <header class="mt-8">
+      <span class="section-kicker">MILAAN GAMES</span>
+      <h1 class="section-title">{policy.title}</h1>
+      <p class="mt-3 text-sm text-slate-400">{t.policy.effective} <time datetime={POLICY.effective}>{date}</time></p>
+    </header>
+    <article class="policy-content mt-8">
+      {policy.sections.map(section => (
+        <section>
+          <h2>{section.h}</h2>
+          {section.p.map(paragraph => <p set:html={render(paragraph)} />)}
+        </section>
+      ))}
+    </article>
+    <p class="mt-10 border-t border-slate-800 pt-6 text-sm"><a href={localizedPath(lang, '/policies/')} class="text-amber-400 hover:underline">{t.policy.title} →</a></p>
+  </main>
+  <Footer lang={lang} />
+</Layout>
+
+<style>
+  .policy-content h2 { margin-top: 32px; font: 700 20px/1.35 var(--font-display); }
+</style>

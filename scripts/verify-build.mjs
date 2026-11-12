@@ -57,11 +57,12 @@ const localizedRoute = (locale, route) => `${locale === 'en' ? '' : `/${locale}`
 const gameRoutes = Object.keys(appPolicies).map(id => `/games/${id}/`);
 const arcadeIds = Object.keys(JSON.parse(await read('src/i18n/messages.json')).en.arcade.games);
 const arcadeRoutes = arcadeIds.map(id => `/play/${id}/`);
-const searchRoutes = ['/', '/play/', ...arcadeRoutes, ...gameRoutes];
+const policyRoutes = ['/policies/', ...Object.keys(appPolicies).map(id => `/policies/${id}/`)];
+const searchRoutes = ['/', '/play/', '/play/privacy/', ...arcadeRoutes, ...gameRoutes, ...policyRoutes];
 const sitemap = (await read('dist/sitemap.xml')).toString();
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
 const expectedUrls = locales.flatMap(locale => searchRoutes.map(route => site + localizedRoute(locale, route)));
-assert.deepEqual(sitemapUrls.sort(), expectedUrls.sort(), 'Sitemap must list each canonical homepage and game page once');
+assert.deepEqual(sitemapUrls.sort(), expectedUrls.sort(), 'Sitemap must list every canonical page once');
 assert((await read('dist/robots.txt')).toString().includes(`Sitemap: ${site}/sitemap.xml`), 'Missing robots.txt sitemap URL');
 
 function verifySeo(html, locale, route) {

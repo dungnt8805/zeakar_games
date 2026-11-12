@@ -9,18 +9,50 @@ import Footer from '../components/Footer.astro';
 import { getGames } from '../data/games';
 
 import type { Locale } from '../i18n/ui';
-import { UI_TRANSLATIONS } from '../i18n/ui';
+import { HTML_LANG, localizedArcadePath, localizedGamePath, localizedPath, UI_TRANSLATIONS } from '../i18n/ui';
+import { metaDescription } from '../lib/seo';
 interface Props { lang: Locale; }
 const { lang } = Astro.props;
 const games = getGames(lang);
 const t = UI_TRANSLATIONS[lang];
+const absolute = (path: string) => new URL(path, Astro.site).href;
+const structuredData = [
+	{
+		'@context': 'https://schema.org',
+		'@type': 'Organization',
+		'@id': `${absolute('/')}#organization`,
+		name: 'Milaan Games',
+		alternateName: ['Milaan', 'Lamian Games', 'Lamian Studio'],
+		url: absolute('/'),
+		logo: absolute('/favicon.svg'),
+		email: 'support@lamianstudio.com',
+		sameAs: ['https://play.google.com/store/apps/developer?id=Milaan'],
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'WebSite',
+		name: 'Milaan Games',
+		url: absolute(localizedPath(lang)),
+		inLanguage: HTML_LANG[lang],
+		publisher: { '@id': `${absolute('/')}#organization` },
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'ItemList',
+		itemListElement: [
+			...games.map((game, index) => ({ '@type': 'ListItem', position: index + 1, name: game.title, url: absolute(localizedGamePath(lang, game.id)) })),
+			{ '@type': 'ListItem', position: games.length + 1, name: t.nav.arcade, url: absolute(localizedArcadePath(lang)) },
+		],
+	},
+];
 ---
 
 <Layout
 	lang={lang}
 	title={`Milaan Games | ${t.nav.games}`}
-	description={t.footer.desc}
+	description={metaDescription(t.footer.desc.length < 120 ? `${t.footer.desc} ${t.page.description}` : t.footer.desc)}
 >
+	<script slot="head" type="application/ld+json" set:html={JSON.stringify(structuredData)} />
 	<Navbar lang={lang} />
 
 	<main id="main-content" tabindex="-1" class="relative z-10 space-y-14 sm:space-y-20">
