@@ -75,6 +75,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	// Arcade
 	game('crowd-rush', 'Crowd Rush', 'arcade'),
 	game('hungry-hole', 'Hungry Hole', 'arcade'),
+	game('territory-war', 'Territory War', 'arcade'),
 	game('fruit-slice', 'Fruit Slice', 'arcade'),
 	game('bubble-shooter', 'Bubble Shooter', 'arcade'),
 	game('snake', 'Snake', 'arcade'),
@@ -89,6 +90,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('blob-arena', 'Blob Arena', 'arcade'),
 	{ id: 'aster-strike', title: 'Aster Strike', category: 'arcade', gameId: 'aster-strike', languages: ['en', 'vi'], sandbox: 'allow-scripts allow-popups allow-popups-to-escape-sandbox', portraitOnly: false },
 	// Sports
+	game('billiards', 'Billiards', 'sports'),
 	game('hoop-shot', 'Hoop Shot', 'sports'),
 	game('penalty-kick', 'Penalty Kick', 'sports'),
 	game('mini-golf', 'Mini Golf', 'sports'),

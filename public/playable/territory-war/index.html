@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Territory War</title>
+<style>
+:root {
+  --ink: #1b2742;
+  --muted: #64708b;
+  --accent: #2f7cf6;
+  --accent-dark: #1a55c4;
+  --red: #ef4444;
+  --red-dark: #b42424;
+  --gold: #ffc53d;
+  --gold-dark: #d29600;
+  --green: #1fae5b;
+  --green-dark: #138442;
+  --hud: #0f2647d9;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: #2386c2; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+canvas:focus-visible { outline: none; }
+.safe { position: fixed; inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); visibility: hidden; pointer-events: none; }
+
+.hud { position: fixed; top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); height: 38px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.hud.off { visibility: hidden; }
+.chip { height: 38px; display: flex; align-items: center; padding: 0 12px; border-radius: 13px; background: var(--hud); color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 12px #0a1a3540; }
+.chip.label { max-width: 34%; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 38px; }
+.clock { font-variant-numeric: tabular-nums; min-width: 62px; justify-content: center; }
+.icon-btn { flex: none; width: 38px; height: 38px; border-radius: 13px; background: var(--hud); display: grid; place-items: center; pointer-events: auto; box-shadow: 0 4px 12px #0a1a3540; }
+.icon-btn svg { width: 14px; height: 14px; fill: #fff; }
+.bar { flex: 1; min-width: 40px; height: 14px; display: flex; border-radius: 99px; overflow: hidden; background: #0f2647; box-shadow: 0 0 0 3px var(--hud), 0 4px 12px #0a1a3540; }
+.bar span { flex: 0 0 0; min-width: 0; transition: flex-grow .35s; }
+.bar span + span { box-shadow: inset 1px 0 #ffffff80; }
+
+.toast { position: fixed; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 50px); transform: translateX(-50%); max-width: calc(100% - 24px); padding: 7px 16px; border-radius: 99px; background: var(--hud); color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; }
+.toast.show { animation: toast 1.8s ease-out both; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px); } }
+.notice { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(calc(100% - 32px), 360px); padding: 14px 18px 16px; border-radius: 20px; background: #0f2647e6; color: #fff; text-align: center; pointer-events: none; box-shadow: 0 16px 40px #0a1a3566; animation: rise .3s ease-out; }
+.notice[hidden] { display: none; }
+.notice strong { display: block; font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+.notice span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.4; color: #cfe0ff; }
+.notice em { display: block; margin-top: 6px; font-style: normal; font-size: 14px; font-weight: 800; color: var(--gold); }
+.notice em:empty { display: none; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: #0b1f3d59; overflow: hidden; }
+.overlay[hidden] { display: none; }
+.panel { position: relative; width: min(100%, 380px); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: 20px 18px 18px; border-radius: 26px; background: #fff; text-align: center; box-shadow: 0 24px 60px #0b1f3d66; animation: rise .3s ease-out; }
+.panel.wide { width: min(100%, 460px); }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.logo { display: block; width: 120px; height: 64px; margin: 0 auto 4px; }
+.panel h1 { font-size: clamp(30px, 9.5vw, 40px); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; }
+.panel h1 span { color: var(--accent); }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.panel h3 { margin: 14px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.wallet { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 5px; padding: 4px 10px 4px 6px; border-radius: 99px; background: #fff6dc; font-weight: 900; font-size: 14px; color: #6b4b00; font-variant-numeric: tabular-nums; }
+.wallet.inline { position: static; display: inline-flex; margin-top: 8px; }
+.coin { flex: none; display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff1b0, #ffc53d 55%, #e3a400); box-shadow: inset 0 0 0 2px #d29600; vertical-align: -3px; }
+
+.play { width: 100%; margin-top: 16px; padding: 13px 10px 12px; border-radius: 18px; background: var(--accent); color: #fff; box-shadow: 0 5px 0 var(--accent-dark); display: grid; gap: 1px; }
+.play b { font-size: 22px; font-weight: 900; }
+.play small { font-size: 13px; font-weight: 700; opacity: .92; }
+.modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+.mode { padding: 10px 6px 9px; border-radius: 16px; display: grid; gap: 1px; min-width: 0; background: #eef3fb; box-shadow: 0 4px 0 #d3dceb; }
+.mode b { font-size: 16px; font-weight: 900; overflow-wrap: anywhere; }
+.mode small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.mode .ico { font-size: 20px; line-height: 1.2; }
+.play:active, .mode:active, .btn:active, .lvl:active { transform: translateY(3px); box-shadow: none; }
+.help { margin-top: 12px !important; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 7px; margin-top: 12px; }
+.lvl { position: relative; padding: 7px 2px 5px; border-radius: 13px; background: #eaf1ff; box-shadow: 0 3px 0 #c9d8f5; display: grid; gap: 1px; min-width: 0; }
+.lvl b { font-size: 18px; font-weight: 900; color: var(--accent-dark); line-height: 1.1; }
+.lvl small { font-size: 11px; letter-spacing: 1px; color: #c4cada; white-space: nowrap; }
+.lvl small i { font-style: normal; color: var(--gold-dark); }
+.lvl.current { background: var(--accent); box-shadow: 0 3px 0 var(--accent-dark); }
+.lvl.current b { color: #fff; }
+.lvl.current small { color: #ffffff88; }
+.lvl.locked { background: #f1f3f7; box-shadow: 0 3px 0 #dfe3ea; cursor: not-allowed; }
+.lvl.locked b { color: #b4bccb; }
+
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #eef2f9; }
+.seg button { flex: 1; min-width: 0; min-height: 36px; padding: 7px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); overflow-wrap: anywhere; }
+.seg button[aria-checked="true"] { background: var(--accent); color: #fff; box-shadow: 0 2px 6px #2f7cf655; }
+.seg.dots button[aria-checked="true"] { background: var(--red); box-shadow: 0 2px 6px #ef444455; }
+
+.ups { display: grid; gap: 8px; margin-top: 14px; }
+.up { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: 16px; background: #f3f6fb; text-align: left; }
+.up .ico { font-size: 26px; line-height: 1; text-align: center; }
+.up b { display: block; font-size: 15px; font-weight: 900; }
+.up small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.pips { display: flex; gap: 3px; margin-top: 4px; }
+.pips i { width: 14px; height: 6px; border-radius: 3px; background: #d6deeb; }
+.pips i.on { background: var(--green); }
+.buy { display: flex; align-items: center; gap: 5px; min-height: 38px; padding: 8px 12px; border-radius: 12px; background: var(--green); color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 var(--green-dark); white-space: nowrap; }
+.buy:disabled { background: #cfd6e2; box-shadow: 0 3px 0 #b8c1d1; cursor: not-allowed; color: #fff; }
+.buy:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+
+.emblem { font-size: 46px; line-height: 1.1; }
+.stars { margin-top: 6px; font-size: 40px; letter-spacing: 6px; line-height: 1.1; color: #dbe0ea; }
+.stars[hidden] { display: none; }
+.stars .on { color: var(--gold); text-shadow: 0 2px 0 var(--gold-dark); }
+.earn { display: inline-flex !important; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px; background: #fff6dc; color: #6b4b00 !important; font-weight: 900; font-size: 15px !important; }
+.earn[hidden] { display: none !important; }
+.badge { display: inline-block; margin: 8px 4px 0 !important; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #3a2a00 !important; font-weight: 800; font-size: 13px !important; }
+.badge[hidden] { display: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.btn { flex: 1 1 110px; min-height: 44px; padding: 12px 10px; border-radius: 14px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 var(--accent-dark); }
+.btn.alt { background: var(--gold); color: #3a2a00; box-shadow: 0 4px 0 var(--gold-dark); }
+.btn.ghost { background: #eef2f9; color: var(--ink); box-shadow: 0 4px 0 #d3dceb; }
+.btn[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-height: 640px) { .logo { display: none; } .panel { padding-top: 16px; } }
+@media (max-width: 360px) { .wallet:not(.inline) { position: static; display: inline-flex; margin-bottom: 6px; } .up { grid-template-columns: 1fr auto; } .up .ico { display: none; } }
+@media (max-height: 540px) and (max-aspect-ratio: 4/3) { .help { display: none; } }
+@media (max-height: 480px) {
+  .hud { top: max(6px, env(safe-area-inset-top)); height: 32px; }
+  .chip, .icon-btn { height: 32px; font-size: 14px; }
+  .chip.label { line-height: 32px; }
+  .icon-btn { width: 32px; }
+  .toast { top: calc(max(6px, env(safe-area-inset-top)) + 40px); font-size: 14px; padding: 5px 14px; }
+  .notice { padding: 8px 14px 10px; width: min(calc(100% - 32px), 420px); }
+  .notice strong { font-size: 19px; }
+  .notice span { font-size: 14px; }
+}
+@media (max-height: 480px) and (min-aspect-ratio: 4/3) {
+  .panel { width: min(100%, 560px); }
+  .panel.wide { width: min(100%, 680px); }
+  .modes { grid-template-columns: repeat(4, 1fr); }
+  .ups { grid-template-columns: repeat(3, 1fr); }
+  .up { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 4px; padding: 8px; }
+  .up .ico { display: none; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); }
+}
+@media (max-height: 420px) {
+  .panel { padding: 12px 14px; border-radius: 20px; }
+  .panel h1 { font-size: 26px; }
+  .panel h2 { font-size: 21px; }
+  .panel p { margin-top: 4px; font-size: 13px; }
+  .panel h3 { margin: 8px 0 4px; }
+  .wallet { top: 8px; right: 8px; }
+  .play { margin-top: 8px; padding: 8px 10px 7px; }
+  .play b { font-size: 18px; }
+  .modes { margin-top: 10px; gap: 8px; }
+  .mode { padding: 6px 4px 5px; }
+  .mode .ico { display: none; }
+  .help { display: none; }
+  .emblem { font-size: 30px; }
+  .stars { font-size: 28px; margin-top: 0; }
+  .actions { margin-top: 10px; }
+  .btn { min-height: 38px; padding: 8px 10px; font-size: 15px; }
+  .grid { gap: 5px; margin-top: 8px; }
+  .lvl { padding: 4px 2px 3px; }
+  .lvl b { font-size: 16px; }
+  .ups { margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .toast.show { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" role="application"></canvas>
+<div class="safe" id="safe" aria-hidden="true"></div>
+
+<div class="hud off" id="hud">
+  <button type="button" class="icon-btn" id="pause-btn" data-i18n-label="pause"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" rx="1.2"/><rect x="8.4" y="1" width="3.6" height="12" rx="1.2"/></svg></button>
+  <div class="chip label" id="hud-label"></div>
+  <div class="bar" id="bar" aria-hidden="true"></div>
+  <div class="chip clock" id="clock">0:00</div>
+</div>
+<div class="toast" id="toast" aria-hidden="true"></div>
+<div class="notice" id="notice" hidden><strong id="notice-title"></strong><span id="notice-text"></span><em id="notice-goal"></em></div>
+
+<div class="overlay" id="menu">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="wallet" id="menu-wallet"><span class="coin" aria-hidden="true"></span><span class="num"></span></div>
+    <svg class="logo" viewBox="0 0 120 64" aria-hidden="true">
+      <path d="M8 40 Q6 22 24 17 Q38 8 54 15 L60 39 Q44 54 26 52 Q10 50 8 40Z" fill="#8ab8ff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M54 15 Q72 5 92 12 Q112 19 110 35 L60 39Z" fill="#ff9e94" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M60 39 L110 35 Q110 52 90 57 Q70 61 60 39Z" fill="#ffd866" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="31" cy="35" r="9" fill="#2f7cf6" stroke="#fff" stroke-width="2.5"/>
+      <circle cx="86" cy="24" r="8" fill="#ef4444" stroke="#fff" stroke-width="2.5"/>
+      <circle cx="87" cy="47" r="7" fill="#f2b705" stroke="#fff" stroke-width="2.5"/>
+      <path d="M31 33 V8" stroke="#1b2742" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M32 8 H46 L42 13 L46 18 H32Z" fill="#2f7cf6" stroke="#1b2742" stroke-width="1.6" stroke-linejoin="round"/>
+      <circle cx="44" cy="35" r="2.6" fill="#2f7cf6"/><circle cx="52" cy="33" r="2.6" fill="#2f7cf6"/><circle cx="60" cy="31" r="2.6" fill="#2f7cf6"/><circle cx="68" cy="29" r="2.6" fill="#2f7cf6"/>
+    </svg>
+    <h1 id="menu-title">Territory <span>War</span></h1>
+    <p data-i18n="tagline"></p>
+    <button type="button" class="play" id="play"><b data-i18n="play"></b><small id="play-info"></small></button>
+    <div class="modes">
+      <button type="button" class="mode" id="go-levels"><span class="ico" aria-hidden="true">🗺️</span><b data-i18n="levels"></b><small id="levels-info"></small></button>
+      <button type="button" class="mode" id="go-skirmish"><span class="ico" aria-hidden="true">⚔️</span><b data-i18n="skirmish"></b><small data-i18n="skirmishInfo"></small></button>
+      <button type="button" class="mode" id="go-daily"><span class="ico" aria-hidden="true">📅</span><b data-i18n="daily"></b><small id="daily-info"></small></button>
+      <button type="button" class="mode" id="go-shop"><span class="ico" aria-hidden="true">🛡️</span><b data-i18n="upgrades"></b><small data-i18n="upgradesInfo"></small></button>
+    </div>
+    <p class="small help" data-i18n="help"></p>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="levelsTitle"></h2>
+    <p class="small" id="levels-sub"></p>
+    <div class="grid" id="level-grid"></div>
+    <div class="actions"><button type="button" class="btn ghost" data-back data-i18n="back"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="skirmish" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="skirmish-title">
+    <h2 id="skirmish-title" data-i18n="skirmish"></h2>
+    <h3 id="size-h" data-i18n="mapSize"></h3>
+    <div class="seg" id="seg-size" role="radiogroup" aria-labelledby="size-h"></div>
+    <h3 id="rivals-h" data-i18n="rivals"></h3>
+    <div class="seg dots" id="seg-rivals" role="radiogroup" aria-labelledby="rivals-h"></div>
+    <h3 id="diff-h" data-i18n="difficulty"></h3>
+    <div class="seg" id="seg-diff" role="radiogroup" aria-labelledby="diff-h"></div>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-back data-i18n="back"></button>
+      <button type="button" class="btn" id="start-skirmish" data-i18n="start"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="shop" hidden>
+  <div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+    <h2 id="shop-title" data-i18n="shopTitle"></h2>
+    <div class="wallet inline" id="shop-wallet"><span class="coin" aria-hidden="true"></span><span class="num"></span></div>
+    <div class="ups" id="ups"></div>
+    <p class="small" data-i18n="shopNote"></p>
+    <div class="actions"><button type="button" class="btn ghost" data-back data-i18n="back"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <div class="actions">
+      <button type="button" class="btn" id="resume" data-i18n="resume"></button>
+      <button type="button" class="btn alt" id="restart" data-i18n="restart"></button>
+      <button type="button" class="btn ghost" id="quit" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="emblem" id="result-emblem" aria-hidden="true"></div>
+    <h2 id="result-title"></h2>
+    <div class="stars" id="result-stars" aria-hidden="true"></div>
+    <p id="result-sub"></p>
+    <p class="small" id="result-note"></p>
+    <p class="earn" id="result-coins"><span class="coin" aria-hidden="true"></span><span></span></p>
+    <p class="badge" id="result-best" data-i18n="newBest" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn" id="result-next" data-i18n="next"></button>
+      <button type="button" class="btn alt" id="result-retry"></button>
+      <button type="button" class="btn ghost" id="result-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Send your troops, capture every region and paint the map blue!', play: 'Play', playInfo: l => `Campaign · Level ${l}`, levels: 'Levels', levelsInfo: s => `${s}★ earned`,
+      skirmish: 'Skirmish', skirmishInfo: '1–5 rivals, your rules', daily: 'Daily map', dailyInfo: b => b ? `Today’s best ${b}` : 'A new map every day', upgrades: 'Upgrades', upgradesInfo: 'Boost your army',
+      help: 'Drag from your blue regions to any other region to attack. Keyboard: arrows to move, Space to select, Enter to send.',
+      coins: n => `${n} coins`, back: 'Back', levelsTitle: 'Campaign', levelsSub: (s, m) => `${s} of ${m} stars`, levelLabel: (n, s) => `Level ${n}, ${s} of 3 stars`, levelLocked: n => `Level ${n}, locked`,
+      mapSize: 'Map size', sizes: ['Small', 'Medium', 'Large'], rivals: 'Rivals', difficulty: 'Difficulty', diffs: ['Easy', 'Normal', 'Hard'], start: 'Start battle',
+      shopTitle: 'Upgrades', shopNote: 'Win battles to earn coins. Upgrades work in every mode.',
+      upStart: 'Starting troops', upStartInfo: n => `+${n} troops in your first region`, upGrowth: 'Growth speed', upGrowthInfo: n => `+${n}% troop growth`, upMarch: 'March speed', upMarchInfo: n => `+${n}% marching speed`,
+      max: 'Max', buyLabel: (name, c) => `Upgrade ${name} for ${c} coins`, bought: name => `${name} upgraded`,
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Menu',
+      hudLevel: n => `Level ${n}`, hudSkirmish: 'Skirmish', hudDaily: 'Daily map',
+      win: 'Victory!', lose: 'Defeated', winSub: tm => `Map conquered in ${tm}`, loseSub: 'Your last region has fallen.', coinsEarned: n => `+${n} coins`,
+      next: 'Next level', retry: 'Try again', playAgain: 'Play again', newBest: 'New best time!', starGoal: tm => `★★★ for a win under ${tm}`,
+      intro: n => n === 1 ? '1 rival — conquer every region!' : `${n} rivals — conquer every region!`,
+      factions: ['Blue', 'Red', 'Gold', 'Green', 'Purple', 'Orange'], you: 'You', neutral: 'Neutral', out: name => `${name} is out!`,
+      tipFirst: 'Drag from your blue region to a grey one.', tipTower: 'Towers shoot troops that march past.', tipSpeed: 'Speed bases send faster troops.', tipCapital: 'Capitals grow twice as fast.',
+      kinds: { tower: 'tower', speed: 'speed base', capital: 'capital' }, baseDesc: (o, n, k) => `${o}, ${n} troops${k ? ', ' + k : ''}`, selectedWord: 'selected', sent: n => `${n} troops sent`,
+      canvasLabel: 'Territory map. Arrow keys move between regions, Space selects yours, Enter sends troops.', locked: 'Locked',
+    },
+    vi: {
+      tagline: 'Xuất quân, chiếm từng vùng đất và nhuộm xanh cả bản đồ!', play: 'Chơi', playInfo: l => `Chiến dịch · Màn ${l}`, levels: 'Các màn', levelsInfo: s => `Đã có ${s}★`,
+      skirmish: 'Đấu tự do', skirmishInfo: '1–5 đối thủ, tùy bạn chọn', daily: 'Bản đồ ngày', dailyInfo: b => b ? `Hôm nay: ${b}` : 'Bản đồ mới mỗi ngày', upgrades: 'Nâng cấp', upgradesInfo: 'Tăng sức mạnh quân đội',
+      help: 'Kéo từ vùng màu xanh của bạn sang vùng khác để tấn công. Bàn phím: phím mũi tên để di chuyển, Space để chọn, Enter để xuất quân.',
+      coins: n => `${n} xu`, back: 'Quay lại', levelsTitle: 'Chiến dịch', levelsSub: (s, m) => `${s}/${m} sao`, levelLabel: (n, s) => `Màn ${n}, ${s}/3 sao`, levelLocked: n => `Màn ${n}, chưa mở khóa`,
+      mapSize: 'Kích thước bản đồ', sizes: ['Nhỏ', 'Vừa', 'Lớn'], rivals: 'Đối thủ', difficulty: 'Độ khó', diffs: ['Dễ', 'Thường', 'Khó'], start: 'Bắt đầu',
+      shopTitle: 'Nâng cấp', shopNote: 'Thắng trận để nhận xu. Nâng cấp có hiệu lực ở mọi chế độ.',
+      upStart: 'Quân khởi đầu', upStartInfo: n => `+${n} quân ở vùng đầu tiên`, upGrowth: 'Tốc độ tăng quân', upGrowthInfo: n => `Quân tăng nhanh hơn ${n}%`, upMarch: 'Tốc độ hành quân', upMarchInfo: n => `Hành quân nhanh hơn ${n}%`,
+      max: 'Tối đa', buyLabel: (name, c) => `Nâng cấp ${name} với ${c} xu`, bought: name => `Đã nâng cấp ${name}`,
+      pause: 'Tạm dừng', paused: 'Tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', menu: 'Menu',
+      hudLevel: n => `Màn ${n}`, hudSkirmish: 'Đấu tự do', hudDaily: 'Bản đồ ngày',
+      win: 'Chiến thắng!', lose: 'Thất bại', winSub: tm => `Chinh phục bản đồ trong ${tm}`, loseSub: 'Vùng đất cuối cùng của bạn đã thất thủ.', coinsEarned: n => `+${n} xu`,
+      next: 'Màn tiếp', retry: 'Thử lại', playAgain: 'Chơi tiếp', newBest: 'Kỷ lục thời gian mới!', starGoal: tm => `★★★ nếu thắng dưới ${tm}`,
+      intro: n => `${n} đối thủ — hãy chiếm mọi vùng đất!`,
+      factions: ['Xanh dương', 'Đỏ', 'Vàng', 'Xanh lá', 'Tím', 'Cam'], you: 'Bạn', neutral: 'Trung lập', out: name => `Phe ${name} đã bị loại!`,
+      tipFirst: 'Kéo từ vùng xanh của bạn sang một vùng xám.', tipTower: 'Tháp canh bắn quân đi ngang qua.', tipSpeed: 'Căn cứ tốc độ xuất quân đi nhanh hơn.', tipCapital: 'Thủ đô tăng quân nhanh gấp đôi.',
+      kinds: { tower: 'tháp canh', speed: 'căn cứ tốc độ', capital: 'thủ đô' }, baseDesc: (o, n, k) => `${o}, ${n} quân${k ? ', ' + k : ''}`, selectedWord: 'đã chọn', sent: n => `Đã xuất ${n} quân`,
+      canvasLabel: 'Bản đồ lãnh thổ. Phím mũi tên để chuyển giữa các vùng, Space để chọn vùng của bạn, Enter để xuất quân.', locked: 'Đã khóa',
+    },
+    zh: {
+      tagline: '派出大军，攻占每一块领土，把地图染成蓝色！', play: '开始', playInfo: l => `战役 · 第 ${l} 关`, levels: '关卡', levelsInfo: s => `已获 ${s}★`,
+      skirmish: '自由对战', skirmishInfo: '1–5 个对手，随你设定', daily: '每日地图', dailyInfo: b => b ? `今日最佳 ${b}` : '每天一张新地图', upgrades: '升级', upgradesInfo: '强化你的军队',
+      help: '从你的蓝色领土拖向其他领土即可进攻。键盘：方向键移动，空格键选择，回车键出兵。',
+      coins: n => `${n} 金币`, back: '返回', levelsTitle: '战役', levelsSub: (s, m) => `${s}/${m} 星`, levelLabel: (n, s) => `第 ${n} 关，${s}/3 星`, levelLocked: n => `第 ${n} 关，未解锁`,
+      mapSize: '地图大小', sizes: ['小', '中', '大'], rivals: '对手', difficulty: '难度', diffs: ['简单', '普通', '困难'], start: '开始战斗',
+      shopTitle: '升级', shopNote: '赢得战斗即可获得金币，升级在所有模式中生效。',
+      upStart: '初始兵力', upStartInfo: n => `首块领土兵力 +${n}`, upGrowth: '增兵速度', upGrowthInfo: n => `兵力增长 +${n}%`, upMarch: '行军速度', upMarchInfo: n => `行军速度 +${n}%`,
+      max: '满级', buyLabel: (name, c) => `花费 ${c} 金币升级${name}`, bought: name => `${name}已升级`,
+      pause: '暂停', paused: '已暂停', resume: '继续', restart: '重新开始', menu: '菜单',
+      hudLevel: n => `第 ${n} 关`, hudSkirmish: '自由对战', hudDaily: '每日地图',
+      win: '胜利！', lose: '战败', winSub: tm => `用时 ${tm} 征服地图`, loseSub: '你的最后一块领土已经失守。', coinsEarned: n => `+${n} 金币`,
+      next: '下一关', retry: '再试一次', playAgain: '再来一局', newBest: '最佳用时新纪录！', starGoal: tm => `${tm} 内获胜可得 ★★★`,
+      intro: n => `${n} 个对手——占领所有领土！`,
+      factions: ['蓝方', '红方', '金方', '绿方', '紫方', '橙方'], you: '你', neutral: '中立', out: name => `${name}已被淘汰！`,
+      tipFirst: '从你的蓝色领土拖到一块灰色领土上。', tipTower: '箭塔会射击从旁经过的部队。', tipSpeed: '疾行基地派出的部队移动更快。', tipCapital: '首都的增兵速度是普通领土的两倍。',
+      kinds: { tower: '箭塔', speed: '疾行基地', capital: '首都' }, baseDesc: (o, n, k) => `${o}，兵力 ${n}${k ? '，' + k : ''}`, selectedWord: '已选中', sent: n => `已派出 ${n} 兵力`,
+      canvasLabel: '领土地图。方向键在领土之间切换，空格键选择你的领土，回车键出兵。', locked: '未解锁',
+    },
+    fr: {
+      tagline: 'Envoyez vos troupes, prenez chaque région et peignez la carte en bleu !', play: 'Jouer', playInfo: l => `Campagne · Niveau ${l}`, levels: 'Niveaux', levelsInfo: s => `${s}★ gagnées`,
+      skirmish: 'Escarmouche', skirmishInfo: '1 à 5 rivaux, à vous de régler', daily: 'Carte du jour', dailyInfo: b => b ? `Record du jour ${b}` : 'Une nouvelle carte chaque jour', upgrades: 'Améliorations', upgradesInfo: 'Renforcez votre armée',
+      help: 'Glissez depuis vos régions bleues vers une autre région pour attaquer. Clavier : flèches pour se déplacer, Espace pour sélectionner, Entrée pour envoyer.',
+      coins: n => `${n} pièces`, back: 'Retour', levelsTitle: 'Campagne', levelsSub: (s, m) => `${s} étoiles sur ${m}`, levelLabel: (n, s) => `Niveau ${n}, ${s} étoile${s > 1 ? 's' : ''} sur 3`, levelLocked: n => `Niveau ${n}, verrouillé`,
+      mapSize: 'Taille de la carte', sizes: ['Petite', 'Moyenne', 'Grande'], rivals: 'Rivaux', difficulty: 'Difficulté', diffs: ['Facile', 'Normal', 'Difficile'], start: 'Lancer la bataille',
+      shopTitle: 'Améliorations', shopNote: 'Gagnez des batailles pour obtenir des pièces. Les améliorations valent dans tous les modes.',
+      upStart: 'Troupes de départ', upStartInfo: n => `+${n} troupes dans votre première région`, upGrowth: 'Croissance', upGrowthInfo: n => `+${n} % de troupes produites`, upMarch: 'Vitesse de marche', upMarchInfo: n => `+${n} % de vitesse de marche`,
+      max: 'Max', buyLabel: (name, c) => `Améliorer ${name} pour ${c} pièces`, bought: name => `${name} amélioré`,
+      pause: 'Pause', paused: 'Pause', resume: 'Reprendre', restart: 'Recommencer', menu: 'Menu',
+      hudLevel: n => `Niveau ${n}`, hudSkirmish: 'Escarmouche', hudDaily: 'Carte du jour',
+      win: 'Victoire !', lose: 'Défaite', winSub: tm => `Carte conquise en ${tm}`, loseSub: 'Votre dernière région est tombée.', coinsEarned: n => `+${n} pièces`,
+      next: 'Niveau suivant', retry: 'Réessayer', playAgain: 'Rejouer', newBest: 'Nouveau meilleur temps !', starGoal: tm => `★★★ pour une victoire en moins de ${tm}`,
+      intro: n => n === 1 ? '1 rival — conquérez toutes les régions !' : `${n} rivaux — conquérez toutes les régions !`,
+      factions: ['Bleu', 'Rouge', 'Or', 'Vert', 'Violet', 'Orange'], you: 'Vous', neutral: 'Neutre', out: name => `${name} est éliminé !`,
+      tipFirst: 'Glissez de votre région bleue vers une région grise.', tipTower: 'Les tours tirent sur les troupes qui passent.', tipSpeed: 'Les bases rapides envoient des troupes plus vives.', tipCapital: 'Les capitales produisent deux fois plus vite.',
+      kinds: { tower: 'tour', speed: 'base rapide', capital: 'capitale' }, baseDesc: (o, n, k) => `${o}, ${n} troupes${k ? ', ' + k : ''}`, selectedWord: 'sélectionnée', sent: n => `${n} troupes envoyées`,
+      canvasLabel: 'Carte des territoires. Flèches pour passer d’une région à l’autre, Espace pour sélectionner les vôtres, Entrée pour envoyer des troupes.', locked: 'Verrouillé',
+    },
+    th: {
+      tagline: 'ส่งกองทัพ ยึดทุกดินแดน แล้วเปลี่ยนแผนที่ให้เป็นสีฟ้า!', play: 'เล่น', playInfo: l => `แคมเปญ · ด่าน ${l}`, levels: 'ด่าน', levelsInfo: s => `ได้ ${s}★ แล้ว`,
+      skirmish: 'ศึกอิสระ', skirmishInfo: 'คู่แข่ง 1–5 ฝ่าย ตั้งค่าเอง', daily: 'แผนที่ประจำวัน', dailyInfo: b => b ? `ดีที่สุดวันนี้ ${b}` : 'แผนที่ใหม่ทุกวัน', upgrades: 'อัปเกรด', upgradesInfo: 'เสริมพลังกองทัพ',
+      help: 'ลากจากดินแดนสีฟ้าของคุณไปยังดินแดนอื่นเพื่อโจมตี คีย์บอร์ด: ปุ่มลูกศรเพื่อเลื่อน Space เพื่อเลือก Enter เพื่อส่งทหาร',
+      coins: n => `${n} เหรียญ`, back: 'กลับ', levelsTitle: 'แคมเปญ', levelsSub: (s, m) => `${s} จาก ${m} ดาว`, levelLabel: (n, s) => `ด่าน ${n} ได้ ${s} จาก 3 ดาว`, levelLocked: n => `ด่าน ${n} ยังล็อกอยู่`,
+      mapSize: 'ขนาดแผนที่', sizes: ['เล็ก', 'กลาง', 'ใหญ่'], rivals: 'คู่แข่ง', difficulty: 'ความยาก', diffs: ['ง่าย', 'ปกติ', 'ยาก'], start: 'เริ่มการรบ',
+      shopTitle: 'อัปเกรด', shopNote: 'ชนะการรบเพื่อรับเหรียญ อัปเกรดใช้ได้ทุกโหมด',
+      upStart: 'ทหารเริ่มต้น', upStartInfo: n => `ทหาร +${n} ในดินแดนแรก`, upGrowth: 'ความเร็วเพิ่มทหาร', upGrowthInfo: n => `ทหารเพิ่มเร็วขึ้น ${n}%`, upMarch: 'ความเร็วเดินทัพ', upMarchInfo: n => `เดินทัพเร็วขึ้น ${n}%`,
+      max: 'สูงสุด', buyLabel: (name, c) => `อัปเกรด${name}ด้วย ${c} เหรียญ`, bought: name => `อัปเกรด${name}แล้ว`,
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', menu: 'เมนู',
+      hudLevel: n => `ด่าน ${n}`, hudSkirmish: 'ศึกอิสระ', hudDaily: 'ประจำวัน',
+      win: 'ชนะแล้ว!', lose: 'พ่ายแพ้', winSub: tm => `พิชิตแผนที่ได้ใน ${tm}`, loseSub: 'ดินแดนสุดท้ายของคุณถูกยึดแล้ว', coinsEarned: n => `+${n} เหรียญ`,
+      next: 'ด่านถัดไป', retry: 'ลองอีกครั้ง', playAgain: 'เล่นอีกครั้ง', newBest: 'ทำเวลาดีที่สุดใหม่!', starGoal: tm => `ชนะภายใน ${tm} เพื่อรับ ★★★`,
+      intro: n => `คู่แข่ง ${n} ฝ่าย ยึดให้ครบทุกดินแดน!`,
+      factions: ['ฟ้า', 'แดง', 'ทอง', 'เขียว', 'ม่วง', 'ส้ม'], you: 'คุณ', neutral: 'เป็นกลาง', out: name => `ฝ่าย${name}ถูกกำจัดแล้ว!`,
+      tipFirst: 'ลากจากดินแดนสีฟ้าของคุณไปยังดินแดนสีเทา', tipTower: 'หอคอยจะยิงทหารที่เดินผ่าน', tipSpeed: 'ฐานความเร็วส่งทหารได้เร็วกว่า', tipCapital: 'เมืองหลวงเพิ่มทหารเร็วเป็นสองเท่า',
+      kinds: { tower: 'หอคอย', speed: 'ฐานความเร็ว', capital: 'เมืองหลวง' }, baseDesc: (o, n, k) => `${o} ทหาร ${n}${k ? ' · ' + k : ''}`, selectedWord: 'เลือกแล้ว', sent: n => `ส่งทหาร ${n} นายแล้ว`,
+      canvasLabel: 'แผนที่ดินแดน ใช้ปุ่มลูกศรเพื่อเลื่อนระหว่างดินแดน Space เพื่อเลือกดินแดนของคุณ Enter เพื่อส่งทหาร', locked: 'ล็อกอยู่',
+    },
+    ja: {
+      tagline: '部隊を送り込み、すべての地域を制圧して地図を青く塗りつぶそう！', play: 'プレイ', playInfo: l => `キャンペーン · レベル ${l}`, levels: 'レベル', levelsInfo: s => `${s}★ 獲得`,
+      skirmish: 'フリー対戦', skirmishInfo: 'ライバル1〜5・自由設定', daily: 'デイリーマップ', dailyInfo: b => b ? `今日のベスト ${b}` : '毎日新しいマップ', upgrades: '強化', upgradesInfo: '軍をパワーアップ',
+      help: '自分の青い地域から別の地域へドラッグして攻撃。キーボード：矢印キーで移動、スペースで選択、Enter で出撃。',
+      coins: n => `${n} コイン`, back: '戻る', levelsTitle: 'キャンペーン', levelsSub: (s, m) => `星 ${s}/${m}`, levelLabel: (n, s) => `レベル ${n}、星 ${s}/3`, levelLocked: n => `レベル ${n}、未解放`,
+      mapSize: 'マップの大きさ', sizes: ['小', '中', '大'], rivals: 'ライバル', difficulty: '難易度', diffs: ['かんたん', 'ふつう', 'むずかしい'], start: 'バトル開始',
+      shopTitle: '強化', shopNote: 'バトルに勝つとコインがもらえます。強化はすべてのモードで有効です。',
+      upStart: '初期兵力', upStartInfo: n => `最初の地域の兵力 +${n}`, upGrowth: '増援速度', upGrowthInfo: n => `兵力の増加 +${n}%`, upMarch: '行軍速度', upMarchInfo: n => `行軍スピード +${n}%`,
+      max: '最大', buyLabel: (name, c) => `${c} コインで${name}を強化`, bought: name => `${name}を強化しました`,
+      pause: '一時停止', paused: '一時停止中', resume: '再開', restart: 'やり直す', menu: 'メニュー',
+      hudLevel: n => `レベル ${n}`, hudSkirmish: 'フリー対戦', hudDaily: 'デイリー',
+      win: '勝利！', lose: '敗北', winSub: tm => `${tm} でマップを制圧`, loseSub: '最後の地域が陥落しました。', coinsEarned: n => `+${n} コイン`,
+      next: '次のレベル', retry: 'もう一度', playAgain: 'もう一度遊ぶ', newBest: 'ベストタイム更新！', starGoal: tm => `${tm} 以内の勝利で ★★★`,
+      intro: n => `ライバル ${n} 勢力 — すべての地域を制圧せよ！`,
+      factions: ['ブルー', 'レッド', 'ゴールド', 'グリーン', 'パープル', 'オレンジ'], you: 'あなた', neutral: '中立', out: name => `${name}が脱落！`,
+      tipFirst: '青い地域から灰色の地域へドラッグしよう。', tipTower: 'タワーはそばを通る部隊を撃ちます。', tipSpeed: 'スピード拠点から出た部隊は速く進みます。', tipCapital: '首都は2倍の速さで兵力が増えます。',
+      kinds: { tower: 'タワー', speed: 'スピード拠点', capital: '首都' }, baseDesc: (o, n, k) => `${o}、兵力 ${n}${k ? '、' + k : ''}`, selectedWord: '選択中', sent: n => `兵 ${n} を出撃`,
+      canvasLabel: '領土マップ。矢印キーで地域を移動、スペースで自分の地域を選択、Enter で出撃します。', locked: 'ロック中',
+    },
+    ko: {
+      tagline: '병력을 보내 모든 지역을 점령하고 지도를 파랗게 물들이세요!', play: '플레이', playInfo: l => `캠페인 · 레벨 ${l}`, levels: '레벨', levelsInfo: s => `별 ${s}개 획득`,
+      skirmish: '자유 대전', skirmishInfo: '상대 1–5명, 원하는 대로', daily: '오늘의 지도', dailyInfo: b => b ? `오늘 최고 ${b}` : '매일 새로운 지도', upgrades: '업그레이드', upgradesInfo: '군대를 강화하세요',
+      help: '파란 내 지역에서 다른 지역으로 드래그해 공격하세요. 키보드: 화살표로 이동, Space로 선택, Enter로 출병.',
+      coins: n => `코인 ${n}개`, back: '뒤로', levelsTitle: '캠페인', levelsSub: (s, m) => `별 ${s}/${m}`, levelLabel: (n, s) => `레벨 ${n}, 별 ${s}/3`, levelLocked: n => `레벨 ${n}, 잠김`,
+      mapSize: '지도 크기', sizes: ['작게', '보통', '크게'], rivals: '상대', difficulty: '난이도', diffs: ['쉬움', '보통', '어려움'], start: '전투 시작',
+      shopTitle: '업그레이드', shopNote: '전투에서 이기면 코인을 얻어요. 업그레이드는 모든 모드에 적용됩니다.',
+      upStart: '시작 병력', upStartInfo: n => `첫 지역 병력 +${n}`, upGrowth: '병력 증가 속도', upGrowthInfo: n => `병력 증가 +${n}%`, upMarch: '행군 속도', upMarchInfo: n => `행군 속도 +${n}%`,
+      max: '최대', buyLabel: (name, c) => `코인 ${c}개로 ${name} 업그레이드`, bought: name => `${name} 업그레이드 완료`,
+      pause: '일시정지', paused: '일시정지', resume: '계속하기', restart: '다시 시작', menu: '메뉴',
+      hudLevel: n => `레벨 ${n}`, hudSkirmish: '자유 대전', hudDaily: '오늘의 지도',
+      win: '승리!', lose: '패배', winSub: tm => `${tm} 만에 지도 정복`, loseSub: '마지막 지역을 빼앗겼어요.', coinsEarned: n => `+${n} 코인`,
+      next: '다음 레벨', retry: '다시 도전', playAgain: '한 번 더', newBest: '최고 기록 경신!', starGoal: tm => `${tm} 안에 이기면 ★★★`,
+      intro: n => `상대 ${n}명 — 모든 지역을 점령하세요!`,
+      factions: ['파랑', '빨강', '노랑', '초록', '보라', '주황'], you: '나', neutral: '중립', out: name => `${name} 탈락!`,
+      tipFirst: '파란 내 지역에서 회색 지역으로 드래그하세요.', tipTower: '타워는 지나가는 병력을 공격해요.', tipSpeed: '스피드 기지에서 보낸 병력은 더 빨라요.', tipCapital: '수도는 병력이 두 배로 빨리 늘어요.',
+      kinds: { tower: '타워', speed: '스피드 기지', capital: '수도' }, baseDesc: (o, n, k) => `${o}, 병력 ${n}${k ? ', ' + k : ''}`, selectedWord: '선택됨', sent: n => `병력 ${n} 출병`,
+      canvasLabel: '영토 지도. 화살표 키로 지역 사이를 이동하고, Space로 내 지역을 선택하고, Enter로 병력을 보냅니다.', locked: '잠김',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const bg = document.createElement('canvas');
+  const bgCtx = bg.getContext('2d');
+  canvas.setAttribute('aria-label', t.canvasLabel);
+  const FONT = getComputedStyle(document.body).fontFamily;
+  const TAU = Math.PI * 2;
+  const STEP = 1 / 60;
+  const NEUTRAL = -1, PLAYER = 0;
+  const LEVELS = 45;
+  const BASE_R = 17, UNIT_R = 3, UNIT_SPEED = 52, TOWER_RANGE = 88, TOWER_RATE = 0.42, CELL_AREA = 8600;
+  const COLORS = [
+    { base: '#2f7cf6', fill: '#8ab8ff', dark: '#1a4fae' },
+    { base: '#ef4444', fill: '#ff9e94', dark: '#a61f1f' },
+    { base: '#eeb000', fill: '#ffd866', dark: '#9c7300' },
+    { base: '#1fae5b', fill: '#86dca6', dark: '#127a3d' },
+    { base: '#9b5cf6', fill: '#cbabff', dark: '#6332c0' },
+    { base: '#f97316', fill: '#ffb47e', dark: '#b2500b' },
+  ];
+  const NEUTRAL_C = { base: '#8c95a8', fill: '#d8dce5', dark: '#5f6779' };
+  const colorOf = o => o === NEUTRAL ? NEUTRAL_C : COLORS[o];
+  const UPGRADES = [
+    { key: 'start', ico: '🪖', name: 'upStart', info: 'upStartInfo', per: 5 },
+    { key: 'growth', ico: '🌱', name: 'upGrowth', info: 'upGrowthInfo', per: 10 },
+    { key: 'march', ico: '🥾', name: 'upMarch', info: 'upMarchInfo', per: 8 },
+  ];
+  const UPG_COST = [30, 60, 100, 160, 240];
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const fmt = sec => { const s = Math.max(0, Math.floor(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+  // ---------- Storage ----------
+  const STORE = 'milaan.territoryWar.';
+  const load = (name, fallback) => { try { const v = localStorage.getItem(STORE + name); return v === null ? fallback : JSON.parse(v) ?? fallback; } catch { return fallback; } };
+  const save = (name, value) => { try { localStorage.setItem(STORE + name, JSON.stringify(value)); } catch {} };
+  let stars = load('stars', []);
+  if (!Array.isArray(stars)) stars = [];
+  stars = Array.from({ length: LEVELS }, (_, i) => clamp(Number(stars[i]) || 0, 0, 3));
+  let coins = Math.max(0, Math.floor(Number(load('coins', 0)) || 0));
+  const upg = { start: 0, growth: 0, march: 0 };
+  { const u = load('upgrades', {}); for (const k in upg) upg[k] = clamp(Math.floor(Number(u && u[k]) || 0), 0, UPG_COST.length); }
+  const skirm = { size: 1, rivals: 3, diff: 1 };
+  { const s = load('skirmish', {}); if (s) { skirm.size = clamp(Number(s.size) || 0, 0, 2); skirm.rivals = clamp(Number(s.rivals) || 3, 1, 5); skirm.diff = clamp(Number(s.diff) || 0, 0, 2); } }
+  let daily = load('daily', null);
+
+  // ---------- Random ----------
+  function mulberry(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let x = a; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+  const hash2 = (a, b) => { let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b + 0x7f4a7c15) | 0, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2d); return (h ^ (h >>> 15)) >>> 0; };
+  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+  // ---------- Map generation ----------
+  // Clip a convex polygon to the half-plane n·p <= c. Every vertex carries the
+  // id of the neighbour whose bisector forms the edge leaving it (-1 = frame).
+  function clipPoly(poly, nx, ny, c, label) {
+    const out = [];
+    for (let k = 0; k < poly.length; k++) {
+      const a = poly[k], b = poly[(k + 1) % poly.length];
+      const da = nx * a.x + ny * a.y - c, db = nx * b.x + ny * b.y - c;
+      if (da <= 0) out.push(a);
+      if ((da <= 0) !== (db <= 0)) {
+        const s = da / (da - db);
+        out.push({ x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s, e: da <= 0 ? label : a.e });
+      }
+    }
+    return out;
+  }
+
+  function voronoiCell(sites, i, frame) {
+    const s = sites[i];
+    let poly = frame.map(p => ({ x: p.x, y: p.y, e: -1 }));
+    for (let j = 0; j < sites.length && poly.length > 2; j++) {
+      if (j === i) continue;
+      const o = sites[j], nx = o.x - s.x, ny = o.y - s.y;
+      poly = clipPoly(poly, nx, ny, nx * (s.x + o.x) / 2 + ny * (s.y + o.y) / 2, j);
+    }
+    return poly;
+  }
+
+  function polyStats(poly) {
+    let a = 0, cx = 0, cy = 0;
+    for (let k = 0; k < poly.length; k++) {
+      const p = poly[k], q = poly[(k + 1) % poly.length], cr = p.x * q.y - q.x * p.y;
+      a += cr; cx += (p.x + q.x) * cr; cy += (p.y + q.y) * cr;
+    }
+    a /= 2;
+    return a ? { area: Math.abs(a), x: cx / (6 * a), y: cy / (6 * a) } : { area: 0, x: poly[0].x, y: poly[0].y };
+  }
+
+  function chaikin(p) {
+    const out = [p[0]];
+    for (let k = 0; k < p.length - 1; k++) {
+      const a = p[k], b = p[k + 1];
+      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    out.push(p[p.length - 1]);
+    return out;
+  }
+
+  // A wiggly, smoothed border shared by two cells: built once per pair and
+  // reused (reversed) by the neighbour, so borders always match exactly.
+  function noisyEdge(cache, seed, i, j, a, b) {
+    const key = i < j ? i * 4096 + j : j * 4096 + i;
+    let pts = cache.get(key);
+    if (!pts) {
+      const r = mulberry(hash2(key, seed));
+      pts = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
+      for (let d = 0; d < 3; d++) {
+        const out = [pts[0]];
+        for (let k = 1; k < pts.length; k++) {
+          const p = pts[k - 1], q = pts[k], dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+          const amp = Math.min(len * 0.14, 10 / (d + 1)) * (r() * 2 - 1);
+          out.push({ x: (p.x + q.x) / 2 - dy / len * amp, y: (p.y + q.y) / 2 + dx / len * amp }, q);
+        }
+        pts = out;
+      }
+      pts = chaikin(chaikin(pts));
+      cache.set(key, pts);
+    }
+    const first = pts[0], last = pts[pts.length - 1];
+    const fwd = (first.x - a.x) ** 2 + (first.y - a.y) ** 2 <= (last.x - a.x) ** 2 + (last.y - a.y) ** 2;
+    return (fwd ? pts : pts.slice().reverse()).slice(1);
+  }
+
+  function genMap(seed, nLand, aspect) {
+    const rnd = mulberry(seed);
+    aspect = clamp(aspect, 0.5, 2.9);
+    const nInt = Math.round(nLand / 0.8) + 1;
+    const W = Math.sqrt(nInt * CELL_AREA * aspect), H = nInt * CELL_AREA / W, sp = Math.sqrt(CELL_AREA);
+    const m = sp * 0.35;
+    // Best-candidate sampling gives evenly spread but irregular seeds.
+    const pts = [];
+    for (let i = 0; i < nInt; i++) {
+      let best = null, bd = -1;
+      for (let k = 0; k < 14; k++) {
+        const c = { x: m + rnd() * (W - 2 * m), y: m + rnd() * (H - 2 * m) };
+        let d = Infinity;
+        for (const p of pts) d = Math.min(d, (p.x - c.x) ** 2 + (p.y - c.y) ** 2);
+        if (d > bd) { bd = d; best = c; }
+      }
+      pts.push(best);
+    }
+    // A ring of sea seeds just outside the rectangle makes the coast wiggle too.
+    const ring = [], off = sp * 0.35;
+    const nx = Math.max(2, Math.round((W + 2 * off) / (sp * 0.85))), ny = Math.max(2, Math.round((H + 2 * off) / (sp * 0.85)));
+    for (let i = 0; i <= nx; i++) { const x = -off + (W + 2 * off) * i / nx; ring.push({ x, y: -off }, { x, y: H + off }); }
+    for (let j = 1; j < ny; j++) { const y = -off + (H + 2 * off) * j / ny; ring.push({ x: -off, y }, { x: W + off, y }); }
+    const F = sp * 2;
+    const frame = [{ x: -F, y: -F }, { x: W + F, y: -F }, { x: W + F, y: H + F }, { x: -F, y: H + F }];
+    let sites = pts.concat(ring), cells = [];
+    for (let it = 0; it < 2; it++) {
+      sites = pts.concat(ring);
+      cells = pts.map((_, i) => voronoiCell(sites, i, frame));
+      if (it === 0) cells.forEach((c, i) => { const s = polyStats(c); pts[i] = { x: clamp(s.x, m, W - m), y: clamp(s.y, m, H - m) }; });
+    }
+    const nb = cells.map(c => [...new Set(c.map(v => v.e).filter(e => e >= 0 && e < nInt))]);
+    // Grow one connected landmass from the centre, preferring rectangle-filling cells.
+    const score = pts.map(p => 1 - Math.hypot((p.x - W / 2) / (W / 2), (p.y - H / 2) / (H / 2)) * 0.9 + (rnd() - 0.5) * 0.7);
+    const land = new Set();
+    let start = 0;
+    score.forEach((s, i) => { if (s > score[start]) start = i; });
+    land.add(start);
+    while (land.size < Math.min(nLand, nInt)) {
+      let pick = -1;
+      for (const i of land) for (const j of nb[i]) if (!land.has(j) && (pick < 0 || score[j] > score[pick])) pick = j;
+      if (pick < 0) break;
+      land.add(pick);
+    }
+    const order = [...land].sort((a, b) => a - b);
+    const siteRegion = sites.map(() => -1);
+    order.forEach((si, ri) => { siteRegion[si] = ri; });
+    const cache = new Map();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const regions = order.map((si, ri) => {
+      const poly = cells[si], st = polyStats(poly), path = new Path2D(), outline = [];
+      path.moveTo(poly[0].x, poly[0].y);
+      outline.push(poly[0]);
+      for (let k = 0; k < poly.length; k++) {
+        const a = poly[k], b = poly[(k + 1) % poly.length];
+        const seg = a.e >= 0 ? noisyEdge(cache, seed, si, a.e, a, b) : [b];
+        for (const p of seg) { path.lineTo(p.x, p.y); outline.push(p); }
+      }
+      path.closePath();
+      let reach = 0;
+      for (const p of outline) {
+        reach = Math.max(reach, Math.hypot(p.x - st.x, p.y - st.y));
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+      }
+      return { id: ri, x: st.x, y: st.y, area: st.area, path, reach, nb: nb[si].filter(j => land.has(j)).map(j => siteRegion[j]), owner: NEUTRAL, troops: 0, kind: '', grow: 0, cap: 0, anim: null, pop: 0, cd: 0 };
+    });
+    const avg = regions.reduce((s, r) => s + r.area, 0) / regions.length;
+    for (const r of regions) r.size = clamp(r.area / avg, 0.5, 1.8);
+    const pad = 9;
+    return { W, H, sites, siteRegion, regions, box: { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 } };
+  }
+
+  // ---------- Level design ----------
+  function campaignParams(L) {
+    const k = (L - 1) / (LEVELS - 1);
+    const nLand = Math.min(9 + Math.round(L * 0.65), 38);
+    const ais = Math.min(L < 4 ? 1 : L < 11 ? 2 : L < 20 ? 3 : L < 30 ? 4 : 5, Math.floor(nLand / 5));
+    const tips = { 1: 'tipFirst', 6: 'tipTower', 10: 'tipSpeed', 14: 'tipCapital' };
+    return {
+      seed: hash2(L, 7331), nLand, ais, skill: Math.min(1, 0.04 + k ** 1.25 * 0.96),
+      towers: L < 6 ? 0 : Math.min(1 + Math.floor((L - 6) / 7), 4),
+      speeds: L < 10 ? 0 : Math.min(1 + Math.floor((L - 10) / 8), 3),
+      capitals: L < 14 ? 0 : Math.min(1 + Math.floor((L - 14) / 10), 3),
+      aiCapital: L >= 22, neutral: 3 + Math.round(L * 0.22), tip: tips[L] || '',
+      t3: Math.round(16 + nLand * 3 + ais * 6),
+    };
+  }
+  function skirmishParams() {
+    const d = skirm.diff, nLand = [14, 24, 36][skirm.size];
+    return { seed: (Math.random() * 2 ** 31) >>> 0, nLand, ais: Math.min(skirm.rivals, Math.floor(nLand / 3)), skill: [0.12, 0.5, 0.92][d], towers: [1, 2, 3][skirm.size], speeds: skirm.size, capitals: skirm.size, aiCapital: d === 2, neutral: 6 + d * 3, tip: '' };
+  }
+  function dailyParams() {
+    const key = todayKey(), seed = hash2(Number(key.replace(/-/g, '')), 2024);
+    const r = mulberry(seed);
+    return { seed, nLand: 22 + Math.floor(r() * 7), ais: 3, skill: 0.55 + r() * 0.15, towers: 2, speeds: 1, capitals: 1, aiCapital: false, neutral: 8, tip: '', day: key };
+  }
+  function aiProfile(skill) {
+    return { skill, interval: 3.3 - 2.3 * skill, margin: 1.5 - 0.4 * skill, gMul: 0.8 + 0.32 * skill, foresight: skill > 0.35 ? 1 : 0.4, delay: 3.5 - 2.5 * skill, speed: 1 + 0.06 * skill };
+  }
+
+  // ---------- State ----------
+  const view = { w: 0, h: 0, dpr: 1, s: 1, x0: 0, y0: 0 };
+  const play = { x: 0, y: 0, w: 1, h: 1 };
+  let run = null, preview = null, rafId = 0, lastTime = 0, acc = 0;
+  let ptr = null, hover = null, kbMode = false;
+  let pendingResult = 0, noticeTimer = 0;
+
+  function measure() {
+    view.w = innerWidth; view.h = innerHeight; view.dpr = Math.min(devicePixelRatio || 1, 2);
+    const cs = getComputedStyle($('safe'));
+    const sl = parseFloat(cs.paddingLeft) || 0, sr = parseFloat(cs.paddingRight) || 0, sb = parseFloat(cs.paddingBottom) || 0;
+    const top = $('hud').getBoundingClientRect().bottom + 6;
+    play.x = Math.max(6, sl); play.y = top;
+    play.w = Math.max(60, view.w - play.x - Math.max(6, sr));
+    play.h = Math.max(60, view.h - top - Math.max(6, sb));
+  }
+  function fit(map) {
+    const b = map.box;
+    view.s = Math.min(play.w / b.w, play.h / b.h);
+    view.x0 = play.x + (play.w - b.w * view.s) / 2 - b.x * view.s;
+    view.y0 = play.y + (play.h - b.h * view.s) / 2 - b.y * view.s;
+  }
+
+  function placeStarts(regions, count, aspect, rnd) {
+    const W = Math.max(...regions.map(r => r.x)), H = Math.max(...regions.map(r => r.y));
+    let player = regions[0], best = -Infinity;
+    for (const r of regions) {
+      const s = (aspect < 1 ? r.y / H : 1 - r.x / W) + rnd() * 0.15;
+      if (s > best) { best = s; player = r; }
+    }
+    const starts = [player];
+    for (let i = 0; i < count; i++) {
+      let pick = null, pd = -1;
+      for (const r of regions) {
+        if (starts.includes(r)) continue;
+        // Never start next door to someone else when there is any choice.
+        const touching = starts.some(s => s.nb.includes(r.id));
+        const d = Math.min(...starts.map(s => dist(s, r))) * (0.9 + rnd() * 0.2) * (touching ? 0.4 : 1);
+        if (d > pd) { pd = d; pick = r; }
+      }
+      if (pick) starts.push(pick);
+    }
+    return starts;
+  }
+
+  function setKind(r, kind) {
+    r.kind = kind;
+    r.grow = (0.5 + 0.5 * r.size) * (kind === 'capital' ? 2 : kind === 'tower' ? 0.7 : 1);
+    r.cap = Math.round((35 + 25 * r.size) * (kind === 'capital' ? 1.6 : 1));
+  }
+
+  function newRun(mode, level) {
+    const p = mode === 'campaign' ? campaignParams(level) : mode === 'daily' ? dailyParams() : skirmishParams();
+    measure();
+    const map = genMap(p.seed, p.nLand, play.w / play.h);
+    const rnd = mulberry(p.seed ^ 0x5bd1e995);
+    const regions = map.regions;
+    for (const r of regions) setKind(r, '');
+    const starts = placeStarts(regions, p.ais, play.w / play.h, rnd);
+    const prof = aiProfile(p.skill);
+    const rot = Math.floor(rnd() * 3);
+    const PERS = ['expander', 'opportunist', 'turtle'];
+    const factions = [{ id: PLAYER, alive: true, gMul: 1 + 0.1 * upg.growth, speed: 1 + 0.08 * upg.march }];
+    starts.forEach((r, i) => {
+      r.owner = i;
+      if (p.aiCapital) setKind(r, 'capital');
+      r.troops = i === 0 ? 15 + 5 * upg.start : 15 + Math.round(p.skill * 10);
+      if (i > 0) factions.push({ id: i, alive: true, pers: PERS[(i - 1 + rot) % 3], skill: prof.skill, gMul: prof.gMul, speed: prof.speed, margin: prof.margin, interval: prof.interval, foresight: prof.foresight, cd: prof.delay + rnd() * 1.5 });
+    });
+    // Specials go to neutral regions: towers on the front lines, capitals on the biggest land.
+    const free = () => regions.filter(r => r.owner === NEUTRAL && !r.kind);
+    const pr = starts[0], ai = starts.slice(1);
+    const front = r => -Math.abs(dist(r, pr) - Math.min(...ai.map(a => dist(r, a)))) / map.W + rnd() * 0.35;
+    for (let i = 0; i < p.towers; i++) { const c = free().sort((a, b) => front(b) - front(a))[0]; if (c) setKind(c, 'tower'); }
+    for (let i = 0; i < p.capitals; i++) { const c = free().sort((a, b) => b.area - a.area)[0]; if (c) setKind(c, 'capital'); }
+    for (let i = 0; i < p.speeds; i++) { const f = free(); const c = f[Math.floor(rnd() * f.length)]; if (c) setKind(c, 'speed'); }
+    for (const r of regions) {
+      if (r.owner !== NEUTRAL) continue;
+      r.troops = p.neutral + Math.floor(rnd() * 7) + Math.round(r.size * 3) + (r.kind === 'tower' ? 8 : r.kind === 'capital' ? 10 : r.kind === 'speed' ? 4 : 0);
+    }
+    if (mode === 'campaign') p.t2 = Math.round(p.t3 * 1.6);
+    return { mode, level, p, map, regions, factions, units: [], streams: [], fx: [], tracers: [], sel: new Set(), time: 0, over: false, paused: false, focus: pr, checkT: 0, incT: -1, inc: null, endT: 0, win: false };
+  }
+
+  // ---------- Simulation ----------
+  function send(src, tgt, n) {
+    n = Math.floor(Math.min(n, src.troops));
+    if (n < 1 || src === tgt) return 0;
+    src.troops -= n;
+    const f = run.factions[src.owner];
+    run.streams.push({ src, tgt, o: src.owner, left: n, acc: 1, k: 0, rate: Math.max(12, n / 1.1), sp: UNIT_SPEED * f.speed * (src.kind === 'speed' ? 1.55 : 1) });
+    return n;
+  }
+
+  const LANES = [0, -5, 5, -2.5, 2.5];
+  function emit(s, dt) {
+    s.acc += s.rate * dt;
+    const dx = s.tgt.x - s.src.x, dy = s.tgt.y - s.src.y, len = Math.hypot(dx, dy) || 1;
+    while (s.acc >= 1 && s.left > 0) {
+      s.acc -= 1; s.left--;
+      const off = LANES[s.k++ % LANES.length];
+      run.units.push({ x: s.src.x + dx / len * BASE_R * 0.9 - dy / len * off, y: s.src.y + dy / len * BASE_R * 0.9 + dx / len * off, t: s.tgt, o: s.o, sp: s.sp, dead: false });
+    }
+  }
+
+  function capture(r, o) {
+    const from = r.owner;
+    r.owner = o;
+    r.troops = Math.max(0, -r.troops);
+    r.anim = reduced ? null : { from, t: 0 };
+    r.pop = 1;
+    burst(r.x, r.y, colorOf(o).base, 14);
+    if (from === PLAYER) { run.sel.delete(r); }
+  }
+
+  function arrive(r, o) {
+    if (r.owner === o) { r.troops += 1; return; }
+    r.troops -= 1;
+    r.pop = Math.max(r.pop, 0.35);
+    if (r.troops < 0) capture(r, o);
+  }
+
+  function burst(x, y, color, n) {
+    if (reduced) return;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, s = 30 + Math.random() * 90;
+      run.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.3, color });
+    }
+  }
+
+  // Opposing units that touch annihilate one-for-one (spatial hash keeps it linear).
+  function fight() {
+    const C = 10, grid = new Map(), units = run.units;
+    const key = (cx, cy) => (cx + 500) * 2048 + cy + 500;
+    for (const u of units) {
+      const k = key(Math.floor(u.x / C), Math.floor(u.y / C));
+      const list = grid.get(k);
+      if (list) list.push(u); else grid.set(k, [u]);
+    }
+    const R2 = (UNIT_R * 2 + 1) ** 2;
+    for (const u of units) {
+      if (u.dead) continue;
+      const cx = Math.floor(u.x / C), cy = Math.floor(u.y / C);
+      search: for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) {
+        const list = grid.get(key(cx + ix, cy + iy));
+        if (!list) continue;
+        for (const v of list) {
+          if (v.dead || v.o === u.o || (v.x - u.x) ** 2 + (v.y - u.y) ** 2 > R2) continue;
+          u.dead = v.dead = true;
+          if (!reduced && Math.random() < 0.5) run.fx.push({ x: (u.x + v.x) / 2, y: (u.y + v.y) / 2, vx: 0, vy: -20, life: 0.3, color: '#fff' });
+          break search;
+        }
+      }
+    }
+  }
+
+  function towers(dt) {
+    for (const r of run.regions) {
+      if (r.kind !== 'tower') continue;
+      r.cd -= dt;
+      if (r.cd > 0) continue;
+      let pick = null, pd = TOWER_RANGE * TOWER_RANGE;
+      for (const u of run.units) {
+        if (u.dead || u.o === r.owner) continue;
+        const d = (u.x - r.x) ** 2 + (u.y - r.y) ** 2;
+        if (d < pd) { pd = d; pick = u; }
+      }
+      if (!pick) { r.cd = 0.1; continue; }
+      pick.dead = true;
+      r.cd = TOWER_RATE;
+      run.tracers.push({ x1: r.x, y1: r.y - 6, x2: pick.x, y2: pick.y, life: 0.14 });
+    }
+  }
+
+  function update(dt) {
+    run.time += run.over ? 0 : dt;
+    for (const r of run.regions) {
+      if (r.owner !== NEUTRAL) {
+        const g = r.grow * run.factions[r.owner].gMul;
+        if (r.troops < r.cap) r.troops = Math.min(r.cap, r.troops + g * dt);
+        else r.troops = Math.max(r.cap, r.troops - 1.5 * dt);
+      }
+      if (r.anim) { r.anim.t += dt / 0.55; if (r.anim.t >= 1) r.anim = null; }
+      if (r.pop > 0) r.pop = Math.max(0, r.pop - dt * 3);
+    }
+    for (const s of run.streams) emit(s, dt);
+    run.streams = run.streams.filter(s => s.left > 0);
+    for (const u of run.units) {
+      if (u.dead) continue;
+      const dx = u.t.x - u.x, dy = u.t.y - u.y, d = Math.hypot(dx, dy);
+      if (d < BASE_R * 0.8) { u.dead = true; arrive(u.t, u.o); continue; }
+      const st = Math.min(d, u.sp * dt);
+      u.x += dx / d * st; u.y += dy / d * st;
+    }
+    fight();
+    towers(dt);
+    let w = 0;
+    for (const u of run.units) if (!u.dead) run.units[w++] = u;
+    run.units.length = w;
+    for (const f of run.fx) { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; f.life -= dt; }
+    run.fx = run.fx.filter(f => f.life > 0);
+    for (const tr of run.tracers) tr.life -= dt;
+    run.tracers = run.tracers.filter(tr => tr.life > 0);
+    if (run.over) return;
+    for (const f of run.factions) {
+      if (f.id === PLAYER || !f.alive) continue;
+      f.cd -= dt;
+      if (f.cd <= 0) { f.cd = f.interval * (0.7 + Math.random() * 0.6); aiThink(f); }
+    }
+    run.checkT -= dt;
+    if (run.checkT <= 0) { run.checkT = 0.25; checkFactions(); updateBar(); }
+  }
+
+  function checkFactions() {
+    const has = run.factions.map(() => false);
+    for (const r of run.regions) if (r.owner >= 0) has[r.owner] = true;
+    for (const u of run.units) has[u.o] = true;
+    for (const s of run.streams) has[s.o] = true;
+    for (const f of run.factions) {
+      if (!f.alive || has[f.id]) continue;
+      f.alive = false;
+      if (f.id === PLAYER) { finish(false); return; }
+      toast(t.out(t.factions[f.id]));
+      announce(t.out(t.factions[f.id]));
+    }
+    if (run.factions.every(f => f.id === PLAYER || !f.alive)) finish(true);
+  }
+
+  // ---------- AI ----------
+  function incoming() {
+    if (run.incT === run.time) return run.inc;
+    const n = run.factions.length + 1;
+    const inc = run.regions.map(() => new Float32Array(n));
+    for (const u of run.units) inc[u.t.id][u.o + 1] += 1;
+    for (const s of run.streams) inc[s.tgt.id][s.o + 1] += s.left;
+    run.incT = run.time; run.inc = inc;
+    return inc;
+  }
+
+  // Expected losses to enemy towers along a straight march.
+  function towerCost(a, b, fid, speed) {
+    let cost = 0;
+    const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1;
+    for (const tw of run.regions) {
+      if (tw.kind !== 'tower' || tw.owner === fid || tw === b) continue;
+      const s = clamp(((tw.x - a.x) * dx + (tw.y - a.y) * dy) / len2, 0, 1);
+      const d = Math.hypot(a.x + dx * s - tw.x, a.y + dy * s - tw.y);
+      if (d < TOWER_RANGE) cost += 2 * Math.sqrt(TOWER_RANGE * TOWER_RANGE - d * d) / speed / TOWER_RATE;
+    }
+    return cost;
+  }
+
+  function aiThink(f) {
+    const mine = run.regions.filter(r => r.owner === f.id);
+    if (!mine.length) return;
+    const inc = incoming();
+    const threat = r => { let s = 0; const a = inc[r.id]; for (let o = 0; o < a.length; o++) if (o !== f.id + 1) s += a[o]; return s - a[f.id + 1]; };
+    const keep = f.pers === 'turtle' ? 10 : f.pers === 'opportunist' ? 4 : 2;
+    const avail = r => Math.max(0, Math.floor(r.troops - keep - Math.max(0, threat(r))));
+    const speed = UNIT_SPEED * f.speed;
+    // 1) Rescue a region that is about to fall.
+    for (const r of mine) {
+      const need = threat(r) - r.troops;
+      if (need <= 0) continue;
+      const helper = mine.filter(m => m !== r && avail(m) > 4).sort((a, b) => dist(a, r) - dist(b, r))[0];
+      if (helper && dist(helper, r) / speed < 6) { send(helper, r, Math.min(avail(helper), need + 4)); return; }
+    }
+    // 2) Pick a target that suits the personality and can be taken.
+    const counts = run.factions.map(() => 0);
+    for (const r of run.regions) if (r.owner >= 0) counts[r.owner]++;
+    let leader = -1;
+    counts.forEach((c, i) => { if (i !== f.id && (leader < 0 || c > counts[leader])) leader = i; });
+    const cands = [];
+    for (const tr of run.regions) {
+      if (tr.owner === f.id) continue;
+      let near = mine[0], nd = Infinity;
+      for (const m of mine) { const d = dist(m, tr); if (d < nd) { nd = d; near = m; } }
+      const eta = nd / speed;
+      let need = tr.troops + 2;
+      if (tr.owner !== NEUTRAL) need += tr.grow * run.factions[tr.owner].gMul * eta * f.foresight;
+      const a = inc[tr.id];
+      for (let o = 0; o < a.length; o++) {
+        if (o === tr.owner + 1) need += a[o];
+        else if (o === f.id + 1) need -= a[o];
+        else need -= a[o] * 0.5;
+      }
+      need += towerCost(near, tr, f.id, speed);
+      if (need <= 0) continue;
+      const neutral = tr.owner === NEUTRAL;
+      let score;
+      if (f.pers === 'expander') score = -nd / 70 - need / 14 + (neutral ? 1.6 : 0) + (tr.kind ? 0.8 : 0);
+      else if (f.pers === 'turtle') score = -need / 7 - nd / 90 + (neutral ? 1 : 0) + (tr.kind === 'capital' ? 1 : 0);
+      else score = -need / 5 - nd / 140 + (tr.troops < 6 ? 2 : 0) + (tr.owner === leader ? 1.2 : 0);
+      // Gentle rivals leave the player alone for a while and prefer free land.
+      if (tr.owner === PLAYER) score -= (1 - f.skill) * 2.2 * Math.max(0, 1 - run.time / 150);
+      cands.push({ tr, need, score });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    for (const c of cands.slice(0, 6)) {
+      const want = c.need * f.margin * (f.pers === 'turtle' ? 1.25 : 1);
+      const srcs = mine.filter(m => avail(m) > 0).sort((a, b) => dist(a, c.tr) - dist(b, c.tr)).slice(0, 4);
+      let sum = 0;
+      const pick = [];
+      for (const s of srcs) { if (sum >= want) break; pick.push(s); sum += avail(s); }
+      if (sum < want) continue;
+      let left = Math.ceil(want) + (f.pers === 'expander' ? 3 : 6);
+      for (const s of pick) { const n = Math.min(avail(s), left); left -= send(s, c.tr, n); }
+      return;
+    }
+    // 3) Nothing to take: move surplus from safe rear regions to the front.
+    if (mine.length > 1) {
+      const enemyDist = r => Math.min(...run.regions.filter(o => o.owner !== f.id).map(o => dist(o, r)));
+      const front = mine.reduce((a, b) => enemyDist(a) <= enemyDist(b) ? a : b);
+      const rear = mine.find(m => m !== front && m.troops > m.cap * 0.8 && avail(m) > 8);
+      if (rear) send(rear, front, avail(rear));
+    }
+  }
+
+  // ---------- Rendering ----------
+  const ICONS = {
+    capital: new Path2D('M-5.5 3.5 L-5.5 -3 L-2.7 0 L0 -4.5 L2.7 0 L5.5 -3 L5.5 3.5 Z'),
+    speed: new Path2D('M1.5 -5.5 L-3.5 1 L-0.2 1 L-1.5 5.5 L3.5 -1 L0.2 -1 Z'),
+    tower: new Path2D('M-4.5 4.5 L-4.5 -4.5 L-2.6 -4.5 L-2.6 -2.7 L-0.9 -2.7 L-0.9 -4.5 L0.9 -4.5 L0.9 -2.7 L2.6 -2.7 L2.6 -4.5 L4.5 -4.5 L4.5 4.5 Z'),
+  };
+  const ICON_COLOR = { capital: '#e3a400', speed: '#ff7a00', tower: '#4b5468' };
+
+  function resize() {
+    measure();
+    canvas.width = Math.round(view.w * view.dpr);
+    canvas.height = Math.round(view.h * view.dpr);
+    const st = run || preview;
+    if (st) fit(st.map);
+    renderBackground();
+    if (!run || run.paused || run.over) render();
+  }
+
+  function renderBackground() {
+    bg.width = canvas.width; bg.height = canvas.height;
+    const g = bgCtx, d = view.dpr;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const grad = g.createLinearGradient(0, 0, 0, bg.height);
+    grad.addColorStop(0, '#2f9bd8'); grad.addColorStop(1, '#1d76b2');
+    g.fillStyle = grad; g.fillRect(0, 0, bg.width, bg.height);
+    const r = mulberry(42);
+    g.strokeStyle = 'rgba(255,255,255,0.13)'; g.lineWidth = 2 * d; g.lineCap = 'round';
+    for (let i = 0, n = Math.round(view.w * view.h / 7000); i < n; i++) {
+      const x = r() * bg.width, y = r() * bg.height, s = (5 + r() * 5) * d;
+      g.beginPath(); g.moveTo(x - s, y); g.quadraticCurveTo(x - s / 2, y - s / 2, x, y); g.quadraticCurveTo(x + s / 2, y + s / 2, x + s, y); g.stroke();
+    }
+    const st = run || preview;
+    if (!st) return;
+    g.setTransform(d * view.s, 0, 0, d * view.s, d * view.x0, d * view.y0);
+    g.lineJoin = 'round';
+    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 26;
+    for (const reg of st.regions) g.stroke(reg.path);
+    g.save(); g.translate(0, 7);
+    g.fillStyle = g.strokeStyle = '#155a8a'; g.lineWidth = 10;
+    for (const reg of st.regions) { g.fill(reg.path); g.stroke(reg.path); }
+    g.restore();
+    g.fillStyle = g.strokeStyle = '#f5e6bd'; g.lineWidth = 10;
+    for (const reg of st.regions) { g.fill(reg.path); g.stroke(reg.path); }
+  }
+
+  function render() {
+    const st = run || preview;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(bg, 0, 0);
+    if (!st) return;
+    const s = view.s, d = view.dpr;
+    ctx.setTransform(d * s, 0, 0, d * s, d * view.x0, d * view.y0);
+    const time = run ? run.time : 0;
+    for (const r of st.regions) {
+      const c = colorOf(r.owner);
+      if (r.anim) {
+        ctx.fillStyle = colorOf(r.anim.from).fill; ctx.fill(r.path);
+        ctx.save(); ctx.clip(r.path);
+        const e = 1 - (1 - r.anim.t) ** 3;
+        ctx.beginPath(); ctx.arc(r.x, r.y, r.reach * e + 1, 0, TAU); ctx.fillStyle = c.fill; ctx.fill();
+        ctx.restore();
+      } else { ctx.fillStyle = c.fill; ctx.fill(r.path); }
+    }
+    // Highlight selected regions and the current drag/keyboard target.
+    const target = run && !run.over ? currentTarget() : null;
+    if (run) {
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      for (const r of run.sel) ctx.fill(r.path);
+      if (target) { ctx.fillStyle = target.owner === PLAYER ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.4)'; ctx.fill(target.path); }
+      else if (hover && !ptr && !run.sel.has(hover)) { ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fill(hover.path); }
+    }
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(1.4, 1.3 / s);
+    for (const r of st.regions) ctx.stroke(r.path);
+    if (target) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.2 / s; ctx.stroke(target.path); }
+    // Tower ranges.
+    ctx.setLineDash([5, 5]); ctx.lineWidth = 1.5 / s;
+    for (const r of st.regions) {
+      if (r.kind !== 'tower') continue;
+      ctx.strokeStyle = r.owner === NEUTRAL ? 'rgba(60,68,88,0.35)' : colorOf(r.owner).dark + '80';
+      ctx.beginPath(); ctx.arc(r.x, r.y, TOWER_RANGE, 0, TAU); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    if (run) {
+      drawOrders(target);
+      drawUnits();
+      ctx.strokeStyle = '#fff6c2'; ctx.lineWidth = 2 / s; ctx.lineCap = 'round';
+      for (const tr of run.tracers) { ctx.globalAlpha = tr.life / 0.14; ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    for (const r of st.regions) drawBase(r, time);
+    if (run) {
+      for (const f of run.fx) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, 2.2, 0, TAU); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      if (kbMode && run.focus && !run.over) {
+        const r = run.focus, R = baseR() + 7;
+        ctx.strokeStyle = '#ffc53d'; ctx.lineWidth = 3 / s; ctx.setLineDash([6 / s, 4 / s]);
+        ctx.beginPath(); ctx.arc(r.x, r.y, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+
+  const baseR = () => clamp(13 / view.s, BASE_R, 24);
+
+  function drawBase(r, time) {
+    const c = colorOf(r.owner), s = view.s;
+    const R = baseR() * (1 + r.pop * 0.22) * (r.kind === 'capital' ? 1.12 : 1);
+    ctx.fillStyle = 'rgba(10,30,60,0.22)';
+    ctx.beginPath(); ctx.ellipse(r.x, r.y + R * 0.35, R * 1.05, R * 0.8, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(r.x, r.y, R + 2.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = c.base;
+    ctx.beginPath(); ctx.arc(r.x, r.y, R, 0, TAU); ctx.fill();
+    if (run && run.sel.has(r)) {
+      const pulse = reduced ? 0 : Math.sin(time * 8) * 1.5;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 / s;
+      ctx.beginPath(); ctx.arc(r.x, r.y, R + 6 + pulse, 0, TAU); ctx.stroke();
+    }
+    const n = Math.floor(r.troops);
+    const fs = clamp(11.5 / s, 12.5, 20) * (n >= 100 ? 0.86 : 1);
+    ctx.font = `900 ${fs}px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(String(n), r.x, r.y + fs * 0.06);
+    if (r.kind) {
+      const bx = r.x + R * 0.78, by = r.y - R * 0.78, k = clamp(1 / s, 0.75, 1.3);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(bx, by, 7.6 * k, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(bx, by); ctx.scale(k, k);
+      ctx.fillStyle = ICON_COLOR[r.kind]; ctx.fill(ICONS[r.kind]);
+      ctx.restore();
+    }
+  }
+
+  function drawUnits() {
+    const byOwner = new Map();
+    for (const u of run.units) { const l = byOwner.get(u.o); if (l) l.push(u); else byOwner.set(u.o, [u]); }
+    for (const [o, list] of byOwner) {
+      const c = COLORS[o];
+      for (const [color, rad] of [[c.dark, UNIT_R + 0.9], [c.base, UNIT_R]]) {
+        ctx.fillStyle = color; ctx.beginPath();
+        for (const u of list) { ctx.moveTo(u.x + rad, u.y); ctx.arc(u.x, u.y, rad, 0, TAU); }
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawOrders(target) {
+    const s = view.s;
+    let end = null;
+    if (ptr && ptr.moved) end = target || { x: ptr.x, y: ptr.y };
+    else if (kbMode && run.sel.size && run.focus && !run.sel.has(run.focus)) end = run.focus;
+    if (!end) return;
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.fillStyle = '#fff'; ctx.lineWidth = 3.4 / s; ctx.lineCap = 'round';
+    ctx.setLineDash([9 / s, 7 / s]);
+    ctx.lineDashOffset = reduced ? 0 : -run.time * 40 / s;
+    for (const r of run.sel) {
+      if (r === end) continue;
+      const dx = end.x - r.x, dy = end.y - r.y, len = Math.hypot(dx, dy);
+      if (len < 4) continue;
+      const stop = end === target || end === run.focus ? baseR() + 6 : 0;
+      const ex = end.x - dx / len * stop, ey = end.y - dy / len * stop;
+      ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(ex, ey); ctx.stroke();
+      const a = Math.atan2(dy, dx), h = 10 / s;
+      ctx.save(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.cos(a - 0.5) * h, ey - Math.sin(a - 0.5) * h); ctx.lineTo(ex - Math.cos(a + 0.5) * h, ey - Math.sin(a + 0.5) * h); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+  }
+
+  // ---------- HUD ----------
+  function buildBar() {
+    const owners = run.factions.map(f => f.id).concat(NEUTRAL);
+    $('bar').replaceChildren(...owners.map(o => { const sp = document.createElement('span'); sp.style.background = colorOf(o).base; sp.dataset.o = o; return sp; }));
+    updateBar();
+  }
+  function updateBar() {
+    const counts = new Map();
+    for (const r of run.regions) counts.set(r.owner, (counts.get(r.owner) || 0) + 1);
+    for (const sp of $('bar').children) sp.style.flexGrow = String(counts.get(Number(sp.dataset.o)) || 0);
+    const c = fmt(run.time);
+    if ($('clock').textContent !== c) $('clock').textContent = c;
+  }
+  function toast(text) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+  function announce(text) { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = text; }, 30); }
+
+  // ---------- Input ----------
+  function toWorld(cx, cy) { return { x: (cx - view.x0) / view.s, y: (cy - view.y0) / view.s }; }
+  function regionAt(cx, cy) {
+    if (!run) return null;
+    const w = toWorld(cx, cy);
+    let best = null, bd = Math.max(BASE_R * 1.4, 22 / view.s) ** 2;
+    for (const r of run.regions) { const d = (r.x - w.x) ** 2 + (r.y - w.y) ** 2; if (d < bd) { bd = d; best = r; } }
+    if (best) return best;
+    let bi = -1, bs = Infinity;
+    run.map.sites.forEach((p, i) => { const d = (p.x - w.x) ** 2 + (p.y - w.y) ** 2; if (d < bs) { bs = d; bi = i; } });
+    const ri = bi >= 0 ? run.map.siteRegion[bi] : -1;
+    return ri >= 0 ? run.regions[ri] : null;
+  }
+  function currentTarget() {
+    if (ptr && ptr.moved) return ptr.over;
+    return null;
+  }
+  const playing = () => run && !run.over && !run.paused;
+
+  function order(target) {
+    const srcs = [...run.sel].filter(r => r !== target && r.owner === PLAYER);
+    run.sel.clear();
+    if (!target || !srcs.length) return;
+    let total = 0;
+    for (const r of srcs) total += send(r, target, r.troops);
+    if (total) { hideNotice(); if (kbMode) announce(t.sent(total)); }
+  }
+
+  canvas.addEventListener('pointerdown', event => {
+    if (!playing()) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    canvas.focus({ preventScroll: true });
+    kbMode = false;
+    hideNotice();
+    try { canvas.setPointerCapture(event.pointerId); } catch {}
+    const r = regionAt(event.clientX, event.clientY), w = toWorld(event.clientX, event.clientY);
+    ptr = { id: event.pointerId, sx: event.clientX, sy: event.clientY, x: w.x, y: w.y, moved: false, start: r, over: r };
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!run) return;
+    const r = regionAt(event.clientX, event.clientY);
+    if (!ptr || ptr.id !== event.pointerId) {
+      hover = playing() && event.pointerType === 'mouse' ? r : null;
+      canvas.style.cursor = hover && hover.owner === PLAYER ? 'pointer' : '';
+      return;
+    }
+    const w = toWorld(event.clientX, event.clientY);
+    ptr.x = w.x; ptr.y = w.y; ptr.over = r;
+    if (!ptr.moved && Math.hypot(event.clientX - ptr.sx, event.clientY - ptr.sy) > 9) {
+      ptr.moved = true;
+      if (ptr.start && ptr.start.owner === PLAYER) run.sel.add(ptr.start);
+    }
+    // Sweeping across your own regions adds them to the attack group.
+    if (ptr.moved && r && r.owner === PLAYER && run.sel.size) run.sel.add(r);
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (!ptr || ptr.id !== event.pointerId) return;
+    const p = ptr;
+    ptr = null;
+    if (!playing()) return;
+    const r = regionAt(event.clientX, event.clientY);
+    if (p.moved) { if (run.sel.size) order(r); return; }
+    tap(r);
+  });
+  canvas.addEventListener('pointercancel', () => { ptr = null; });
+  canvas.addEventListener('pointerleave', () => { hover = null; });
+
+  function tap(r) {
+    if (!r) { run.sel.clear(); return; }
+    if (r.owner === PLAYER) {
+      if (run.sel.has(r)) run.sel.delete(r);
+      else if (run.sel.size) order(r);
+      else run.sel.add(r);
+    } else if (run.sel.size) order(r);
+  }
+
+  function describe(r) {
+    const owner = r.owner === PLAYER ? t.you : r.owner === NEUTRAL ? t.neutral : t.factions[r.owner];
+    return t.baseDesc(owner, Math.floor(r.troops), r.kind ? t.kinds[r.kind] : '') + (run.sel.has(r) ? `, ${t.selectedWord}` : '');
+  }
+  function moveFocus(dx, dy) {
+    const from = run.focus || run.regions.find(r => r.owner === PLAYER) || run.regions[0];
+    let best = null, bs = Infinity;
+    for (const r of run.regions) {
+      if (r === from) continue;
+      const vx = r.x - from.x, vy = r.y - from.y, len = Math.hypot(vx, vy);
+      const cos = (vx * dx + vy * dy) / len;
+      if (cos < 0.45) continue;
+      const sc = len * (2.2 - cos * 1.2);
+      if (sc < bs) { bs = sc; best = r; }
+    }
+    if (best) setFocus(best);
+  }
+  function setFocus(r) { run.focus = r; announce(describe(r)); }
+
+  canvas.addEventListener('keydown', event => {
+    if (!playing() || event.altKey || event.ctrlKey || event.metaKey) return;
+    const k = event.key;
+    const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    if (dirs[k]) { event.preventDefault(); kbMode = true; moveFocus(...dirs[k]); return; }
+    if (k === 'Tab') {
+      // Tab cycles through your own regions, then lets focus leave the map.
+      const own = run.regions.filter(r => r.owner === PLAYER).sort((a, b) => a.y - b.y || a.x - b.x);
+      const i = own.indexOf(run.focus), next = own[event.shiftKey ? i - 1 : i + 1];
+      if (next && (i >= 0 || !event.shiftKey)) { event.preventDefault(); kbMode = true; setFocus(next); }
+      return;
+    }
+    if (k === ' ' || k === 'Spacebar') {
+      event.preventDefault(); kbMode = true;
+      const r = run.focus;
+      if (r && r.owner === PLAYER) { if (run.sel.has(r)) run.sel.delete(r); else run.sel.add(r); announce(describe(r)); }
+      return;
+    }
+    if (k === 'Enter') {
+      event.preventDefault(); kbMode = true;
+      const r = run.focus;
+      if (!r) return;
+      if ([...run.sel].some(s => s !== r)) order(r);
+      else if (r.owner === PLAYER) { run.sel.add(r); announce(describe(r)); }
+    }
+  });
+  canvas.addEventListener('focus', () => { if (playing() && !run.focus) run.focus = run.regions.find(r => r.owner === PLAYER); });
+  document.addEventListener('keydown', event => {
+    if ((event.key === 'p' || event.key === 'P') && run && !run.over && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      run.paused ? resume() : pause();
+    }
+  });
+
+  // ---------- Flow ----------
+  const OVERLAYS = ['menu', 'levels', 'skirmish', 'shop', 'paused', 'result'];
+  let lastPanel = 'menu';
+  function show(id, focusEl) {
+    for (const o of OVERLAYS) $(o).hidden = o !== id;
+    if (id) {
+      if (id !== 'paused' && id !== 'result') lastPanel = id;
+      const f = focusEl || $(id).querySelector('button:not([disabled])');
+      if (f) f.focus({ preventScroll: true });
+    }
+  }
+  const unlocked = () => { const i = stars.findIndex(s => !s); return i < 0 ? LEVELS : i + 1; };
+  const totalStars = () => stars.reduce((a, b) => a + b, 0);
+  function setWallet() {
+    for (const id of ['menu-wallet', 'shop-wallet']) { const w = $(id); w.querySelector('.num').textContent = String(coins); w.setAttribute('aria-label', t.coins(coins)); }
+  }
+  function todayBest() { return daily && daily.d === todayKey() && daily.best ? daily.best : 0; }
+
+  function showMenu() {
+    stopRun();
+    $('hud').classList.add('off');
+    $('play-info').textContent = t.playInfo(unlocked());
+    $('levels-info').textContent = t.levelsInfo(totalStars());
+    const b = todayBest();
+    $('daily-info').textContent = t.dailyInfo(b ? fmt(b) : '');
+    setWallet();
+    makePreview();
+    show('menu', $('play'));
+  }
+
+  function makePreview() {
+    measure();
+    const seed = (Math.random() * 2 ** 31) >>> 0;
+    const map = genMap(seed, 24, play.w / play.h);
+    const rnd = mulberry(seed);
+    const regions = map.regions;
+    // Paint a few colourful empires with a flood fill so the menu backdrop looks like a live war.
+    const starts = placeStarts(regions, 4, play.w / play.h, rnd);
+    const queue = [];
+    starts.forEach((r, i) => { r.owner = i; queue.push(r); });
+    let grown = starts.length;
+    while (queue.length && grown < regions.length * 0.75) {
+      const r = queue.splice(Math.floor(rnd() * queue.length), 1)[0];
+      for (const j of r.nb) { const o = regions[j]; if (o.owner === NEUTRAL && rnd() < 0.75) { o.owner = r.owner; queue.push(o); grown++; } }
+    }
+    for (const r of regions) { setKind(r, rnd() < 0.08 ? 'tower' : ''); r.troops = 5 + Math.floor(rnd() * 40); }
+    preview = { map, regions };
+    fit(map);
+    renderBackground();
+    render();
+  }
+
+  function buildLevels() {
+    const open = unlocked();
+    $('levels-sub').textContent = t.levelsSub(totalStars(), LEVELS * 3);
+    $('level-grid').replaceChildren(...Array.from({ length: LEVELS }, (_, i) => {
+      const n = i + 1, b = document.createElement('button');
+      b.type = 'button'; b.className = 'lvl';
+      const s = stars[i];
+      if (n > open) {
+        b.classList.add('locked'); b.setAttribute('aria-disabled', 'true');
+        b.innerHTML = '<b></b><small aria-hidden="true">🔒</small>';
+        b.setAttribute('aria-label', t.levelLocked(n));
+      } else {
+        if (n === open && !s) b.classList.add('current');
+        b.innerHTML = '<b></b><small aria-hidden="true"><i></i></small>';
+        b.querySelector('i').textContent = '★'.repeat(s);
+        b.querySelector('small').append('★'.repeat(3 - s));
+        b.setAttribute('aria-label', t.levelLabel(n, s));
+        b.addEventListener('click', () => startRun('campaign', n));
+      }
+      b.querySelector('b').textContent = String(n);
+      return b;
+    }));
+    show('levels');
+    const cur = $('level-grid').querySelector('.current') || $('level-grid').children[Math.min(open, LEVELS) - 1];
+    if (cur) { cur.focus({ preventScroll: true }); cur.scrollIntoView({ block: 'nearest' }); }
+  }
+
+  function seg(el, labels, value, onPick) {
+    el.replaceChildren(...labels.map((txt, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.setAttribute('role', 'radio'); b.textContent = txt;
+      b.setAttribute('aria-checked', String(i === value));
+      b.addEventListener('click', () => { onPick(i); for (const c of el.children) c.setAttribute('aria-checked', String(c === b)); });
+      return b;
+    }));
+  }
+  function buildSkirmish() {
+    seg($('seg-size'), t.sizes, skirm.size, i => { skirm.size = i; save('skirmish', skirm); });
+    seg($('seg-rivals'), ['1', '2', '3', '4', '5'], skirm.rivals - 1, i => { skirm.rivals = i + 1; save('skirmish', skirm); });
+    seg($('seg-diff'), t.diffs, skirm.diff, i => { skirm.diff = i; save('skirmish', skirm); });
+    show('skirmish', $('start-skirmish'));
+  }
+
+  function buildShop(focusKey) {
+    setWallet();
+    $('ups').replaceChildren(...UPGRADES.map(u => {
+      const lvl = upg[u.key], row = document.createElement('div');
+      row.className = 'up';
+      row.innerHTML = '<span class="ico" aria-hidden="true"></span><div><b></b><small></small><div class="pips" aria-hidden="true"></div></div><button type="button" class="buy"></button>';
+      row.querySelector('.ico').textContent = u.ico;
+      row.querySelector('b').textContent = t[u.name];
+      row.querySelector('small').textContent = t[u.info](Math.min(lvl + 1, UPG_COST.length) * u.per);
+      row.querySelector('.pips').replaceChildren(...UPG_COST.map((_, i) => { const p = document.createElement('i'); if (i < lvl) p.className = 'on'; return p; }));
+      const btn = row.querySelector('.buy');
+      btn.dataset.key = u.key;
+      if (lvl >= UPG_COST.length) { btn.textContent = t.max; btn.disabled = true; }
+      else {
+        const cost = UPG_COST[lvl];
+        btn.innerHTML = '<span class="coin" aria-hidden="true"></span><span></span>';
+        btn.lastChild.textContent = String(cost);
+        btn.setAttribute('aria-label', t.buyLabel(t[u.name], cost));
+        btn.disabled = coins < cost;
+        btn.addEventListener('click', () => {
+          if (coins < cost || upg[u.key] >= UPG_COST.length) return;
+          coins -= cost; upg[u.key]++;
+          save('coins', coins); save('upgrades', upg);
+          announce(t.bought(t[u.name]));
+          buildShop(u.key);
+        });
+      }
+      return row;
+    }));
+    if (focusKey) {
+      const b = $('ups').querySelector(`.buy[data-key="${focusKey}"]`);
+      (b && !b.disabled ? b : $('shop').querySelector('[data-back]')).focus({ preventScroll: true });
+    }
+  }
+
+  function startRun(mode, level = 0) {
+    stopRun();
+    clearTimeout(pendingResult);
+    show(null);
+    $('hud').classList.remove('off');
+    run = newRun(mode, level);
+    preview = null;
+    fit(run.map);
+    renderBackground();
+    $('hud-label').textContent = mode === 'campaign' ? t.hudLevel(level) : mode === 'daily' ? t.hudDaily : t.hudSkirmish;
+    $('clock').textContent = '0:00';
+    buildBar();
+    const title = $('hud-label').textContent;
+    showNotice(title, [t.intro(run.p.ais), run.p.tip ? t[run.p.tip] : ''].filter(Boolean).join(' '), mode === 'campaign' ? t.starGoal(fmt(run.p.t3)) : '');
+    announce(`${title}. ${t.intro(run.p.ais)}`);
+    canvas.focus({ preventScroll: true });
+    lastTime = performance.now(); acc = 0;
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function stopRun() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    run = null; ptr = null; hover = null;
+    hideNotice();
+  }
+
+  function showNotice(title, text, goal) {
+    $('notice-title').textContent = title;
+    $('notice-text').textContent = text;
+    $('notice-goal').textContent = goal;
+    $('notice').hidden = false;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(hideNotice, run && run.p.tip === 'tipFirst' ? 6000 : 3200);
+  }
+  function hideNotice() { clearTimeout(noticeTimer); $('notice').hidden = true; }
+
+  function finish(win) {
+    run.over = true; run.win = win;
+    run.sel.clear(); ptr = null;
+    hideNotice();
+    const p = run.p, tm = run.time;
+    let got = 0, earned = 0, best = false;
+    if (win) {
+      if (run.mode === 'campaign') {
+        got = tm <= p.t3 ? 3 : tm <= p.t2 ? 2 : 1;
+        const prev = stars[run.level - 1];
+        earned = prev ? 4 + got * 2 : 10 + run.level + got * 5;
+        if (got > prev) { stars[run.level - 1] = got; save('stars', stars); }
+      } else if (run.mode === 'daily') {
+        const today = todayKey();
+        if (!daily || daily.d !== today) daily = { d: today, best: 0, wins: 0 };
+        earned = daily.wins ? 6 : 30;
+        best = !daily.best || tm < daily.best;
+        if (best) daily.best = Math.round(tm * 10) / 10;
+        daily.wins++;
+        save('daily', daily);
+      } else earned = Math.round((6 + p.ais * 4) * (1 + skirm.diff * 0.5));
+    } else earned = run.mode === 'campaign' ? 0 : 2;
+    coins += earned;
+    save('coins', coins);
+    updateBar();
+    run.result = { got, earned, best };
+    pendingResult = setTimeout(showResult, reduced ? 200 : 1100);
+  }
+
+  function showResult() {
+    if (!run || !run.over) return;
+    cancelAnimationFrame(rafId); rafId = 0;
+    render();
+    const { got, earned, best } = run.result, win = run.win;
+    $('result-emblem').textContent = win ? '🏆' : '🏳️';
+    $('result-title').textContent = win ? t.win : t.lose;
+    $('result-sub').textContent = win ? t.winSub(fmt(run.time)) : t.loseSub;
+    const st = $('result-stars');
+    st.replaceChildren();
+    st.hidden = !(win && run.mode === 'campaign');
+    for (let i = 0; i < 3; i++) { const s = document.createElement('span'); s.textContent = '★'; if (i < got) s.className = 'on'; st.append(s); }
+    $('result-note').textContent = win && run.mode === 'campaign' && got < 3 ? t.starGoal(fmt(run.p.t3)) : '';
+    $('result-coins').hidden = !earned;
+    $('result-coins').lastChild.textContent = t.coinsEarned(earned);
+    $('result-best').hidden = !best;
+    const hasNext = win && run.mode === 'campaign' && run.level < LEVELS;
+    $('result-next').hidden = !hasNext;
+    $('result-retry').textContent = win ? t.playAgain : t.retry;
+    show('result', hasNext ? $('result-next') : $('result-retry'));
+    announce([$('result-title').textContent, $('result-sub').textContent, win && run.mode === 'campaign' ? `${got}/3 ★` : '', earned ? t.coinsEarned(earned) : ''].filter(Boolean).join(' '));
+  }
+
+  function frame(time) {
+    rafId = 0;
+    if (!run || run.paused) return;
+    // Fixed simulation step; a stalled frame is clamped so nothing teleports.
+    acc += Math.min(0.05, Math.max(0, (time - lastTime) / 1000));
+    lastTime = time;
+    while (acc >= STEP) { update(STEP); acc -= STEP; }
+    render();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function pause() {
+    if (!run || run.over || run.paused) return;
+    run.paused = true; ptr = null;
+    cancelAnimationFrame(rafId); rafId = 0;
+    hideNotice();
+    show('paused', $('resume'));
+    announce(t.paused);
+  }
+  function resume() {
+    if (!run || run.over) return;
+    run.paused = false;
+    show(null);
+    lastTime = performance.now(); acc = 0;
+    if (!rafId) rafId = requestAnimationFrame(frame);
+    canvas.focus({ preventScroll: true });
+  }
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  window.addEventListener('blur', () => { ptr = null; });
+  $('pause-btn').addEventListener('click', pause);
+  $('resume').addEventListener('click', resume);
+  $('restart').addEventListener('click', () => { const r = run; startRun(r.mode, r.level); });
+  $('quit').addEventListener('click', showMenu);
+  $('play').addEventListener('click', () => startRun('campaign', unlocked()));
+  $('go-levels').addEventListener('click', buildLevels);
+  $('go-skirmish').addEventListener('click', buildSkirmish);
+  $('go-daily').addEventListener('click', () => startRun('daily'));
+  $('go-shop').addEventListener('click', () => { buildShop(); show('shop'); });
+  $('start-skirmish').addEventListener('click', () => startRun('skirmish'));
+  for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', showMenu);
+  $('result-menu').addEventListener('click', showMenu);
+  $('result-retry').addEventListener('click', () => startRun(run.mode, run.level));
+  $('result-next').addEventListener('click', () => startRun('campaign', Math.min(LEVELS, run.level + 1)));
+
+  window.addEventListener('resize', resize);
+  // Read-only snapshot for automated checks.
+  window.__territoryWar = () => run && {
+    mode: run.mode, level: run.level, time: run.time, over: run.over, win: run.win, paused: run.paused, t3: run.p.t3,
+    units: run.units.length, alive: run.factions.map(f => f.alive),
+    regions: run.regions.map(r => ({ id: r.id, owner: r.owner, troops: Math.floor(r.troops), kind: r.kind, sx: view.x0 + r.x * view.s, sy: view.y0 + r.y * view.s })),
+  };
+  resize();
+  showMenu();
+})();
+</script>
+</body>
+</html>

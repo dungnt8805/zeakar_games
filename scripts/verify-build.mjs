@@ -64,6 +64,12 @@ const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => m
 const expectedUrls = locales.flatMap(locale => searchRoutes.map(route => site + localizedRoute(locale, route)));
 assert.deepEqual(sitemapUrls.sort(), expectedUrls.sort(), 'Sitemap must list every canonical page once');
 assert((await read('dist/robots.txt')).toString().includes(`Sitemap: ${site}/sitemap.xml`), 'Missing robots.txt sitemap URL');
+const llms = (await read('dist/llms.txt')).toString();
+const llmsFull = (await read('dist/llms-full.txt')).toString();
+for (const route of [...arcadeRoutes, ...gameRoutes]) {
+  assert(llms.includes(`](${site}${route})`), `llms.txt is missing ${route}`);
+  assert(llmsFull.includes(`URL: ${site}${route}\n`), `llms-full.txt is missing ${route}`);
+}
 
 function verifySeo(html, locale, route) {
   assert(html.includes(`<link rel="canonical" href="${site}${localizedRoute(locale, route)}">`), `Wrong canonical: ${locale}${route}`);
