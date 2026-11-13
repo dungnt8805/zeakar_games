@@ -83,7 +83,7 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({ game, lang = '
 
 					{/* Badge */}
 					{game.badge && (
-						<div className="absolute top-3 left-3 z-20 rounded-full bg-amber-500/95 backdrop-blur-md px-3 py-1 text-xs font-bold text-slate-950 shadow-lg">
+						<div className="absolute top-3 left-3 z-20 rounded-full bg-amber-500/95 backdrop-blur-md px-3 py-1 text-xs font-bold text-[var(--on-accent-pill)] shadow-lg">
 							{game.badge}
 						</div>
 					)}

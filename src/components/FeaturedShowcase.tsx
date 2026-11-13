@@ -25,7 +25,7 @@ export const FeaturedShowcase: React.FC<FeaturedShowcaseProps> = ({ games, lang 
 	if (!currentGame) return null;
 
 	return (
-		<div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-[#111520] p-4 sm:p-8 lg:p-10 ">
+		<div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-[var(--surface)] p-4 sm:p-8 lg:p-10 ">
 			{/* Ambient background glow */}
 			<div className="absolute -top-32 -right-32 h-64 sm:h-96 w-64 sm:w-96 rounded-full bg-amber-500/10 blur-[100px] sm:blur-[120px] pointer-events-none" />
 			<div className="absolute -bottom-32 -left-32 h-64 sm:h-96 w-64 sm:w-96 rounded-full bg-rose-500/10 blur-[100px] sm:blur-[120px] pointer-events-none" />
@@ -54,7 +54,7 @@ export const FeaturedShowcase: React.FC<FeaturedShowcaseProps> = ({ games, lang 
 							aria-pressed={selectedIndex === idx}
 							className={`cursor-pointer flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold transition-all duration-200 shrink-0 ${
 								selectedIndex === idx
-									? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
+									? 'bg-[var(--accent-pill)] text-[var(--on-accent-pill)] shadow-md shadow-amber-500/20'
 									: 'text-slate-400 hover:text-white hover:bg-slate-800/60'
 							}`}
 						>
@@ -92,7 +92,7 @@ export const FeaturedShowcase: React.FC<FeaturedShowcaseProps> = ({ games, lang 
 
 						{/* Badge */}
 						{currentGame.badge && (
-							<div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3 py-0.5 sm:px-3.5 sm:py-1 text-[10px] sm:text-xs font-bold text-slate-950 shadow-lg">
+							<div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-pill)] px-3 py-0.5 sm:px-3.5 sm:py-1 text-[10px] sm:text-xs font-bold text-[var(--on-accent-pill)] shadow-lg">
 								{currentGame.badge}
 							</div>
 						)}

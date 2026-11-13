@@ -1,0 +1,52 @@
+---
+import { UI_TRANSLATIONS, type Locale } from '../i18n/ui';
+interface Props { currentLang?: Locale; className?: string; }
+const { currentLang = 'en', className = '' } = Astro.props;
+const t = UI_TRANSLATIONS[currentLang].theme;
+// "auto" follows the device (prefers-color-scheme); the rest match [data-theme] blocks in global.css.
+const OPTIONS = ['auto', 'dark', 'light', 'gold', 'honey', 'sunflower'] as const;
+---
+<details class={`theme-picker ${className}`} data-label={t.label}>
+  <summary aria-label={`${t.label}: ${t.auto}`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" /></svg><span class="theme-picker-current">{t.auto}</span><span aria-hidden="true">⌄</span></summary>
+  <div role="group" aria-label={t.label}>{OPTIONS.map(option => <button type="button" data-theme-option={option} data-name={t[option]} aria-pressed={option === 'auto' ? 'true' : 'false'}><span><span class="theme-swatch" data-swatch={option} aria-hidden="true"></span>{t[option]}</span><span class="theme-check" aria-hidden="true">{option === 'auto' ? '✓' : ''}</span></button>)}</div>
+</details>
+<script>
+type ThemeApi = { set(choice: string): void };
+const root = document.documentElement;
+for (const picker of document.querySelectorAll<HTMLDetailsElement>('.theme-picker')) {
+  const summary = picker.querySelector('summary')!;
+  const current = picker.querySelector('.theme-picker-current')!;
+  const buttons = [...picker.querySelectorAll<HTMLButtonElement>('[data-theme-option]')];
+  const sync = () => {
+    const choice = root.dataset.themeChoice ?? 'auto';
+    for (const button of buttons) {
+      const active = button.dataset.themeOption === choice;
+      button.setAttribute('aria-pressed', String(active));
+      button.querySelector('.theme-check')!.textContent = active ? '✓' : '';
+      if (active) {
+        current.textContent = button.dataset.name ?? '';
+        summary.setAttribute('aria-label', `${picker.dataset.label}: ${button.dataset.name}`);
+      }
+    }
+  };
+  sync();
+  document.addEventListener('milaan:theme', sync);
+  for (const button of buttons) button.addEventListener('click', () => {
+    (window as Window & { milaanTheme?: ThemeApi }).milaanTheme?.set(button.dataset.themeOption!);
+    picker.open = false;
+    summary.focus();
+  });
+  document.addEventListener('click', event => { if (!picker.contains(event.target as Node)) picker.open = false; });
+  picker.addEventListener('toggle', () => {
+    if (picker.open) document.querySelectorAll<HTMLDetailsElement>('.language-picker[open], .theme-picker[open]').forEach(other => { if (other !== picker) other.open = false; });
+  });
+  picker.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { picker.open = false; summary.focus(); return; }
+    if (!picker.open || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+    event.preventDefault();
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length : (index <= 0 ? buttons.length : index) - 1;
+    buttons[next].focus();
+  });
+}
+</script>
