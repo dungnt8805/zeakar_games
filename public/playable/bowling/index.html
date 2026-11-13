@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bowling</title>
+<style>
+:root {
+  --bg: #120d24;
+  --text: #f4f0ff;
+  --muted: #aca2cc;
+  --accent: #ff5e7e;
+  --accent-dark: #c33859;
+  --teal: #37e2c6;
+  --panel: #f8f5ff;
+  --ink: #241b40;
+  --ink-muted: #6f6792;
+  --line: #e3dcf4;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(120% 90% at 50% 15%, #2b1f55, var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+.app { position: fixed; inset: 0; display: grid; grid-template-areas: "board" "stage" "ctrl"; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
+.board { grid-area: board; min-width: 0; min-height: 0; width: 100%; max-width: 560px; justify-self: center; display: flex; flex-direction: column; gap: 5px; }
+.side-title { display: none; align-items: center; gap: 8px; font-size: 22px; font-weight: 900; letter-spacing: -.02em; }
+.cards { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+.card { flex: 1 1 0; min-width: 0; padding: 4px 7px; border-radius: 12px; background: #ffffff0d; box-shadow: inset 0 0 0 1px #ffffff17; }
+.card.on { order: -1; flex-basis: 100%; background: #37e2c614; box-shadow: inset 0 0 0 2px var(--teal); }
+.ch { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 20px; }
+.ch .dot { flex: none; width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffffaa, var(--c) 50%, #0008); }
+.ch .nm { flex: 1; min-width: 0; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch .tot { font-size: 17px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.ch .tag { font-size: 11px; font-weight: 800; color: var(--muted); }
+.frames { display: none; grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(0, 1.45fr); margin-top: 4px; border-radius: 8px; overflow: hidden; background: #00000059; }
+.card.on .frames { display: grid; }
+.fr { min-width: 0; border-left: 1px solid #ffffff1c; }
+.fr:first-child { border-left: 0; }
+.fr.cur { background: #37e2c633; }
+.rl { display: flex; justify-content: flex-end; height: 16px; }
+.rl i { flex: 0 0 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 900; line-height: 1; }
+.fr.t .rl i { flex-basis: 33.34%; }
+.rl i + i { box-shadow: inset 1px -1px 0 #ffffff2b; }
+.rl i.x { color: var(--accent); }
+.rl i.s { color: var(--teal); }
+.rl i.sp b { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1.5px #ffb347; }
+.cm { height: 17px; text-align: center; font-size: 12px; font-weight: 900; line-height: 17px; font-variant-numeric: tabular-nums; }
+.side-help { display: none; margin-top: auto; padding: 8px 10px; border-radius: 12px; background: #ffffff0a; font-size: 12px; font-weight: 700; line-height: 1.45; color: var(--muted); }
+.side-help b { color: var(--text); font-weight: 800; }
+.sdesc { margin-top: 3px; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+
+.stage { grid-area: stage; position: relative; min-width: 0; min-height: 0; border-radius: 16px; overflow: hidden; background: #0b0818; box-shadow: inset 0 0 0 1px #ffffff14; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+#cv:focus-visible { outline: none; }
+.stage:has(#cv:focus-visible) { box-shadow: inset 0 0 0 3px #37e2c699; }
+.info { position: absolute; right: 8px; top: 8px; max-width: calc(100% - 90px); padding: 4px 10px; border-radius: 99px; background: #0b0818c9; font-size: 12px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; box-shadow: inset 0 0 0 1px #ffffff1c; }
+.info:empty { display: none; }
+.toast { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -6px); max-width: calc(100% - 16px); width: max-content; padding: 6px 14px; border-radius: 99px; background: #0b0818ee; color: #fff; font-size: 14px; font-weight: 800; line-height: 1.3; text-align: center; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; box-shadow: 0 6px 20px #0007, inset 0 0 0 1px #ffffff1c; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(.6); max-width: calc(100% - 20px); font-size: clamp(30px, 11cqmin, 64px); font-weight: 900; letter-spacing: -.02em; line-height: 1.05; text-align: center; color: #fff; text-shadow: 0 4px 0 #0006, 0 0 24px #0009; pointer-events: none; opacity: 0; transition: opacity .2s, transform .35s cubic-bezier(.2, 1.6, .4, 1); }
+.stage { container-type: size; }
+.banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.banner.strike { color: #ffd84a; text-shadow: 0 4px 0 #c33859, 0 0 30px #ff5e7e; }
+.banner.spare { color: var(--teal); text-shadow: 0 4px 0 #136f63, 0 0 26px #37e2c6aa; }
+.banner.small, .banner.long { font-size: clamp(22px, 7cqmin, 40px); }
+
+.ctrl { grid-area: ctrl; display: flex; align-items: stretch; gap: 6px; width: 100%; max-width: 560px; justify-self: center; }
+.ibtn { flex: none; width: 46px; min-height: 48px; border-radius: 14px; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff1c; display: grid; place-items: center; font-size: 20px; font-weight: 900; line-height: 1; }
+.ibtn:active { transform: translateY(1px); background: #ffffff22; }
+.curve { flex: none; display: flex; align-items: center; gap: 3px; padding: 3px; border-radius: 14px; background: #ffffff0d; box-shadow: inset 0 0 0 1px #ffffff1c; }
+.curve button { width: 36px; height: 100%; min-height: 40px; border-radius: 10px; background: #ffffff14; font-size: 20px; font-weight: 900; line-height: 1; }
+.curve button:disabled { opacity: .35; cursor: default; }
+.curve .cv { min-width: 62px; display: grid; justify-items: center; gap: 1px; line-height: 1.1; }
+.curve .cv small { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: .03em; text-transform: uppercase; }
+.curve .cv b { font-size: 15px; font-weight: 900; color: var(--teal); white-space: nowrap; }
+.bowl { flex: 1 1 auto; min-width: 96px; min-height: 48px; position: relative; overflow: hidden; border-radius: 16px; background: var(--accent); color: #2b0a15; box-shadow: 0 4px 0 var(--accent-dark); touch-action: none; line-height: 1.1; }
+.bowl::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #ffe27a, #ffad42); transform: scaleX(var(--p, 0)); transform-origin: left; }
+.bowl span { position: relative; display: block; font-size: 19px; font-weight: 900; }
+.bowl small { position: relative; display: block; font-size: 11px; font-weight: 800; opacity: .75; }
+.bowl:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent-dark); }
+.bowl:disabled { opacity: .5; cursor: default; transform: none; box-shadow: 0 4px 0 var(--accent-dark); }
+
+.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: #0a0618cc; }
+.ov.light { background: #0a061866; }
+.ov[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 18px 16px; border-radius: 22px; background: var(--panel); color: var(--ink); text-align: center; box-shadow: 0 7px 0 #d5cbec, 0 24px 60px #000b; animation: rise .28s ease-out; overscroll-behavior: contain; }
+.panel.xl { width: min(100%, 640px); }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.logo { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.logo h1 { font-size: 38px; font-weight: 900; letter-spacing: -.03em; line-height: 1; color: var(--ink); }
+.bball { flex: none; position: relative; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #ffb3c4, var(--accent) 45%, #7d1832); box-shadow: 0 4px 10px #0004; }
+.bball i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #3a0d1a; }
+.bball i:nth-child(1) { left: 14px; top: 10px; } .bball i:nth-child(2) { left: 22px; top: 12px; } .bball i:nth-child(3) { left: 18px; top: 19px; }
+.side-title .bball { width: 26px; height: 26px; }
+.side-title .bball i { width: 5px; height: 5px; }
+.side-title .bball i:nth-child(1) { left: 9px; top: 6px; } .side-title .bball i:nth-child(2) { left: 15px; top: 8px; } .side-title .bball i:nth-child(3) { left: 11px; top: 13px; }
+.tagline { margin-top: 8px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--ink-muted); }
+.modes { margin-top: 14px; display: grid; gap: 8px; }
+.mode { display: grid; grid-template-columns: 36px 1fr; align-items: center; gap: 2px 10px; padding: 10px 12px; border-radius: 16px; background: #fff; text-align: left; box-shadow: 0 3px 0 var(--line), inset 0 0 0 1px var(--line); }
+.mode:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line), inset 0 0 0 1px var(--line); }
+.mode .ic { grid-row: span 2; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; background: var(--c); color: #fff; font-weight: 900; }
+.mode strong { font-size: 16px; font-weight: 900; line-height: 1.2; }
+.mode small { font-size: 12px; font-weight: 700; color: var(--ink-muted); line-height: 1.3; }
+.small { margin-top: 10px; font-size: 12px; font-weight: 700; line-height: 1.4; color: var(--ink-muted); }
+.small:empty { display: none; }
+.field { margin-top: 14px; text-align: left; }
+.field[hidden] { display: none; }
+.label { margin-bottom: 6px; font-size: 12px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-muted); }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #ebe5f8; }
+.seg button { flex: 1; min-width: 0; min-height: 36px; padding: 7px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--ink-muted); line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #d5cbec; }
+.cta { display: block; width: 100%; margin-top: 16px; padding: 13px; border-radius: 16px; background: var(--accent); color: #2b0a15; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 14px; background: #ebe5f8; color: var(--ink); font-size: 15px; font-weight: 800; }
+.ghost[hidden], .cta[hidden] { display: none; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin-top: 8px; padding: 9px 12px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); text-align: left; font-size: 15px; font-weight: 800; }
+.toggle span:first-child { min-width: 0; }
+.toggle small { display: block; font-size: 11px; color: var(--ink-muted); font-weight: 700; }
+.sw { flex: 0 0 auto; width: 42px; height: 24px; border-radius: 99px; background: #d3cbe6; position: relative; transition: background .2s; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0004; transition: transform .2s; }
+.toggle[aria-checked="true"] .sw { background: #22b59c; }
+.toggle[aria-checked="true"] .sw::after { transform: translateX(18px); }
+.big { margin-top: 8px; font-size: 40px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.sub { margin-top: 6px; font-size: 15px; font-weight: 800; color: var(--ink-muted); line-height: 1.35; }
+.stars { margin-top: 8px; font-size: 34px; letter-spacing: 4px; color: #f2a516; text-shadow: 0 2px 0 #c47c06; }
+.stars .off { color: #ddd6ea; text-shadow: none; }
+.stars:empty { display: none; }
+.levels { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+.lv { position: relative; min-height: 64px; padding: 6px 2px 5px; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 var(--line), inset 0 0 0 1px var(--line); display: grid; justify-items: center; align-content: center; gap: 3px; }
+.lv strong { font-size: 13px; font-weight: 900; line-height: 1; color: var(--ink-muted); }
+.lv svg { width: 34px; height: 24px; display: block; }
+.lv small { font-size: 10px; letter-spacing: 1px; color: #f2a516; line-height: 1; }
+.lv small .off { color: #ddd6ea; }
+.lv:disabled { opacity: .45; cursor: default; }
+.lv.cur { box-shadow: 0 3px 0 var(--accent-dark), inset 0 0 0 2px var(--accent); }
+.scorelist { margin-top: 12px; display: grid; gap: 8px; text-align: left; }
+.scorelist .card { background: #2a2050; color: var(--text); box-shadow: none; padding: 6px 8px; }
+.scorelist .card.on { box-shadow: inset 0 0 0 2px var(--teal); }
+.scorelist .frames { display: grid; }
+.res-list { margin-top: 8px; display: grid; gap: 4px; font-size: 15px; font-weight: 800; color: var(--ink); }
+.res-list:empty { display: none; }
+.res-list div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 12px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.res-list div.win { box-shadow: inset 0 0 0 2px var(--teal); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Wide frames: the lane takes the full height, scorecards and controls move to a side column. */
+@media (min-aspect-ratio: 5/4) {
+  .app { grid-template-areas: "stage board" "stage ctrl"; grid-template-columns: minmax(0, 1fr) clamp(240px, 34vw, 450px); grid-template-rows: minmax(0, 1fr) auto; gap: 8px; }
+  .board { max-width: none; min-height: 0; overflow-y: auto; align-self: stretch; }
+  .side-title { display: flex; }
+  .side-help { display: block; }
+  .cards { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+  .card, .card.on { flex: none; order: 0; }
+  .card .frames { display: grid; }
+  .ctrl { max-width: none; flex-wrap: wrap; align-self: end; }
+  .ctrl .bowl { flex-basis: 100%; min-height: 58px; order: 5; }
+  .ctrl .curve { flex: 1 1 auto; justify-content: space-between; }
+  #scores-btn { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (min-height: 560px) {
+  .ch .nm { font-size: 15px; }
+  .ch .tot { font-size: 20px; }
+  .rl { height: 19px; }
+  .rl i { font-size: 13px; }
+  .cm { height: 21px; line-height: 21px; font-size: 14px; }
+}
+/* Short landscape screens: only the active player keeps the full scorecard. */
+@media (min-aspect-ratio: 5/4) and (max-height: 480px) {
+  .side-title, .side-help { display: none; }
+  .cards { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .card { flex: 1 1 0; }
+  .card.on { flex-basis: 100%; order: -1; }
+  .card:not(.on) .frames { display: none; }
+  .ctrl { gap: 5px; }
+  .ibtn { min-height: 40px; width: 42px; }
+  .curve button { min-height: 34px; }
+  .ctrl .bowl { min-height: 46px; }
+  #scores-btn { display: grid; }
+}
+@media (max-height: 520px) {
+  .panel { padding: 12px 14px; border-radius: 18px; }
+  .logo h1 { font-size: 30px; }
+  .bball { width: 32px; height: 32px; }
+  .bball i { width: 6px; height: 6px; }
+  .bball i:nth-child(1) { left: 11px; top: 8px; } .bball i:nth-child(2) { left: 18px; top: 10px; } .bball i:nth-child(3) { left: 14px; top: 16px; }
+  .tagline { display: none; }
+  .modes { margin-top: 10px; gap: 6px; }
+  .mode { padding: 7px 10px; }
+  .field { margin-top: 10px; }
+  .cta { margin-top: 12px; padding: 10px; font-size: 17px; }
+  .ghost { margin-top: 8px; padding: 9px; }
+  .big { font-size: 32px; }
+  .stars { font-size: 28px; }
+  .res-list { gap: 3px; font-size: 14px; }
+  .res-list div { padding: 3px 12px; }
+  .panel h2 { font-size: 23px; }
+}
+@media (max-height: 420px) and (min-width: 520px) {
+  .panel.wide { width: min(100%, 620px); }
+  .panel.wide .modes { grid-template-columns: 1fr 1fr; }
+  .mode small { display: none; }
+  .mode { grid-template-columns: 30px 1fr; }
+  .mode .ic { width: 28px; height: 28px; grid-row: auto; font-size: 14px; }
+}
+@media (max-width: 360px) {
+  .card { padding: 3px 5px; }
+  .rl i { font-size: 10px; }
+  .cm { font-size: 11px; }
+  .ctrl { gap: 4px; }
+  .curve { gap: 2px; }
+  .curve .cv { min-width: 44px; }
+  .curve button { width: 30px; }
+  .ibtn { width: 40px; }
+  .bowl { min-width: 76px; }
+  .bowl span { font-size: 17px; }
+  .bowl small { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <section class="board" id="board">
+    <div class="side-title" aria-hidden="true"><span class="bball"><i></i><i></i><i></i></span>Bowling</div>
+    <div class="cards" id="cards"></div>
+    <div class="side-help" id="side-help"></div>
+  </section>
+  <div class="stage" id="stage">
+    <canvas id="cv" tabindex="0" role="img"></canvas>
+    <div class="info" id="info"></div>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+    <div class="banner" id="banner" aria-hidden="true"></div>
+  </div>
+  <div class="ctrl" id="ctrl">
+    <button type="button" class="ibtn" id="menu-btn" data-i18n-label="menu">☰</button>
+    <div class="curve" role="group" id="curve-group">
+      <button type="button" id="curve-l" data-i18n-label="curveL">↶</button>
+      <div class="cv" aria-hidden="true"><small data-i18n="curve"></small><b id="curve-val"></b></div>
+      <button type="button" id="curve-r" data-i18n-label="curveR">↷</button>
+    </div>
+    <button type="button" class="ibtn" id="scores-btn" data-i18n-label="scores">▦</button>
+    <button type="button" class="bowl" id="bowl"><span data-i18n="bowl"></span><small data-i18n="hold"></small></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="ov" id="menu">
+  <div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="logo"><span class="bball" aria-hidden="true"><i></i><i></i><i></i></span><h1 id="menu-title">Bowling</h1></div>
+    <p class="tagline" data-i18n="tagline"></p>
+    <div class="modes">
+      <button type="button" class="mode" data-mode="solo"><span class="ic" style="--c:#ff5e7e" aria-hidden="true">1</span><strong data-i18n="mSolo"></strong><small data-i18n="dSolo"></small></button>
+      <button type="button" class="mode" data-mode="cpu"><span class="ic" style="--c:#3a8dff" aria-hidden="true">⚡</span><strong data-i18n="mCpu"></strong><small data-i18n="dCpu"></small></button>
+      <button type="button" class="mode" data-mode="party"><span class="ic" style="--c:#f2a516" aria-hidden="true">4</span><strong data-i18n="mParty"></strong><small data-i18n="dParty"></small></button>
+      <button type="button" class="mode" data-mode="spare"><span class="ic" style="--c:#22b59c" aria-hidden="true">★</span><strong data-i18n="mSpare"></strong><small id="spare-sub"></small></button>
+    </div>
+    <p class="small" id="menu-best"></p>
+    <button type="button" class="ghost" id="menu-settings" data-i18n="settings"></button>
+    <p class="small" data-i18n="help"></p>
+  </div>
+</div>
+
+<div class="ov" id="setup" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <h2 id="setup-title"></h2>
+    <div class="field" id="f-diff"><p class="label" id="l-diff" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="l-diff" data-key="diff"><button type="button" data-v="0" data-i18n="easy"></button><button type="button" data-v="1" data-i18n="medium"></button><button type="button" data-v="2" data-i18n="hard"></button></div></div>
+    <div class="field" id="f-players"><p class="label" id="l-players" data-i18n="players"></p><div class="seg" role="group" aria-labelledby="l-players" data-key="players"><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button></div></div>
+    <div class="field" id="f-oil"><p class="label" id="l-oil" data-i18n="oil"></p><div class="seg" role="group" aria-labelledby="l-oil" data-key="oil"><button type="button" data-v="0" data-i18n="dry"></button><button type="button" data-v="1" data-i18n="mediumOil"></button><button type="button" data-v="2" data-i18n="slick"></button></div><p class="small" data-i18n="oilNote"></p></div>
+    <p class="small" id="record"></p>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+    <button type="button" class="ghost" id="setup-back" data-i18n="back"></button>
+  </div>
+</div>
+
+<div class="ov" id="levels" hidden>
+  <div class="panel wide xl" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title" data-i18n="levels"></h2>
+    <p class="sub" id="levels-stars"></p>
+    <div class="levels" id="level-grid"></div>
+    <button type="button" class="ghost" id="levels-back" data-i18n="back"></button>
+  </div>
+</div>
+
+<div class="ov" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused"></h2>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <div id="settings-list">
+      <button type="button" class="toggle" role="switch" aria-checked="false" data-set="guide"><span><span data-i18n="guide"></span><small data-i18n="guideNote"></small></span><span class="sw" aria-hidden="true"></span></button>
+      <button type="button" class="toggle" role="switch" aria-checked="false" data-set="follow"><span data-i18n="follow"></span><span class="sw" aria-hidden="true"></span></button>
+      <button type="button" class="toggle" role="switch" aria-checked="false" data-set="sound"><span data-i18n="sound"></span><span class="sw" aria-hidden="true"></span></button>
+    </div>
+    <button type="button" class="ghost" id="restart" data-i18n="restart"></button>
+    <button type="button" class="ghost" id="to-menu" data-i18n="mainMenu"></button>
+    <p class="small" data-i18n="keys"></p>
+  </div>
+</div>
+
+<div class="ov" id="scores" hidden>
+  <div class="panel xl" role="dialog" aria-modal="true" aria-labelledby="scores-title">
+    <h2 id="scores-title" data-i18n="scores"></h2>
+    <div class="scorelist" id="score-list"></div>
+    <button type="button" class="cta" id="scores-close" data-i18n="close"></button>
+  </div>
+</div>
+
+<div class="ov light" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <h2 id="result-title"></h2>
+    <p class="stars" id="result-stars"></p>
+    <p class="big" id="result-big"></p>
+    <p class="sub" id="result-sub"></p>
+    <div class="res-list" id="result-list"></div>
+    <button type="button" class="cta" id="result-main"></button>
+    <button type="button" class="ghost" id="result-alt"></button>
+    <button type="button" class="ghost" id="result-menu" data-i18n="mainMenu"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Ten-pin bowling with real pin action. Curve the ball into the pocket and chase a perfect 300.',
+      mSolo: 'Solo game', dSolo: 'Ten frames to beat your best score', mCpu: 'vs CPU', dCpu: 'Three levels from rookie to champion', mParty: 'Party', dParty: '2–4 players on one device', mSpare: 'Spare challenges', dSpare: (n, s, m) => `${n} pin set-ups · ★ ${s}/${m}`,
+      settings: 'Settings', help: 'Drag near the ball to move it, drag on the lane to aim, then hold Bowl and release.', bestScore: n => `Best score: ${n}`,
+      difficulty: 'CPU level', easy: 'Rookie', medium: 'Pro', hard: 'Champion', players: 'Players', oil: 'Lane oil', dry: 'Dry', mediumOil: 'Medium', slick: 'Slick', oilNote: 'Dry lanes make the ball hook more, slick lanes less.',
+      record: (w, l) => `Your record: ${w} won · ${l} lost`, start: 'Start', back: 'Back',
+      paused: 'Paused', resume: 'Resume', restart: 'Restart', mainMenu: 'Main menu', sound: 'Sound', guide: 'Full path guide', guideNote: 'Shows the whole curve to the pins', follow: 'Camera follows the ball',
+      keys: '←/→ move · A/D aim · Q/E curve · hold Space to bowl · P pause',
+      bowl: 'Bowl', hold: 'Hold & release', curve: 'Curve', curveL: 'Curve more to the left', curveR: 'Curve more to the right', straight: 'Straight', menu: 'Menu', scores: 'Scoreboard', close: 'Close',
+      lane: (f, b, n) => `Bowling lane. Frame ${f}, ball ${b}. ${n} pins standing.`,
+      you: 'You', cpu: 'CPU', player: n => `Player ${n}`, frameBall: (f, b) => `Frame ${f} · Ball ${b}`, turnOf: n => `${n}’s turn`, yourTurn: 'Your turn', cpuThinks: 'CPU is lining up…',
+      strike: 'Strike!', double: 'Double!', turkey: 'Turkey!', bagger: n => `${n} strikes in a row!`, spare: 'Spare!', gutter: 'Gutter ball', split: 'Split!', pins: n => n === 1 ? '1 pin' : `${n} pins`, miss: 'Miss',
+      speed: v => `${Math.round(v * 2.237)} mph`,
+      gameOver: 'Game over', newBest: 'New best score!', bestLine: n => `Best ${n}`, youWin: 'You win!', youLose: 'The CPU wins', tie: 'It’s a tie', wins: n => `${n} wins!`, statLine: (x, s) => `Strikes ${x} · Spares ${s}`, again: 'Play again',
+      levels: 'Spare challenges', level: n => `Challenge ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `Try ${n}`, clearAll: 'Knock down every pin with one ball', cleared: 'Cleared!', notCleared: 'Not this time, try again', next: 'Next challenge', retry: 'Retry', triesUsed: n => n === 1 ? 'First try!' : `Cleared in ${n} tries`, allDone: 'You cleared every challenge!',
+      frameScore: (name, f, total) => `${name}: frame ${f}, total ${total}`,
+      hint: 'Drag by the ball to move · drag the lane to aim · hold Bowl',
+    },
+    vi: {
+      tagline: 'Bowling 10 ky với chuyển động ky chân thực. Ném bóng xoáy vào khe ky và chinh phục 300 điểm tuyệt đối.',
+      mSolo: 'Chơi đơn', dSolo: '10 frame để phá kỷ lục của bạn', mCpu: 'Đấu với máy', dCpu: '3 cấp độ từ tập sự đến vô địch', mParty: 'Chơi nhóm', dParty: '2–4 người chơi trên một thiết bị', mSpare: 'Thử thách spare', dSpare: (n, s, m) => `${n} thế ky · ★ ${s}/${m}`,
+      settings: 'Cài đặt', help: 'Kéo gần quả bóng để di chuyển, kéo trên đường lăn để ngắm, rồi giữ nút Ném và thả ra.', bestScore: n => `Kỷ lục: ${n}`,
+      difficulty: 'Cấp độ của máy', easy: 'Tập sự', medium: 'Chuyên nghiệp', hard: 'Vô địch', players: 'Số người chơi', oil: 'Dầu đường lăn', dry: 'Khô', mediumOil: 'Vừa', slick: 'Trơn', oilNote: 'Đường lăn khô làm bóng xoáy nhiều hơn, đường trơn thì ít hơn.',
+      record: (w, l) => `Thành tích: thắng ${w} · thua ${l}`, start: 'Bắt đầu', back: 'Quay lại',
+      paused: 'Tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', mainMenu: 'Menu chính', sound: 'Âm thanh', guide: 'Đường dẫn đầy đủ', guideNote: 'Hiện cả đường cong tới ky', follow: 'Camera bám theo bóng',
+      keys: '←/→ di chuyển · A/D ngắm · Q/E độ xoáy · giữ Space để ném · P tạm dừng',
+      bowl: 'Ném', hold: 'Giữ rồi thả', curve: 'Độ xoáy', curveL: 'Xoáy thêm sang trái', curveR: 'Xoáy thêm sang phải', straight: 'Thẳng', menu: 'Menu', scores: 'Bảng điểm', close: 'Đóng',
+      lane: (f, b, n) => `Đường lăn bowling. Frame ${f}, lượt ném ${b}. Còn ${n} ky đứng.`,
+      you: 'Bạn', cpu: 'Máy', player: n => `Người chơi ${n}`, frameBall: (f, b) => `Frame ${f} · Lượt ${b}`, turnOf: n => `Lượt của ${n}`, yourTurn: 'Đến lượt bạn', cpuThinks: 'Máy đang ngắm…',
+      strike: 'Strike!', double: 'Double!', turkey: 'Turkey!', bagger: n => `${n} strike liên tiếp!`, spare: 'Spare!', gutter: 'Bóng rơi rãnh', split: 'Split!', pins: n => `${n} ky`, miss: 'Trượt',
+      speed: v => `${Math.round(v * 3.6)} km/h`,
+      gameOver: 'Kết thúc ván', newBest: 'Kỷ lục mới!', bestLine: n => `Kỷ lục ${n}`, youWin: 'Bạn thắng!', youLose: 'Máy thắng', tie: 'Hòa', wins: n => `${n} thắng!`, statLine: (x, s) => `Strike ${x} · Spare ${s}`, again: 'Chơi ván mới',
+      levels: 'Thử thách spare', level: n => `Thử thách ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `Lần ${n}`, clearAll: 'Hạ hết ky chỉ với một lần ném', cleared: 'Hoàn thành!', notCleared: 'Chưa được, thử lại nhé', next: 'Thử thách tiếp', retry: 'Thử lại', triesUsed: n => n === 1 ? 'Ngay lần đầu!' : `Hoàn thành sau ${n} lần`, allDone: 'Bạn đã vượt qua mọi thử thách!',
+      frameScore: (name, f, total) => `${name}: frame ${f}, tổng ${total}`,
+      hint: 'Kéo gần bóng để di chuyển · kéo đường lăn để ngắm · giữ nút Ném',
+    },
+    zh: {
+      tagline: '真实球瓶碰撞的十瓶保龄球。打出弧线球切入球窝，挑战满分 300！',
+      mSolo: '单人游戏', dSolo: '打满十格，刷新最高分', mCpu: '对战电脑', dCpu: '从新手到冠军三种难度', mParty: '派对模式', dParty: '2–4 人在同一设备轮流玩', mSpare: '补中挑战', dSpare: (n, s, m) => `${n} 种残局 · ★ ${s}/${m}`,
+      settings: '设置', help: '在球附近拖动来移动位置，在球道上拖动来瞄准，然后按住“投球”再松开。', bestScore: n => `最高分：${n}`,
+      difficulty: '电脑难度', easy: '新手', medium: '高手', hard: '冠军', players: '玩家人数', oil: '球道油况', dry: '干', mediumOil: '中', slick: '滑', oilNote: '球道越干弧线越大，越滑弧线越小。',
+      record: (w, l) => `战绩：胜 ${w} · 负 ${l}`, start: '开始', back: '返回',
+      paused: '已暂停', resume: '继续', restart: '重新开始', mainMenu: '主菜单', sound: '音效', guide: '完整路线指示', guideNote: '显示直到球瓶的整条弧线', follow: '镜头跟随球',
+      keys: '←/→ 移动 · A/D 瞄准 · Q/E 弧线 · 按住空格投球 · P 暂停',
+      bowl: '投球', hold: '按住后松开', curve: '弧线', curveL: '更向左弯', curveR: '更向右弯', straight: '直球', menu: '菜单', scores: '计分板', close: '关闭',
+      lane: (f, b, n) => `保龄球道。第 ${f} 格第 ${b} 球，还剩 ${n} 个球瓶。`,
+      you: '你', cpu: '电脑', player: n => `玩家 ${n}`, frameBall: (f, b) => `第 ${f} 格 · 第 ${b} 球`, turnOf: n => `轮到${n}`, yourTurn: '轮到你了', cpuThinks: '电脑正在瞄准…',
+      strike: '全中！', double: '连续两次全中！', turkey: '三连全中！', bagger: n => `${n} 连全中！`, spare: '补中！', gutter: '洗沟球', split: '分瓶！', pins: n => `${n} 瓶`, miss: '未击中',
+      speed: v => `${Math.round(v * 3.6)} km/h`,
+      gameOver: '比赛结束', newBest: '新纪录！', bestLine: n => `最高分 ${n}`, youWin: '你赢了！', youLose: '电脑获胜', tie: '平局', wins: n => `${n}获胜！`, statLine: (x, s) => `全中 ${x} · 补中 ${s}`, again: '再来一局',
+      levels: '补中挑战', level: n => `挑战 ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `第 ${n} 次`, clearAll: '一球击倒全部球瓶', cleared: '挑战成功！', notCleared: '差一点，再试一次', next: '下一关', retry: '重试', triesUsed: n => n === 1 ? '一次成功！' : `用了 ${n} 次`, allDone: '所有挑战都已完成！',
+      frameScore: (name, f, total) => `${name}：第 ${f} 格，总分 ${total}`,
+      hint: '在球附近拖动移动 · 在球道上拖动瞄准 · 按住投球',
+    },
+    fr: {
+      tagline: 'Du bowling à dix quilles avec de vraies collisions. Donnez de l’effet à la boule vers la poche et visez la partie parfaite à 300.',
+      mSolo: 'Partie solo', dSolo: 'Dix carreaux pour battre votre record', mCpu: 'Contre l’ordi', dCpu: 'Trois niveaux, du débutant au champion', mParty: 'Entre amis', dParty: '2 à 4 joueurs sur un appareil', mSpare: 'Défis de spare', dSpare: (n, s, m) => `${n} configurations · ★ ${s}/${m}`,
+      settings: 'Réglages', help: 'Glissez près de la boule pour la déplacer, glissez sur la piste pour viser, puis maintenez « Lancer » et relâchez.', bestScore: n => `Record : ${n}`,
+      difficulty: 'Niveau de l’ordi', easy: 'Débutant', medium: 'Pro', hard: 'Champion', players: 'Joueurs', oil: 'Huilage de la piste', dry: 'Sèche', mediumOil: 'Moyen', slick: 'Glissante', oilNote: 'Sur piste sèche la boule tourne davantage, sur piste glissante moins.',
+      record: (w, l) => `Votre bilan : ${w} victoires · ${l} défaites`, start: 'Jouer', back: 'Retour',
+      paused: 'Pause', resume: 'Reprendre', restart: 'Recommencer', mainMenu: 'Menu principal', sound: 'Son', guide: 'Trajectoire complète', guideNote: 'Affiche toute la courbe jusqu’aux quilles', follow: 'La caméra suit la boule',
+      keys: '←/→ déplacer · A/D viser · Q/E effet · maintenir Espace pour lancer · P pause',
+      bowl: 'Lancer', hold: 'Maintenir et relâcher', curve: 'Effet', curveL: 'Plus d’effet vers la gauche', curveR: 'Plus d’effet vers la droite', straight: 'Droit', menu: 'Menu', scores: 'Feuille de score', close: 'Fermer',
+      lane: (f, b, n) => `Piste de bowling. Carreau ${f}, boule ${b}. ${n} quilles debout.`,
+      you: 'Vous', cpu: 'Ordi', player: n => `Joueur ${n}`, frameBall: (f, b) => `Carreau ${f} · Boule ${b}`, turnOf: n => `Au tour de ${n}`, yourTurn: 'À vous de jouer', cpuThinks: 'L’ordi prend sa visée…',
+      strike: 'Strike !', double: 'Double !', turkey: 'Turkey !', bagger: n => `${n} strikes d’affilée !`, spare: 'Spare !', gutter: 'Dans la gouttière', split: 'Split !', pins: n => n === 1 ? '1 quille' : `${n} quilles`, miss: 'Raté',
+      speed: v => `${Math.round(v * 3.6)} km/h`,
+      gameOver: 'Partie terminée', newBest: 'Nouveau record !', bestLine: n => `Record ${n}`, youWin: 'Vous gagnez !', youLose: 'L’ordi gagne', tie: 'Égalité', wins: n => `${n} gagne !`, statLine: (x, s) => `Strikes ${x} · Spares ${s}`, again: 'Rejouer',
+      levels: 'Défis de spare', level: n => `Défi ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `Essai ${n}`, clearAll: 'Faites tomber toutes les quilles en une boule', cleared: 'Réussi !', notCleared: 'Pas cette fois, réessayez', next: 'Défi suivant', retry: 'Réessayer', triesUsed: n => n === 1 ? 'Du premier coup !' : `Réussi en ${n} essais`, allDone: 'Vous avez réussi tous les défis !',
+      frameScore: (name, f, total) => `${name} : carreau ${f}, total ${total}`,
+      hint: 'Glissez près de la boule pour la déplacer · sur la piste pour viser · maintenez Lancer',
+    },
+    th: {
+      tagline: 'โบว์ลิ่ง 10 พินพร้อมการกระเด็นของพินที่สมจริง ปั่นลูกให้โค้งเข้าพ็อกเก็ตแล้วล่าเกมเพอร์เฟกต์ 300 แต้ม',
+      mSolo: 'เล่นเดี่ยว', dSolo: '10 เฟรม ทำลายสถิติของคุณ', mCpu: 'แข่งกับ CPU', dCpu: '3 ระดับ ตั้งแต่มือใหม่ถึงแชมป์', mParty: 'ปาร์ตี้', dParty: 'ผู้เล่น 2–4 คนบนเครื่องเดียว', mSpare: 'ภารกิจสแปร์', dSpare: (n, s, m) => `${n} รูปแบบพิน · ★ ${s}/${m}`,
+      settings: 'ตั้งค่า', help: 'ลากใกล้ลูกบอลเพื่อเลื่อนตำแหน่ง ลากบนเลนเพื่อเล็ง แล้วกดปุ่มโยนค้างไว้และปล่อย', bestScore: n => `สถิติสูงสุด: ${n}`,
+      difficulty: 'ระดับ CPU', easy: 'มือใหม่', medium: 'มือโปร', hard: 'แชมป์', players: 'จำนวนผู้เล่น', oil: 'น้ำมันบนเลน', dry: 'แห้ง', mediumOil: 'ปานกลาง', slick: 'ลื่น', oilNote: 'เลนแห้งทำให้ลูกโค้งมากขึ้น เลนลื่นลูกจะโค้งน้อยลง',
+      record: (w, l) => `สถิติ: ชนะ ${w} · แพ้ ${l}`, start: 'เริ่ม', back: 'กลับ',
+      paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', mainMenu: 'เมนูหลัก', sound: 'เสียง', guide: 'เส้นนำทางเต็ม', guideNote: 'แสดงเส้นโค้งทั้งหมดจนถึงพิน', follow: 'กล้องตามลูกบอล',
+      keys: '←/→ เลื่อน · A/D เล็ง · Q/E ความโค้ง · กด Space ค้างเพื่อโยน · P หยุด',
+      bowl: 'โยน', hold: 'กดค้างแล้วปล่อย', curve: 'ความโค้ง', curveL: 'โค้งไปทางซ้ายมากขึ้น', curveR: 'โค้งไปทางขวามากขึ้น', straight: 'ตรง', menu: 'เมนู', scores: 'ตารางคะแนน', close: 'ปิด',
+      lane: (f, b, n) => `เลนโบว์ลิ่ง เฟรม ${f} ลูกที่ ${b} เหลือพินตั้งอยู่ ${n} พิน`,
+      you: 'คุณ', cpu: 'CPU', player: n => `ผู้เล่น ${n}`, frameBall: (f, b) => `เฟรม ${f} · ลูกที่ ${b}`, turnOf: n => `ตาของ${n}`, yourTurn: 'ตาของคุณ', cpuThinks: 'CPU กำลังเล็ง…',
+      strike: 'สไตรก์!', double: 'ดับเบิล!', turkey: 'เทอร์กี้!', bagger: n => `สไตรก์ ${n} ครั้งติด!`, spare: 'สแปร์!', gutter: 'ลงราง', split: 'สปลิต!', pins: n => `${n} พิน`, miss: 'พลาด',
+      speed: v => `${Math.round(v * 3.6)} กม./ชม.`,
+      gameOver: 'จบเกม', newBest: 'สถิติใหม่!', bestLine: n => `สถิติ ${n}`, youWin: 'คุณชนะ!', youLose: 'CPU ชนะ', tie: 'เสมอ', wins: n => `${n} ชนะ!`, statLine: (x, s) => `สไตรก์ ${x} · สแปร์ ${s}`, again: 'เล่นอีกครั้ง',
+      levels: 'ภารกิจสแปร์', level: n => `ภารกิจ ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `ครั้งที่ ${n}`, clearAll: 'ล้มพินทั้งหมดด้วยลูกเดียว', cleared: 'สำเร็จ!', notCleared: 'ยังไม่ได้ ลองอีกครั้งนะ', next: 'ภารกิจถัดไป', retry: 'ลองใหม่', triesUsed: n => n === 1 ? 'ผ่านในครั้งแรก!' : `ผ่านเมื่อครั้งที่ ${n}`, allDone: 'คุณผ่านครบทุกภารกิจแล้ว!',
+      frameScore: (name, f, total) => `${name}: เฟรม ${f} รวม ${total}`,
+      hint: 'ลากใกล้ลูกเพื่อเลื่อน · ลากบนเลนเพื่อเล็ง · กดโยนค้างไว้',
+    },
+    ja: {
+      tagline: 'リアルなピンアクションの10ピンボウリング。カーブでポケットを狙い、パーフェクト300を目指そう。',
+      mSolo: 'ひとりで', dSolo: '10フレームでハイスコアに挑戦', mCpu: 'CPUと対戦', dCpu: 'ルーキーからチャンピオンまで3段階', mParty: 'みんなで', dParty: '1台で2〜4人がプレイ', mSpare: 'スペアチャレンジ', dSpare: (n, s, m) => `${n}種類のピン配置 · ★ ${s}/${m}`,
+      settings: '設定', help: 'ボールの近くをドラッグして位置を調整、レーン上をドラッグして狙いを決め、「投げる」を長押しして離そう。', bestScore: n => `ハイスコア：${n}`,
+      difficulty: 'CPUの強さ', easy: 'ルーキー', medium: 'プロ', hard: 'チャンピオン', players: 'プレイヤー数', oil: 'レーンのオイル', dry: 'ドライ', mediumOil: 'ふつう', slick: '多め', oilNote: 'ドライなレーンほどよく曲がり、オイルが多いほど曲がりにくくなります。',
+      record: (w, l) => `戦績：${w}勝 · ${l}敗`, start: 'スタート', back: '戻る',
+      paused: '一時停止', resume: '再開', restart: 'やり直す', mainMenu: 'メインメニュー', sound: 'サウンド', guide: 'フルガイド', guideNote: 'ピンまでのカーブをすべて表示', follow: 'カメラがボールを追う',
+      keys: '←/→ 移動 · A/D 狙い · Q/E カーブ · Spaceを長押しで投球 · P 一時停止',
+      bowl: '投げる', hold: '長押しして離す', curve: 'カーブ', curveL: 'もっと左に曲げる', curveR: 'もっと右に曲げる', straight: 'ストレート', menu: 'メニュー', scores: 'スコア表', close: '閉じる',
+      lane: (f, b, n) => `ボウリングレーン。第${f}フレーム ${b}投目。残りのピンは${n}本。`,
+      you: 'あなた', cpu: 'CPU', player: n => `プレイヤー${n}`, frameBall: (f, b) => `第${f}フレーム · ${b}投目`, turnOf: n => `${n}の番`, yourTurn: 'あなたの番です', cpuThinks: 'CPUが狙っています…',
+      strike: 'ストライク！', double: 'ダブル！', turkey: 'ターキー！', bagger: n => `${n}連続ストライク！`, spare: 'スペア！', gutter: 'ガター', split: 'スプリット！', pins: n => `${n}本`, miss: 'ミス',
+      speed: v => `${Math.round(v * 3.6)} km/h`,
+      gameOver: 'ゲーム終了', newBest: 'ハイスコア更新！', bestLine: n => `ハイスコア ${n}`, youWin: 'あなたの勝ち！', youLose: 'CPUの勝ち', tie: '引き分け', wins: n => `${n}の勝ち！`, statLine: (x, s) => `ストライク ${x} · スペア ${s}`, again: 'もう一度',
+      levels: 'スペアチャレンジ', level: n => `チャレンジ ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `${n}投目`, clearAll: '1投でピンをすべて倒そう', cleared: 'クリア！', notCleared: '残念、もう一度', next: '次のチャレンジ', retry: 'リトライ', triesUsed: n => n === 1 ? '一発クリア！' : `${n}投でクリア`, allDone: 'すべてのチャレンジをクリアしました！',
+      frameScore: (name, f, total) => `${name}：第${f}フレーム、合計${total}`,
+      hint: 'ボール付近をドラッグで移動 · レーンをドラッグで狙う · 投げるを長押し',
+    },
+    ko: {
+      tagline: '실감 나는 핀 액션의 10핀 볼링. 훅을 걸어 포켓을 노리고 퍼펙트 300에 도전하세요.',
+      mSolo: '혼자 하기', dSolo: '10프레임으로 최고 점수에 도전', mCpu: 'CPU 대전', dCpu: '루키부터 챔피언까지 3단계', mParty: '파티', dParty: '한 기기에서 2–4명이 함께', mSpare: '스페어 챌린지', dSpare: (n, s, m) => `핀 배치 ${n}개 · ★ ${s}/${m}`,
+      settings: '설정', help: '공 근처를 드래그해 위치를 옮기고, 레인 위를 드래그해 조준한 뒤 ‘투구’를 길게 눌렀다 떼세요.', bestScore: n => `최고 점수: ${n}`,
+      difficulty: 'CPU 난이도', easy: '루키', medium: '프로', hard: '챔피언', players: '플레이어 수', oil: '레인 오일', dry: '드라이', mediumOil: '보통', slick: '많음', oilNote: '레인이 건조할수록 공이 많이 휘고, 오일이 많을수록 덜 휘어요.',
+      record: (w, l) => `전적: ${w}승 · ${l}패`, start: '시작', back: '뒤로',
+      paused: '일시 정지', resume: '계속하기', restart: '다시 시작', mainMenu: '메인 메뉴', sound: '사운드', guide: '전체 경로 가이드', guideNote: '핀까지 휘는 경로를 모두 표시', follow: '카메라가 공을 따라가기',
+      keys: '←/→ 이동 · A/D 조준 · Q/E 훅 · Space 길게 눌러 투구 · P 일시 정지',
+      bowl: '투구', hold: '길게 눌렀다 떼기', curve: '훅', curveL: '왼쪽으로 더 휘기', curveR: '오른쪽으로 더 휘기', straight: '직구', menu: '메뉴', scores: '점수표', close: '닫기',
+      lane: (f, b, n) => `볼링 레인. ${f}프레임 ${b}구. 남은 핀 ${n}개.`,
+      you: '나', cpu: 'CPU', player: n => `플레이어 ${n}`, frameBall: (f, b) => `${f}프레임 · ${b}구`, turnOf: n => `${n} 차례`, yourTurn: '내 차례', cpuThinks: 'CPU가 조준하는 중…',
+      strike: '스트라이크!', double: '더블!', turkey: '터키!', bagger: n => `${n}연속 스트라이크!`, spare: '스페어!', gutter: '거터', split: '스플릿!', pins: n => `${n}핀`, miss: '미스',
+      speed: v => `${Math.round(v * 3.6)} km/h`,
+      gameOver: '게임 종료', newBest: '최고 점수 경신!', bestLine: n => `최고 ${n}`, youWin: '승리!', youLose: 'CPU 승리', tie: '무승부', wins: n => `${n} 승리!`, statLine: (x, s) => `스트라이크 ${x} · 스페어 ${s}`, again: '다시 하기',
+      levels: '스페어 챌린지', level: n => `챌린지 ${n}`, starsTotal: (s, m) => `★ ${s} / ${m}`, tries: n => `${n}번째 시도`, clearAll: '한 번의 투구로 모든 핀을 쓰러뜨리세요', cleared: '성공!', notCleared: '아쉬워요, 다시 도전!', next: '다음 챌린지', retry: '다시 도전', triesUsed: n => n === 1 ? '한 번에 성공!' : `${n}번 만에 성공`, allDone: '모든 챌린지를 완료했어요!',
+      frameScore: (name, f, total) => `${name}: ${f}프레임, 합계 ${total}`,
+      hint: '공 근처 드래그로 이동 · 레인 드래그로 조준 · 투구 길게 누르기',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // ---------- Physics (metres, seconds; x across the lane, + to the right; y from the foul line toward the pins)
+  const LANE_HALF = 0.527, GUTTER = 0.235, WALL = LANE_HALF + GUTTER, HEAD_Y = 18.29, PIT_Y = 19.42, END_Y = 20.2;
+  const BOARD = 2 * LANE_HALF / 39;
+  const BALL_R = 0.109, PIN_R = 0.06, PIN_RD = 0.1, PIN_H = 0.38, M_BALL = 6.4, M_PIN = 1.55;
+  const ROW = 0.2639, SP = 0.1524;
+  const SPOTS = [[0, 0], [-SP, ROW], [SP, ROW], [-2 * SP, 2 * ROW], [0, 2 * ROW], [2 * SP, 2 * ROW], [-3 * SP, 3 * ROW], [-SP, 3 * ROW], [SP, 3 * ROW], [3 * SP, 3 * ROW]].map(([x, y]) => [x, HEAD_Y + y]);
+  const OIL = [7.5, 10.5, 13.5]; // where the oil ends for dry, medium and slick lanes
+  const SIM_DT = 1 / 240, HOOK_A = 0.8, KNOCK_V = 0.42, E_BALL = 0.62, E_PIN = 0.55, E_WALL = 0.5;
+  const speedOf = power => 5 + power * 4.5;
+  const ALL_PINS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  function makePins(standing) {
+    return SPOTS.map(([x, y], i) => ({ n: i + 1, x, y, vx: 0, vy: 0, st: standing.includes(i + 1) ? 'up' : 'gone', tilt: 0, dir: 0, spin: 0, wob: 0, wobV: 0, fade: 1, pit: 0 }));
+  }
+  function makeWorld(standing, oil) {
+    return { pins: makePins(standing), ball: { x: 0, y: -0.3, vx: 0, vy: 0, hook: 0, gutter: false, gone: false, roll: 0, hit: false }, oilEnd: OIL[oil] || OIL[1], t: 0, after: 0, sound: null };
+  }
+  function launch(w, x0, angle, power, hook) {
+    const v = speedOf(power), b = w.ball;
+    Object.assign(b, { x: x0, y: -0.3, vx: v * Math.sin(angle), vy: v * Math.cos(angle), hook, gutter: false, gone: false, hit: false });
+  }
+  const smooth = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
+  function ballAccel(w, b) {
+    const dry = 0.03 + 0.97 * smooth(w.oilEnd - 1.5, w.oilEnd + 2, b.y);
+    return b.hook * HOOK_A * dry;
+  }
+  function knock(p, nx, ny, w) {
+    p.st = 'down';
+    p.dir = Math.atan2(ny, nx);
+    p.spin = ((p.n * 7919 + Math.round(w.t * 1000)) % 13 - 6) * 1.1;
+    if (w.sound) w.sound('pin', Math.hypot(p.vx, p.vy));
+  }
+  function collide(w, a, b, ra, rb, ma, mb, e, ballHit) {
+    const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy, rr = ra + rb;
+    if (d2 >= rr * rr || d2 < 1e-12) return;
+    const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+    const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    const ia = 1 / ma, ib = 1 / mb;
+    if (rel < 0) {
+      const j = -(1 + e) * rel / (ia + ib);
+      a.vx -= j * ia * nx; a.vy -= j * ia * ny;
+      b.vx += j * ib * nx; b.vy += j * ib * ny;
+    }
+    const push = (rr - d) / (ia + ib);
+    a.x -= push * ia * nx; a.y -= push * ia * ny;
+    b.x += push * ib * nx; b.y += push * ib * ny;
+    if (ballHit) { if (!a.hit && w.sound) w.sound('hit', -rel); a.hit = true; }
+    const hard = -rel > KNOCK_V;
+    if (b.st === 'up' && hard) knock(b, nx, ny, w);
+    else if (b.st === 'up' && rel < 0) { b.wobV += Math.min(4, -rel * 9); b.dir = Math.atan2(ny, nx); }
+    if (!ballHit && a.st === 'up' && hard) knock(a, -nx, -ny, w);
+    else if (!ballHit && a.st === 'up' && rel < 0) { a.wobV += Math.min(4, -rel * 9); a.dir = Math.atan2(-ny, -nx); }
+  }
+  const pinR = p => p.st === 'up' ? PIN_R : PIN_R + (PIN_RD - PIN_R) * Math.min(1, p.tilt / 1.2);
+  function stepWorld(w, h) {
+    w.t += h;
+    const b = w.ball;
+    if (!b.gone) {
+      if (!b.gutter) b.vx += ballAccel(w, b) * h;
+      const v = Math.hypot(b.vx, b.vy), slow = v > 1 ? (v - 0.2 * h) / v : 1;
+      b.vx *= slow; b.vy *= slow;
+      b.x += b.vx * h; b.y += b.vy * h;
+      b.roll += Math.hypot(b.vx, b.vy) * h / BALL_R;
+      if (!b.gutter && Math.abs(b.x) > LANE_HALF) { b.gutter = true; if (w.sound) w.sound('gutter', 1); }
+      if (b.gutter) { const gx = Math.sign(b.x) * (LANE_HALF + GUTTER / 2); b.vx = 0; b.vy = Math.max(b.vy, 1.2); b.x += (gx - b.x) * Math.min(1, h * 14); }
+      if (b.y > PIT_Y + 0.15 || w.t > 14) b.gone = true;
+    }
+    for (const p of w.pins) {
+      if (p.st === 'gone') continue;
+      const sp = Math.hypot(p.vx, p.vy);
+      if (sp > 0) {
+        const dec = (p.st === 'up' ? 9 : 2.6) * h, k = sp > dec ? (sp - dec) / sp : 0;
+        p.vx *= k; p.vy *= k;
+      }
+      p.x += p.vx * h; p.y += p.vy * h;
+      if (p.st === 'down') {
+        p.tilt = Math.min(Math.PI / 2, p.tilt + h * 7.5);
+        p.dir += p.spin * h; p.spin *= Math.max(0, 1 - 1.8 * h);
+      } else {
+        p.wobV -= p.wob * 260 * h; p.wobV *= Math.max(0, 1 - 7 * h); p.wob += p.wobV * h;
+        if (Math.abs(p.wob) > 0.55) knock(p, Math.cos(p.dir), Math.sin(p.dir), w);
+      }
+      const r = pinR(p);
+      if (Math.abs(p.x) > WALL - r && p.y > HEAD_Y - 0.9) { p.x = Math.sign(p.x) * (WALL - r); if (p.vx * Math.sign(p.x) > 0) p.vx *= -E_WALL; }
+      if (p.st === 'up' && Math.abs(p.x) > LANE_HALF) knock(p, Math.sign(p.x), 0, w);
+      if (p.y > PIT_Y) { p.st = 'gone'; p.pit = 1; }
+    }
+    if (!b.gone && !b.gutter) for (const p of w.pins) if (p.st !== 'gone') collide(w, b, p, BALL_R, pinR(p), M_BALL, M_PIN, E_BALL, true);
+    const ps = w.pins;
+    for (let i = 0; i < 10; i++) {
+      const a = ps[i]; if (a.st === 'gone') continue;
+      for (let j = i + 1; j < 10; j++) {
+        const c = ps[j]; if (c.st === 'gone') continue;
+        if (a.st === 'up' && c.st === 'up' && !a.vx && !a.vy && !c.vx && !c.vy) continue;
+        collide(w, a, c, pinR(a), pinR(c), M_PIN, M_PIN, E_PIN, false);
+      }
+    }
+    if (b.gone || b.y > HEAD_Y + 1) w.after += h;
+  }
+  function settled(w) {
+    if (!w.ball.gone) return false;
+    if (w.after > 4) return true;
+    return w.pins.every(p => p.st === 'gone' || (Math.hypot(p.vx, p.vy) < 0.04 && Math.abs(p.wobV) < 0.05 && (p.st !== 'down' || p.tilt >= Math.PI / 2)));
+  }
+  function standingAfter(w) { return w.pins.filter(p => p.st === 'up').map(p => p.n); }
+  // Runs a whole roll without drawing; used by the CPU planner and the tests.
+  function simulate(pinsIn, oil, x0, angle, power, hook) {
+    const w = makeWorld([], oil);
+    w.pins = pinsIn.map(p => ({ ...p, vx: 0, vy: 0, tilt: 0, wob: 0, wobV: 0 }));
+    launch(w, x0, angle, power, hook);
+    for (let i = 0; i < 240 * 12 && !settled(w); i++) stepWorld(w, SIM_DT);
+    return w;
+  }
+  // Ball path without pins, sampled every few steps (aim guide) or just its x where it reaches yEnd.
+  function ballPath(oil, x0, angle, power, hook, yEnd, pts) {
+    const w = makeWorld([], oil), b = w.ball;
+    launch(w, x0, angle, power, hook);
+    for (let i = 0; i < 240 * 8 && b.y < yEnd && !b.gutter; i++) { stepWorld(w, SIM_DT); if (pts && i % 6 === 0) pts.push(b.x, b.y); }
+    if (pts) pts.push(b.x, b.y);
+    return b.gutter ? NaN : b.x;
+  }
+  function aimFor(oil, x0, power, hook, tx, ty = HEAD_Y) {
+    let lo = -0.09, hi = 0.09;
+    for (let i = 0; i < 26; i++) {
+      const mid = (lo + hi) / 2, x = ballPath(oil, x0, mid, power, hook, ty);
+      if (Number.isNaN(x) ? mid > Math.atan2(-x0, ty) : x > tx) hi = mid; else lo = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  // ---------- CPU planner (sees only the lane and the standing pins, like a player)
+  const CPU = [
+    { hook: -0.33, power: 0.5, sx: 0.07, sa: 0.013, sp: 0.15, sh: 0.2 },
+    { hook: -0.67, power: 0.6, sx: 0.035, sa: 0.0055, sp: 0.06, sh: 0.08 },
+    { hook: -0.67, power: 0.72, sx: 0.01, sa: 0.0009, sp: 0.02, sh: 0.025 },
+  ];
+  const upIn = w => w.pins.filter(p => p.st === 'up').length;
+  // A generator so the browser can spread the search over several frames.
+  function* planShot(pins, oil, lvl) {
+    const c = CPU[lvl], up = pins.filter(p => p.st === 'up');
+    if (up.length === 10) {
+      let best = null;
+      for (const x0 of [0.14, 0.22, 0.3, 0.38]) {
+        const a = aimFor(oil, x0, c.power, c.hook, 0.065);
+        let v = 0;
+        for (const dx of [-0.02, 0, 0.02]) v += 10 - upIn(simulate(pins, oil, x0 + dx * 0.4, a + dx / 18.6, c.power, c.hook)) + (dx ? 0 : 0.5);
+        if (!best || v > best.v) best = { v, x0, angle: a, power: c.power, hook: c.hook };
+        yield;
+      }
+      return best;
+    }
+    const ty = up.reduce((s, p) => s + p.y, 0) / up.length, power = 0.78;
+    const grid = [];
+    for (const x0 of [-0.36, -0.18, 0, 0.18, 0.36]) {
+      const row = [];
+      for (let tx = -0.56; tx <= 0.561; tx += 0.028) {
+        const angle = Math.atan2(tx - x0, ty + 0.3);
+        row.push({ x0, angle, power, hook: 0, k: up.length - upIn(simulate(pins, oil, x0, angle, power, 0)) });
+      }
+      grid.push(row);
+      yield;
+    }
+    let best = null;
+    for (const row of grid) row.forEach((s, i) => {
+      const v = s.k * 4 + (row[i - 1] ? row[i - 1].k : 0) + (row[i + 1] ? row[i + 1].k : 0) - Math.abs(s.x0) * 0.5;
+      if (!best || v > best.v) best = { ...s, v };
+    });
+    return best;
+  }
+  function runPlan(gen) { let r = gen.next(); while (!r.done) r = gen.next(); return r.value; }
+  function addNoise(plan, lvl, rnd) {
+    const c = CPU[lvl];
+    return {
+      x0: Math.max(-LANE_HALF + 0.12, Math.min(LANE_HALF - 0.12, plan.x0 + rnd() * c.sx)),
+      angle: plan.angle + rnd() * c.sa,
+      power: Math.max(0.05, Math.min(1, plan.power + rnd() * c.sp)),
+      hook: Math.max(-1, Math.min(1, plan.hook + rnd() * c.sh)),
+    };
+  }
+
+  // ---------- Scoring
+  function splitFrames(rolls) {
+    const fr = [];
+    let i = 0;
+    for (let f = 0; f < 10 && i < rolls.length; f++) {
+      const n = f < 9 ? (rolls[i] === 10 ? 1 : 2) : 3;
+      fr.push({ start: i, rolls: rolls.slice(i, i + n) });
+      i += n;
+    }
+    return fr;
+  }
+  const frameDone = (f, r) => f < 9 ? r[0] === 10 || r.length === 2 : r.length === 3 || (r.length === 2 && r[0] + r[1] < 10);
+  function scoreCard(rolls) {
+    const fr = splitFrames(rolls);
+    let cum = 0, open = false;
+    fr.forEach((o, f) => {
+      const r = o.rolls, nx = k => rolls[o.start + k];
+      let add = null;
+      if (f < 9) {
+        if (r[0] === 10) add = nx(1) != null && nx(2) != null ? 10 + nx(1) + nx(2) : null;
+        else if (r.length === 2) add = r[0] + r[1] === 10 ? (nx(2) != null ? 10 + nx(2) : null) : r[0] + r[1];
+      } else if (frameDone(9, r)) add = r.reduce((a, b) => a + b, 0);
+      if (add == null) open = true;
+      if (!open) cum += add;
+      o.cum = open ? null : cum;
+      o.marks = marksOf(f, r);
+    });
+    const last = fr[fr.length - 1];
+    const done = fr.length === 10 && frameDone(9, last.rolls);
+    let frame = fr.length, ball = 0;
+    if (last && !frameDone(fr.length - 1, last.rolls)) { frame = fr.length - 1; ball = last.rolls.length; }
+    return { frames: fr, total: cum, done, frame: Math.min(frame, 9), ball, full: done || fullRackNext(frame, last && frame === fr.length - 1 ? last.rolls : []) };
+  }
+  // Whether the next ball is thrown at a fresh rack of ten.
+  function fullRackNext(frame, r) {
+    if (!r.length) return true;
+    if (frame < 9) return false;
+    if (r.length === 1) return r[0] === 10;
+    return r[0] === 10 ? r[1] === 10 : r[0] + r[1] === 10;
+  }
+  function marksOf(f, r) {
+    const m = v => v === 0 ? '-' : String(v);
+    if (f < 9) {
+      if (r[0] === 10) return ['', 'X'];
+      return [r[0] == null ? '' : m(r[0]), r[1] == null ? '' : r[0] + r[1] === 10 ? '/' : m(r[1])];
+    }
+    const out = ['', '', ''];
+    if (r[0] != null) out[0] = r[0] === 10 ? 'X' : m(r[0]);
+    if (r[1] != null) out[1] = r[0] === 10 ? (r[1] === 10 ? 'X' : m(r[1])) : (r[0] + r[1] === 10 ? '/' : m(r[1]));
+    if (r[2] != null) {
+      const fresh = r[0] === 10 ? r[1] === 10 : r[0] + r[1] === 10;
+      out[2] = fresh ? (r[2] === 10 ? 'X' : m(r[2])) : (r[1] + r[2] === 10 ? '/' : m(r[2]));
+    }
+    return out;
+  }
+  // Head pin down and the standing pins fall into separate groups.
+  function isSplit(standing) {
+    if (standing.length < 2 || standing.includes(1)) return false;
+    const left = new Set(standing), seen = new Set([standing[0]]), q = [standing[0]];
+    while (q.length) {
+      const a = q.pop();
+      for (const b of left) if (!seen.has(b) && Math.hypot(SPOTS[a - 1][0] - SPOTS[b - 1][0], SPOTS[a - 1][1] - SPOTS[b - 1][1]) < 0.32) { seen.add(b); q.push(b); }
+    }
+    return seen.size < standing.length;
+  }
+  // ---------- end physics
+  // ---------- Spare challenges (each one is checked clearable with a single ball by the test solver)
+  const SPARES = [[10], [7], [5], [2, 4], [3, 6, 10], [2, 4, 7], [6, 10], [4, 7], [2, 8], [3, 9], [1, 2, 4, 7], [5, 8], [2, 4, 5, 8], [1, 3, 6, 10], [3, 6, 9, 10], [3, 10], [2, 7], [2, 10], [1, 2, 10], [8, 10], [5, 7], [5, 10], [6, 7], [4, 9], [6, 7, 10], [4, 7, 10], [4, 6, 7, 9, 10]];
+
+  // ---------- Storage
+  const KEY = 'milaan.bowling.';
+  const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(KEY + k)); return v && typeof v === typeof d ? v : d; } catch { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} };
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const settings = Object.assign({ sound: true, guide: false, follow: !reduced }, load('settings', {}));
+  const prefs = Object.assign({ diff: 1, players: 2, oil: 1 }, load('prefs', {}));
+  const stats = Object.assign({ games: 0, high: 0, strikes: 0 }, load('stats', {}));
+  stats.w = Array.isArray(stats.w) ? stats.w : [0, 0, 0];
+  stats.l = Array.isArray(stats.l) ? stats.l : [0, 0, 0];
+  let stars = load('spares', []);
+  if (!Array.isArray(stars)) stars = [];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const starOf = i => clamp(Number(stars[i]) || 0, 0, 3);
+  const totalStars = () => SPARES.reduce((s, _, i) => s + starOf(i), 0);
+
+  // ---------- DOM
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const els = { toast: $('toast'), banner: $('banner'), announcer: $('announcer'), cards: $('cards'), info: $('info'), bowl: $('bowl'), curveL: $('curve-l'), curveR: $('curve-r'), curveVal: $('curve-val') };
+  const OVERLAYS = ['menu', 'setup', 'levels', 'pause', 'scores', 'result'];
+  const overlayOpen = () => OVERLAYS.some(id => !$(id).hidden);
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const ease = k => 1 - (1 - k) * (1 - k);
+  const COLORS = ['#ff5e7e', '#3a8dff', '#f2b21b', '#9b6bff'];
+  const BALL_Y0 = -0.3, CAM0 = -16, NEAR = 0.6, PITCH = 2 * WALL + 0.32, PIN_W = 0.121, X_MAX = LANE_HALF - 0.11;
+
+  function liveWorld(standing, oil) {
+    const w = makeWorld(standing, oil);
+    w.sound = (kind, v) => sfx(kind, v);
+    return w;
+  }
+  let world = liveWorld(ALL_PINS, 1);
+  let g = null, gameSeq = 0, acc = 0, timeScale = 1;
+  const S = { x0: 0.12, angle: -0.003, hook: 0, power: 0, charging: false, chargeBy: '', chargeT: 0, lastPower: 0.6, meterT: 0, speedTxt: '', drag: null, sweep: null, sweepY: null, lift: 0, rackT: 1, camTarget: CAM0, guideKey: '', guidePts: [] };
+  const cam = { y: CAM0, x: 0 };
+
+  // Game-time timers: they stop while a panel is open or the tab is hidden.
+  let timers = [];
+  function after(sec, fn) { timers.push({ t: sec, fn, seq: gameSeq }); }
+  function runTimers(dt) {
+    const due = [];
+    timers = timers.filter(tm => { if (tm.seq !== gameSeq) return false; tm.t -= dt; if (tm.t <= 0) { due.push(tm); return false; } return true; });
+    for (const tm of due) if (tm.seq === gameSeq) tm.fn();
+  }
+
+  function announce(text) { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = text; }, 30); }
+  let toastTimer = 0, bannerTimer = 0;
+  function toast(text, ms = 2200) {
+    els.toast.textContent = text;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), ms);
+  }
+  function clearToasts() { clearTimeout(toastTimer); els.toast.classList.remove('show'); clearTimeout(bannerTimer); els.banner.classList.remove('show'); }
+  function banner(text, kind) {
+    els.banner.textContent = text;
+    els.banner.className = `banner ${kind}${[...text].length > 13 ? ' long' : ''}`;
+    void els.banner.offsetWidth;
+    els.banner.classList.add('show');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => els.banner.classList.remove('show'), 1250);
+  }
+
+  // ---------- Sound (synthesized)
+  let actx = null, noiseBuf = null, rollSrc = null, rollGain = null, sfxBudget = 3;
+  function unlockAudio() {
+    if (!settings.sound) return;
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch { actx = null; }
+  }
+  const audioOk = () => settings.sound && actx && actx.state === 'running';
+  function noise() {
+    if (!noiseBuf) {
+      noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+  function burst(freq, q, dur, vol, delay = 0) {
+    const now = actx.currentTime + delay, src = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    src.buffer = noise(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    gn.gain.setValueAtTime(vol, now); gn.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(f).connect(gn).connect(actx.destination);
+    src.start(now, Math.random() * 0.5); src.stop(now + dur + 0.02);
+  }
+  function tone(freq, dur, vol, type, delay = 0) {
+    const now = actx.currentTime + delay, o = actx.createOscillator(), gn = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, now);
+    gn.gain.setValueAtTime(vol, now); gn.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    o.connect(gn).connect(actx.destination); o.start(now); o.stop(now + dur + 0.02);
+  }
+  function sfx(kind, v = 1) {
+    if (!audioOk() || sfxBudget <= 0) return;
+    sfxBudget--;
+    try {
+      if (kind === 'pin') burst(2300 + Math.random() * 1500, 1.3, 0.1, Math.min(0.45, 0.06 + v * 0.035));
+      else if (kind === 'hit') { burst(800, 0.8, 0.2, 0.5); tone(120, 0.14, 0.3, 'sine'); }
+      else if (kind === 'gutter') tone(78, 0.3, 0.35, 'sine');
+      else if (kind === 'strike') [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.24, 0.15, 'triangle', i * 0.08));
+      else if (kind === 'spare') [587, 880].forEach((f, i) => tone(f, 0.22, 0.15, 'triangle', i * 0.09));
+      else if (kind === 'sweep') burst(260, 0.7, 0.4, 0.14);
+      else if (kind === 'click') tone(900, 0.05, 0.08, 'triangle');
+    } catch {}
+  }
+  function rollSound(on, vol = 0) {
+    if (!actx) return;
+    try {
+      if (on && audioOk() && !rollSrc) {
+        rollSrc = actx.createBufferSource(); rollSrc.buffer = noise(); rollSrc.loop = true;
+        const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 160;
+        rollGain = actx.createGain(); rollGain.gain.value = 0;
+        rollSrc.connect(f).connect(rollGain).connect(actx.destination); rollSrc.start();
+      }
+      if (rollGain) rollGain.gain.setTargetAtTime(on ? vol : 0, actx.currentTime, 0.06);
+      if (!on && rollSrc) { const s = rollSrc; rollSrc = null; setTimeout(() => { try { s.stop(); } catch {} }, 400); }
+    } catch {}
+  }
+
+  // ---------- View: a perspective camera behind the foul line that dollies down the lane with the ball
+  const view = { w: 0, h: 0, dpr: 1, f: 1, hc: 2, hz: 0, dEnd: 20 };
+  const A = {}, B = {}, C = {}, D = {};
+  function proj(x, y, z, o) {
+    const d = Math.max(0.05, y - cam.y);
+    o.x = view.w / 2 + view.f * (x - cam.x) / d;
+    o.y = view.hz + view.f * (view.hc - z) / d;
+    o.s = view.f / d;
+    return o;
+  }
+  function resize() {
+    const r = $('stage').getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    Object.assign(view, { w: r.width, h: r.height, dpr });
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.height * dpr);
+    // Fit the whole lane: approach at the bottom edge, the tops of the back pins near the top edge.
+    const dB = -1.05 - CAM0, dT = 19.15 - CAM0, top = r.height * 0.075, bottom = r.height * 0.985, span = bottom - top;
+    const k1 = 1 / dB - 1 / dT, k2 = PIN_H / dT;
+    let f = 0.96 * r.width * dB / (2 * WALL + 0.16);
+    let hc = (span - f * k2) / (f * k1);
+    if (hc < 1.05) { hc = 1.05; f = span / (hc * k1 + k2); }
+    if (hc > 4.2) { hc = 4.2; f = span / (hc * k1 + k2); }
+    const hz = bottom - f * hc / dB;
+    // How close the follow camera gets: the pin deck ends up a little below the middle of the stage.
+    Object.assign(view, { f, hc, hz, dEnd: clamp(f * hc / (r.height * 0.64 - hz), 6, 30) - 0.4 });
+    draw();
+  }
+  function toLane(e) {
+    const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top, dy = sy - view.hz;
+    if (dy <= 2) return { x: S.x0 + Math.tan(S.angle) * 40, y: 60 };
+    const d = view.f * view.hc / dy;
+    return { x: cam.x + (sx - view.w / 2) * d / view.f, y: cam.y + d };
+  }
+
+  // ---------- Drawing
+  const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, k) => { const p = hexRgb(a), q = hexRgb(b); return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * k)).join(',')})`; };
+  const FONT = getComputedStyle(document.body).fontFamily;
+  const PAL = { cap: '#271d49', approach: '#d6ae78', lane: ['#ebc790', '#e4bd85', '#efcd99'], gutter: '#3d3263', deck: '#f2e9d6', pit: '#07050d', kick: '#2d2254', mask: '#33266a' };
+  const DIM = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, Array.isArray(v) ? v.map(c => mix(c, '#120d24', 0.5)) : mix(v, '#120d24', 0.5)]));
+  const pinImg = document.createElement('canvas');
+  function makePinSprite() {
+    const W = 60, H = 190, c = pinImg.getContext('2d');
+    pinImg.width = W; pinImg.height = H;
+    const prof = [[0, 0.42], [0.07, 0.64], [0.18, 0.9], [0.3, 1], [0.42, 0.92], [0.52, 0.7], [0.6, 0.45], [0.67, 0.37], [0.76, 0.44], [0.86, 0.5], [0.94, 0.4], [0.985, 0.2], [1, 0]];
+    const X = r => W / 2 + r * (W / 2 - 1), Y = h => H - 1 - h * (H - 2);
+    const trace = pts => {
+      for (let i = 1; i < pts.length - 1; i++) c.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
+      c.lineTo(...pts[pts.length - 1]);
+    };
+    const left = prof.map(([h, r]) => [X(-r), Y(h)]), right = prof.map(([h, r]) => [X(r), Y(h)]).reverse();
+    c.beginPath(); c.moveTo(...left[0]); trace(left); trace(right); c.closePath();
+    const gr = c.createLinearGradient(0, 0, W, 0);
+    gr.addColorStop(0, '#b4abcb'); gr.addColorStop(0.3, '#ffffff'); gr.addColorStop(0.58, '#f4f0fa'); gr.addColorStop(1, '#978db0');
+    c.fillStyle = gr; c.fill();
+    c.save(); c.clip();
+    c.fillStyle = '#d92f4f';
+    c.fillRect(0, Y(0.655), W, H * 0.032); c.fillRect(0, Y(0.705), W, H * 0.032);
+    c.restore();
+    c.strokeStyle = '#2a1f4a33'; c.lineWidth = 1.5; c.stroke();
+  }
+  function poly4(a, b, c, d, fill) {
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+  }
+  function floor(x0, x1, y0, y1, z, fill) {
+    y0 = Math.max(y0, cam.y + NEAR);
+    if (y1 <= y0) return;
+    poly4(proj(x0, y0, z, A), proj(x1, y0, z, B), proj(x1, y1, z, C), proj(x0, y1, z, D), fill);
+  }
+  function wallX(x, y0, y1, z0, z1, fill) {
+    y0 = Math.max(y0, cam.y + NEAR);
+    if (y1 <= y0) return;
+    poly4(proj(x, y0, z0, A), proj(x, y1, z0, B), proj(x, y1, z1, C), proj(x, y0, z1, D), fill);
+  }
+  function wallY(x0, x1, y, z0, z1, fill) {
+    if (y < cam.y + NEAR) return;
+    poly4(proj(x0, y, z0, A), proj(x1, y, z0, B), proj(x1, y, z1, C), proj(x0, y, z1, D), fill);
+  }
+  function drawPinShape(x0, y0, z0, x1, y1, z1, alpha) {
+    if (Math.min(y0, y1) < cam.y + NEAR) return;
+    proj(x0, y0, z0, A); proj(x1, y1, z1, B);
+    const w = PIN_W * (A.s + B.s) / 2, dx = B.x - A.x, dy = B.y - A.y, len = Math.max(Math.hypot(dx, dy), w * 0.8);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(A.x, A.y);
+    ctx.rotate(Math.atan2(dx, -dy));
+    ctx.drawImage(pinImg, -w / 2, -len, w, len);
+    ctx.restore();
+  }
+  function shadow(x, y, r, alpha) {
+    if (y < cam.y + NEAR) return;
+    proj(x, y, 0, A);
+    const flat = clamp(view.hc / (y - cam.y), 0.06, 1);
+    ctx.fillStyle = `rgba(20,10,40,${alpha})`;
+    ctx.beginPath(); ctx.ellipse(A.x, A.y, r * A.s, r * A.s * flat, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawPin(p, X = 0, alpha = 1) {
+    const H = PIN_H;
+    if (p.st === 'up') {
+      const lift = S.lift + (1 - ease(S.rackT)) * 0.55, a = alpha * (p.isNew ? S.rackT : 1);
+      const ux = Math.cos(p.dir), uy = Math.sin(p.dir), w = p.wob;
+      shadow(p.x + X, p.y, 0.075, 0.28 * a * (1 - lift));
+      drawPinShape(p.x + X, p.y, lift, p.x + X + Math.sin(w) * ux * H, p.y + Math.sin(w) * uy * H, lift + Math.cos(w) * H, a);
+      return;
+    }
+    const s = Math.sin(p.tilt), ux = Math.cos(p.dir), uy = Math.sin(p.dir), r = 0.055 * s;
+    const a = alpha * (p.st === 'gone' ? p.pit : p.fade);
+    if (a <= 0.01) return;
+    const sink = p.st === 'gone' ? (1 - p.pit) * 0.3 : 0;
+    shadow(p.x, p.y, 0.09, 0.22 * a);
+    drawPinShape(p.x - ux * H * 0.45 * s, p.y - uy * H * 0.45 * s, r - sink, p.x + ux * H * 0.55 * s, p.y + uy * H * 0.55 * s, Math.cos(p.tilt) * H + r - sink, a);
+  }
+  function drawBall(b, color) {
+    if (b.gone || b.y > END_Y || b.y < cam.y + NEAR) return;
+    let z = BALL_R;
+    if (b.gutter) z -= 0.045;
+    if (b.y > PIT_Y) z -= (b.y - PIT_Y) * 2;
+    if (b.y <= PIT_Y) shadow(b.x, b.y, BALL_R * 1.05, 0.38);
+    proj(b.x, b.y, z, B);
+    const r = BALL_R * B.s;
+    const gr = ctx.createRadialGradient(B.x - r * 0.38, B.y - r * 0.42, r * 0.08, B.x, B.y, r);
+    gr.addColorStop(0, mix(color, '#ffffff', 0.7)); gr.addColorStop(0.35, color); gr.addColorStop(1, mix(color, '#100820', 0.72));
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(B.x, B.y, r, 0, Math.PI * 2); ctx.fill();
+    // finger holes ride round with the roll
+    const al = Math.atan2(view.hc - BALL_R, Math.max(0.5, b.y - cam.y));
+    ctx.fillStyle = '#1a0c24';
+    for (const [hx, off] of [[-0.2, 0], [0.2, 0], [0, 0.42]]) {
+      const th = b.roll + off, vis = Math.sin(al - th + 1.2);
+      if (vis <= 0.05) continue;
+      ctx.beginPath(); ctx.ellipse(B.x + hx * r, B.y - r * 0.62 * Math.cos(th - al - 0.6), r * 0.11, r * 0.11 * vis, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function drawLane(X, dim) {
+    const c = dim ? DIM : PAL;
+    floor(X - PITCH / 2, X + PITCH / 2, -8, END_Y + 0.2, 0, c.cap);
+    floor(X - WALL, X + WALL, -8, 0, 0, c.approach);
+    floor(X - WALL, X - LANE_HALF, 0, PIT_Y, -0.01, c.gutter);
+    floor(X + LANE_HALF, X + WALL, 0, PIT_Y, -0.01, c.gutter);
+    if (dim) floor(X - LANE_HALF, X + LANE_HALF, 0, HEAD_Y - 0.3, 0, c.lane[0]);
+    else for (let i = 0; i < 39; i++) { const x0 = X - LANE_HALF + i * BOARD; floor(x0, x0 + BOARD + 0.002, 0, HEAD_Y - 0.3, 0, c.lane[(i * 7) % 3]); }
+    floor(X - LANE_HALF, X + LANE_HALF, HEAD_Y - 0.3, PIT_Y, 0, c.deck);
+    floor(X - WALL, X + WALL, PIT_Y, END_Y + 0.2, -0.01, c.pit);
+    if (!dim) laneMarks();
+    wallX(X - WALL, HEAD_Y - 0.7, END_Y + 0.2, 0, 0.62, c.kick);
+    wallX(X + WALL, HEAD_Y - 0.7, END_Y + 0.2, 0, 0.62, c.kick);
+    wallY(X - WALL - 0.16, X + WALL + 0.16, HEAD_Y - 0.62, 1.55, 2.05, c.mask);
+    wallY(X - WALL - 0.16, X + WALL + 0.16, HEAD_Y - 0.62, 1.55, 1.6, dim ? '#5c3a6e' : '#ff5e7e');
+    wallY(X - WALL - 0.16, X + WALL + 0.16, HEAD_Y - 0.62, 2.0, 2.05, dim ? '#2f5c66' : '#37e2c6');
+    if (HEAD_Y - 0.62 > cam.y + NEAR) {
+      proj(X, HEAD_Y - 0.62, 1.8, A);
+      const fs = 0.2 * A.s;
+      if (fs > 6) {
+        ctx.fillStyle = dim ? '#8d80b8' : '#fff6e0';
+        ctx.font = `900 ${fs}px ${FONT}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(12 + Math.round(X / PITCH)), A.x, A.y);
+      }
+    }
+    if (dim) for (const [x, y] of SPOTS) drawPinShape(x + X, y, 0, x + X, y, PIN_H, 0.6);
+  }
+  function laneMarks() {
+    const yn = Math.max(0, cam.y + NEAR);
+    // sheen: brighter far down the lane, slightly darker near the camera
+    if (yn < HEAD_Y) {
+      proj(0, HEAD_Y - 0.3, 0, A); proj(0, yn, 0, B);
+      const gr = ctx.createLinearGradient(0, A.y, 0, B.y);
+      gr.addColorStop(0, 'rgba(255,248,230,0.38)'); gr.addColorStop(0.45, 'rgba(255,248,230,0.05)'); gr.addColorStop(1, 'rgba(60,30,10,0.12)');
+      floor(-LANE_HALF, LANE_HALF, 0, HEAD_Y - 0.3, 0.001, gr);
+    }
+    floor(-LANE_HALF, LANE_HALF, -0.015, 0.015, 0.002, '#c2384c');
+    for (let i = 0; i < 7; i++) {
+      const x = LANE_HALF - BOARD * (5 * (i + 1) - 0.5), y = 3.66 + (3 - Math.abs(i - 3)) * 0.3;
+      if (y - 0.15 < cam.y + NEAR) continue;
+      poly4(proj(x, y + 0.15, 0.002, A), proj(x + 0.018, y - 0.15, 0.002, B), proj(x - 0.018, y - 0.15, 0.002, C), proj(x, y + 0.15, 0.002, D), '#7a4a2ec0');
+    }
+    for (const bd of [3, 5, 8, 11, 14, 26, 29, 32, 35, 37]) { const x = LANE_HALF - BOARD * (bd - 0.5); floor(x - 0.008, x + 0.008, 2.12, 2.145, 0.002, '#7a4a2eb0'); }
+    for (const [x, y] of SPOTS) floor(x - 0.025, x + 0.025, y - 0.025, y + 0.025, 0.001, '#cbbd9f');
+  }
+  function drawScene() {
+    const w = view.w, h = view.h;
+    const gr = ctx.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#0b071c'); gr.addColorStop(0.5, '#1a1238'); gr.addColorStop(1, '#120d24');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+    wallY(-40, 40, END_Y + 0.25, 0, 6, '#1b1336');
+    wallY(-40, 40, END_Y + 0.24, 1.18, 1.23, '#ff5e7e99');
+    wallY(-40, 40, END_Y + 0.24, 1.3, 1.33, '#37e2c677');
+    if (END_Y > cam.y + NEAR) {
+      proj(0, END_Y + 0.22, 0.95, A); proj(0, END_Y + 0.22, 0, B);
+      const cg = ctx.createLinearGradient(0, A.y, 0, B.y);
+      cg.addColorStop(0, '#2a1f52'); cg.addColorStop(1, '#0d0919');
+      for (const k of [-3, -2, -1, 0, 1, 2, 3]) wallY(k * PITCH - WALL, k * PITCH + WALL, END_Y + 0.22, 0, 0.95, cg);
+    }
+    for (const k of [-3, 3, -2, 2, -1, 1]) drawLane(k * PITCH, true);
+    drawLane(0, false);
+  }
+  function drawObjects() {
+    const objs = [];
+    for (const p of world.pins) if (p.st !== 'gone' || p.pit > 0) objs.push({ d: p.y, p });
+    objs.push({ d: world.ball.y, ball: true });
+    if (S.sweepY != null) objs.push({ d: S.sweepY, sweep: true });
+    objs.sort((a, b) => b.d - a.d);
+    const pl = g && g.players[g.cur], color = pl ? pl.color : COLORS[0];
+    for (const o of objs) {
+      if (o.ball) drawBall(world.ball, color);
+      else if (o.sweep) {
+        floor(-WALL, WALL, S.sweepY - 0.05, S.sweepY, 0.28, '#4a3f78');
+        wallY(-WALL, WALL, S.sweepY - 0.05, 0.03, 0.28, '#2c2450');
+      } else drawPin(o.p);
+    }
+  }
+  function guidePath() {
+    const key = [S.x0, S.angle, S.hook, S.lastPower, g.oil].join();
+    if (key !== S.guideKey) { S.guideKey = key; S.guidePts = []; ballPath(g.oil, S.x0, S.angle, S.lastPower, S.hook / 3, HEAD_Y, S.guidePts); }
+    return S.guidePts;
+  }
+  function drawGuide() {
+    const human = g.players[g.cur].cpu == null;
+    const y1 = BALL_Y0 + 0.35, pts = settings.guide && human ? guidePath() : [S.x0 + Math.tan(S.angle) * 0.35, y1, S.x0 + Math.tan(S.angle) * 6.3, 6];
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.setLineDash([7, 7]);
+    ctx.beginPath();
+    let first = true;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pts[i + 1] < y1 - 0.01 || pts[i + 1] < cam.y + NEAR) continue;
+      proj(pts[i], pts[i + 1], 0.01, A);
+      if (first) ctx.moveTo(A.x, A.y); else ctx.lineTo(A.x, A.y);
+      first = false;
+    }
+    ctx.lineWidth = 5; ctx.strokeStyle = '#2a103a55'; ctx.stroke();
+    ctx.lineWidth = 2.6; ctx.strokeStyle = human ? '#ff3d6e' : '#2f7fff'; ctx.stroke();
+    // arrow head at the end of the guide
+    const n = pts.length;
+    if (n >= 4 && pts[n - 1] > cam.y + NEAR) {
+      proj(pts[n - 2], pts[n - 1], 0.01, A);
+      const dx = pts[n - 2] - pts[n - 4], dy = pts[n - 1] - pts[n - 3], l = Math.hypot(dx, dy) || 1;
+      proj(pts[n - 2] - dx / l * 0.4, pts[n - 1] - dy / l * 0.4, 0.01, B);
+      const ang = Math.atan2(A.y - B.y, A.x - B.x), sz = 9;
+      ctx.setLineDash([]); ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(A.x - sz * Math.cos(ang - 0.45), A.y - sz * Math.sin(ang - 0.45)); ctx.lineTo(A.x - sz * Math.cos(ang + 0.45), A.y - sz * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function drawMiniMap() {
+    const sp = 12, x0 = 8, y0 = 8;
+    ctx.fillStyle = '#0b0818c9';
+    roundRect(x0, y0, sp * 3 + 22, sp * 3 * 0.86 + 22, 10); ctx.fill();
+    world.pins.forEach((p, i) => {
+      const [sx, sy] = SPOTS[i], cx = x0 + 11 + sp * 1.5 + sx / SP * sp / 2, cy = y0 + 11 + (3 - (sy - HEAD_Y) / ROW) * sp * 0.86;
+      ctx.beginPath(); ctx.arc(cx, cy, 4.4, 0, Math.PI * 2);
+      if (p.st === 'up') { ctx.fillStyle = '#fff'; ctx.fill(); ctx.fillStyle = '#d92f4f'; ctx.fillRect(cx - 2.2, cy - 0.8, 4.4, 1.6); }
+      else { ctx.strokeStyle = '#ffffff40'; ctx.lineWidth = 1.2; ctx.stroke(); }
+    });
+  }
+  function drawMeter() {
+    if (!S.charging && S.meterT <= 0) return;
+    const h = Math.min(view.h * 0.42, 190), x = view.w - 26, y = view.h - h - 18;
+    ctx.fillStyle = '#0b0818c9'; roundRect(x - 4, y - 4, 22, h + 8, 11); ctx.fill();
+    const gr = ctx.createLinearGradient(0, y + h, 0, y);
+    gr.addColorStop(0, '#37e2c6'); gr.addColorStop(0.6, '#ffd84a'); gr.addColorStop(1, '#ff5e7e');
+    ctx.fillStyle = gr; roundRect(x, y + h * (1 - S.power), 14, Math.max(4, h * S.power), 7); ctx.fill();
+    if (!S.charging && S.speedTxt) {
+      ctx.font = `800 13px ${FONT}`;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(S.speedTxt).width;
+      ctx.fillStyle = '#0b0818c9'; roundRect(x - tw - 22, y + h * (1 - S.power) - 12, tw + 14, 24, 12); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(S.speedTxt, x - 15, y + h * (1 - S.power));
+    }
+  }
+  function draw() {
+    if (!view.w) return;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    drawScene();
+    if (g && (g.phase === 'aim' || g.phase === 'cpu')) drawGuide();
+    drawObjects();
+    drawMiniMap();
+    drawMeter();
+  }
+
+  // ---------- Turn flow
+  const humanCanAim = () => !!g && g.phase === 'aim' && !overlayOpen();
+  const tri = tt => 1 - Math.abs(((tt / 0.85) % 2) - 1);
+  function setPowerUi(p) { els.bowl.style.setProperty('--p', p.toFixed(3)); }
+  function setX0(v) { S.x0 = clamp(v, -X_MAX, X_MAX); world.ball.x = S.x0; }
+  function setAngle(a) { S.angle = clamp(a, -0.09, 0.09); }
+  function setHook(v) { S.hook = clamp(v, -3, 3); updateCurve(); }
+
+  function startGame(opts) {
+    gameSeq++;
+    timers = [];
+    for (const id of OVERLAYS) $(id).hidden = true;
+    clearToasts();
+    const mode = opts.mode;
+    const names = mode === 'cpu' ? [t.you, t.cpu] : mode === 'party' ? Array.from({ length: opts.players }, (_, i) => t.player(i + 1)) : [t.you];
+    g = {
+      opts, mode, oil: mode === 'spare' ? 1 : opts.oil, cur: 0, phase: 'idle', level: opts.level || 0, tries: 1, hinted: false, cpuAnim: null, upBefore: [],
+      players: names.map((name, i) => ({ name, cpu: mode === 'cpu' && i === 1 ? opts.diff : null, color: COLORS[i], rolls: [], splits: [], streak: 0, strikes: 0, spares: 0, aim: { x0: mode === 'cpu' && i === 1 ? 0.25 : 0.12, angle: -0.003, hook: 0 } })),
+    };
+    world = liveWorld(mode === 'spare' ? SPARES[g.level] : ALL_PINS, g.oil);
+    for (const p of world.pins) p.isNew = true;
+    S.rackT = 0; S.lift = 0; S.sweep = null; S.sweepY = null; S.meterT = 0;
+    cam.y = CAM0;
+    beginTurn();
+    cv.focus({ preventScroll: true });
+  }
+  function beginTurn() {
+    if (!g) return;
+    const pl = g.players[g.cur];
+    S.camTarget = CAM0; S.charging = false; S.power = 0; setPowerUi(0);
+    Object.assign(world.ball, { x: pl.aim.x0, y: BALL_Y0, vx: 0, vy: 0, gutter: false, gone: false, hit: false, roll: 0 });
+    world.t = 0; world.after = 0;
+    S.x0 = pl.aim.x0; S.angle = pl.aim.angle; S.hook = pl.aim.hook;
+    g.upBefore = world.pins.filter(p => p.st === 'up').map(p => p.n);
+    g.phase = pl.cpu != null ? 'cpu' : 'aim';
+    g.cpuAnim = null;
+    updateHud();
+    const first = g.mode === 'spare' || scoreCard(pl.rolls).ball === 0;
+    if (g.players.length > 1 && first) toast(pl.cpu != null ? t.cpuThinks : g.mode === 'cpu' ? t.yourTurn : t.turnOf(pl.name));
+    if (pl.cpu != null) cpuTurn(pl);
+    else if (!g.hinted) { g.hinted = true; after(g.players.length > 1 ? 2.2 : 0.3, () => { if (g && g.phase === 'aim') toast(t.hint, 3400); }); }
+  }
+  function cpuTurn(pl) {
+    const seq = gameSeq, gen = planShot(world.pins, g.oil, pl.cpu);
+    // The search runs in short slices so the page never stalls.
+    const work = () => {
+      if (seq !== gameSeq || !g || g.phase !== 'cpu') return;
+      if (overlayOpen() || document.hidden) { setTimeout(work, 150); return; }
+      const t0 = performance.now();
+      let r;
+      do r = gen.next(); while (!r.done && performance.now() - t0 < 24);
+      if (!r.done) { setTimeout(work, 0); return; }
+      g.cpuAnim = { t: 0, from: { x0: S.x0, angle: S.angle }, shot: addNoise(r.value, pl.cpu, gauss) };
+    };
+    after(0.4, work);
+  }
+  function animateCpu(dt) {
+    const a = g.cpuAnim;
+    a.t += dt;
+    const k = ease(Math.min(1, a.t / 0.9));
+    setX0(lerp(a.from.x0, a.shot.x0, k));
+    S.angle = lerp(a.from.angle, a.shot.angle, k);
+    if (S.hook !== Math.round(a.shot.hook * 3)) setHook(Math.round(a.shot.hook * 3));
+    const charge = a.t - 1.15;
+    if (charge <= 0) return;
+    S.charging = true;
+    S.power = Math.min(a.shot.power, charge / 0.85);
+    setPowerUi(S.power);
+    if (S.power >= a.shot.power) { g.cpuAnim = null; S.charging = false; g.players[g.cur].aim = { x0: a.shot.x0, angle: a.shot.angle, hook: S.hook }; release(a.shot); }
+  }
+  function startCharge(by) {
+    if (!humanCanAim() || S.charging) return;
+    unlockAudio();
+    S.charging = true; S.chargeBy = by; S.chargeT = 0; S.power = 0;
+  }
+  function cancelCharge() { S.charging = false; S.power = 0; setPowerUi(0); }
+  function releaseHuman() {
+    if (!S.charging) return;
+    S.charging = false;
+    if (!humanCanAim()) return;
+    if (S.power < 0.04) { cancelCharge(); toast(t.hold); return; }
+    g.players[g.cur].aim = { x0: S.x0, angle: S.angle, hook: S.hook };
+    S.lastPower = S.power;
+    release({ x0: S.x0, angle: S.angle, power: S.power, hook: S.hook / 3 });
+  }
+  function release(shot) {
+    g.phase = 'roll';
+    acc = 0;
+    launch(world, shot.x0, shot.angle, shot.power, shot.hook);
+    world.t = 0; world.after = 0;
+    S.power = shot.power; setPowerUi(shot.power);
+    S.meterT = 1.6; S.speedTxt = t.speed(speedOf(shot.power));
+    clearTimeout(toastTimer); els.toast.classList.remove('show');
+    rollSound(true, 0.05);
+    updateHud();
+  }
+  function rollEnd() {
+    g.phase = 'result';
+    rollSound(false);
+    const up = world.pins.filter(p => p.st === 'up').map(p => p.n);
+    const before = g.upBefore, knocked = before.length - up.length;
+    if (g.mode === 'spare') { spareEnd(up); return; }
+    const pl = g.players[g.cur], c0 = scoreCard(pl.rolls), fresh = before.length === 10;
+    pl.rolls.push(knocked);
+    const split = fresh && isSplit(up);
+    pl.splits.push(split);
+    const c1 = scoreCard(pl.rolls);
+    let msg, kind = 'small';
+    if (fresh && !up.length) {
+      pl.streak++; pl.strikes++;
+      msg = pl.streak >= 4 ? t.bagger(pl.streak) : pl.streak === 3 ? t.turkey : pl.streak === 2 ? t.double : t.strike;
+      kind = 'strike'; sfx('strike');
+    } else {
+      pl.streak = 0;
+      if (!up.length) { msg = t.spare; kind = 'spare'; pl.spares++; sfx('spare'); }
+      else if (!knocked) msg = world.ball.gutter ? t.gutter : t.miss;
+      else if (split) msg = `${t.split} ${t.pins(knocked)}`;
+      else msg = t.pins(knocked);
+    }
+    banner(msg, kind);
+    const frameOver = c1.done || c1.frame !== c0.frame;
+    announce(frameOver && c1.frames[c0.frame].cum != null ? `${msg} ${t.frameScore(pl.name, c0.frame + 1, c1.total)}` : `${pl.name}: ${msg}`);
+    renderCards();
+    after(1.15, () => startSweep(frameOver || c1.full ? ALL_PINS : null, () => { if (frameOver) nextPlayer(); else beginTurn(); }));
+  }
+  function nextPlayer() {
+    const n = g.players.length;
+    for (let i = 1; i <= n; i++) {
+      const j = (g.cur + i) % n;
+      if (!scoreCard(g.players[j].rolls).done) { g.cur = j; beginTurn(); return; }
+    }
+    gameOver();
+  }
+  function startSweep(rack, cb) {
+    g.phase = 'sweep';
+    S.sweep = { t: 0, rack, cb };
+    sfx('sweep');
+  }
+  // The table lifts the standing pins, the bar pushes the deadwood into the pit, then the pins come back down.
+  function stepSweep(dt) {
+    const s = S.sweep;
+    s.t += dt;
+    const k = Math.min(1, s.t / 0.9);
+    S.lift = 0.55 * (k < 0.2 ? ease(k / 0.2) : k > 0.8 ? 1 - ease((k - 0.8) / 0.2) : 1);
+    const kb = clamp((k - 0.15) / 0.6, 0, 1);
+    S.sweepY = kb > 0 && kb < 1 ? HEAD_Y - 0.55 + kb * (PIT_Y - HEAD_Y + 0.75) : null;
+    for (const p of world.pins) if (p.st === 'down') {
+      if (S.sweepY != null && p.y < S.sweepY + 0.1) p.y = S.sweepY + 0.1;
+      if (kb > 0) p.fade = Math.max(0, p.fade - dt * 1.8);
+    }
+    if (k < 1) return;
+    S.sweep = null; S.sweepY = null; S.lift = 0;
+    for (const p of world.pins) if (p.st === 'down') p.st = 'gone';
+    if (s.rack) { world.pins = makePins(s.rack); for (const p of world.pins) p.isNew = true; S.rackT = 0; }
+    for (const p of world.pins) { p.vx = 0; p.vy = 0; p.wob = 0; p.wobV = 0; }
+    after(s.rack ? 0.4 : 0.1, s.cb);
+  }
+  function gameOver() {
+    g.phase = 'over';
+    const tot = g.players.map(p => scoreCard(p.rolls).total);
+    let newBest = false;
+    g.players.forEach((p, i) => {
+      if (p.cpu != null) return;
+      stats.games++; stats.strikes += p.strikes;
+      if (tot[i] > stats.high) { stats.high = tot[i]; newBest = true; }
+    });
+    const me = g.players[0], stat = t.statLine(me.strikes, me.spares);
+    let o;
+    if (g.mode === 'solo') o = { title: t.gameOver, big: String(tot[0]), sub: `${stat} · ${newBest ? t.newBest : t.bestLine(stats.high)}` };
+    else if (g.mode === 'cpu') {
+      const lv = g.players[1].cpu, res = Math.sign(tot[0] - tot[1]);
+      if (res > 0) stats.w[lv] = (stats.w[lv] || 0) + 1; else if (res < 0) stats.l[lv] = (stats.l[lv] || 0) + 1;
+      o = { title: res > 0 ? t.youWin : res < 0 ? t.youLose : t.tie, big: `${tot[0]} – ${tot[1]}`, sub: newBest ? `${stat} · ${t.newBest}` : stat };
+    } else {
+      const top = Math.max(...tot), winners = g.players.filter((_, i) => tot[i] === top);
+      o = { title: winners.length > 1 ? t.tie : t.wins(winners[0].name), big: String(top), sub: newBest ? t.newBest : '', list: g.players.map((p, i) => [p.name, tot[i], tot[i] === top]).sort((a, b) => b[1] - a[1]) };
+    }
+    save('stats', stats);
+    sfx(g.mode === 'cpu' && tot[0] < tot[1] ? 'gutter' : 'strike');
+    showResult({ ...o, main: t.again, onMain: () => startGame(g.opts) });
+  }
+  function spareEnd(up) {
+    if (!up.length) {
+      const st = g.tries === 1 ? 3 : g.tries === 2 ? 2 : 1, lv = g.level, last = lv >= SPARES.length - 1;
+      if (st > starOf(lv)) { stars[lv] = st; save('spares', stars); }
+      banner(t.cleared, 'spare'); sfx('spare');
+      g.phase = 'over';
+      showResult({ title: t.cleared, stars: st, big: t.level(lv + 1), sub: last ? t.allDone : t.triesUsed(g.tries), main: last ? t.retry : t.next, onMain: () => startGame({ mode: 'spare', level: last ? lv : lv + 1 }), alt: last ? '' : t.retry, onAlt: () => startGame({ mode: 'spare', level: lv }) });
+      return;
+    }
+    banner(t.notCleared, 'small');
+    announce(t.notCleared);
+    g.tries++;
+    after(1.15, () => startSweep(SPARES[g.level], beginTurn));
+  }
+
+  // ---------- HUD
+  function cardHtml(pl, on) {
+    const sc = scoreCard(pl.rolls);
+    let fr = '';
+    for (let f = 0; f < 10; f++) {
+      const o = sc.frames[f], marks = o ? o.marks : f < 9 ? ['', ''] : ['', '', ''];
+      const cur = on && !sc.done && f === sc.frame;
+      const boxes = marks.map((m, k) => {
+        const ri = o && !(f < 9 && o.rolls[0] === 10) ? o.start + k : -1, sp = ri >= 0 && pl.splits[ri];
+        return `<i class="${m === 'X' ? 'x' : m === '/' ? 's' : ''}${sp ? ' sp' : ''}">${sp ? `<b>${m}</b>` : m}</i>`;
+      }).join('');
+      fr += `<div class="fr${f === 9 ? ' t' : ''}${cur ? ' cur' : ''}"><div class="rl">${boxes}</div><div class="cm">${o && o.cum != null ? o.cum : ''}</div></div>`;
+    }
+    return `<div class="card${on ? ' on' : ''}" style="--c:${pl.color}" aria-label="${pl.name}: ${sc.total}"><div class="ch"><span class="dot"></span><span class="nm">${pl.name}</span><b class="tot">${sc.total}</b></div><div class="frames" aria-hidden="true">${fr}</div></div>`;
+  }
+  function renderCards() {
+    if (!g) { els.cards.innerHTML = ''; return; }
+    if (g.mode === 'spare') {
+      const st = starOf(g.level);
+      els.cards.innerHTML = `<div class="card on" style="--c:${COLORS[0]}"><div class="ch"><span class="dot"></span><span class="nm">${t.level(g.level + 1)}</span><span class="tag">${t.tries(g.tries)}</span><b class="tot" aria-label="${st}/3 ★">${'★'.repeat(st)}</b></div><p class="sdesc">${t.clearAll}</p></div>`;
+      return;
+    }
+    els.cards.innerHTML = g.players.map((p, i) => cardHtml(p, i === g.cur)).join('');
+    if (!$('scores').hidden) $('score-list').innerHTML = g.players.map((p, i) => cardHtml(p, i === g.cur)).join('');
+  }
+  function updateCurve() {
+    const v = S.hook;
+    els.curveVal.textContent = v === 0 ? t.straight : v < 0 ? '‹'.repeat(-v) : '›'.repeat(v);
+    const can = humanCanAim();
+    els.curveL.disabled = !can || v <= -3;
+    els.curveR.disabled = !can || v >= 3;
+    els.curveL.setAttribute('aria-label', `${t.curveL} (${t.curve} ${v})`);
+    els.curveR.setAttribute('aria-label', `${t.curveR} (${t.curve} ${v})`);
+  }
+  function updateHud() {
+    renderCards();
+    updateCurve();
+    els.bowl.disabled = !humanCanAim();
+    $('side-help').innerHTML = g ? `<b>${t.oil}: ${[t.dry, t.mediumOil, t.slick][g.oil]}</b>${stats.high ? ` · ${t.bestScore(stats.high)}` : ''}<br>${t.help}<br>${t.keys}` : '';
+    if (!g) { els.info.textContent = ''; cv.setAttribute('aria-label', 'Bowling'); return; }
+    const pl = g.players[g.cur], up = world.pins.filter(p => p.st === 'up').length;
+    if (g.mode === 'spare') {
+      els.info.textContent = `${t.level(g.level + 1)} · ${t.tries(g.tries)}`;
+      cv.setAttribute('aria-label', `${t.clearAll}. ${t.lane(1, g.tries, up)}`);
+    } else {
+      const sc = scoreCard(pl.rolls);
+      els.info.textContent = `${g.players.length > 1 ? pl.name + ' · ' : ''}${t.frameBall(sc.frame + 1, sc.ball + 1)}`;
+      cv.setAttribute('aria-label', t.lane(sc.frame + 1, sc.ball + 1, up));
+    }
+  }
+
+  // ---------- Overlays
+  let lastFocus = null, resultActions = {};
+  function openOverlay(id) {
+    lastFocus = document.activeElement;
+    clearTimeout(bannerTimer); els.banner.classList.remove('show');
+    $(id).hidden = false;
+    const f = $(id).querySelector('.cta:not([hidden]), button:not([hidden]):not(:disabled)');
+    if (f) f.focus({ preventScroll: true });
+    updateHud();
+  }
+  function closeOverlay(id) {
+    $(id).hidden = true;
+    if (!overlayOpen()) (g ? cv : lastFocus || cv).focus({ preventScroll: true });
+    updateHud();
+  }
+  function showResult(o) {
+    $('result-title').textContent = o.title;
+    $('result-stars').innerHTML = o.stars ? `${'★'.repeat(o.stars)}<span class="off">${'★'.repeat(3 - o.stars)}</span>` : '';
+    $('result-stars').setAttribute('aria-label', o.stars ? `${o.stars} / 3 ★` : '');
+    $('result-big').textContent = o.big || '';
+    $('result-sub').textContent = o.sub || '';
+    $('result-list').innerHTML = (o.list || []).map(([n, s, w]) => `<div class="${w ? 'win' : ''}"><span>${n}</span><b>${s}</b></div>`).join('');
+    $('result-main').textContent = o.main;
+    $('result-alt').textContent = o.alt || '';
+    $('result-alt').hidden = !o.alt;
+    resultActions = { main: o.onMain, alt: o.onAlt };
+    announce(`${o.title}. ${o.big || ''} ${o.sub || ''}`);
+    after(reduced ? 0.2 : 1, () => { if (g && g.phase === 'over') openOverlay('result'); });
+  }
+  function openMenu() {
+    gameSeq++;
+    timers = [];
+    g = null;
+    clearToasts();
+    rollSound(false);
+    for (const id of OVERLAYS) $(id).hidden = true;
+    world = liveWorld(ALL_PINS, 1);
+    S.x0 = 0.12; S.angle = -0.003; S.hook = 0; S.charging = false; S.meterT = 0; S.sweep = null; S.sweepY = null; S.lift = 0; S.rackT = 1;
+    cam.y = CAM0;
+    $('spare-sub').textContent = t.dSpare(SPARES.length, totalStars(), SPARES.length * 3);
+    $('menu-best').textContent = stats.high ? t.bestScore(stats.high) : '';
+    openOverlay('menu');
+  }
+  let setupMode = 'solo';
+  function openSetup(mode) {
+    setupMode = mode;
+    $('menu').hidden = true;
+    $('setup-title').textContent = { solo: t.mSolo, cpu: t.mCpu, party: t.mParty }[mode];
+    $('f-diff').hidden = mode !== 'cpu';
+    $('f-players').hidden = mode !== 'party';
+    syncSegs();
+    openOverlay('setup');
+  }
+  function syncSegs() {
+    for (const seg of document.querySelectorAll('#setup .seg')) for (const b of seg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(String(prefs[seg.dataset.key]) === b.dataset.v));
+    $('record').textContent = setupMode === 'cpu' ? t.record(Number(stats.w[prefs.diff]) || 0, Number(stats.l[prefs.diff]) || 0) : setupMode === 'solo' && stats.high ? t.bestScore(stats.high) : '';
+  }
+  function pinSvg(list) {
+    let s = '<svg viewBox="0 0 34 24" aria-hidden="true">';
+    SPOTS.forEach(([x, y], i) => { s += `<circle cx="${(17 + x / SP * 4).toFixed(1)}" cy="${(21 - (y - HEAD_Y) / ROW * 6).toFixed(1)}" r="2.6" fill="${list.includes(i + 1) ? '#ff5e7e' : '#ddd6ea'}"/>`; });
+    return s + '</svg>';
+  }
+  function openLevels() {
+    for (const id of OVERLAYS) $(id).hidden = true;
+    const grid = $('level-grid');
+    grid.innerHTML = '';
+    SPARES.forEach((lv, i) => {
+      const st = starOf(i), locked = i > 0 && !starOf(i - 1) && !st;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'lv'; b.disabled = locked;
+      b.innerHTML = `<strong>${i + 1}</strong>${pinSvg(lv)}<small>${'★'.repeat(st)}<span class="off">${'★'.repeat(3 - st)}</span></small>`;
+      b.setAttribute('aria-label', `${t.level(i + 1)} · ${lv.join('-')} · ${st}/3 ★`);
+      b.addEventListener('click', () => startGame({ mode: 'spare', level: i }));
+      grid.appendChild(b);
+    });
+    $('levels-stars').textContent = t.starsTotal(totalStars(), SPARES.length * 3);
+    openOverlay('levels');
+    const next = grid.querySelectorAll('.lv:not(:disabled)');
+    if (next.length) next[next.length - 1].focus({ preventScroll: true });
+  }
+  let settingsFromMenu = false;
+  function openPause(fromMenu) {
+    settingsFromMenu = fromMenu;
+    $('menu').hidden = true;
+    cancelCharge();
+    rollSound(false);
+    $('resume').textContent = fromMenu ? t.back : t.resume;
+    $('restart').hidden = fromMenu;
+    $('to-menu').hidden = fromMenu;
+    for (const b of document.querySelectorAll('[data-set]')) b.setAttribute('aria-checked', String(!!settings[b.dataset.set]));
+    openOverlay('pause');
+  }
+  function openScores() {
+    if (!g || g.mode === 'spare') return;
+    $('score-list').innerHTML = g.players.map((p, i) => cardHtml(p, i === g.cur)).join('');
+    openOverlay('scores');
+  }
+
+  // ---------- Input
+  cv.addEventListener('pointerdown', e => {
+    unlockAudio();
+    if (!humanCanAim()) return;
+    e.preventDefault();
+    cv.focus({ preventScroll: true });
+    const p = toLane(e);
+    const kind = p.y < 1.4 ? 'move' : 'aim';
+    S.drag = { id: e.pointerId, kind, sx: e.clientX, x0: S.x0 };
+    try { cv.setPointerCapture(e.pointerId); } catch {}
+    if (kind === 'aim') aimAt(p);
+  });
+  function aimAt(p) { if (p.y - BALL_Y0 > 1) setAngle(Math.atan2(p.x - S.x0, p.y - BALL_Y0)); }
+  cv.addEventListener('pointermove', e => {
+    if (!S.drag || e.pointerId !== S.drag.id || !humanCanAim()) return;
+    if (S.drag.kind === 'move') setX0(S.drag.x0 + (e.clientX - S.drag.sx) * (BALL_Y0 - cam.y) / view.f);
+    else aimAt(toLane(e));
+  });
+  const endDrag = e => { if (S.drag && e.pointerId === S.drag.id) S.drag = null; };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  els.bowl.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    startCharge('ptr');
+    try { els.bowl.setPointerCapture(e.pointerId); } catch {}
+  });
+  els.bowl.addEventListener('pointerup', () => { if (S.chargeBy === 'ptr') releaseHuman(); });
+  els.bowl.addEventListener('pointercancel', () => { if (S.chargeBy === 'ptr') cancelCharge(); });
+  els.bowl.addEventListener('contextmenu', e => e.preventDefault());
+  els.curveL.addEventListener('click', () => { if (humanCanAim()) { setHook(S.hook - 1); sfx('click'); } });
+  els.curveR.addEventListener('click', () => { if (humanCanAim()) { setHook(S.hook + 1); sfx('click'); } });
+  $('menu-btn').addEventListener('click', () => { if (g) openPause(false); else openMenu(); });
+  $('scores-btn').addEventListener('click', openScores);
+  $('scores-close').addEventListener('click', () => closeOverlay('scores'));
+
+  const isBowlKey = e => e.key === ' ' || e.key === 'Enter';
+  const bowlKeyTarget = () => { const a = document.activeElement; return !a || a === document.body || a === cv || a === els.bowl; };
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape' || overlayOpen() || !g || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k === 'p') { e.preventDefault(); openPause(false); return; }
+    if (isBowlKey(e) && bowlKeyTarget()) { e.preventDefault(); if (!e.repeat) startCharge('key'); return; }
+    if (!humanCanAim()) return;
+    const step = e.shiftKey ? 4 : 1;
+    if (k === 'ArrowLeft' || k === 'ArrowRight') { e.preventDefault(); setX0(S.x0 + (k === 'ArrowLeft' ? -1 : 1) * BOARD * step); }
+    else if (k === 'a' || k === 'd') { e.preventDefault(); setAngle(S.angle + (k === 'a' ? -1 : 1) * 0.0008 * step); }
+    else if (k === 'q' || k === 'e') { e.preventDefault(); setHook(S.hook + (k === 'q' ? -1 : 1)); }
+  });
+  addEventListener('keyup', e => {
+    if (!isBowlKey(e) || S.chargeBy !== 'key' || !S.charging) return;
+    e.preventDefault();
+    releaseHuman();
+  });
+
+  for (const b of document.querySelectorAll('[data-mode]')) b.addEventListener('click', () => {
+    unlockAudio();
+    const m = b.dataset.mode;
+    if (m === 'spare') openLevels(); else openSetup(m);
+  });
+  for (const seg of document.querySelectorAll('#setup .seg')) seg.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    prefs[seg.dataset.key] = Number(b.dataset.v);
+    save('prefs', prefs);
+    syncSegs();
+  });
+  $('start').addEventListener('click', () => startGame({ mode: setupMode, diff: prefs.diff, players: prefs.players, oil: prefs.oil }));
+  $('setup-back').addEventListener('click', openMenu);
+  $('levels-back').addEventListener('click', openMenu);
+  $('menu-settings').addEventListener('click', () => openPause(true));
+  $('resume').addEventListener('click', () => { if (settingsFromMenu) { $('pause').hidden = true; openMenu(); } else closeOverlay('pause'); });
+  $('restart').addEventListener('click', () => { if (g) startGame(g.opts); });
+  $('to-menu').addEventListener('click', openMenu);
+  $('result-main').addEventListener('click', () => { if (resultActions.main) resultActions.main(); });
+  $('result-alt').addEventListener('click', () => { if (resultActions.alt) resultActions.alt(); });
+  $('result-menu').addEventListener('click', openMenu);
+  for (const b of document.querySelectorAll('[data-set]')) b.addEventListener('click', () => {
+    const k = b.dataset.set;
+    settings[k] = !settings[k];
+    b.setAttribute('aria-checked', String(settings[k]));
+    save('settings', settings);
+    if (k === 'sound' && settings.sound) unlockAudio();
+  });
+
+  // ---------- Main loop
+  function update(dt) {
+    sfxBudget = 3;
+    if (!g || overlayOpen()) return;
+    dt *= timeScale;
+    runTimers(dt);
+    if (!g) return;
+    if (S.meterT > 0 && !S.charging) S.meterT -= dt;
+    if (S.rackT < 1) S.rackT = Math.min(1, S.rackT + dt / 0.35);
+    for (const p of world.pins) if (p.st === 'gone' && p.pit > 0) p.pit = Math.max(0, p.pit - dt * 3);
+    const b = world.ball;
+    if (g.phase === 'aim') {
+      if (S.charging) { S.chargeT += dt; S.power = tri(S.chargeT); setPowerUi(S.power); }
+      b.x = S.x0; b.y = BALL_Y0;
+    } else if (g.phase === 'cpu') {
+      if (g.cpuAnim) animateCpu(dt);
+    } else if (g.phase === 'roll') {
+      acc += dt;
+      let n = 0;
+      while (acc >= SIM_DT && n < 2400) { acc -= SIM_DT; stepWorld(world, SIM_DT); n++; }
+      rollSound(!b.gone, b.gutter ? 0.05 : 0.04 + Math.hypot(b.vx, b.vy) * 0.022);
+      if (settled(world)) rollEnd();
+    }
+    if (S.sweep) stepSweep(dt);
+    if (settings.follow && g && g.phase !== 'aim' && g.phase !== 'cpu') S.camTarget = Math.max(S.camTarget, clamp(b.y - (BALL_Y0 - CAM0), CAM0, HEAD_Y - view.dEnd));
+    cam.y += (S.camTarget - cam.y) * Math.min(1, dt * (g && g.phase === 'roll' ? 7 : 3.6));
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!document.hidden) { update(dt); draw(); }
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelCharge(); rollSound(false); } });
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+
+  if (navigator.webdriver) window.__bowling = {
+    state: () => ({
+      mode: g && g.mode, phase: g && g.phase, cur: g && g.cur, tries: g && g.tries, level: g && g.level, cam: +cam.y.toFixed(2),
+      up: world.pins.filter(p => p.st === 'up').map(p => p.n), x0: S.x0, angle: S.angle, hook: S.hook,
+      players: g ? g.players.map(p => { const sc = scoreCard(p.rolls); return { name: p.name, cpu: p.cpu, rolls: p.rolls.slice(), total: sc.total, done: sc.done }; }) : [],
+    }),
+    shoot: (x0, angle, power, hook) => {
+      if (!humanCanAim()) return false;
+      setX0(x0); setAngle(angle); setHook(hook);
+      g.players[g.cur].aim = { x0: S.x0, angle: S.angle, hook: S.hook };
+      S.lastPower = power;
+      release({ x0: S.x0, angle: S.angle, power, hook: hook / 3 });
+      return true;
+    },
+    aimFor: (x0, tx, power, hook, ty) => aimFor(g ? g.oil : 1, x0, power, hook / 3, tx, ty),
+    speed: k => { timeScale = k; },
+  };
+
+  makePinSprite();
+  new ResizeObserver(resize).observe($('stage'));
+  resize();
+  openMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

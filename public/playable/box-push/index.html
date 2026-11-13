@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Box Push</title>
+<style>
+:root {
+  --bg: #2a2340;
+  --bg-2: #41355f;
+  --ink: #2b2238;
+  --muted: #6d6382;
+  --cream: #fff8ec;
+  --cream-2: #f3e7d1;
+  --cream-shadow: #c7b28f;
+  --on-bg: #f6eedf;
+  --on-bg-muted: #c9bfe0;
+  --wood: #e2a457;
+  --wood-hi: #f1c27e;
+  --wood-dark: #a8642a;
+  --teal: #2fc4a4;
+  --teal-hi: #86ecd3;
+  --teal-dark: #1b8f77;
+  --coral: #ff6b4a;
+  --coral-dark: #cf4b2e;
+  --amber: #ffc23d;
+  --amber-dark: #d39818;
+  --star: #f2b13b;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--on-bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(120% 90% at 50% 18%, var(--bg-2), transparent 70%), radial-gradient(#ffffff0d 1.2px, transparent 1.4px);
+  background-size: 100% 100%, 22px 22px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+.app { height: 100%; max-width: 560px; margin: auto; display: flex; flex-direction: column; gap: 9px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+header { display: flex; align-items: center; gap: 10px; min-width: 0; }
+h1 { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+h1 span { color: var(--amber); }
+.logo { flex: none; width: 1.15em; height: 1.15em; border-radius: .22em; background: linear-gradient(45deg, transparent 42%, var(--wood-dark) 42% 58%, transparent 58%), linear-gradient(var(--wood-hi), var(--wood)); box-shadow: inset 0 0 0 .1em var(--wood-dark), 0 .08em 0 #0006; }
+.icon-btn { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 14px; background: var(--cream); color: var(--ink); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 var(--cream-shadow); }
+.icon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--cream-shadow); }
+
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 5px 4px; border-radius: 14px; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff1c; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--on-bg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; color: var(--cream); white-space: nowrap; }
+.stat strong.over { color: #ffb199; }
+.goal { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; font-weight: 700; color: var(--on-bg-muted); line-height: 1.3; text-align: center; }
+.goal b { display: inline-block; padding: 1px 9px; border-radius: 99px; background: var(--amber); color: var(--ink); font-size: 11px; letter-spacing: .03em; }
+.goal .cnt { color: var(--teal-hi); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.board-wrap { position: relative; flex: 1; min-height: 0; touch-action: none; cursor: pointer; }
+.board { --cell: 32px; --spd: 110ms; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 10px; outline: none; }
+html.kb .board:focus { box-shadow: 0 0 0 3px var(--amber); }
+.board svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.bg .gl { animation: glow 1.8s ease-in-out infinite; }
+@keyframes glow { 50% { opacity: .55; } }
+.crate, .worker, .marker { position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell); transform: translate(calc(var(--x) * var(--cell)), calc(var(--y) * var(--cell))); transition: transform var(--spd) linear; pointer-events: none; }
+.crate { z-index: 2; padding: calc(var(--cell) * .07); }
+.crate i { position: relative; display: block; width: 100%; height: 100%; border-radius: calc(var(--cell) * .14); background: linear-gradient(var(--wood-hi), var(--wood)); box-shadow: inset 0 0 0 calc(var(--cell) * .07) var(--wood-dark), 0 calc(var(--cell) * .07) 0 #00000055; transition: background .25s, box-shadow .25s; }
+.crate i::before { content: ""; position: absolute; inset: calc(var(--cell) * .07); border-radius: calc(var(--cell) * .04); background: linear-gradient(45deg, transparent 42%, var(--wood-dark) 42% 58%, transparent 58%), linear-gradient(transparent 48%, #00000018 48% 52%, transparent 52%); }
+.crate.on i { background: linear-gradient(var(--teal-hi), var(--teal)); box-shadow: inset 0 0 0 calc(var(--cell) * .07) var(--teal-dark), 0 calc(var(--cell) * .07) 0 #00000055, 0 0 calc(var(--cell) * .35) #2fc4a4aa; }
+.crate.on i::before { background: linear-gradient(45deg, transparent 42%, var(--teal-dark) 42% 58%, transparent 58%), linear-gradient(transparent 48%, #00000018 48% 52%, transparent 52%); }
+.crate.hinted i { animation: pulse .8s ease-in-out infinite; }
+@keyframes pulse { 50% { filter: brightness(1.2); box-shadow: inset 0 0 0 calc(var(--cell) * .07) var(--wood-dark), 0 0 0 calc(var(--cell) * .08) var(--amber), 0 calc(var(--cell) * .07) 0 #00000055; } }
+.crate.stuck i { animation: wobble .4s 2; }
+@keyframes wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+.board.won .crate i { animation: hop .5s calc(var(--i) * 70ms) both; }
+@keyframes hop { 45% { transform: translateY(calc(var(--cell) * -.22)) scale(1.04); } }
+.worker { z-index: 3; }
+.worker svg { display: block; width: 100%; height: 100%; }
+.worker .eyes { transform: translate(calc(var(--fx, 0) * 5px), calc(var(--fy, 0) * 3px)); transition: transform .12s; }
+.worker .sprite { width: 100%; height: 100%; }
+.worker.step .sprite { animation: bob var(--spd) ease-out; }
+.worker.step2 .sprite { animation: bob2 var(--spd) ease-out; }
+@keyframes bob { 50% { transform: translateY(calc(var(--cell) * -.06)) scaleY(1.04); } }
+@keyframes bob2 { 50% { transform: translateY(calc(var(--cell) * -.06)) scaleY(1.04); } }
+.worker.bump .sprite { animation: bump .22s ease-out; }
+@keyframes bump { 40% { transform: translate(calc(var(--bx) * var(--cell) * .14), calc(var(--by) * var(--cell) * .14)); } }
+.board.won .worker .sprite { animation: cheer .6s .2s 2; }
+@keyframes cheer { 50% { transform: translateY(calc(var(--cell) * -.3)); } }
+.marker { z-index: 1; display: grid; place-items: center; transition: none; }
+.marker[hidden] { display: none; }
+.marker.from::before { content: ""; width: 70%; height: 70%; border-radius: 50%; border: max(2px, calc(var(--cell) * .07)) dashed var(--amber); animation: spin 4s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+.marker.arrow { z-index: 4; }
+.marker.arrow svg { width: 70%; height: 70%; transform: rotate(var(--rot)); filter: drop-shadow(0 2px 2px #0006); animation: nudge .8s ease-in-out infinite; }
+@keyframes nudge { 50% { translate: calc(var(--ax) * var(--cell) * .1) calc(var(--ay) * var(--cell) * .1); } }
+.toast { position: absolute; left: 50%; bottom: 6px; z-index: 6; width: max-content; max-width: calc(100% - 12px); transform: translateX(-50%); padding: 7px 14px; border-radius: 99px; background: #1d1830e8; color: var(--cream); font-size: 13px; font-weight: 800; line-height: 1.3; text-align: center; box-shadow: 0 6px 18px #0005; pointer-events: none; animation: toast-in .25s ease-out; }
+.toast.warn { background: #b8432ce8; }
+.toast[hidden] { display: none; }
+
+.tools { display: flex; gap: 8px; }
+.tool { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px; border-radius: 16px; background: var(--cream); color: var(--ink); box-shadow: 0 4px 0 var(--cream-shadow); font-size: 15px; font-weight: 800; }
+.tool span:first-child { font-size: 18px; line-height: 1; }
+.tool span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--cream-shadow); }
+.tool:disabled { opacity: .5; }
+.tool.hint-btn { background: var(--amber); box-shadow: 0 4px 0 var(--amber-dark); }
+.tool.hint-btn:active:not(:disabled) { box-shadow: 0 1px 0 var(--amber-dark); }
+.tool.busy span:first-child { animation: spin 1s linear infinite; }
+.help { text-align: center; font-size: 12px; font-weight: 700; color: var(--on-bg-muted); line-height: 1.35; }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: #150f2299; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: calc(100% - 4px); overflow: auto; background: var(--cream); color: var(--ink); border-radius: 28px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0007; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+@keyframes toast-in { from { opacity: 0; margin-bottom: -8px; } }
+.panel h2 { font-size: 26px; font-weight: 900; line-height: 1.15; letter-spacing: -.02em; }
+.panel h2 span { color: var(--coral); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .small { font-size: 13px; }
+.stars { margin-top: 4px; font-size: 38px; letter-spacing: 4px; color: #e5d9bf; }
+.stars b { color: var(--star); }
+.result { font-size: 18px; font-weight: 800; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #fff !important; font-size: 14px; font-weight: 800; }
+.badge[hidden], .note[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 15px; border-radius: 18px; background: var(--coral); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--coral-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--coral-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid #e6d8bb; font-weight: 800; }
+.row2 { display: flex; gap: 10px; }
+.row2 .secondary { flex: 1; min-width: 0; }
+.legend { margin-top: 12px; display: flex; justify-content: center; gap: 14px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 18px; border-radius: 4px; }
+.lg-crate { background: linear-gradient(45deg, transparent 40%, var(--wood-dark) 40% 60%, transparent 60%), var(--wood); box-shadow: inset 0 0 0 2px var(--wood-dark); }
+.lg-goal { border-radius: 50% !important; border: 3px solid var(--teal); background: radial-gradient(var(--teal) 30%, transparent 34%); }
+.lg-done { background: var(--teal); box-shadow: inset 0 0 0 2px var(--teal-dark); }
+
+.lv-head { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.lv-total { font-size: 15px; font-weight: 900; color: var(--star); }
+.tier { margin-top: 14px; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 6px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 14px; background: #f6ecd9; box-shadow: 0 3px 0 #dccaa6; font-size: 17px; font-weight: 900; color: var(--ink); }
+.level-btn small { font-size: 10px; letter-spacing: 1px; color: var(--star); min-height: 12px; line-height: 12px; }
+.level-btn.current { background: var(--coral); color: #fff; box-shadow: 0 3px 0 var(--coral-dark); }
+.level-btn.current small { color: #ffe9a8; }
+.level-btn:disabled { opacity: .45; box-shadow: none; }
+.unlock-tip { font-size: 12px !important; }
+#close-levels { position: sticky; bottom: 0; background: var(--cream); box-shadow: 0 10px 0 var(--cream); }
+
+@media (min-width: 640px) and (max-aspect-ratio: 5/4) { .app { max-width: 700px; } }
+@media (max-width: 480px) {
+  .tool { flex-direction: column; gap: 2px; padding: 7px 4px 6px; font-size: 13px; line-height: 1.15; }
+  .tool span:last-child { max-width: 100%; }
+}
+@media (max-width: 360px) {
+  .hud { gap: 4px; }
+  .stat { padding: 4px 2px; }
+  .stat small { letter-spacing: 0; }
+  .stat strong { font-size: 17px; }
+  .tools { gap: 6px; }
+  .tool { padding: 7px 2px 6px; font-size: 12px; }
+}
+@media (max-height: 640px) { .help { display: none; } }
+@media (max-height: 540px) { .app { gap: 7px; } .goal { font-size: 12px; } }
+@media (max-height: 420px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 18px; border-radius: 22px; }
+  .panel .emoji { font-size: 30px; }
+  .panel h2 { font-size: 21px; }
+  .panel p { margin-top: 4px; font-size: 14px; line-height: 1.35; }
+  .panel .small { font-size: 12px; }
+  .stars { margin-top: 0; font-size: 28px; }
+  .badge { margin-top: 6px; padding: 4px 12px; }
+  .cta { margin-top: 10px; padding: 11px; font-size: 17px; }
+  .secondary { margin-top: 8px; padding: 9px; }
+  .legend { margin-top: 6px; }
+  .tier { margin-top: 8px; }
+  .level-grid { grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 6px; }
+  .level-btn { font-size: 15px; border-radius: 10px; }
+  #levels .panel { width: min(100%, 640px); }
+  #intro .panel, #win .panel { width: min(100%, 560px); }
+}
+@media (max-height: 420px) and (min-width: 700px) { .level-grid { grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 5px; } .level-btn { font-size: 14px; } }
+@media (max-height: 420px) and (min-width: 520px) and (max-width: 699.98px) { .level-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+
+/* Wide frames: HUD and tools in a side column, the warehouse gets the full height. */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: 1240px; display: grid; grid-template-columns: clamp(200px, 25vw, 300px) minmax(0, 1fr); grid-template-rows: auto auto auto auto 1fr auto; grid-template-areas: "top board" "hud board" "goal board" "tools board" ". board" "help board"; gap: 12px 22px; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); }
+  header { grid-area: top; padding-top: 4px; }
+  h1 { font-size: clamp(22px, 2.6vw, 34px); }
+  .hud { grid-area: hud; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { padding: 7px 6px; }
+  .stat strong { font-size: 22px; }
+  .goal { grid-area: goal; justify-content: flex-start; text-align: left; font-size: 14px; }
+  .tools { grid-area: tools; flex-direction: column; }
+  .tool { flex: none; flex-direction: row; gap: 8px; padding: 11px 10px; font-size: 16px; }
+  .help { grid-area: help; display: block; text-align: left; }
+  .board-wrap { grid-area: board; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { grid-template-columns: clamp(190px, 30vw, 260px) minmax(0, 1fr); grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "top board" "hud board" "goal board" "tools board" ". board"; gap: 7px 14px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  header { padding-top: 0; }
+  h1 { font-size: 22px; }
+  .icon-btn { width: 38px; height: 38px; font-size: 18px; }
+  .hud { gap: 5px; }
+  .stat { padding: 3px 4px; }
+  .stat small { letter-spacing: 0; }
+  .stat strong { font-size: 17px; }
+  .goal { font-size: 12px; }
+  .tools { gap: 6px; }
+  .tool { flex-direction: row; gap: 6px; padding: 6px 6px; border-radius: 12px; font-size: 13px; line-height: 1.15; box-shadow: 0 3px 0 var(--cream-shadow); }
+  .tool.hint-btn { box-shadow: 0 3px 0 var(--amber-dark); }
+  .tool span:first-child { font-size: 15px; }
+  .help { display: none; }
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1><i class="logo" aria-hidden="true"></i><span class="ttl">Box <span>Push</span></span></h1>
+    <button type="button" class="icon-btn" id="open-levels" data-i18n-label="levels">☰</button>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="pushes"></small><strong id="pushes">0</strong></div>
+    <div class="stat"><small data-i18n="optimal"></small><strong id="optimal">–</strong></div>
+  </div>
+  <p class="goal" id="goal"></p>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board" tabindex="0" role="application"></div>
+    <p class="toast" id="toast" hidden></p>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="undo"><span aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" class="tool hint-btn" id="hint"><span aria-hidden="true">💡</span><span data-i18n="hint"></span></button>
+    <button type="button" class="tool" id="retry"><span aria-hidden="true">↻</span><span data-i18n="restart"></span></button>
+  </div>
+  <p class="help" data-i18n="help"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="intro">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <p class="emoji" aria-hidden="true">📦👷</p>
+    <h2 id="intro-title">Box <span>Push</span></h2>
+    <p data-i18n="tagline"></p>
+    <div class="legend" aria-hidden="true"><span><i class="lg-crate"></i>→</span><span><i class="lg-goal"></i>=</span><span><i class="lg-done"></i>✓</span></div>
+    <p class="small" data-i18n="controls"></p>
+    <button type="button" class="cta" id="play"></button>
+    <button type="button" class="secondary" id="intro-levels" data-i18n="chooseLevel"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="small" id="opt-line"></p>
+    <p class="small note" id="win-note"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <div class="row2">
+      <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+      <button type="button" class="secondary" id="win-levels" data-i18n="levels"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <div class="lv-head"><h2 id="levels-title" data-i18n="chooseLevel"></h2><span class="lv-total" id="lv-total"></span></div>
+    <p class="small unlock-tip" data-i18n="unlockTip"></p>
+    <div id="level-list"></div>
+    <button type="button" class="secondary" id="close-levels" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Push every crate onto a glowing target. Crates can only be pushed, never pulled — so plan before you shove!', controls: 'Arrow keys or WASD to walk and push · U undo · R restart · H hint. On touch: tap a square to walk there, tap a crate beside you to push it, or swipe.', help: 'Tap to walk · tap a crate or swipe to push · arrow keys work too', level: 'Level', moves: 'Moves', pushes: 'Pushes', optimal: 'Optimal', levels: 'Levels', undo: 'Undo', hint: 'Hint', restart: 'Restart', tiers: ['Easy', 'Medium', 'Hard', 'Expert'], goal: n => `Solvable in ${n} pushes`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `Play level ${n}`, chooseLevel: 'Choose a level', close: 'Close', locked: 'Locked', levelN: n => `Level ${n}`, starsLabel: n => `${n} of 3 stars`, won: n => `Level ${n} cleared!`, allDone: 'Every warehouse is tidy — you cleared all the levels!', result: (m, p) => `${m} moves · ${p} pushes`, optimalLine: o => `Fewest possible: ${o} pushes`, perfect: 'Perfect — the fewest pushes possible!', hintUsed: 'A hint was used, so 2 stars max.', newBest: 'New best!', next: 'Next level', replay: 'Replay', stuck: 'That crate is stuck now — undo to free it.', thinking: 'Thinking…', noHint: 'No solution from here — undo a few moves.', hintSay: (dir, n) => `Hint: push the glowing crate ${dir}. ${n} ${n === 1 ? 'push' : 'pushes'} to go.`, onTarget: (a, b) => `${a} of ${b} crates on targets`, board: n => `Warehouse, level ${n}. Arrow keys move the worker.`, undone: 'Move undone', restarted: 'Level restarted', unlockTip: 'Clear levels to unlock the next ones.', dirs: ['up', 'right', 'down', 'left'] },
+    vi: { tagline: 'Đẩy mọi thùng hàng vào ô đích phát sáng. Thùng chỉ đẩy được chứ không kéo được — hãy tính trước khi đẩy!', controls: 'Phím mũi tên hoặc WASD để đi và đẩy · U hoàn tác · R chơi lại · H gợi ý. Trên màn hình cảm ứng: chạm một ô để đi tới đó, chạm thùng ngay cạnh để đẩy, hoặc vuốt.', help: 'Chạm để đi · chạm thùng hoặc vuốt để đẩy · dùng phím mũi tên cũng được', level: 'Màn', moves: 'Bước', pushes: 'Lần đẩy', optimal: 'Tối ưu', levels: 'Chọn màn', undo: 'Hoàn tác', hint: 'Gợi ý', restart: 'Chơi lại', tiers: ['Dễ', 'Vừa', 'Khó', 'Chuyên gia'], goal: n => `Có thể giải với ${n} lần đẩy`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `Chơi màn ${n}`, chooseLevel: 'Chọn màn chơi', close: 'Đóng', locked: 'Chưa mở', levelN: n => `Màn ${n}`, starsLabel: n => `${n}/3 sao`, won: n => `Hoàn thành màn ${n}!`, allDone: 'Kho nào cũng gọn gàng — bạn đã phá đảo tất cả các màn!', result: (m, p) => `${m} bước · ${p} lần đẩy`, optimalLine: o => `Ít nhất có thể: ${o} lần đẩy`, perfect: 'Hoàn hảo — số lần đẩy ít nhất!', hintUsed: 'Đã dùng gợi ý nên tối đa 2 sao.', newBest: 'Kỷ lục mới!', next: 'Màn tiếp theo', replay: 'Chơi lại', stuck: 'Thùng này bị kẹt rồi — hãy hoàn tác để gỡ.', thinking: 'Đang suy nghĩ…', noHint: 'Từ đây không còn lời giải — hãy hoàn tác vài bước.', hintSay: (dir, n) => `Gợi ý: đẩy thùng đang sáng ${dir}. Còn ${n} lần đẩy.`, onTarget: (a, b) => `${a}/${b} thùng đã vào đích`, board: n => `Nhà kho, màn ${n}. Dùng phím mũi tên để di chuyển người bốc hàng.`, undone: 'Đã hoàn tác', restarted: 'Đã chơi lại màn', unlockTip: 'Hoàn thành màn để mở các màn tiếp theo.', dirs: ['lên trên', 'sang phải', 'xuống dưới', 'sang trái'] },
+    zh: { tagline: '把每个箱子推到发光的目标点上。箱子只能推、不能拉——推之前先想清楚！', controls: '方向键或 WASD 行走和推箱 · U 撤销 · R 重来 · H 提示。触屏：点格子走过去，点身边的箱子推动它，也可以滑动。', help: '点击行走 · 点箱子或滑动来推 · 也可用方向键', level: '关卡', moves: '步数', pushes: '推箱', optimal: '最少', levels: '选择关卡', undo: '撤销', hint: '提示', restart: '重来', tiers: ['简单', '中等', '困难', '专家'], goal: n => `最少推 ${n} 次即可通关`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `开始第 ${n} 关`, chooseLevel: '选择关卡', close: '关闭', locked: '未解锁', levelN: n => `第 ${n} 关`, starsLabel: n => `${n}/3 星`, won: n => `第 ${n} 关完成！`, allDone: '仓库全部整理完毕——你已通关所有关卡！', result: (m, p) => `${m} 步 · 推箱 ${p} 次`, optimalLine: o => `最少推箱次数：${o}`, perfect: '完美——推箱次数最少！', hintUsed: '使用了提示，最多 2 颗星。', newBest: '新纪录！', next: '下一关', replay: '重玩', stuck: '这个箱子卡住了——撤销一步来解救它。', thinking: '思考中…', noHint: '当前局面无解——请撤销几步。', hintSay: (dir, n) => `提示：把发光的箱子向${dir}推。还需推 ${n} 次。`, onTarget: (a, b) => `${a}/${b} 个箱子已到位`, board: n => `仓库，第 ${n} 关。用方向键移动搬运工。`, undone: '已撤销', restarted: '已重新开始', unlockTip: '通关后解锁后续关卡。', dirs: ['上', '右', '下', '左'] },
+    fr: { tagline: 'Poussez chaque caisse sur une cible lumineuse. On ne peut que pousser, jamais tirer : réfléchissez avant d’agir !', controls: 'Flèches ou ZQSD pour marcher et pousser · U annuler · R recommencer · H indice. Sur écran tactile : touchez une case pour y aller, touchez une caisse voisine pour la pousser, ou balayez.', help: 'Touchez pour marcher · touchez une caisse ou balayez pour pousser', level: 'Niveau', moves: 'Pas', pushes: 'Poussées', optimal: 'Optimal', levels: 'Niveaux', undo: 'Annuler', hint: 'Indice', restart: 'Recommencer', tiers: ['Facile', 'Moyen', 'Difficile', 'Expert'], goal: n => `Faisable en ${n} poussées`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `Jouer le niveau ${n}`, chooseLevel: 'Choisir un niveau', close: 'Fermer', locked: 'Verrouillé', levelN: n => `Niveau ${n}`, starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, won: n => `Niveau ${n} réussi !`, allDone: 'Tous les entrepôts sont rangés : vous avez fini tous les niveaux !', result: (m, p) => `${m} pas · ${p} poussée${p > 1 ? 's' : ''}`, optimalLine: o => `Minimum possible : ${o} poussées`, perfect: 'Parfait — le moins de poussées possible !', hintUsed: 'Indice utilisé : 2 étoiles au maximum.', newBest: 'Nouveau record !', next: 'Niveau suivant', replay: 'Rejouer', stuck: 'Cette caisse est bloquée : annulez pour la libérer.', thinking: 'Réflexion…', noHint: 'Plus de solution d’ici : annulez quelques coups.', hintSay: (dir, n) => `Indice : poussez la caisse lumineuse vers ${dir}. Encore ${n} poussée${n > 1 ? 's' : ''}.`, onTarget: (a, b) => `${a} caisse${a > 1 ? 's' : ''} sur ${b} en place`, board: n => `Entrepôt, niveau ${n}. Les flèches déplacent le manutentionnaire.`, undone: 'Coup annulé', restarted: 'Niveau recommencé', unlockTip: 'Réussissez des niveaux pour débloquer les suivants.', dirs: ['le haut', 'la droite', 'le bas', 'la gauche'] },
+    th: { tagline: 'ดันลังทุกใบไปไว้บนจุดเป้าหมายที่เรืองแสง ลังดันได้อย่างเดียว ดึงไม่ได้ คิดให้ดีก่อนดัน!', controls: 'ปุ่มลูกศรหรือ WASD เพื่อเดินและดัน · U ย้อนกลับ · R เริ่มใหม่ · H คำใบ้ บนจอสัมผัส: แตะช่องเพื่อเดินไป แตะลังที่อยู่ข้างตัวเพื่อดัน หรือปัดก็ได้', help: 'แตะเพื่อเดิน · แตะลังหรือปัดเพื่อดัน · ใช้ปุ่มลูกศรก็ได้', level: 'ด่าน', moves: 'ก้าว', pushes: 'ดัน', optimal: 'น้อยสุด', levels: 'เลือกด่าน', undo: 'ย้อนกลับ', hint: 'คำใบ้', restart: 'เริ่มใหม่', tiers: ['ง่าย', 'ปานกลาง', 'ยาก', 'เซียน'], goal: n => `แก้ได้ด้วยการดัน ${n} ครั้ง`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `เล่นด่าน ${n}`, chooseLevel: 'เลือกด่าน', close: 'ปิด', locked: 'ยังไม่ปลดล็อก', levelN: n => `ด่าน ${n}`, starsLabel: n => `${n} จาก 3 ดาว`, won: n => `ผ่านด่าน ${n} แล้ว!`, allDone: 'โกดังทุกแห่งเป็นระเบียบแล้ว คุณผ่านครบทุกด่าน!', result: (m, p) => `${m} ก้าว · ดัน ${p} ครั้ง`, optimalLine: o => `น้อยที่สุดที่ทำได้: ดัน ${o} ครั้ง`, perfect: 'สมบูรณ์แบบ — ดันน้อยที่สุดแล้ว!', hintUsed: 'ใช้คำใบ้แล้ว ได้สูงสุด 2 ดาว', newBest: 'สถิติใหม่!', next: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', stuck: 'ลังใบนี้ติดแล้ว กดย้อนกลับเพื่อแก้', thinking: 'กำลังคิด…', noHint: 'จากตรงนี้ไม่มีทางแก้แล้ว ลองย้อนกลับสักสองสามก้าว', hintSay: (dir, n) => `คำใบ้: ดันลังที่เรืองแสงไป${dir} เหลืออีก ${n} ครั้ง`, onTarget: (a, b) => `ลังเข้าเป้าแล้ว ${a} จาก ${b} ใบ`, board: n => `โกดัง ด่าน ${n} ใช้ปุ่มลูกศรเพื่อเดิน`, undone: 'ย้อนกลับแล้ว', restarted: 'เริ่มด่านใหม่แล้ว', unlockTip: 'ผ่านด่านเพื่อปลดล็อกด่านถัดไป', dirs: ['ข้างบน', 'ทางขวา', 'ข้างล่าง', 'ทางซ้าย'] },
+    ja: { tagline: '箱をすべて光るゴールに押し込もう。箱は押せても引けません。押す前によく考えて！', controls: '矢印キーか WASD で移動・押す · U 戻す · R やり直し · H ヒント。タッチ操作：マスをタップでそこまで歩き、隣の箱をタップで押します。スワイプでも動けます。', help: 'タップで歩く · 箱をタップかスワイプで押す · 矢印キーも使えます', level: 'レベル', moves: '歩数', pushes: '押した数', optimal: '最少', levels: 'レベル選択', undo: '戻す', hint: 'ヒント', restart: 'やり直し', tiers: ['かんたん', 'ふつう', 'むずかしい', '達人'], goal: n => `最少 ${n} 回押せばクリア`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `レベル ${n} をプレイ`, chooseLevel: 'レベルを選ぶ', close: '閉じる', locked: 'ロック中', levelN: n => `レベル ${n}`, starsLabel: n => `星 ${n}/3`, won: n => `レベル ${n} クリア！`, allDone: 'すべての倉庫が片付きました！全レベルクリア！', result: (m, p) => `${m}歩 · ${p}回押し`, optimalLine: o => `最少記録：${o}回押し`, perfect: 'パーフェクト！最少の押し回数です！', hintUsed: 'ヒントを使ったので星は最大 2 つです。', newBest: '自己ベスト更新！', next: '次のレベル', replay: 'もう一度', stuck: 'この箱はもう動かせません。戻して立て直そう。', thinking: '考え中…', noHint: 'ここからは解けません。何手か戻してみよう。', hintSay: (dir, n) => `ヒント：光っている箱を${dir}へ押そう。あと ${n} 回。`, onTarget: (a, b) => `${b}個中 ${a}個の箱がゴールに`, board: n => `倉庫、レベル ${n}。矢印キーで作業員を動かします。`, undone: '1手戻しました', restarted: 'やり直しました', unlockTip: 'クリアすると次のレベルが開きます。', dirs: ['上', '右', '下', '左'] },
+    ko: { tagline: '모든 상자를 빛나는 목표 지점으로 밀어 넣으세요. 상자는 밀 수만 있고 당길 수는 없어요. 밀기 전에 잘 생각하세요!', controls: '방향키나 WASD로 걷고 밀기 · U 되돌리기 · R 다시 시작 · H 힌트. 터치: 칸을 탭하면 그곳으로 걷고, 바로 옆 상자를 탭하면 밀어요. 스와이프도 돼요.', help: '탭해서 걷기 · 상자 탭이나 스와이프로 밀기 · 방향키도 돼요', level: '레벨', moves: '걸음', pushes: '밀기', optimal: '최소', levels: '레벨 선택', undo: '되돌리기', hint: '힌트', restart: '다시 시작', tiers: ['쉬움', '보통', '어려움', '전문가'], goal: n => `최소 ${n}번 밀어서 해결 가능`, crates: (a, b) => `📦 ${a}/${b}`, play: n => `레벨 ${n} 플레이`, chooseLevel: '레벨 선택', close: '닫기', locked: '잠김', levelN: n => `레벨 ${n}`, starsLabel: n => `별 ${n}/3`, won: n => `레벨 ${n} 클리어!`, allDone: '모든 창고 정리 완료! 전체 레벨을 클리어했어요!', result: (m, p) => `${m}걸음 · ${p}번 밀기`, optimalLine: o => `가능한 최소: ${o}번 밀기`, perfect: '완벽해요! 가장 적게 밀었어요!', hintUsed: '힌트를 사용해서 별은 최대 2개예요.', newBest: '최고 기록!', next: '다음 레벨', replay: '다시 하기', stuck: '이 상자는 이제 움직일 수 없어요. 되돌려서 풀어 주세요.', thinking: '생각 중…', noHint: '여기서는 풀 수 없어요. 몇 수 되돌려 보세요.', hintSay: (dir, n) => `힌트: 빛나는 상자를 ${dir}으로 미세요. ${n}번 남았어요.`, onTarget: (a, b) => `상자 ${b}개 중 ${a}개 목표 도착`, board: n => `창고, 레벨 ${n}. 방향키로 작업자를 움직이세요.`, undone: '한 수 되돌렸어요', restarted: '레벨을 다시 시작했어요', unlockTip: '레벨을 클리어하면 다음 레벨이 열려요.', dirs: ['위쪽', '오른쪽', '아래쪽', '왼쪽'] },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Warehouses, row by row: '#' wall, '-' outside, ' ' floor, '.' target, '$' crate, '*' crate on target, '@' worker, '+' worker on target.
+  // Generated offline from random rooms by searching backwards ("pulling" crates) from the solved state and keeping the deepest
+  // start found; the number is the optimal push count, re-verified by an independent forward solver.
+  const LEVELS = [
+    ["--######|###   @#|#.   $ #|#      #|########", 4],
+    ["---####|####  #|# $   #|#    @#|#   .##|######-", 4],
+    ["-#####|-#   #|##$ .#|#    #|#   @#|######", 4],
+    ["#####--|#   ##-|# $  ##|##    #|-## @ #|--#.  #|--#####", 4],
+    ["---#####|####   #|# @# # #|# $   .#|###    #|--#   ##|--#   #-|--#####-", 4],
+    ["######-|#@  .##|#     #|# $   #|#   ###|#####--", 4],
+    ["-#####|##  .#|#  @ #|#  $ #|#  ###|#  #--|####--", 5],
+    ["-######|-#  @ #|-# $  #|####  #|#.    #|#   ###|#####--", 6],
+    ["########|# .    #|#      #|##     #|-##@ $ #|--#  ###|--####--", 6],
+    ["######|#    #|# $$ #|# @.##|#.  #-|#####-", 4],
+    ["#######-|#     ##|#   $$ #|# .#. @#|#    ###|######--", 5],
+    ["######|#.   #|# $  #|#$   #|#@ . #|###  #|--####", 5],
+    ["--####|### .#|#.  @#|#  $ #|#  $ #|#    #|######", 7],
+    ["--#####|###   #|# $ $ #|#.    #|#  . @#|#     #|#######", 7],
+    ["######-|#    #-|# $$ #-|#   ##-|#   ###|#   . #|#  @ .#|#######", 11],
+    ["----####-|-#### @#-|##. # $#-|#   ## #-|#.   # ##|#   $#  #|###     #|--#     #|--#######", 18],
+    ["-#####-|##   ##|#...  #|# $   #|####$ #|--#@  #|--# $ #|--#   #|--#####", 15],
+    ["####-----|#@ #-----|# $#-####|#  ###  #|# $ # . #|#       #|#     . #|#########", 14],
+    ["#######|#     #|#     #|# .##.#|#  ## #|# $ $ #|# .$###|# @ #--|#####--", 14],
+    ["########|#.     #|# $##  #|#  ##  #|# .#   #|# .    #|### $$ #|--## @##|---####-", 14],
+    ["########|#@ ##  #|# $#   #|#  #$$ #|#. .  .#|########", 15],
+    ["--#####|--#  .#|###$  #|#  $$.#|#   +##|#   ##-|#####--", 12],
+    ["-########|## .@   #|# $     #|# ###  .#|# $ $.###|#     #--|#######--", 15],
+    ["-#####|-# @ #|##$. #|# .$##|#  $ #|#  . #|######", 13],
+    ["--#####|--# . #|###   #|#.  @ #|#$$# .#|#   ###|#  $ #-|#    #-|######-", 18],
+    ["########-|#    . #-|#  #  $##|#   #$$ #|###.  @ #|--####. #|-----#  #|-----####", 13],
+    ["---####--|---#  #--|#### $###|#  #    #|# $     #|#@ ###  #|###     #|--# .  .#|--#######", 16],
+    ["--######|--#    #|-##$# @#|##   . #|#. $$  #|#   ####|#. ##---|####----", 16],
+    ["-####---|##  #---|#   ##--|#.   ##-|#     ##|#. # $@#|#   $$ #|##  . ##|-######-", 16],
+    ["---####--|---# @#--|--##$$###|###     #|#  .$   #|#..  ####|######---", 23],
+    ["--#####-|--#. .#-|--# $ #-|--# $###|###    #|#  @#  #|#  .# .#|### $$ #|--##   #|---#####", 21],
+    ["##########|#  #   @ #|#..# $## #|#   $$ # #|#   .  $.#|##########", 20],
+    ["----####|-#### @#|##. #$$#|# $  $ #|# .#  .#|#     ##|##     #|-###  .#|---#####", 21],
+    ["########|#  . $@#|#  ## $#|#  ### #|#$$#-# #|#  ### #|#    ..#|#.   # #|##     #|-#######", 20],
+    ["######---|#   @#---|# $ $#---|#### #---|#    ####|# # .#. #|# $$ .. #|##      #|-####   #|----#####", 20],
+    ["--######-|###   .#-|#  .   #-|# ## #.##|# $  #  #|###$$   #|--#+$   #|--#######", 21],
+    ["########-|#  #  @#-|#$.# $ #-|#. ## ##-|#   #.###|#  $#.  #|##$     #|-#     ##|-#######-", 21],
+    ["-####----|##  #####|#   ##@ #|#.###.$ #|#. ## $ #|# $## # #|#    $. #|#     ###|#######--", 20],
+    ["######--|#  . ###|# $ $  #|# $##$ #|#  ##  #|#  # . #|#  +.###|######--", 20],
+    ["-----#####|-----#.  #|######   #|#  ##@ ###|#.  $$   #|# $  $. .#|##   #####|-#####----", 20],
+    ["#######-|#  .$ ##|#  .$. #|#@ #$ .#|# $    #|###  ###|--####--", 21],
+    ["#####---|#  @#---|# $$####|# # $  #|# $.   #|####.  #|--#. .##|--#   #-|--#   #-|--#####-", 20],
+    ["--####--|-##  #--|-# $ ###|-#@$ $ #|-##$.  #|###  ###|#. .  #-|#.    #-|#######-", 20],
+    ["-#####--|-# @ ###|-# $$  #|-# $   #|-####  #|---#   #|#### .##|#      #|# .   .#|########", 24],
+    ["--########|###  ..  #|#.@$###  #|# $$ ##  #|# $   #  #|###      #|--#  .   #|--########", 37],
+    ["----#######|----#     #|----# $ . #|#######   #|#   # $ ###|# $+# $ .#-|# .$  .  #-|##########-", 28],
+    ["##########|# . ##   #|#   ##$  #|#  ## .$ #|# @ #$  ##|#  $    #-|# . ##. #-|#########-", 29],
+    ["-####-----|##. ##----|#    ###--|#  @   ###|#  ##$$  #|#. #  .  #|# $  $#  #|### .  ###|--# $. #--|--######--", 36],
+    ["-----#####|-----#  .#|###### $ #|#. .##   #|#  $###  #|##   #@$ #|-#    $  #|-# .######|-####-----", 33],
+    ["-########|-#      #|##$ . . #|# @##  ##|# $##   #|# $    .#|##$# $.##|-#  .  #-|-#######-", 31],
+    ["########-|# .##  #-|#  #  .#-|# $    #-|# $$   #-|#. ##  ##|#$$##.  #|#@ ##  .#|#########", 31],
+    ["####-------|# .##------|#.  #######|#     @# .#|#  $ $$# $#|#####.    #|----# $  ##|----#. ###-|----####---", 29],
+    ["##########|#.   ##@.#|#     #$ #|### $ $. #|--##  #. #|---#$$#  #|---#    .#|---#######", 28],
+    ["-####----|## @#####|# $$.#  #|#     $ #|### .## #|--#$ #. #|--# .   #|--#    ##|--######-", 31],
+    ["#######--|#     ###|# $   $ #|#  # $ .#|# $ # ..#|#   ### #|#######@#|-#  ## .#|-# . $ ##|-#######-", 29],
+    ["--########|###      #|#  $     #|# $ #### #|###  #  .#|-##$.   .#|-#.  ###$#|-#    .$@#|-#########", 35],
+    ["######--|#    ###|#   .  #|#  # ..#|# $ #.##|# $ $$#-|#   $+#-|#######-", 37],
+    ["######---|#.  .#---|# #$ ####|# #  $+ #|# ### $ #|#  #  $##|#  #   .#|#     $ #|#. ###  #|####-####", 35],
+    ["-#######-|##     #-|#    $$#-|#  ### ##|# $##.  #|#   .$ @#|#$ .#####|#.. #----|#####----", 34],
+    ["---######|---#.$  #|####@$$ #|#  ##   #|# .## ###|#       #|# .## $ #|#  $  .##|#.  ####-|#####----", 48],
+  ];
+  const TIERS = [15, 30, 45, 60];
+  const OPEN_AHEAD = 3;
+  const STORAGE_KEY = 'milaan.boxPush.progress';
+  const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  const KEY_DIR = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };
+  const CODE_DIR = { KeyW: 0, KeyD: 1, KeyS: 2, KeyA: 3 };
+  const HINT_CAP = 600000;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), wrap: $('wrap'), toast: $('toast'), level: $('level'), moves: $('moves'), pushes: $('pushes'), optimal: $('optimal'), goal: $('goal'), undo: $('undo'), hint: $('hint'), restart: $('retry'), announcer: $('announcer'), intro: $('intro'), play: $('play'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), optLine: $('opt-line'), winNote: $('win-note'), newBest: $('new-best'), next: $('next'), levels: $('levels'), levelList: $('level-list'), lvTotal: $('lv-total') };
+
+  const blankProgress = () => ({ current: 1, stars: {}, best: {}, bestMoves: {}, save: null });
+  const readProgress = () => { try { return { ...blankProgress(), ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return blankProgress(); } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const tierOf = n => TIERS.findIndex(last => n <= last);
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const announce = text => { els.announcer.textContent = ''; requestAnimationFrame(() => { els.announcer.textContent = text; }); };
+  const maxCleared = () => Object.keys(progress.stars).reduce((m, k) => (progress.stars[k] > 0 ? Math.max(m, Number(k)) : m), 0);
+  const isOpen = n => n <= maxCleared() + OPEN_AHEAD;
+
+  let progress = readProgress();
+  let game = null;
+  let queue = [];
+  let busy = false;
+  let hintJob = null;
+  let toastTimer = 0;
+
+  function parseLevel(code) {
+    const rows = code.split('|');
+    const R = rows.length, C = Math.max(...rows.map(r => r.length));
+    const tiles = new Uint8Array(R * C), goal = new Uint8Array(R * C), boxes = [];
+    let player = -1;
+    rows.forEach((row, y) => {
+      for (let x = 0; x < C; x++) {
+        const ch = row[x] ?? '-', i = y * C + x;
+        tiles[i] = ch === '-' ? 0 : ch === '#' ? 1 : 2;
+        if ('.*+'.includes(ch)) goal[i] = 1;
+        if ('$*'.includes(ch)) boxes.push(i);
+        if ('@+'.includes(ch)) player = i;
+      }
+    });
+    // Compact floor indexing for the hint search.
+    const fi = new Int16Array(R * C).fill(-1), fc = [];
+    tiles.forEach((v, i) => { if (v === 2) { fi[i] = fc.length; fc.push(i); } });
+    const nbr = new Int16Array(fc.length * 4).fill(-1);
+    fc.forEach((c, f) => { for (let d = 0; d < 4; d++) { const n = step1(c, d, C, R); if (n >= 0 && tiles[n] === 2) nbr[f * 4 + d] = fi[n]; } });
+    // A crate can only ever reach a target from "live" floor: pull outwards from every target.
+    const live = new Uint8Array(R * C);
+    const stack = [];
+    goal.forEach((g, i) => { if (g) { live[i] = 1; stack.push(i); } });
+    while (stack.length) {
+      const b = stack.pop();
+      for (let d = 0; d < 4; d++) {
+        const p = step1(b, d, C, R), pp = p >= 0 ? step1(p, d, C, R) : -1;
+        if (p < 0 || pp < 0 || tiles[p] !== 2 || tiles[pp] !== 2 || live[p]) continue;
+        live[p] = 1; stack.push(p);
+      }
+    }
+    return { R, C, tiles, goal, boxes, player, fi, fc, nbr, live };
+  }
+
+  function step1(i, d, C, R) {
+    const x = i % C + DX[d], y = Math.floor(i / C) + DY[d];
+    return x < 0 || y < 0 || x >= C || y >= R ? -1 : y * C + x;
+  }
+  const next = (i, d) => step1(i, d, game.L.C, game.L.R);
+  const isFloor = i => i >= 0 && game.L.tiles[i] === 2;
+
+  function drawBoard() {
+    const { R, C, tiles, goal } = game.L;
+    const parts = [`<svg class="bg" viewBox="-0.1 -0.1 ${C + 0.2} ${R + 0.2}" preserveAspectRatio="none" aria-hidden="true">`];
+    parts.push('<defs><linearGradient id="wl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7db8"/><stop offset="1" stop-color="#5d5283"/></linearGradient></defs>');
+    for (let i = 0; i < R * C; i++) {
+      if (tiles[i] !== 2) continue;
+      const x = i % C, y = Math.floor(i / C);
+      parts.push(`<rect x="${x - 0.01}" y="${y - 0.01}" width="1.02" height="1.02" fill="${(x + y) % 2 ? '#efe2c6' : '#e8d8b8'}"/>`);
+      parts.push(`<path d="M${x} ${y + 0.5}h1" stroke="#d6c39d" stroke-width=".025"/>`);
+    }
+    for (let i = 0; i < R * C; i++) {
+      if (!goal[i]) continue;
+      const x = i % C + 0.5, y = Math.floor(i / C) + 0.5;
+      parts.push(`<g class="gl"><circle cx="${x}" cy="${y}" r=".3" fill="#2fc4a433" stroke="#2fc4a4" stroke-width=".07"/><circle cx="${x}" cy="${y}" r=".11" fill="#2fc4a4"/></g>`);
+    }
+    for (let i = 0; i < R * C; i++) {
+      if (tiles[i] !== 1) continue;
+      const x = i % C, y = Math.floor(i / C);
+      parts.push(`<rect x="${x + 0.03}" y="${y + 0.03}" width=".94" height=".94" rx=".16" fill="#463d66"/><rect x="${x + 0.03}" y="${y + 0.01}" width=".94" height=".84" rx=".16" fill="url(#wl)"/><path d="M${x + 0.2} ${y + 0.3}h.6M${x + 0.2} ${y + 0.56}h.6" stroke="#ffffff22" stroke-width=".06" stroke-linecap="round"/>`);
+    }
+    parts.push('</svg>');
+    els.board.innerHTML = parts.join('');
+    game.crateEls = game.boxes.map((cell, i) => {
+      const el = document.createElement('div');
+      el.className = 'crate';
+      el.style.setProperty('--i', i);
+      el.innerHTML = '<i></i>';
+      els.board.append(el);
+      return el;
+    });
+    const worker = document.createElement('div');
+    worker.className = 'worker';
+    worker.innerHTML = '<div class="sprite"><svg viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="91" rx="27" ry="6" fill="#00000040"/><path d="M24 90Q24 60 50 60Q76 60 76 90Z" fill="#3a6fd8"/><rect x="39" y="64" width="22" height="17" rx="4" fill="#2c57b0"/><circle cx="50" cy="44" r="23" fill="#ffd3a8"/><path d="M26 40Q26 15 50 15Q74 15 74 40Z" fill="#ffc531"/><rect x="20" y="36" width="60" height="8" rx="4" fill="#e9a200"/><rect x="46.5" y="15" width="7" height="21" rx="3.5" fill="#ffe082"/><circle cx="36" cy="57" r="4" fill="#ff9b8a" opacity=".55"/><circle cx="64" cy="57" r="4" fill="#ff9b8a" opacity=".55"/><g class="eyes"><ellipse cx="42" cy="51" rx="3.4" ry="4" fill="#2b2238"/><ellipse cx="58" cy="51" rx="3.4" ry="4" fill="#2b2238"/></g></svg></div>';
+    els.board.append(worker);
+    game.workerEl = worker;
+    game.fromEl = Object.assign(document.createElement('div'), { className: 'marker from', hidden: true });
+    game.arrowEl = Object.assign(document.createElement('div'), { className: 'marker arrow', hidden: true });
+    game.arrowEl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 13h-5v8H8v-8H3z" fill="#ffc23d" stroke="#2b2238" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    els.board.append(game.fromEl, game.arrowEl);
+    layout();
+  }
+
+  function setPos(el, cell) {
+    const C = game.L.C;
+    el.style.setProperty('--x', cell % C);
+    el.style.setProperty('--y', Math.floor(cell / C));
+  }
+
+  function render() {
+    game.boxes.forEach((cell, i) => {
+      setPos(game.crateEls[i], cell);
+      game.crateEls[i].classList.toggle('on', !!game.L.goal[cell]);
+    });
+    setPos(game.workerEl, game.player);
+    game.workerEl.style.setProperty('--fx', DX[game.facing]);
+    game.workerEl.style.setProperty('--fy', DY[game.facing] < 0 ? -0.6 : DY[game.facing]);
+  }
+
+  function layout() {
+    if (!game) return;
+    const w = els.wrap.clientWidth, h = els.wrap.clientHeight;
+    const cell = Math.max(10, Math.floor(Math.min(w / game.L.C, h / game.L.R, 88)));
+    els.board.style.setProperty('--cell', `${cell}px`);
+    els.board.style.width = `${cell * game.L.C}px`;
+    els.board.style.height = `${cell * game.L.R}px`;
+  }
+
+  const onTargets = () => game.boxes.reduce((n, c) => n + game.L.goal[c], 0);
+
+  function updateHud() {
+    els.level.textContent = `${game.n}/${LEVELS.length}`;
+    els.moves.textContent = String(game.moves);
+    els.pushes.textContent = String(game.pushes);
+    els.pushes.classList.toggle('over', game.pushes > game.optimal);
+    els.optimal.textContent = String(game.optimal);
+    els.undo.disabled = !game.history.length || game.done;
+    els.hint.disabled = game.done;
+    const cnt = els.goal.querySelector('.cnt');
+    if (cnt) cnt.textContent = t.crates(onTargets(), game.boxes.length);
+  }
+
+  function startLevel(n, restore = null) {
+    cancelHint();
+    queue = [];
+    const [code, optimal] = LEVELS[n - 1];
+    const L = parseLevel(code);
+    game = { n, L, optimal, boxes: L.boxes.slice(), player: L.player, facing: 2, moves: 0, pushes: 0, history: [], hintUsed: false, done: false, hint: null };
+    game.boxAt = new Int16Array(L.R * L.C).fill(-1);
+    game.boxes.forEach((c, i) => { game.boxAt[c] = i; });
+    els.board.classList.remove('won');
+    els.board.setAttribute('aria-label', t.board(n));
+    els.board.style.setProperty('--spd', '0ms');
+    drawBoard();
+    if (restore && restore.level === n && typeof restore.path === 'string') {
+      // Replay the saved moves; group sizes keep undo working action by action.
+      let at = 0;
+      for (const size of restore.groups || []) {
+        const act = { steps: [] };
+        for (let k = 0; k < size && at < restore.path.length; k++, at++) { const s = doStep('urdl'.indexOf(restore.path[at].toLowerCase())); if (s) act.steps.push(s); }
+        if (act.steps.length) game.history.push(act);
+      }
+      game.hintUsed = Boolean(restore.hintUsed);
+    }
+    render();
+    requestAnimationFrame(() => els.board.style.setProperty('--spd', '110ms'));
+    els.goal.innerHTML = '';
+    const pill = document.createElement('b');
+    pill.textContent = t.tiers[tierOf(n)];
+    const cnt = document.createElement('span');
+    cnt.className = 'cnt';
+    els.goal.append(pill, document.createTextNode(t.goal(optimal)), cnt);
+    hideToast();
+    updateHud();
+    progress.current = n;
+    persist();
+    for (const o of [els.win, els.levels, els.intro]) o.hidden = true;
+  }
+
+  function persist() {
+    if (!game) return;
+    progress.save = game.done ? null : { level: game.n, path: game.history.map(a => a.steps.map(s => 'urdl'[s.d][s.push ? 'toUpperCase' : 'toLowerCase']()).join('')).join(''), groups: game.history.map(a => a.steps.length), hintUsed: game.hintUsed };
+    saveProgress();
+  }
+
+  // One step of the worker. Returns the step record, or null when blocked.
+  function doStep(d) {
+    const n = next(game.player, d);
+    game.facing = d;
+    if (!isFloor(n)) return null;
+    const b = game.boxAt[n];
+    if (b >= 0) {
+      const to = next(n, d);
+      if (!isFloor(to) || game.boxAt[to] >= 0) return null;
+      game.boxAt[n] = -1; game.boxAt[to] = b; game.boxes[b] = to;
+      game.pushes++;
+    }
+    game.player = n;
+    game.moves++;
+    return { d, push: b >= 0, box: b };
+  }
+
+  function undoStep(s) {
+    const back = next(game.player, (s.d + 2) % 4);
+    if (s.push) {
+      const at = next(game.player, s.d);
+      game.boxAt[at] = -1; game.boxAt[game.player] = s.box; game.boxes[s.box] = game.player;
+      game.pushes--;
+    }
+    game.player = back;
+    game.facing = s.d;
+    game.moves--;
+  }
+
+  function bump(d) {
+    const w = game.workerEl;
+    w.style.setProperty('--bx', DX[d]);
+    w.style.setProperty('--by', DY[d]);
+    w.classList.remove('bump', 'step', 'step2');
+    void w.offsetWidth;
+    w.classList.add('bump');
+  }
+
+  // Input becomes queued steps so animations play one cell at a time; a blocked step drops the rest of its action.
+  function enqueue(dirs, fast = false) {
+    if (!game || game.done || !dirs.length) return;
+    const act = { steps: [] };
+    for (const d of dirs) queue.push({ d, act, fast });
+    pump();
+  }
+
+  function pump() {
+    while (!busy && queue.length) {
+      const item = queue.shift();
+      if (game.done) { queue = []; return; }
+      const s = doStep(item.d);
+      if (!s) {
+        render();
+        bump(item.d);
+        queue = queue.filter(q => q.act !== item.act);
+        continue;
+      }
+      if (!item.act.steps.length) game.history.push(item.act);
+      item.act.steps.push(s);
+      afterStep(s, item.fast);
+      if (reducedMotion.matches) continue;
+      busy = true;
+      setTimeout(() => { busy = false; pump(); }, item.fast ? 75 : 115);
+    }
+  }
+
+  function afterStep(s, fast) {
+    cancelHint();
+    els.board.style.setProperty('--spd', reducedMotion.matches ? '0ms' : fast ? '72ms' : '110ms');
+    clearHint();
+    render();
+    const w = game.workerEl;
+    const cls = w.classList.contains('step') ? 'step2' : 'step';
+    w.classList.remove('step', 'step2', 'bump');
+    w.classList.add(cls);
+    updateHud();
+    if (s.push) {
+      const cell = game.boxes[s.box];
+      if (game.L.goal[cell]) announce(t.onTarget(onTargets(), game.boxes.length));
+      if (onTargets() === game.boxes.length) return win();
+      if (isStuck(cell)) {
+        showToast(t.stuck, true);
+        announce(t.stuck);
+        const el = game.crateEls[s.box];
+        el.classList.remove('stuck'); void el.offsetWidth; el.classList.add('stuck');
+      }
+    }
+    persist();
+  }
+
+  // Simple deadlocks: a crate on dead floor, or a 2×2 block of walls and crates that holds a crate off target.
+  function isStuck(cell) {
+    const L = game.L;
+    if (!L.goal[cell] && !L.live[cell]) return true;
+    const solid = i => i < 0 || L.tiles[i] !== 2 || game.boxAt[i] >= 0;
+    for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) {
+      const x = cell % L.C + dx, y = Math.floor(cell / L.C) + dy;
+      const sq = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]].map(([a, b]) => (a < 0 || b < 0 || a >= L.C || b >= L.R ? -1 : b * L.C + a));
+      if (sq.every(solid) && sq.some(i => i >= 0 && game.boxAt[i] >= 0 && !L.goal[i])) return true;
+    }
+    return false;
+  }
+
+  function undo() {
+    if (!game || game.done || !game.history.length) return;
+    queue = [];
+    cancelHint();
+    const act = game.history.pop();
+    for (let k = act.steps.length - 1; k >= 0; k--) undoStep(act.steps[k]);
+    els.board.style.setProperty('--spd', reducedMotion.matches ? '0ms' : '90ms');
+    clearHint();
+    hideToast();
+    render();
+    updateHud();
+    persist();
+    announce(t.undone);
+  }
+
+  function restart() {
+    if (!game) return;
+    const used = game.hintUsed;
+    startLevel(game.n);
+    game.hintUsed = used;
+    persist();
+    announce(t.restarted);
+    els.board.focus({ preventScroll: true });
+  }
+
+  // Walking: breadth-first path over free floor.
+  function pathTo(target) {
+    if (target === game.player) return [];
+    const L = game.L, prev = new Int32Array(L.R * L.C).fill(-1), how = new Int8Array(L.R * L.C);
+    prev[game.player] = game.player;
+    const q = [game.player];
+    for (let qi = 0; qi < q.length; qi++) {
+      const c = q[qi];
+      for (let d = 0; d < 4; d++) {
+        const n = next(c, d);
+        if (!isFloor(n) || game.boxAt[n] >= 0 || prev[n] >= 0) continue;
+        prev[n] = c; how[n] = d;
+        if (n === target) { const dirs = []; for (let k = n; k !== game.player; k = prev[k]) dirs.unshift(how[k]); return dirs; }
+        q.push(n);
+      }
+    }
+    return null;
+  }
+
+  function tapCell(cell) {
+    if (!game || game.done || busy || queue.length) return;
+    if (cell < 0 || !isFloor(cell) || cell === game.player) return;
+    const b = game.boxAt[cell];
+    if (b < 0) { const p = pathTo(cell); if (p && p.length) enqueue(p, p.length > 1); return; }
+    for (let d = 0; d < 4; d++) if (next(game.player, d) === cell) { enqueue([d]); return; }
+    // A far crate: follow the hint when it points at this crate, otherwise walk to the nearest side it can be pushed from.
+    if (game.hint && game.hint.box === cell) { const p = pathTo(game.hint.from); if (p) { enqueue([...p, game.hint.d], true); return; } }
+    let best = null;
+    for (let d = 0; d < 4; d++) {
+      const from = next(cell, (d + 2) % 4), to = next(cell, d);
+      if (!isFloor(from) || game.boxAt[from] >= 0 || !isFloor(to) || game.boxAt[to] >= 0) continue;
+      const p = pathTo(from);
+      if (p && (!best || p.length < best.length)) best = p;
+    }
+    if (best) enqueue(best, true);
+  }
+
+  function showToast(text, warn = false, ms = 2600) {
+    clearTimeout(toastTimer);
+    els.toast.textContent = text;
+    els.toast.classList.toggle('warn', warn);
+    els.toast.hidden = false;
+    if (ms) toastTimer = setTimeout(hideToast, ms);
+  }
+  function hideToast() { clearTimeout(toastTimer); els.toast.hidden = true; }
+
+  function clearHint() {
+    if (!game) return;
+    game.hint = null;
+    game.crateEls?.forEach(el => el.classList.remove('hinted'));
+    if (game.fromEl) { game.fromEl.hidden = true; game.arrowEl.hidden = true; }
+  }
+
+  function cancelHint() {
+    if (hintJob) { hintJob.cancelled = true; hideToast(); }
+    hintJob = null;
+    els.hint.classList.remove('busy');
+  }
+
+  // Push-optimal breadth-first search from the current position, sliced so the page never freezes.
+  function requestHint() {
+    if (!game || game.done || hintJob) return;
+    queue = [];
+    const L = game.L, F = L.fc.length, nbr = L.nbr;
+    const occ = new Uint8Array(F), mark = new Int32Array(F), rmark = new Int32Array(F);
+    let stamp = 0, rstamp = 0;
+    const flood = (p, m, s) => { let min = p; const st = [p]; m[p] = s; while (st.length) { const i = st.pop(); if (i < min) min = i; for (let d = 0; d < 4; d++) { const j = nbr[i * 4 + d]; if (j >= 0 && !occ[j] && m[j] !== s) { m[j] = s; st.push(j); } } } return min; };
+    const keyOf = (bx, p) => { let k = 0; for (const b of bx) k = k * F + b; return k * F + p; };
+    const goalF = new Uint8Array(F), liveF = new Uint8Array(F);
+    L.fc.forEach((c, f) => { goalF[f] = L.goal[c]; liveF[f] = L.live[c]; });
+    const start = game.boxes.map(c => L.fi[c]).sort((a, b) => a - b);
+    start.forEach(b => { occ[b] = 1; });
+    const p0 = flood(L.fi[game.player], mark, ++stamp);
+    start.forEach(b => { occ[b] = 0; });
+    const states = [start], players = [p0], first = [null], depth = [0];
+    const seen = new Set([keyOf(start, p0)]);
+    const job = { cancelled: false };
+    hintJob = job;
+    els.hint.classList.add('busy');
+    const slow = setTimeout(() => { if (hintJob === job) showToast(t.thinking, false, 0); }, 250);
+    let qi = 0;
+    const finish = result => {
+      clearTimeout(slow);
+      if (job.cancelled) return;
+      hintJob = null;
+      els.hint.classList.remove('busy');
+      hideToast();
+      if (!result) { showToast(t.noHint, true); announce(t.noHint); return; }
+      showHint(result);
+    };
+    const chunk = () => {
+      if (job.cancelled) return;
+      const until = performance.now() + 12;
+      while (qi < states.length) {
+        if (states.length > HINT_CAP) return finish(null);
+        const bx = states[qi];
+        bx.forEach(b => { occ[b] = 1; });
+        flood(players[qi], rmark, ++rstamp);
+        for (let bi = 0; bi < bx.length; bi++) {
+          const b = bx[bi];
+          for (let d = 0; d < 4; d++) {
+            const from = nbr[b * 4 + ((d + 2) % 4)];
+            if (from < 0 || rmark[from] !== rstamp) continue;
+            const to = nbr[b * 4 + d];
+            if (to < 0 || occ[to] || !liveF[to]) continue;
+            const nb = bx.slice(); nb[bi] = to; nb.sort((x, y) => x - y);
+            occ[b] = 0; occ[to] = 1;
+            const np = flood(b, mark, ++stamp);
+            occ[to] = 0; occ[b] = 1;
+            const k = keyOf(nb, np);
+            if (seen.has(k)) continue;
+            seen.add(k);
+            const f = first[qi] || { box: L.fc[b], d, from: L.fc[from] };
+            if (nb.every(x => goalF[x])) { bx.forEach(x => { occ[x] = 0; }); return finish({ ...f, left: depth[qi] + 1 }); }
+            states.push(nb); players.push(np); first.push(f); depth.push(depth[qi] + 1);
+          }
+        }
+        bx.forEach(b => { occ[b] = 0; });
+        qi++;
+        if (performance.now() > until) { setTimeout(chunk, 0); return; }
+      }
+      finish(null);
+    };
+    chunk();
+  }
+
+  function showHint(h) {
+    clearHint();
+    game.hint = h;
+    game.hintUsed = true;
+    persist();
+    const bi = game.boxAt[h.box];
+    if (bi >= 0) game.crateEls[bi].classList.add('hinted');
+    setPos(game.fromEl, h.from);
+    game.fromEl.hidden = h.from === game.player;
+    setPos(game.arrowEl, h.box);
+    game.arrowEl.style.setProperty('--rot', `${h.d * 90}deg`);
+    game.arrowEl.style.setProperty('--ax', DX[h.d]);
+    game.arrowEl.style.setProperty('--ay', DY[h.d]);
+    game.arrowEl.hidden = false;
+    announce(t.hintSay(t.dirs[h.d], h.left));
+  }
+
+  function starsFor(pushes) {
+    const o = game.optimal;
+    const s = pushes <= o ? 3 : pushes <= o + Math.max(3, Math.ceil(o * 0.25)) ? 2 : 1;
+    return game.hintUsed ? Math.min(s, 2) : s;
+  }
+
+  function win() {
+    game.done = true;
+    queue = [];
+    cancelHint();
+    hideToast();
+    updateHud();
+    const stars = starsFor(game.pushes);
+    const key = String(game.n);
+    const prevBest = progress.best[key];
+    const better = prevBest === undefined || game.pushes < prevBest || (game.pushes === prevBest && game.moves < (progress.bestMoves[key] ?? Infinity));
+    if (better) { progress.best[key] = game.pushes; progress.bestMoves[key] = game.moves; }
+    progress.stars[key] = Math.max(progress.stars[key] ?? 0, stars);
+    progress.current = Math.min(LEVELS.length, game.n + 1);
+    progress.save = null;
+    saveProgress();
+    els.board.classList.add('won');
+    const last = game.n === LEVELS.length;
+    els.winTitle.textContent = last ? t.allDone : t.won(game.n);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(game.moves, game.pushes);
+    els.optLine.textContent = t.optimalLine(game.optimal);
+    els.winNote.textContent = game.hintUsed ? t.hintUsed : game.pushes <= game.optimal ? t.perfect : '';
+    els.winNote.hidden = !els.winNote.textContent;
+    els.newBest.hidden = !better || prevBest === undefined;
+    els.next.hidden = last;
+    const n = game.n;
+    setTimeout(() => {
+      if (!game.done || game.n !== n) return;
+      els.win.hidden = false;
+      announce(`${els.winTitle.textContent} ${t.starsLabel(stars)}. ${t.result(game.moves, game.pushes)}`);
+      (last ? $('replay') : els.next).focus({ preventScroll: true });
+    }, reducedMotion.matches ? 150 : 900);
+  }
+
+  function openLevels() {
+    els.levelList.replaceChildren();
+    const total = Object.values(progress.stars).reduce((a, b) => a + b, 0);
+    els.lvTotal.textContent = `★ ${total}/${LEVELS.length * 3}`;
+    t.tiers.forEach((name, tier) => {
+      const heading = document.createElement('p');
+      heading.className = 'tier';
+      heading.textContent = name;
+      const grid = document.createElement('div');
+      grid.className = 'level-grid';
+      for (let n = (TIERS[tier - 1] ?? 0) + 1; n <= TIERS[tier]; n++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `level-btn${game && n === game.n ? ' current' : ''}`;
+        const locked = !isOpen(n);
+        const stars = progress.stars[n] ?? 0;
+        b.disabled = locked;
+        b.innerHTML = `<span>${locked ? '🔒' : n}</span><small>${'★'.repeat(stars)}</small>`;
+        b.setAttribute('aria-label', `${t.levelN(n)}, ${locked ? t.locked : t.starsLabel(stars)}`);
+        b.addEventListener('click', () => { startLevel(n); els.board.focus({ preventScroll: true }); });
+        grid.append(b);
+      }
+      els.levelList.append(heading, grid);
+    });
+    els.win.hidden = true;
+    els.intro.hidden = true;
+    els.intro.dataset.seen = '1';
+    els.levels.hidden = false;
+    const current = els.levelList.querySelector('.current');
+    current?.focus({ preventScroll: true });
+    current?.scrollIntoView({ block: 'center' });
+  }
+
+  const overlayOpen = () => !els.win.hidden || !els.levels.hidden || !els.intro.hidden;
+
+  // The board's focus ring only shows for keyboard users.
+  document.addEventListener('keydown', e => { if (e.key === 'Tab') document.documentElement.classList.add('kb'); }, true);
+  document.addEventListener('pointerdown', () => document.documentElement.classList.remove('kb'), true);
+
+  document.addEventListener('keydown', e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || overlayOpen() || !game) return;
+    const d = KEY_DIR[e.key] ?? CODE_DIR[e.code];
+    if (d !== undefined) {
+      e.preventDefault();
+      if (game.done) return;
+      // Held keys only add a step when the queue has drained, so the worker never overshoots.
+      if (e.repeat ? queue.length || busy : queue.length > 1) return;
+      enqueue([d]);
+      return;
+    }
+    const k = e.key.toLowerCase();
+    if (k === 'u' || k === 'backspace') { e.preventDefault(); undo(); }
+    else if (k === 'r') { e.preventDefault(); restart(); }
+    else if (k === 'h') { e.preventDefault(); requestHint(); }
+  });
+
+  // Pointer: a tap walks or pushes; dragging steps the worker one cell per cell-length of travel.
+  let drag = null;
+  els.wrap.addEventListener('pointerdown', e => {
+    if (!game || game.done || drag) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false };
+    els.wrap.setPointerCapture(e.pointerId);
+    els.board.focus({ preventScroll: true });
+  });
+  els.wrap.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const cell = parseFloat(els.board.style.getPropertyValue('--cell')) || 32;
+    const step = Math.max(22, cell * 0.75);
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < step) return;
+    drag.moved = true;
+    const horiz = Math.abs(dx) > Math.abs(dy);
+    const d = horiz ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+    if (queue.length < 2) enqueue([d]);
+    drag.x = e.clientX; drag.y = e.clientY;
+  });
+  const endDrag = (e, cancel) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { moved, x0, y0 } = drag;
+    drag = null;
+    if (cancel || moved || Math.hypot(e.clientX - x0, e.clientY - y0) > 14) return;
+    const r = els.board.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / (r.width / game.L.C)), y = Math.floor((e.clientY - r.top) / (r.height / game.L.R));
+    if (x >= 0 && y >= 0 && x < game.L.C && y < game.L.R) tapCell(y * game.L.C + x);
+  };
+  els.wrap.addEventListener('pointerup', e => endDrag(e, false));
+  els.wrap.addEventListener('pointercancel', e => endDrag(e, true));
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', requestHint);
+  els.restart.addEventListener('click', restart);
+  $('open-levels').addEventListener('click', openLevels);
+  $('intro-levels').addEventListener('click', openLevels);
+  $('win-levels').addEventListener('click', openLevels);
+  $('close-levels').addEventListener('click', () => {
+    els.levels.hidden = true;
+    if (game && game.done) { els.win.hidden = false; els.next.focus({ preventScroll: true }); }
+    else els.board.focus({ preventScroll: true });
+  });
+  els.next.addEventListener('click', () => { startLevel(game.n + 1); els.board.focus({ preventScroll: true }); });
+  $('replay').addEventListener('click', () => { startLevel(game.n); els.board.focus({ preventScroll: true }); });
+  els.play.addEventListener('click', () => { els.intro.hidden = true; els.intro.dataset.seen = '1'; els.board.focus({ preventScroll: true }); });
+
+  new ResizeObserver(layout).observe(els.wrap);
+
+  // Read-only hooks for automated tests.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__boxPush = {
+    state: () => game && { level: game.n, cols: game.L.C, rows: game.L.R, player: game.player, boxes: game.boxes.slice(), moves: game.moves, pushes: game.pushes, optimal: game.optimal, done: game.done, busy: busy || queue.length > 0, hint: game.hint && { ...game.hint }, hintBusy: !!hintJob, overlay: [els.intro, els.win, els.levels].find(o => !o.hidden)?.id || null },
+    levels: () => LEVELS.map(([code, optimal]) => ({ rows: code.split('|'), optimal })),
+    cellCenter: cell => { const r = els.board.getBoundingClientRect(); const C = game.L.C; return { x: r.left + (cell % C + 0.5) * r.width / C, y: r.top + (Math.floor(cell / C) + 0.5) * r.height / game.L.R }; },
+  };
+
+  const first = Math.min(Math.max(1, progress.current || 1), LEVELS.length);
+  startLevel(isOpen(first) ? first : 1, progress.save);
+  els.intro.hidden = false;
+  els.play.textContent = t.play(game.n);
+  els.play.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

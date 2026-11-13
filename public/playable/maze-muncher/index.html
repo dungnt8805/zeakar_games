@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maze Muncher</title>
+<style>
+:root {
+  --bg: #0b0920;
+  --bg2: #2a1d62;
+  --panel: #19143f;
+  --panel2: #272061;
+  --edge: #07051a;
+  --text: #f6f2ff;
+  --muted: #aaa3d8;
+  --accent: #ffd23f;
+  --accent-dark: #d49b00;
+  --pink: #ff7ac6;
+  --mint: #4ff0c4;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg) 68%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- Layout: portrait stacks HUD / maze / footer; wide frames put the maze at full height between two side columns ---------- */
+.app { position: relative; height: 100%; max-width: 680px; margin: 0 auto; display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "hud tools" "stage stage" "foot foot" "pad pad";
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); touch-action: none; }
+.brand { grid-area: brand; display: none; min-width: 0; }
+.brand h1 { font-size: clamp(22px, 4.4vh, 38px); font-weight: 900; letter-spacing: -.03em; line-height: 1.02; }
+.brand h1 span, .panel h1 span { color: var(--accent); }
+.chip { display: inline-block; max-width: 100%; padding: 4px 10px; border-radius: 99px; background: var(--panel2); color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.hud { grid-area: hud; display: grid; grid-template-columns: 1.25fr .9fr 1.1fr; gap: 6px; min-width: 0; }
+.stat { min-width: 0; padding: 5px 6px; border-radius: 13px; background: var(--panel); text-align: center; box-shadow: inset 0 0 0 1px #ffffff10; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.2; white-space: nowrap; }
+.stat.dots { display: none; }
+.tools { grid-area: tools; display: flex; gap: 6px; align-items: stretch; }
+.icon-btn { flex: 0 0 auto; width: 44px; min-height: 40px; border-radius: 13px; background: var(--panel2); display: grid; place-items: center; box-shadow: 0 3px 0 var(--edge); }
+.icon-btn svg { width: 18px; height: 18px; fill: var(--text); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
+.icon-btn[hidden] { display: none; }
+.icon-btn[aria-pressed="true"] { background: #3b3290; }
+.stage { grid-area: stage; position: relative; min-height: 0; min-width: 0; display: grid; place-items: center; }
+#board { grid-area: 1 / 1; display: block; border-radius: 14px; box-shadow: 0 0 0 3px #ffffff12, 0 18px 40px #0009; }
+#board:focus { outline: none; }
+#board:focus-visible { outline: 2px solid #ffd23f70; outline-offset: 3px; }
+.banner { grid-area: 1 / 1; display: grid; align-content: start; justify-items: center; gap: 4px; padding-top: 17%; text-align: center; pointer-events: none; }
+.banner[hidden] { display: none; }
+.banner strong { font-size: clamp(26px, 7vmin, 46px); font-weight: 900; letter-spacing: -.02em; color: #fff; text-shadow: 0 3px 0 #0009, 0 0 22px var(--glow, #ffd23f); animation: pop .5s cubic-bezier(.3, 1.6, .5, 1); }
+.banner span { font-size: clamp(13px, 3.4vmin, 18px); font-weight: 800; color: var(--accent); text-shadow: 0 2px 0 #000a; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
+.foot { grid-area: foot; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; height: 24px; }
+.foot canvas { display: block; height: 20px; }
+#lives-cv { flex: 0 1 96px; min-width: 0; }
+#fruit-cv { flex: 0 1 132px; min-width: 0; }
+.foot .chip { flex: 0 0 auto; max-width: 62%; }
+.side { grid-area: side; display: none; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: hidden; }
+.status { padding: 8px 10px; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px #ffffff10; }
+.status .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cap { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status b { font-size: 15px; font-weight: 900; white-space: nowrap; }
+.status b.fright { color: #8fa0ff; }
+.status b.chase { color: #ff8b97; }
+.status b.scatter { color: var(--mint); }
+.bar { display: block; height: 6px; margin-top: 6px; border-radius: 9px; background: #ffffff14; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; border-radius: 9px; background: #8fa0ff; transform-origin: left; transform: scaleX(0); }
+.legend { list-style: none; padding: 0; display: grid; gap: 7px; }
+.legend li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 2px 8px; align-items: center; }
+.legend svg { width: 26px; height: 26px; grid-row: span 2; }
+.legend b { font-size: 14px; font-weight: 900; line-height: 1.1; }
+.legend span { font-size: 12px; line-height: 1.3; color: var(--muted); }
+.keys { font-size: 12px; line-height: 1.45; color: var(--muted); }
+
+.dpad { grid-area: pad; display: none; justify-content: center; gap: 8px; }
+body.dpad-on .dpad { display: flex; }
+.dpad button { flex: 1 1 0; max-width: 76px; height: 46px; border-radius: 14px; background: var(--panel2); display: grid; place-items: center; box-shadow: 0 3px 0 var(--edge); touch-action: none; }
+.dpad button.hit { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); background: #3b3290; }
+.dpad svg { width: 22px; height: 22px; fill: var(--text); }
+.dpad .up svg { transform: rotate(-90deg); } .dpad .left svg { transform: rotate(180deg); } .dpad .down svg { transform: rotate(90deg); }
+
+/* ---------- Panels ---------- */
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: #07051acc; backdrop-filter: blur(3px); touch-action: manipulation; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 18px 18px; border-radius: 24px; background: var(--panel); text-align: center; box-shadow: 0 0 0 1px #ffffff17, 0 22px 50px #000b; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.art { display: block; width: 170px; height: 44px; margin: 0 auto 6px; }
+.panel h1 { font-size: clamp(28px, 9vw, 38px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.panel h2 { font-size: clamp(24px, 7.5vw, 32px); font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.cols { display: grid; gap: 4px; }
+.lab { margin-top: 12px !important; font-size: 11px !important; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: left; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.seg button { min-width: 0; min-height: 44px; padding: 5px 4px; border-radius: 12px; background: var(--panel2); display: grid; align-content: center; gap: 1px; box-shadow: 0 3px 0 var(--edge); }
+.seg button b { font-size: 15px; font-weight: 900; line-height: 1.15; }
+.seg button small { font-size: 10.5px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #2a1c00; box-shadow: 0 3px 0 var(--accent-dark); }
+.seg button[aria-pressed="true"] small { color: #5a4300; }
+.hint { margin-top: 6px !important; font-size: 12.5px !important; text-align: left; min-height: 1.4em; }
+.mazes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.mazes button { position: relative; min-width: 0; aspect-ratio: 1; max-height: 64px; padding: 4px; border-radius: 12px; background: var(--panel2); box-shadow: 0 3px 0 var(--edge); display: grid; place-items: center; }
+.mazes button canvas { width: 100%; height: 100%; max-width: 54px; max-height: 54px; border-radius: 6px; }
+.mazes button i { position: absolute; left: 3px; top: 2px; font-style: normal; font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000; }
+.mazes button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent), 0 3px 0 var(--edge); }
+.mazes button:disabled { cursor: not-allowed; }
+.mazes button:disabled canvas { opacity: .25; filter: grayscale(1); }
+.mazes button:disabled::after { content: "🔒"; position: absolute; font-size: 16px; }
+.panel .legend { margin-top: 8px; text-align: left; }
+.cta { width: 100%; min-height: 48px; margin-top: 14px; padding: 12px; border-radius: 16px; background: var(--accent); color: #2a1c00; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.btn { width: 100%; min-height: 42px; margin-top: 10px; padding: 9px 10px; border-radius: 14px; background: var(--panel2); font-size: 15px; font-weight: 800; box-shadow: 0 4px 0 var(--edge); }
+.cta:active, .btn:active, .seg button:active, .mazes button:active { transform: translateY(3px); box-shadow: none; }
+.row2 { display: flex; gap: 8px; }
+.row2 .btn { flex: 1 1 0; }
+.badge { display: inline-block; margin-top: 10px !important; padding: 4px 14px; border-radius: 99px; background: var(--pink); color: #3a0423 !important; font-size: 13px !important; font-weight: 800; }
+.badge[hidden] { display: none; }
+.result { color: var(--text) !important; font-size: 30px !important; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.2 !important; }
+.sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.sum div { min-width: 0; padding: 6px 4px; border-radius: 12px; background: #ffffff0d; }
+.sum dt { font-size: 10.5px; font-weight: 800; letter-spacing: .02em; color: var(--muted); line-height: 1.2; }
+.sum dd { margin: 0; font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.start-legend { display: none; }
+
+@media (max-width: 360px) {
+  .hud { gap: 4px; }
+  .stat { padding: 4px 3px; }
+  .stat strong { font-size: 17px; }
+  .stat small { letter-spacing: 0; }
+  .icon-btn { width: 40px; }
+}
+@media (min-height: 700px) and (max-aspect-ratio: 5/4) { .start-legend { display: block; } }
+@media (max-height: 560px) {
+  .panel { padding: 14px 14px 12px; }
+  .art { display: none; }
+  .panel p { font-size: 13px; }
+  .cta { min-height: 42px; margin-top: 10px; padding: 8px; font-size: 17px; }
+}
+
+/* ---------- Wide frames ---------- */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; column-gap: clamp(12px, 2.4vw, 34px); row-gap: 10px;
+    grid-template-columns: minmax(140px, 1fr) minmax(0, calc(100dvh - 20px)) minmax(140px, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "brand stage tools" "hud stage side" "foot stage pad" ". stage pad"; }
+  .brand { display: block; }
+  .brand, .hud, .foot { justify-self: end; width: min(100%, 270px); }
+  .tools, .side, .dpad { justify-self: start; width: min(100%, 270px); }
+  .dpad { align-self: end; }
+  .brand .chip { margin-top: 6px; }
+  .hud { grid-template-columns: 1fr; gap: 6px; }
+  .stat { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 7px 12px; text-align: left; }
+  .stat strong { font-size: clamp(18px, 3.4vh, 28px); }
+  .stat.dots { display: flex; }
+  .foot { flex-direction: column; align-items: flex-start; height: auto; gap: 8px; }
+  .foot .chip { display: none; }
+  .foot canvas { height: 24px; }
+  #lives-cv { flex: none; width: 132px; }
+  #fruit-cv { flex: none; width: 180px; max-width: 100%; }
+  .tools { justify-content: flex-start; }
+  .side { display: flex; }
+  .dpad { display: none; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 48px); gap: 6px; justify-content: start; }
+  body.dpad-on .dpad { display: grid; }
+  .dpad button { max-width: none; height: auto; }
+  .dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; } .dpad .right { grid-area: 2 / 3; } .dpad .down { grid-area: 3 / 2; }
+  .panel.start { width: min(100%, 720px); }
+  .panel.start .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
+  .panel.start .colA { text-align: left; }
+  .panel.start .colA .art { margin-left: 0; }
+  .start-legend { display: block; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 600px) {
+  .legend span { display: none; }
+  .legend li { grid-template-columns: 22px minmax(0, 1fr); }
+  .legend svg { width: 22px; height: 22px; grid-row: auto; }
+  .keys { font-size: 11px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 460px) {
+  .app { row-gap: 6px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom));
+    grid-template-columns: minmax(130px, 1fr) minmax(0, calc(100dvh - 16px)) minmax(130px, 1fr); }
+  .brand h1 { font-size: 20px; }
+  .brand .chip { margin-top: 3px; padding: 2px 8px; font-size: 11px; }
+  .stat { padding: 3px 10px; border-radius: 10px; }
+  .stat strong { font-size: 17px; line-height: 1.15; }
+  .foot { gap: 4px; }
+  .foot canvas { height: 18px; }
+  .icon-btn { width: 38px; min-height: 34px; height: 34px; border-radius: 11px; }
+  .side { gap: 6px; }
+  .status { padding: 5px 8px; }
+  .legend, .keys { display: none; }
+  .dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 38px); gap: 4px; }
+  .panel { padding: 12px 14px; border-radius: 18px; }
+  .panel h1 { font-size: 24px; }
+  .panel h2 { font-size: 22px; }
+  .panel p { margin-top: 4px; }
+  .art, .start-legend { display: none; }
+  .lab { margin-top: 6px !important; }
+  .seg button { min-height: 38px; }
+  .mazes button { max-height: 48px; }
+  .result { font-size: 24px !important; }
+  .sum { margin-top: 6px; }
+  .sum div { padding: 3px 4px; }
+  .sum dd { font-size: 15px; }
+  .btn { min-height: 38px; margin-top: 6px; padding: 6px; }
+  .cta { min-height: 40px; margin-top: 8px; padding: 6px; font-size: 17px; }
+  .acts { display: flex; gap: 8px; }
+  .acts .cta, .acts .btn { flex: 1 1 0; margin-top: 8px; min-height: 40px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 340px) {
+  .stat.dots, .colB .small { display: none; }
+  .status .bar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <div class="brand">
+    <h1>Maze <span>Muncher</span></h1>
+    <span class="chip" id="maze-chip-wide"></span>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="v-score">0</strong></div>
+    <div class="stat"><small data-i18n="level"></small><strong id="v-level">1</strong></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="v-best">0</strong></div>
+    <div class="stat dots"><small data-i18n="dots"></small><strong id="v-dots">0</strong></div>
+  </div>
+  <div class="tools">
+    <button type="button" class="icon-btn" id="pause-btn" data-i18n-label="pause"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1.2"/><rect x="9.4" y="2" width="3.6" height="12" rx="1.2"/></svg></button>
+    <button type="button" class="icon-btn" id="dpad-toggle" data-i18n-label="dpad" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg></button>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="board" tabindex="0" role="img"></canvas>
+    <div class="banner" id="banner" hidden><strong id="banner-title"></strong><span id="banner-text"></span></div>
+  </div>
+  <div class="foot">
+    <canvas id="lives-cv" role="img"></canvas>
+    <span class="chip" id="maze-chip"></span>
+    <canvas id="fruit-cv" aria-hidden="true"></canvas>
+  </div>
+  <aside class="side">
+    <div class="status">
+      <div class="row"><span class="cap" data-i18n="modeCap"></span><b id="mode-text"></b></div>
+      <span class="bar"><i id="mode-bar"></i></span>
+    </div>
+    <ul class="legend" id="side-legend"></ul>
+    <p class="keys" data-i18n="controls"></p>
+  </aside>
+  <div class="dpad" id="dpad">
+    <button type="button" class="left" data-dir="left" data-i18n-label="left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l10 8-10 8z"/></svg></button>
+    <button type="button" class="up" data-dir="up" data-i18n-label="up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l10 8-10 8z"/></svg></button>
+    <button type="button" class="down" data-dir="down" data-i18n-label="down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l10 8-10 8z"/></svg></button>
+    <button type="button" class="right" data-dir="right" data-i18n-label="right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l10 8-10 8z"/></svg></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel start" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <div class="cols">
+      <div class="colA">
+        <svg class="art" viewBox="0 0 170 44" aria-hidden="true">
+          <circle cx="62" cy="24" r="3" fill="#ffe6c2"/><circle cx="76" cy="24" r="3" fill="#ffe6c2"/><circle cx="92" cy="24" r="7" fill="#fff3a0"/>
+          <path d="M36 4.5 37.4 9" stroke="#2f8f45" stroke-width="2.2"/><ellipse cx="40" cy="4" rx="5.5" ry="2.6" fill="#3fbf5a" transform="rotate(-28 40 4)"/>
+          <path d="M33 24 L48.5 14 A18 18 0 1 0 48.5 34 Z" fill="#b6f24a"/><circle cx="37" cy="15" r="4" fill="#fff"/><circle cx="38.4" cy="15" r="2.2" fill="#16301a"/>
+          <ellipse cx="116" cy="40" rx="4.4" ry="2.8" fill="#ff4d5e"/><ellipse cx="130" cy="40" rx="4.4" ry="2.8" fill="#ff4d5e"/><path d="M113 13 114 3.5 119 8zM133 13 132 3.5 127 8z" fill="#ff4d5e"/><circle cx="123" cy="25" r="13.5" fill="#ff4d5e"/><ellipse cx="118.5" cy="23" rx="3.6" ry="4.4" fill="#fff"/><ellipse cx="127.5" cy="23" rx="3.6" ry="4.4" fill="#fff"/><circle cx="117" cy="23.6" r="2" fill="#1d2a6b"/><circle cx="126" cy="23.6" r="2" fill="#1d2a6b"/>
+          <ellipse cx="149" cy="40.5" rx="3.6" ry="2.4" fill="#c4ecff"/><ellipse cx="161" cy="40.5" rx="3.6" ry="2.4" fill="#c4ecff"/><circle cx="155" cy="28" r="11" fill="#c4ecff"/><circle cx="151.5" cy="26" r="1.6" fill="#24306e"/><circle cx="158.5" cy="26" r="1.6" fill="#24306e"/><path d="M149.5 32l2-1.4 2 1.4 2-1.4 2 1.4 2-1.4" stroke="#24306e" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+        </svg>
+        <h1 id="start-title">Maze <span>Muncher</span></h1>
+        <p data-i18n="tagline"></p>
+        <div class="start-legend">
+          <p class="lab" data-i18n="chasersTitle"></p>
+          <ul class="legend" id="start-legend"></ul>
+        </div>
+      </div>
+      <div class="colB">
+        <p class="lab" data-i18n="difficulty"></p>
+        <div class="seg" id="diff-seg">
+          <button type="button" data-diff="easy" aria-pressed="false"><b data-i18n="easy"></b><small></small></button>
+          <button type="button" data-diff="normal" aria-pressed="false"><b data-i18n="normal"></b><small></small></button>
+          <button type="button" data-diff="hard" aria-pressed="false"><b data-i18n="hard"></b><small></small></button>
+        </div>
+        <p class="hint" id="diff-hint"></p>
+        <p class="lab" data-i18n="startMaze"></p>
+        <div class="mazes" id="maze-pick"></div>
+        <p class="hint" id="maze-hint"></p>
+        <button type="button" class="cta" id="play-btn" data-i18n="play"></button>
+        <p class="small" data-i18n="controls"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <p class="result" id="paused-score"></p>
+    <button type="button" class="cta" id="resume-btn" data-i18n="resume"></button>
+    <div class="row2">
+      <button type="button" class="btn" id="restart-btn" data-i18n="restart"></button>
+      <button type="button" class="btn" data-action="menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <h2 id="over-title" data-i18n="over"></h2>
+    <p class="result" id="final-score"></p>
+    <p id="final-reached"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <dl class="sum">
+      <div><dt data-i18n="statDots"></dt><dd id="s-dots">0</dd></div>
+      <div><dt data-i18n="statChasers"></dt><dd id="s-chasers">0</dd></div>
+      <div><dt data-i18n="statFruits"></dt><dd id="s-fruits">0</dd></div>
+    </dl>
+    <div class="acts">
+      <button type="button" class="cta" id="again-btn" data-i18n="again"></button>
+      <button type="button" class="btn" data-action="menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      score: 'Score', level: 'Level', best: 'Best', dots: 'Dots left', pause: 'Pause', dpad: 'Show or hide the on-screen pad', up: 'Up', down: 'Down', left: 'Left', right: 'Right',
+      tagline: 'Gobble every dot, grab a power pellet and turn the tables on four crafty chasers!',
+      difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard',
+      diffDesc: { easy: '4 lives, slower chasers and longer power-ups.', normal: 'The classic arcade balance with 3 lives.', hard: 'Faster, sneakier chasers and short power-ups.' },
+      startMaze: 'Starting maze', mazeLabel: (n, name) => `Maze ${n} · ${name}`, locked: n => `Locked — reach maze ${n} in a game to unlock it.`,
+      mazes: ['Arcade Hall', 'Candy Lanes', 'Garden Loop', 'Desert Ruins', 'Night Castle'],
+      chasersTitle: 'Meet the chasers',
+      chaserDesc: ['Hunts you head-on and speeds up when few dots remain.', 'Aims a few tiles ahead of you to cut you off.', 'Teams up with Blaze to trap you from the side.', 'Chases from afar but wanders off when close.'],
+      play: 'Play', controls: 'Arrow keys / WASD or swipe to steer · P or Space to pause',
+      ready: 'READY!', levelUp: n => `Level ${n}`, cleared: 'Maze cleared!',
+      paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Menu',
+      over: 'Game over', newBest: 'New best!', again: 'Play again', reached: (n, name) => `Reached level ${n} · ${name}`,
+      statDots: 'Dots', statChasers: 'Chasers munched', statFruits: 'Fruits',
+      extraLife: 'Extra life!', lifeLost: n => `Caught! ${n} ${n === 1 ? 'life' : 'lives'} left.`, power: 'Power pellet! The chasers are frozen — munch them!', unlocked: name => `New maze unlocked: ${name}`,
+      modeCap: 'Chasers', scatter: 'Scatter', chase: 'Chase', fright: 'Frozen',
+      bestShort: n => `Best ${n}`, finalScore: s => `Score ${s}`, lives: n => `${n} ${n === 1 ? 'life' : 'lives'}`,
+      canvas: (s, l, lv, m) => `Maze Muncher board: ${m}, level ${lv}. Score ${s}. Lives ${l}.`,
+    },
+    vi: {
+      score: 'Điểm', level: 'Màn', best: 'Kỷ lục', dots: 'Hạt còn lại', pause: 'Tạm dừng', dpad: 'Hiện hoặc ẩn phím điều khiển trên màn hình', up: 'Lên', down: 'Xuống', left: 'Trái', right: 'Phải',
+      tagline: 'Ăn sạch từng hạt, chộp viên năng lượng và lật ngược thế cờ trước bốn kẻ săn đuổi ranh mãnh!',
+      difficulty: 'Độ khó', easy: 'Dễ', normal: 'Thường', hard: 'Khó',
+      diffDesc: { easy: '4 mạng, kẻ đuổi chậm hơn, năng lượng kéo dài hơn.', normal: 'Cân bằng kiểu arcade cổ điển, 3 mạng.', hard: 'Kẻ đuổi nhanh và ranh hơn, năng lượng ngắn.' },
+      startMaze: 'Mê cung xuất phát', mazeLabel: (n, name) => `Mê cung ${n} · ${name}`, locked: n => `Đang khóa — chơi đến mê cung ${n} để mở khóa.`,
+      mazes: ['Sảnh Arcade', 'Phố Kẹo', 'Vườn Xanh', 'Tàn Tích Sa Mạc', 'Lâu Đài Đêm'],
+      chasersTitle: 'Bốn kẻ săn đuổi',
+      chaserDesc: ['Đuổi thẳng theo bạn và tăng tốc khi còn ít hạt.', 'Nhắm trước mặt bạn vài ô để chặn đầu.', 'Phối hợp với Blaze để vây bạn từ bên hông.', 'Đuổi khi ở xa nhưng lảng đi khi đến gần.'],
+      play: 'Chơi', controls: 'Phím mũi tên / WASD hoặc vuốt để rẽ · P hoặc Space để tạm dừng',
+      ready: 'SẴN SÀNG!', levelUp: n => `Màn ${n}`, cleared: 'Đã ăn sạch mê cung!',
+      paused: 'Tạm dừng', resume: 'Chơi tiếp', restart: 'Chơi lại', menu: 'Menu',
+      over: 'Kết thúc', newBest: 'Kỷ lục mới!', again: 'Chơi lại', reached: (n, name) => `Đến màn ${n} · ${name}`,
+      statDots: 'Hạt đã ăn', statChasers: 'Kẻ đuổi bị ăn', statFruits: 'Trái cây',
+      extraLife: 'Thêm một mạng!', lifeLost: n => `Bị bắt rồi! Còn ${n} mạng.`, power: 'Viên năng lượng! Kẻ đuổi bị đóng băng — ăn chúng đi!', unlocked: name => `Mở khóa mê cung mới: ${name}`,
+      modeCap: 'Kẻ đuổi', scatter: 'Tản ra', chase: 'Truy đuổi', fright: 'Đóng băng',
+      bestShort: n => `Kỷ lục ${n}`, finalScore: s => `Điểm ${s}`, lives: n => `${n} mạng`,
+      canvas: (s, l, lv, m) => `Bảng chơi Maze Muncher: ${m}, màn ${lv}. Điểm ${s}. Còn ${l} mạng.`,
+    },
+    zh: {
+      score: '得分', level: '关卡', best: '最高分', dots: '剩余豆子', pause: '暂停', dpad: '显示或隐藏屏幕方向键', up: '上', down: '下', left: '左', right: '右',
+      tagline: '吃光每一颗豆子，抓起能量球，反过来追击四个狡猾的追兵！',
+      difficulty: '难度', easy: '简单', normal: '普通', hard: '困难',
+      diffDesc: { easy: '4 条命，追兵更慢，能量更持久。', normal: '经典街机手感，3 条命。', hard: '追兵更快更狡猾，能量时间更短。' },
+      startMaze: '起始迷宫', mazeLabel: (n, name) => `迷宫 ${n} · ${name}`, locked: n => `未解锁——在游戏中到达迷宫 ${n} 即可解锁。`,
+      mazes: ['街机大厅', '糖果小巷', '花园回廊', '沙漠遗迹', '夜之城堡'],
+      chasersTitle: '认识追兵',
+      chaserDesc: ['正面直追，豆子快吃完时还会加速。', '瞄准你前方几格，专门堵截。', '和 Blaze 配合，从侧面包抄你。', '离得远时紧追，靠近了反而溜走。'],
+      play: '开始', controls: '方向键 / WASD 或滑动转向 · P 或空格键暂停',
+      ready: '准备！', levelUp: n => `第 ${n} 关`, cleared: '迷宫清空！',
+      paused: '已暂停', resume: '继续', restart: '重新开始', menu: '菜单',
+      over: '游戏结束', newBest: '新纪录！', again: '再玩一次', reached: (n, name) => `到达第 ${n} 关 · ${name}`,
+      statDots: '吃掉豆子', statChasers: '吃掉追兵', statFruits: '水果',
+      extraLife: '奖励一条命！', lifeLost: n => `被抓住了！还剩 ${n} 条命。`, power: '能量球！追兵被冻住了，快吃掉它们！', unlocked: name => `解锁新迷宫：${name}`,
+      modeCap: '追兵', scatter: '分散', chase: '追击', fright: '冻住',
+      bestShort: n => `最高 ${n}`, finalScore: s => `得分 ${s}`, lives: n => `${n} 条命`,
+      canvas: (s, l, lv, m) => `Maze Muncher 游戏区：${m}，第 ${lv} 关。得分 ${s}，剩余 ${l} 条命。`,
+    },
+    fr: {
+      score: 'Score', level: 'Niveau', best: 'Record', dots: 'Pastilles', pause: 'Pause', dpad: 'Afficher ou masquer la croix directionnelle', up: 'Haut', down: 'Bas', left: 'Gauche', right: 'Droite',
+      tagline: 'Gobez toutes les pastilles, attrapez une super-pastille et renversez la situation face à quatre poursuivants rusés !',
+      difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile',
+      diffDesc: { easy: '4 vies, poursuivants plus lents, bonus plus longs.', normal: 'L’équilibre arcade classique, avec 3 vies.', hard: 'Poursuivants plus vifs et plus rusés, bonus courts.' },
+      startMaze: 'Labyrinthe de départ', mazeLabel: (n, name) => `Labyrinthe ${n} · ${name}`, locked: n => `Verrouillé — atteignez le labyrinthe ${n} en jeu pour le débloquer.`,
+      mazes: ['Salle d’arcade', 'Allées sucrées', 'Jardin en boucle', 'Ruines du désert', 'Château de nuit'],
+      chasersTitle: 'Les poursuivants',
+      chaserDesc: ['Vous fonce dessus et accélère quand il reste peu de pastilles.', 'Vise quelques cases devant vous pour vous couper la route.', 'S’allie à Blaze pour vous prendre en tenaille.', 'Vous poursuit de loin, mais s’éloigne quand il est proche.'],
+      play: 'Jouer', controls: 'Flèches / WASD ou balayez pour tourner · P ou Espace pour la pause',
+      ready: 'PRÊT ?', levelUp: n => `Niveau ${n}`, cleared: 'Labyrinthe nettoyé !',
+      paused: 'Pause', resume: 'Reprendre', restart: 'Recommencer', menu: 'Menu',
+      over: 'Partie terminée', newBest: 'Nouveau record !', again: 'Rejouer', reached: (n, name) => `Niveau ${n} atteint · ${name}`,
+      statDots: 'Pastilles', statChasers: 'Poursuivants croqués', statFruits: 'Fruits',
+      extraLife: 'Vie supplémentaire !', lifeLost: n => `Attrapé ! Plus que ${n} ${n > 1 ? 'vies' : 'vie'}.`, power: 'Super-pastille ! Les poursuivants sont gelés, croquez-les !', unlocked: name => `Nouveau labyrinthe débloqué : ${name}`,
+      modeCap: 'Poursuivants', scatter: 'Dispersion', chase: 'Poursuite', fright: 'Gelés',
+      bestShort: n => `Record ${n}`, finalScore: s => `Score ${s}`, lives: n => `${n} ${n > 1 ? 'vies' : 'vie'}`,
+      canvas: (s, l, lv, m) => `Plateau Maze Muncher : ${m}, niveau ${lv}. Score ${s}. ${l} ${l > 1 ? 'vies' : 'vie'}.`,
+    },
+    th: {
+      score: 'คะแนน', level: 'ด่าน', best: 'สูงสุด', dots: 'เม็ดที่เหลือ', pause: 'หยุดชั่วคราว', dpad: 'แสดงหรือซ่อนปุ่มทิศทางบนจอ', up: 'ขึ้น', down: 'ลง', left: 'ซ้าย', right: 'ขวา',
+      tagline: 'เก็บเม็ดให้หมด คว้าเม็ดพลังแล้วพลิกเกมไล่งับสี่ตัวไล่จอมเจ้าเล่ห์!',
+      difficulty: 'ความยาก', easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก',
+      diffDesc: { easy: '4 ชีวิต ตัวไล่ช้าลง และพลังอยู่นานขึ้น', normal: 'สมดุลแบบอาร์เคดคลาสสิก มี 3 ชีวิต', hard: 'ตัวไล่เร็วและฉลาดขึ้น พลังอยู่ไม่นาน' },
+      startMaze: 'เขาวงกตเริ่มต้น', mazeLabel: (n, name) => `เขาวงกต ${n} · ${name}`, locked: n => `ยังล็อกอยู่ — เล่นให้ถึงเขาวงกต ${n} เพื่อปลดล็อก`,
+      mazes: ['ห้องอาร์เคด', 'ตรอกขนมหวาน', 'สวนวงวน', 'ซากเมืองทะเลทราย', 'ปราสาทยามค่ำ'],
+      chasersTitle: 'รู้จักตัวไล่',
+      chaserDesc: ['พุ่งไล่ตรง ๆ และเร็วขึ้นเมื่อเม็ดเหลือน้อย', 'เล็งไปข้างหน้าคุณสองสามช่องเพื่อดักทาง', 'ร่วมมือกับ Blaze ปิดล้อมจากด้านข้าง', 'ไล่เมื่ออยู่ไกล แต่พอใกล้กลับเดินหนี'],
+      play: 'เล่น', controls: 'ปุ่มลูกศร / WASD หรือปัดเพื่อเลี้ยว · P หรือ Space เพื่อหยุด',
+      ready: 'พร้อม!', levelUp: n => `ด่าน ${n}`, cleared: 'เคลียร์เขาวงกตแล้ว!',
+      paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', menu: 'เมนู',
+      over: 'จบเกม', newBest: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', reached: (n, name) => `ถึงด่าน ${n} · ${name}`,
+      statDots: 'เม็ดที่กิน', statChasers: 'ตัวไล่ที่งับ', statFruits: 'ผลไม้',
+      extraLife: 'ได้ชีวิตเพิ่ม!', lifeLost: n => `โดนจับแล้ว! เหลือ ${n} ชีวิต`, power: 'เม็ดพลัง! ตัวไล่ถูกแช่แข็งแล้ว รีบงับเลย!', unlocked: name => `ปลดล็อกเขาวงกตใหม่: ${name}`,
+      modeCap: 'ตัวไล่', scatter: 'แยกย้าย', chase: 'ไล่ล่า', fright: 'แช่แข็ง',
+      bestShort: n => `สูงสุด ${n}`, finalScore: s => `คะแนน ${s}`, lives: n => `${n} ชีวิต`,
+      canvas: (s, l, lv, m) => `กระดาน Maze Muncher: ${m} ด่าน ${lv} คะแนน ${s} เหลือ ${l} ชีวิต`,
+    },
+    ja: {
+      score: 'スコア', level: 'レベル', best: 'ベスト', dots: '残りドット', pause: '一時停止', dpad: '画面の方向パッドを表示／非表示', up: '上', down: '下', left: '左', right: '右',
+      tagline: 'ドットを全部たいらげよう！パワーエサで形勢逆転、ずる賢い4匹の追っ手を食べちゃおう。',
+      difficulty: '難易度', easy: 'やさしい', normal: 'ふつう', hard: 'むずかしい',
+      diffDesc: { easy: 'ライフ4、追っ手は遅め、パワーは長め。', normal: '王道アーケードのバランス、ライフ3。', hard: '追っ手が速くてずる賢い、パワーは短め。' },
+      startMaze: 'スタートする迷路', mazeLabel: (n, name) => `迷路 ${n} · ${name}`, locked: n => `ロック中 — ゲームで迷路 ${n} まで進むと解放されます。`,
+      mazes: ['アーケードホール', 'キャンディ通り', 'ガーデンループ', '砂漠の遺跡', '夜の城'],
+      chasersTitle: '追っ手たち',
+      chaserDesc: ['まっすぐ追ってくる。残りドットが少ないと加速。', '少し先回りして行く手をふさぐ。', 'Blaze と組んで横から挟みうち。', '遠いと追ってくるが、近づくとそっぽを向く。'],
+      play: 'プレイ', controls: '矢印キー / WASD かスワイプで方向転換 · P かスペースで一時停止',
+      ready: 'よーい！', levelUp: n => `レベル ${n}`, cleared: '迷路クリア！',
+      paused: '一時停止中', resume: '再開', restart: '最初から', menu: 'メニュー',
+      over: 'ゲームオーバー', newBest: '自己ベスト更新！', again: 'もう一度', reached: (n, name) => `レベル ${n} に到達 · ${name}`,
+      statDots: 'ドット', statChasers: '食べた追っ手', statFruits: 'フルーツ',
+      extraLife: 'ライフが1つ増えた！', lifeLost: n => `つかまった！残りライフ ${n}`, power: 'パワーエサ！追っ手が凍った、今がチャンス！', unlocked: name => `新しい迷路を解放：${name}`,
+      modeCap: '追っ手', scatter: '散開', chase: '追跡', fright: '凍結中',
+      bestShort: n => `ベスト ${n}`, finalScore: s => `スコア ${s}`, lives: n => `ライフ ${n}`,
+      canvas: (s, l, lv, m) => `Maze Muncher の盤面：${m}、レベル ${lv}。スコア ${s}、ライフ ${l}。`,
+    },
+    ko: {
+      score: '점수', level: '레벨', best: '최고', dots: '남은 점', pause: '일시정지', dpad: '화면 방향 패드 표시/숨기기', up: '위', down: '아래', left: '왼쪽', right: '오른쪽',
+      tagline: '점을 모두 먹어 치우고, 파워 알약으로 판을 뒤집어 교활한 추적자 넷을 잡아먹으세요!',
+      difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움',
+      diffDesc: { easy: '목숨 4개, 느린 추적자, 긴 파워 타임.', normal: '클래식 아케이드 밸런스, 목숨 3개.', hard: '더 빠르고 교활한 추적자, 짧은 파워 타임.' },
+      startMaze: '시작 미로', mazeLabel: (n, name) => `미로 ${n} · ${name}`, locked: n => `잠김 — 게임에서 미로 ${n}까지 가면 열려요.`,
+      mazes: ['아케이드 홀', '캔디 골목', '가든 루프', '사막 유적', '밤의 성'],
+      chasersTitle: '추적자 소개',
+      chaserDesc: ['정면으로 쫓아오고, 점이 얼마 안 남으면 빨라져요.', '몇 칸 앞을 노려 길을 막아요.', 'Blaze와 힘을 합쳐 옆에서 포위해요.', '멀리선 쫓아오지만 가까워지면 딴 데로 가요.'],
+      play: '플레이', controls: '방향키 / WASD 또는 스와이프로 방향 전환 · P 또는 Space로 일시정지',
+      ready: '준비!', levelUp: n => `레벨 ${n}`, cleared: '미로 클리어!',
+      paused: '일시정지', resume: '계속하기', restart: '처음부터', menu: '메뉴',
+      over: '게임 오버', newBest: '최고 기록!', again: '다시 하기', reached: (n, name) => `레벨 ${n} 도달 · ${name}`,
+      statDots: '먹은 점', statChasers: '잡아먹은 추적자', statFruits: '과일',
+      extraLife: '목숨 추가!', lifeLost: n => `잡혔어요! 목숨 ${n}개 남음.`, power: '파워 알약! 추적자가 얼어붙었어요. 지금 잡아먹으세요!', unlocked: name => `새 미로 열림: ${name}`,
+      modeCap: '추적자', scatter: '흩어짐', chase: '추격', fright: '얼어붙음',
+      bestShort: n => `최고 ${n}`, finalScore: s => `점수 ${s}`, lives: n => `목숨 ${n}개`,
+      canvas: (s, l, lv, m) => `Maze Muncher 보드: ${m}, 레벨 ${lv}. 점수 ${s}, 목숨 ${l}개.`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Mazes are written as left halves (cols 0–10) and mirrored. # wall, . dot, o power pellet, t tunnel,
+  // - pen door, P pen, B first chaser, F fruit spot, S muncher start, space = empty corridor.
+  const MAZES = [
+    { id: 'hall', rows: [
+      '###########',
+      '#.........#',
+      '#o###.###.#',
+      '#..........',
+      '#.###.#.###',
+      '#.....#...#',
+      '#####.###.#',
+      '#####.#   B',
+      '#####.# ##-',
+      'ttttt.  #PP',
+      '#####.# ###',
+      '#####.#   F',
+      '#####.# ###',
+      '#.........#',
+      '#.###.###.#',
+      '#o..#.....S',
+      '###.#.#.###',
+      '#.....#...#',
+      '#.#######.#',
+      '#..........',
+      '###########',
+    ] },
+    { id: 'candy', rows: [
+      '###########',
+      '#o...#.....',
+      '#.##.#.###.',
+      '#..........',
+      '###.##.#.##',
+      '###.##.#...',
+      '###.##.####',
+      'ttt.....  B',
+      '###.###.##-',
+      '###.###.#PP',
+      '###.###.###',
+      '#.........F',
+      '#.###.#.###',
+      '#o..#.#...S',
+      '###.#.###.#',
+      '#.........#',
+      '#.##.###.##',
+      '#.##.###.##',
+      '#.##.###.##',
+      '#..........',
+      '###########',
+    ] },
+    { id: 'garden', rows: [
+      '###########',
+      '#....#.....',
+      '#o##.#.###.',
+      '#..........',
+      '###.#.##.##',
+      'tt..#.#....',
+      '###.#.#.###',
+      '#...#.#....',
+      '#.###.#.###',
+      '#.....#   B',
+      '###.#.# ##-',
+      '###.#.# #PP',
+      '#...#.# ###',
+      '#.###.#   F',
+      '#.....#.###',
+      '###.#.#.#.S',
+      '#o..#...#.#',
+      '#.#####.#.#',
+      '#.#####.#.#',
+      '#..........',
+      '###########',
+    ] },
+    { id: 'ruins', rows: [
+      '###########',
+      '#o..#......',
+      '#.#.#.##.##',
+      '#.#...#...#',
+      '#.###.#.#.#',
+      '#.....#.#..',
+      '###.#.#.#.#',
+      '###.#.#   B',
+      '###.#.# ##-',
+      'ttt...  #PP',
+      '###.#.# ###',
+      '#.....#   F',
+      '#.###.#.###',
+      '#...#.....S',
+      '#.#.#.###.#',
+      '#o#...#...#',
+      '#.###.#.###',
+      '#...#...#..',
+      '#.#.#.#.#.#',
+      '#..........',
+      '###########',
+    ] },
+    { id: 'castle', rows: [
+      '###########',
+      '#o...#.....',
+      '#.##.#.##.#',
+      '#..........',
+      '#.##.#.##.#',
+      '#.##.#.   B',
+      'tt##.## ##-',
+      '#.##.## #PP',
+      '#.##.## ###',
+      '#.........F',
+      '#.###.###.#',
+      '#...#...#.S',
+      '###.#.#.#.#',
+      '#...#.#...#',
+      '#.###.#.#.#',
+      '#.....#...#',
+      '###.#.#.###',
+      '#o..#...#..',
+      '#.#.###.#.#',
+      '#..........',
+      '###########',
+    ] },
+  ].map(parseMaze);
+  const THEMES = {
+    hall: { wall: '#6f80ff', fill: '#17134a', bg: '#0a0822' },
+    candy: { wall: '#ff6f9f', fill: '#2c1038', bg: '#120717' },
+    garden: { wall: '#35d6a0', fill: '#0e2c2b', bg: '#061413' },
+    ruins: { wall: '#ffb347', fill: '#2e1c10', bg: '#140b06' },
+    castle: { wall: '#b78cff', fill: '#21134a', bg: '#0c0720' },
+  };
+  const CHASERS = [
+    { name: 'Blaze', color: '#ff4d5e' },
+    { name: 'Pounce', color: '#ff8ad8' },
+    { name: 'Flank', color: '#36e0e6' },
+    { name: 'Dozy', color: '#ffa53d' },
+  ];
+  const FRUITS = [
+    { kind: 'cherry', points: 100 }, { kind: 'strawberry', points: 300 }, { kind: 'orange', points: 500 }, { kind: 'apple', points: 700 },
+    { kind: 'grapes', points: 1000 }, { kind: 'melon', points: 2000 }, { kind: 'star', points: 3000 }, { kind: 'gem', points: 5000 },
+  ];
+  const DIFFS = {
+    easy: { lives: 4, chaser: 0.9, fright: 1.4, release: 1.3, scatter: 1.25 },
+    normal: { lives: 3, chaser: 1, fright: 1, release: 1, scatter: 1 },
+    hard: { lives: 3, chaser: 1.07, fright: 0.65, release: 0.5, scatter: 0.75 },
+  };
+  const COLS = 21, ROWS = 21, T = 16, W = COLS * T, H = ROWS * T;
+  const STEP = 1 / 120;
+  const BASE = 8.4; // tiles per second at 100% speed
+  const EXTRA_LIFE = 10000;
+  const DIRS = { up: { x: 0, y: -1, n: 'up' }, down: { x: 0, y: 1, n: 'down' }, left: { x: -1, y: 0, n: 'left' }, right: { x: 1, y: 0, n: 'right' } };
+  const ORDER = [DIRS.up, DIRS.left, DIRS.down, DIRS.right];
+  const OPP = { up: DIRS.down, down: DIRS.up, left: DIRS.right, right: DIRS.left };
+  const KEY_DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const FONT = getComputedStyle(document.body).fontFamily;
+  const canvas = $('board'), ctx = canvas.getContext('2d');
+  const wallCv = document.createElement('canvas'), flashCv = document.createElement('canvas');
+  const els = { score: $('v-score'), level: $('v-level'), best: $('v-best'), dots: $('v-dots'), chip: $('maze-chip'), chipWide: $('maze-chip-wide'), banner: $('banner'), bannerTitle: $('banner-title'), bannerText: $('banner-text'), modeText: $('mode-text'), modeBar: $('mode-bar'), lives: $('lives-cv'), fruits: $('fruit-cv'), start: $('start'), paused: $('paused'), over: $('over'), announcer: $('announcer'), pause: $('pause-btn'), dpadToggle: $('dpad-toggle') };
+
+  const PREFIX = 'milaan.mazeMuncher.';
+  const read = key => { try { return localStorage.getItem(PREFIX + key); } catch { return null; } };
+  const write = (key, value) => { try { localStorage.setItem(PREFIX + key, String(value)); } catch {} };
+  const readBest = diff => Number(read(`best.${diff}`)) || 0;
+  let unlocked = (Number(read('unlocked')) || 1) | 1;
+  const pref = { diff: DIFFS[read('diff')] ? read('diff') : 'normal', maze: Math.min(4, Math.max(0, Number(read('maze')) || 0)) };
+  if (!(unlocked & (1 << pref.maze))) pref.maze = 0;
+
+  function parseMaze(def) {
+    const rows = def.rows.map(h => h + [...h.slice(0, -1)].reverse().join(''));
+    const at = ch => { for (let y = 0; y < rows.length; y++) { const x = rows[y].indexOf(ch); if (x >= 0) return { x, y }; } return null; };
+    const door = at('-');
+    let dots = 0;
+    for (const r of rows) for (const c of r) if (c === '.' || c === 'o') dots++;
+    return { id: def.id, rows, door, pen: { x: door.x, y: door.y + 1 }, start: at('S'), fruit: at('F'), first: at('B'), dots };
+  }
+
+  function levelSpec(L, D) {
+    const tier = L === 1 ? 0 : L < 5 ? 1 : 2;
+    const boost = 1 + Math.min(0.12, Math.max(0, L - 4) * 0.015);
+    return {
+      player: [0.8, 0.88, 0.95][tier] * Math.min(boost, 1.04),
+      playerFright: [0.9, 0.94, 1][tier],
+      chaser: [0.75, 0.85, 0.95][tier] * boost * D.chaser,
+      chaserFright: [0.5, 0.55, 0.6][tier],
+      tunnel: [0.4, 0.45, 0.5][tier],
+      fright: Math.max(1.2, ([6, 5, 4, 3.5, 3, 2.6, 2.3, 2, 1.8, 1.6][L - 1] ?? 1.5) * D.fright),
+      elroy: Math.min(40, 20 + (L - 1) * 5),
+      release: [[0, 15, 40], [0, 0, 25], [0, 0, 0]][Math.min(L, 3) - 1].map(v => Math.round(v * D.release)),
+      idle: L < 5 ? 4 : 3,
+      schedule: [[7, 20, 7, 20, 5, 20, 5], [7, 20, 7, 20, 5, 40, 2], [5, 20, 5, 20, 5, 45, 1]][tier].map((v, i) => (i % 2 ? v : v * D.scatter)),
+    };
+  }
+
+  // ---------- Game state ----------
+  let G = null;
+  let speedScale = 1; // test hook only
+
+  function newGame() {
+    const D = DIFFS[pref.diff];
+    G = { diff: pref.diff, D, level: 1, score: 0, lives: D.lives, startMaze: pref.maze, extraGiven: false, best: readBest(pref.diff), bestBefore: readBest(pref.diff),
+      stats: { dots: 0, chasers: 0, fruits: 0 }, fruitsGot: [], pops: [], parts: [], time: 0, acc: 0, paused: false, phase: 'ready', phaseT: 0, godMode: false };
+    hideOverlays();
+    loadLevel();
+    canvas.focus({ preventScroll: true });
+  }
+
+  function loadLevel() {
+    const idx = (G.startMaze + G.level - 1) % MAZES.length;
+    G.mazeIdx = idx;
+    G.maze = MAZES[idx];
+    G.theme = THEMES[G.maze.id];
+    G.cells = G.maze.rows.map(r => [...r]);
+    G.dotsLeft = G.maze.dots;
+    G.dotsEaten = 0;
+    G.fruit = null;
+    G.fruitAt = [Math.round(G.maze.dots * 0.35), Math.round(G.maze.dots * 0.7)];
+    G.spec = levelSpec(G.level, G.D);
+    G.penMode = 'personal';
+    G.globalDots = 0;
+    unlockMaze(idx);
+    buildWalls();
+    resetActors();
+    setPhase('ready', 2.2);
+    showBanner(t.levelUp(G.level), t.mazes[idx]);
+    announce(`${t.levelUp(G.level)} · ${t.mazes[idx]}`);
+    els.chip.textContent = t.mazes[idx];
+    els.chipWide.textContent = t.mazeLabel(idx + 1, t.mazes[idx]);
+    updateHud();
+  }
+
+  function unlockMaze(idx) {
+    if (unlocked & (1 << idx)) return;
+    unlocked |= 1 << idx;
+    write('unlocked', unlocked);
+    setTimeout(() => announce(t.unlocked(t.mazes[idx])), 1200);
+  }
+
+  function resetActors() {
+    const m = G.maze;
+    G.player = { x: m.start.x, y: m.start.y, dir: DIRS.left, want: null, wantT: 0, moving: false, chew: 0 };
+    G.chasers = CHASERS.map((c, id) => ({
+      id, x: id === 0 ? m.first.x : m.pen.x + [0, 0, -1, 1][id], y: id === 0 ? m.first.y : m.pen.y,
+      dir: id === 0 ? DIRS.left : DIRS.up, state: id === 0 ? 'active' : 'home', fright: false, dots: 0,
+    }));
+    G.modeIdx = 0;
+    G.modeT = G.spec.schedule[0];
+    G.frightT = 0;
+    G.chain = 0;
+    G.idle = 0;
+    G.acc = 0;
+    G.eaten = null;
+  }
+
+  function setPhase(phase, time = 0) { G.phase = phase; G.phaseT = time; }
+  const live = () => G && G.phase !== 'over' && G.phase !== 'menu';
+  const mode = () => (G.frightT > 0 ? 'fright' : G.modeIdx % 2 ? 'chase' : 'scatter');
+  const wrapX = x => ((x % COLS) + COLS) % COLS;
+  const cellAt = (x, y) => (y < 0 || y >= ROWS ? '#' : G.cells[y][wrapX(x)]);
+  const openPlayer = (x, y) => { const c = cellAt(x, y); return c !== '#' && c !== '-' && c !== 'P'; };
+  const openChaser = (x, y) => openPlayer(x, y);
+  const atCenter = a => Math.abs(a.x - Math.round(a.x)) < 1e-6 && Math.abs(a.y - Math.round(a.y)) < 1e-6;
+
+  // Moves an actor along its direction, stopping at every tile centre to let it decide what to do next.
+  function advance(a, dist, onCenter, canGo) {
+    for (let guard = 0; dist > 1e-9 && guard < 6; guard++) {
+      if (atCenter(a)) {
+        a.x = Math.round(a.x); a.y = Math.round(a.y);
+        if (!canGo(a.x + a.dir.x, a.y + a.dir.y) && onCenter(a) === false) return;
+        if (!canGo(a.x + a.dir.x, a.y + a.dir.y)) return;
+      }
+      const d = a.dir;
+      const pos = d.x ? a.x : a.y;
+      const next = (d.x || d.y) > 0 ? Math.floor(pos + 1e-6) + 1 : Math.ceil(pos - 1e-6) - 1;
+      const gap = Math.abs(next - pos);
+      if (dist < gap) {
+        if (d.x) a.x += d.x * dist; else a.y += d.y * dist;
+        dist = 0;
+      } else {
+        if (d.x) a.x = next; else a.y = next;
+        dist -= gap;
+        if (a.x < -0.5) a.x += COLS; else if (a.x > COLS - 0.5) a.x -= COLS;
+        if (onCenter(a) === false) return;
+      }
+      if (a.x < -0.5) a.x += COLS; else if (a.x > COLS - 0.5) a.x -= COLS;
+    }
+  }
+
+  function playerCenter(p) {
+    if (p.want && openPlayer(p.x + p.want.x, p.y + p.want.y)) { p.dir = p.want; p.want = null; return true; }
+    if (!openPlayer(p.x + p.dir.x, p.y + p.dir.y)) { p.moving = false; return false; }
+    return true;
+  }
+
+  function chaserTarget(ch) {
+    const m = G.maze, p = G.player;
+    if (ch.state === 'eyes') return [m.door.x, m.door.y - 1];
+    const px = wrapX(Math.round(p.x)), py = Math.round(p.y), pd = p.dir;
+    const corners = [[COLS - 3, -3], [2, -3], [COLS, ROWS + 1], [0, ROWS + 1]];
+    const elroy = ch.id === 0 && G.dotsLeft <= G.spec.elroy;
+    if (mode() === 'scatter' && !elroy) return corners[ch.id];
+    if (ch.id === 1) return [px + pd.x * 4, py + pd.y * 4];
+    if (ch.id === 2) {
+      const red = G.chasers[0], vx = px + pd.x * 2, vy = py + pd.y * 2;
+      return [vx * 2 - Math.round(red.x), vy * 2 - Math.round(red.y)];
+    }
+    if (ch.id === 3) {
+      const dx = ch.x - px, dy = ch.y - py;
+      return dx * dx + dy * dy > 49 ? [px, py] : corners[3];
+    }
+    return [px, py];
+  }
+
+  function chaserCenter(ch) {
+    const m = G.maze;
+    if (ch.state === 'eyes' && wrapX(ch.x) === m.door.x && ch.y === m.door.y - 1) { ch.state = 'enter'; ch.dir = DIRS.down; return false; }
+    const back = OPP[ch.dir.n];
+    const opts = ORDER.filter(d => d !== back && openChaser(ch.x + d.x, ch.y + d.y));
+    if (!opts.length) { ch.dir = back; return true; }
+    if (ch.fright && ch.state === 'active') { ch.dir = opts[Math.floor(Math.random() * opts.length)]; return true; }
+    const [tx, ty] = chaserTarget(ch);
+    let best = opts[0], bestD = Infinity;
+    for (const d of opts) {
+      const dx = ch.x + d.x - tx, dy = ch.y + d.y - ty, dd = dx * dx + dy * dy;
+      if (dd < bestD - 1e-9) { bestD = dd; best = d; }
+    }
+    ch.dir = best;
+    return true;
+  }
+
+  function chaserSpeed(ch) {
+    const s = G.spec;
+    if (ch.state === 'eyes' || ch.state === 'enter') return 1.9;
+    if (ch.state === 'leave' || ch.state === 'home') return 0.5;
+    if (cellAt(Math.round(ch.x), Math.round(ch.y)) === 't') return s.tunnel;
+    if (ch.fright) return s.chaserFright;
+    if (ch.id === 0 && G.dotsLeft <= G.spec.elroy) return s.chaser * (G.dotsLeft <= G.spec.elroy / 2 ? 1.1 : 1.05);
+    return s.chaser;
+  }
+
+  function reverse(ch) {
+    if (ch.state !== 'active') return;
+    const o = OPP[ch.dir.n];
+    if (!atCenter(ch) || openChaser(Math.round(ch.x) + o.x, Math.round(ch.y) + o.y)) ch.dir = o;
+  }
+
+  function moveChaser(ch, h) {
+    if (ch.state === 'home') return;
+    const m = G.maze, v = chaserSpeed(ch) * BASE * h;
+    if (ch.state === 'leave') {
+      if (Math.abs(ch.x - m.pen.x) > 1e-6) {
+        const d = Math.sign(m.pen.x - ch.x);
+        ch.dir = d > 0 ? DIRS.right : DIRS.left;
+        ch.x += d * Math.min(v, Math.abs(m.pen.x - ch.x));
+        return;
+      }
+      ch.x = m.pen.x; ch.dir = DIRS.up; ch.y -= v;
+      if (ch.y <= m.door.y - 1) { ch.y = m.door.y - 1; ch.state = 'active'; ch.dir = DIRS.left; }
+      return;
+    }
+    if (ch.state === 'enter') {
+      ch.y += v;
+      if (ch.y >= m.pen.y) { ch.y = m.pen.y; ch.state = 'leave'; ch.fright = false; }
+      return;
+    }
+    advance(ch, v, chaserCenter, (x, y) => openChaser(x, y));
+  }
+
+  function releaseNext() {
+    const ch = G.chasers.find(c => c.state === 'home');
+    if (ch) ch.state = 'leave';
+  }
+
+  function checkRelease() {
+    const waiting = G.chasers.find(c => c.state === 'home');
+    if (!waiting) return;
+    if (G.penMode === 'personal' ? waiting.dots >= G.spec.release[waiting.id - 1] : G.globalDots >= [0, 3, 9, 17][waiting.id]) { waiting.state = 'leave'; G.idle = 0; return; }
+    if (G.idle >= G.spec.idle) { G.idle = 0; releaseNext(); }
+  }
+
+  function movePlayer(h) {
+    const p = G.player;
+    if (p.want) { p.wantT -= h; if (p.wantT <= 0) p.want = null; }
+    if (p.want && p.moving && p.want === OPP[p.dir.n]) { p.dir = p.want; p.want = null; }
+    if (!p.moving) {
+      if (p.want && openPlayer(p.x + p.want.x, p.y + p.want.y)) { p.dir = p.want; p.want = null; p.moving = true; }
+      else if (openPlayer(p.x + p.dir.x, p.y + p.dir.y)) p.moving = true;
+    }
+    if (p.moving) {
+      const dist = (G.frightT > 0 ? G.spec.playerFright : G.spec.player) * BASE * h;
+      advance(p, dist, playerCenter, openPlayer);
+      p.chew += dist;
+    }
+    eatAt(wrapX(Math.round(p.x)), Math.round(p.y));
+  }
+
+  function eatAt(x, y) {
+    const c = G.cells[y][x];
+    if (c === '.' || c === 'o') {
+      G.cells[y][x] = ' ';
+      G.dotsLeft--; G.dotsEaten++; G.stats.dots++;
+      G.idle = 0;
+      if (G.penMode === 'personal') { const w = G.chasers.find(ch => ch.state === 'home'); if (w) w.dots++; } else G.globalDots++;
+      if (c === 'o') { addScore(50); startFright(); burst(x, y, '#fff3a0', 14); }
+      else addScore(10);
+      if (G.fruitAt.includes(G.dotsEaten)) {
+        const kind = FRUITS[Math.min(FRUITS.length - 1, [0, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6][G.level] ?? 7)];
+        G.fruit = { ...kind, t: 9.5 };
+      }
+      if (G.dotsLeft === 0) levelClear();
+    }
+    if (G.fruit && x === G.maze.fruit.x && y === G.maze.fruit.y) {
+      addScore(G.fruit.points);
+      pop(x, y, String(G.fruit.points), '#ffd23f');
+      burst(x, y, '#ffd23f', 10);
+      G.fruitsGot.push(G.fruit.kind);
+      G.stats.fruits++;
+      G.fruit = null;
+      paintFruits();
+    }
+  }
+
+  function startFright() {
+    G.frightT = G.spec.fright;
+    G.chain = 0;
+    for (const ch of G.chasers) {
+      if (ch.state === 'eyes' || ch.state === 'enter') continue;
+      ch.fright = true;
+      reverse(ch);
+    }
+    announce(t.power);
+  }
+
+  function endFright() { G.frightT = 0; for (const ch of G.chasers) ch.fright = false; }
+
+  function addScore(n) {
+    G.score += n;
+    if (!G.extraGiven && G.score >= EXTRA_LIFE) {
+      G.extraGiven = true; G.lives++;
+      paintLives();
+      showBanner(t.extraLife, '', 1200);
+      announce(t.extraLife);
+    }
+    if (G.score > G.best) { G.best = G.score; write(`best.${G.diff}`, G.best); }
+    updateHud();
+  }
+
+  function collide() {
+    const p = G.player;
+    for (const ch of G.chasers) {
+      if (ch.state !== 'active') continue;
+      let dx = Math.abs(ch.x - p.x); dx = Math.min(dx, COLS - dx);
+      const dy = ch.y - p.y;
+      if (dx * dx + dy * dy > 0.36) continue;
+      if (ch.fright) eatChaser(ch);
+      else if (!G.godMode) { die(); return; }
+    }
+  }
+
+  function eatChaser(ch) {
+    const points = 200 << G.chain;
+    G.chain = Math.min(G.chain + 1, 3);
+    G.stats.chasers++;
+    ch.fright = false;
+    ch.state = 'eyes';
+    G.eaten = { ch, points, x: ch.x, y: ch.y };
+    addScore(points);
+    burst(ch.x, ch.y, CHASERS[ch.id].color, 12);
+    setPhase('eat', 0.55);
+  }
+
+  function die() {
+    G.frightT = 0;
+    G.fruit = null;
+    for (const ch of G.chasers) ch.fright = false;
+    setPhase('dying', 0);
+  }
+
+  function afterDeath() {
+    G.lives--;
+    paintLives();
+    if (G.lives <= 0) { gameOver(); return; }
+    resetActors();
+    G.penMode = 'global';
+    G.globalDots = 0;
+    setPhase('ready', 1.6);
+    announce(t.lifeLost(G.lives));
+    updateHud();
+  }
+
+  function levelClear() {
+    G.fruit = null;
+    G.frightT = 0;
+    setPhase('clear', 0);
+    showBanner(t.cleared, '', 1800);
+    announce(t.cleared);
+  }
+
+  function gameOver() {
+    setPhase('over');
+    els.banner.hidden = true;
+    $('final-score').textContent = t.finalScore(G.score);
+    $('final-reached').textContent = t.reached(G.level, t.mazes[G.mazeIdx]);
+    $('s-dots').textContent = G.stats.dots;
+    $('s-chasers').textContent = G.stats.chasers;
+    $('s-fruits').textContent = G.stats.fruits;
+    const isBest = G.score > G.bestBefore;
+    $('new-best').hidden = !isBest;
+    els.over.hidden = false;
+    $('again-btn').focus({ preventScroll: true });
+    announce(`${t.over}. ${t.finalScore(G.score)}. ${t.reached(G.level, t.mazes[G.mazeIdx])}${isBest ? `. ${t.newBest}` : ''}`);
+  }
+
+  function step(h) {
+    if (G.frightT > 0) { G.frightT -= h; if (G.frightT <= 0) endFright(); }
+    else if (G.modeT !== Infinity) {
+      G.modeT -= h;
+      if (G.modeT <= 0) { G.modeIdx++; G.modeT = G.spec.schedule[G.modeIdx] ?? Infinity; for (const ch of G.chasers) reverse(ch); }
+    }
+    if (G.fruit) { G.fruit.t -= h; if (G.fruit.t <= 0) G.fruit = null; }
+    G.idle += h;
+    checkRelease();
+    movePlayer(h);
+    if (G.phase !== 'play') return;
+    collide();
+    if (G.phase !== 'play') return;
+    for (const ch of G.chasers) moveChaser(ch, h);
+    collide();
+  }
+
+  function update(dt) {
+    G.time += dt;
+    updateFx(dt);
+    if (G.paused) return;
+    switch (G.phase) {
+      case 'ready':
+        G.phaseT -= dt;
+        if (G.phaseT <= 0) { G.phase = 'play'; els.banner.hidden = true; }
+        break;
+      case 'play':
+        G.acc += dt;
+        while (G.acc >= STEP && G.phase === 'play') { G.acc -= STEP; step(STEP); }
+        break;
+      case 'eat':
+        G.phaseT -= dt;
+        if (G.phaseT <= 0) { G.eaten = null; G.phase = 'play'; G.acc = 0; }
+        break;
+      case 'dying':
+        G.phaseT += dt;
+        if (G.phaseT >= 2.1) afterDeath();
+        break;
+      case 'clear':
+        G.phaseT += dt;
+        if (G.phaseT >= 2.4) { G.level++; loadLevel(); }
+        break;
+    }
+  }
+
+  // ---------- Effects ----------
+  function pop(x, y, text, color) { G.pops.push({ x, y, text, color, life: 1 }); }
+  function burst(x, y, color, n) {
+    if (reduceMotion) return;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 4;
+      G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.3, color });
+    }
+  }
+  function updateFx(dt) {
+    for (const q of G.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; q.life -= dt; }
+    G.parts = G.parts.filter(q => q.life > 0);
+    for (const q of G.pops) { q.y -= dt * 0.8; q.life -= dt; }
+    G.pops = G.pops.filter(q => q.life > 0);
+  }
+
+  // ---------- Rendering ----------
+  let scale = 1, dpr = 1;
+  function resize() {
+    const r = $('stage').getBoundingClientRect();
+    scale = Math.max(0.1, Math.min(r.width / W, r.height / H));
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = `${Math.floor(W * scale)}px`;
+    canvas.style.height = `${Math.floor(H * scale)}px`;
+    els.banner.style.width = canvas.style.width;
+    els.banner.style.height = canvas.style.height;
+    canvas.width = Math.round(W * scale * dpr);
+    canvas.height = Math.round(H * scale * dpr);
+    buildWalls();
+    paintLives();
+    paintFruits();
+  }
+
+  function paintWalls(g, maze, edge, fill, glow) {
+    const isWall = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && maze.rows[y][x] === '#';
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    for (const [w, color, blur] of [[T * 0.76, edge, glow], [T * 0.42, fill, 0]]) {
+      g.strokeStyle = g.fillStyle = color;
+      g.lineWidth = w;
+      g.shadowColor = edge;
+      g.shadowBlur = blur;
+      g.beginPath();
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        if (!isWall(x, y)) continue;
+        const cx = (x + 0.5) * T, cy = (y + 0.5) * T;
+        g.moveTo(cx, cy); g.lineTo(cx + 0.01, cy);
+        if (isWall(x + 1, y)) { g.moveTo(cx, cy); g.lineTo(cx + T, cy); }
+        if (isWall(x, y + 1)) { g.moveTo(cx, cy); g.lineTo(cx, cy + T); }
+      }
+      g.stroke();
+      g.shadowBlur = 0;
+      for (let y = 0; y < ROWS - 1; y++) for (let x = 0; x < COLS - 1; x++) {
+        if (isWall(x, y) && isWall(x + 1, y) && isWall(x, y + 1) && isWall(x + 1, y + 1)) g.fillRect((x + 0.5) * T, (y + 0.5) * T, T, T);
+      }
+    }
+    const d = maze.door;
+    g.fillStyle = '#ffc2e6';
+    g.fillRect(d.x * T - 1, (d.y + 0.5) * T - T * 0.09, T + 2, T * 0.18);
+  }
+
+  function buildWalls() {
+    if (!G) return;
+    for (const [cv, flash] of [[wallCv, false], [flashCv, true]]) {
+      cv.width = canvas.width; cv.height = canvas.height;
+      const g = cv.getContext('2d');
+      g.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+      paintWalls(g, G.maze, flash ? '#ffffff' : G.theme.wall, flash ? '#3b356e' : G.theme.fill, 7 * scale * dpr);
+    }
+  }
+
+  // The muncher: a lime chomper with a leaf sprout that always stays on top of its head.
+  function drawMuncher(g, cx, cy, r, angle, open, dying = 0) {
+    const mouth = dying ? Math.min(Math.PI, open + dying * Math.PI) : open;
+    if (mouth >= Math.PI - 0.01) return;
+    const shrink = dying ? 1 - dying * 0.25 : 1;
+    if (!dying) {
+      g.fillStyle = '#3fbf5a';
+      g.beginPath(); g.ellipse(cx + r * 0.18, cy - r * 1.02, r * 0.34, r * 0.16, -0.5, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#2f8f45'; g.lineWidth = r * 0.12;
+      g.beginPath(); g.moveTo(cx, cy - r * 0.8); g.lineTo(cx + r * 0.06, cy - r * 1.05); g.stroke();
+    }
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(angle);
+    if (Math.cos(angle) < -0.5) g.scale(1, -1);
+    g.scale(shrink, shrink);
+    g.fillStyle = '#b6f24a';
+    g.beginPath();
+    g.moveTo(-r * 0.15, 0);
+    g.arc(0, 0, r, mouth, Math.PI * 2 - mouth);
+    g.closePath();
+    g.fill();
+    g.save();
+    g.clip();
+    g.fillStyle = '#86d534';
+    g.beginPath(); g.arc(-r * 0.15, r * 0.95, r * 0.95, 0, Math.PI * 2); g.fill();
+    g.restore();
+    g.fillStyle = '#ffffff66';
+    g.beginPath(); g.arc(-r * 0.3, -r * 0.45, r * 0.2, 0, Math.PI * 2); g.fill();
+    if (!dying) {
+      g.fillStyle = '#fff';
+      g.beginPath(); g.arc(r * 0.16, -r * 0.48, r * 0.24, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#16301a';
+      g.beginPath(); g.arc(r * 0.24, -r * 0.48, r * 0.13, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ff8fa3aa';
+      g.beginPath(); g.arc(-r * 0.05, -r * 0.08, r * 0.12, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+  }
+
+  // Chasers are round puff monsters on two little feet; each has its own accessory.
+  function drawChaser(g, cx, cy, r, id, dir, look, time) {
+    const frozen = look === 'fright' || look === 'flash';
+    const walk = Math.sin(time * 14) * r * 0.1;
+    if (look !== 'eyes') {
+      const color = look === 'flash' ? '#ff9fb4' : frozen ? '#c4ecff' : CHASERS[id].color;
+      const dark = look === 'flash' ? '#b0304e' : frozen ? '#24306e' : null;
+      g.fillStyle = color;
+      if (!frozen && id === 0) { // horns
+        g.beginPath(); g.moveTo(cx - r * 0.7, cy - r * 0.5); g.lineTo(cx - r * 0.62, cy - r * 1.22); g.lineTo(cx - r * 0.25, cy - r * 0.85); g.fill();
+        g.beginPath(); g.moveTo(cx + r * 0.7, cy - r * 0.5); g.lineTo(cx + r * 0.62, cy - r * 1.22); g.lineTo(cx + r * 0.25, cy - r * 0.85); g.fill();
+      } else if (!frozen && id === 2) { // antenna
+        g.strokeStyle = color; g.lineWidth = r * 0.14;
+        g.beginPath(); g.moveTo(cx, cy - r * 0.9); g.lineTo(cx + r * 0.22, cy - r * 1.35); g.stroke();
+        g.beginPath(); g.arc(cx + r * 0.24, cy - r * 1.42, r * 0.18, 0, Math.PI * 2); g.fill();
+      }
+      g.beginPath(); g.ellipse(cx - r * 0.42, cy + r * 0.8 + walk, r * 0.3, r * 0.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx + r * 0.42, cy + r * 0.8 - walk, r * 0.3, r * 0.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(cx, cy - r * 0.04, r * 0.9, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff30';
+      g.beginPath(); g.ellipse(cx - r * 0.35, cy - r * 0.5, r * 0.26, r * 0.16, -0.6, 0, Math.PI * 2); g.fill();
+      if (!frozen && id === 1) { // bow
+        g.fillStyle = '#ffd23f';
+        g.beginPath(); g.moveTo(cx + r * 0.45, cy - r * 0.86); g.lineTo(cx + r * 0.05, cy - r * 1.18); g.lineTo(cx + r * 0.12, cy - r * 0.6); g.fill();
+        g.beginPath(); g.moveTo(cx + r * 0.45, cy - r * 0.86); g.lineTo(cx + r * 0.86, cy - r * 1.15); g.lineTo(cx + r * 0.84, cy - r * 0.55); g.fill();
+      }
+      if (frozen) {
+        g.fillStyle = dark;
+        g.beginPath(); g.arc(cx - r * 0.3, cy - r * 0.2, r * 0.12, 0, Math.PI * 2); g.arc(cx + r * 0.3, cy - r * 0.2, r * 0.12, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = dark; g.lineWidth = r * 0.1; g.lineCap = 'round';
+        g.beginPath();
+        for (let i = 0; i <= 6; i++) g.lineTo(cx - r * 0.45 + i * r * 0.15, cy + r * 0.3 + (i % 2 ? -r * 0.09 : r * 0.05));
+        g.stroke();
+        if (look === 'fright') { g.fillStyle = '#ffffffcc'; g.fillRect(cx + r * 0.42, cy - r * 0.62, r * 0.12, r * 0.12); g.fillRect(cx - r * 0.62, cy + r * 0.05, r * 0.1, r * 0.1); }
+        return;
+      }
+    }
+    for (const side of [-1, 1]) {
+      const ex = cx + side * r * 0.34, ey = cy - r * 0.16;
+      g.fillStyle = '#fff';
+      g.beginPath(); g.ellipse(ex, ey, r * 0.26, r * 0.32, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1d2a6b';
+      g.beginPath(); g.arc(ex + dir.x * r * 0.11, ey + dir.y * r * 0.13, r * 0.14, 0, Math.PI * 2); g.fill();
+      if (id === 3 && look !== 'eyes') { // sleepy lids
+        g.fillStyle = CHASERS[3].color;
+        g.beginPath(); g.ellipse(ex, ey - r * 0.1, r * 0.3, r * 0.22, 0, Math.PI, 0); g.fill();
+      }
+    }
+  }
+
+  function drawFruit(g, kind, cx, cy, r) {
+    const circle = (x, y, rr, color) => { g.fillStyle = color; g.beginPath(); g.arc(x, y, rr, 0, Math.PI * 2); g.fill(); };
+    const leaf = (x, y, rot) => { g.fillStyle = '#3ccf6e'; g.beginPath(); g.ellipse(x, y, r * 0.3, r * 0.14, rot, 0, Math.PI * 2); g.fill(); };
+    g.lineCap = 'round';
+    switch (kind) {
+      case 'cherry':
+        g.strokeStyle = '#3ccf6e'; g.lineWidth = r * 0.12;
+        g.beginPath(); g.moveTo(cx - r * 0.4, cy + r * 0.2); g.quadraticCurveTo(cx - r * 0.1, cy - r * 0.5, cx + r * 0.3, cy - r * 0.8); g.moveTo(cx + r * 0.35, cy + r * 0.3); g.lineTo(cx + r * 0.3, cy - r * 0.8); g.stroke();
+        circle(cx - r * 0.42, cy + r * 0.38, r * 0.4, '#ff3b5c'); circle(cx + r * 0.38, cy + r * 0.45, r * 0.4, '#e8193f');
+        circle(cx - r * 0.55, cy + r * 0.25, r * 0.1, '#ffffffaa');
+        break;
+      case 'strawberry':
+        g.fillStyle = '#ff3b5c';
+        g.beginPath(); g.moveTo(cx - r * 0.75, cy - r * 0.35); g.quadraticCurveTo(cx, cy - r * 0.7, cx + r * 0.75, cy - r * 0.35); g.quadraticCurveTo(cx + r * 0.6, cy + r * 0.5, cx, cy + r * 0.9); g.quadraticCurveTo(cx - r * 0.6, cy + r * 0.5, cx - r * 0.75, cy - r * 0.35); g.fill();
+        g.fillStyle = '#ffe6a0';
+        for (const [sx, sy] of [[-0.35, -0.1], [0.1, -0.15], [0.4, 0.05], [-0.15, 0.3], [0.2, 0.4], [-0.4, 0.15]]) g.fillRect(cx + sx * r, cy + sy * r, r * 0.1, r * 0.1);
+        leaf(cx - r * 0.25, cy - r * 0.6, -0.4); leaf(cx + r * 0.25, cy - r * 0.6, 0.4);
+        break;
+      case 'orange':
+        circle(cx, cy + r * 0.1, r * 0.78, '#ff9a1f'); circle(cx - r * 0.25, cy - r * 0.15, r * 0.18, '#ffffff66'); leaf(cx + r * 0.25, cy - r * 0.72, -0.5);
+        break;
+      case 'apple':
+        circle(cx - r * 0.3, cy + r * 0.12, r * 0.6, '#ff3d4f'); circle(cx + r * 0.3, cy + r * 0.12, r * 0.6, '#ff3d4f');
+        g.strokeStyle = '#7a4a1f'; g.lineWidth = r * 0.12; g.beginPath(); g.moveTo(cx, cy - r * 0.35); g.lineTo(cx + r * 0.1, cy - r * 0.8); g.stroke();
+        leaf(cx + r * 0.35, cy - r * 0.65, -0.3); circle(cx - r * 0.45, cy - r * 0.05, r * 0.14, '#ffffff77');
+        break;
+      case 'grapes':
+        for (const [gx, gy] of [[-0.4, -0.3], [0, -0.3], [0.4, -0.3], [-0.2, 0.1], [0.2, 0.1], [0, 0.5]]) circle(cx + gx * r, cy + gy * r, r * 0.27, '#9b5cff');
+        leaf(cx + r * 0.2, cy - r * 0.75, 0.3);
+        break;
+      case 'melon':
+        circle(cx, cy, r * 0.82, '#3ccf6e');
+        g.strokeStyle = '#1e8a45'; g.lineWidth = r * 0.1;
+        for (const k of [-0.4, 0, 0.4]) { g.beginPath(); g.ellipse(cx + k * r, cy, r * 0.12 + Math.abs(k) * 0.1 * r, r * 0.78, 0, 0, Math.PI * 2); g.stroke(); }
+        break;
+      case 'star':
+        g.fillStyle = '#ffe14a';
+        g.beginPath();
+        for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.4 : r * 0.9; g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+        g.closePath(); g.fill();
+        break;
+      default:
+        g.fillStyle = '#4fe3ff';
+        g.beginPath(); g.moveTo(cx, cy - r * 0.8); g.lineTo(cx + r * 0.8, cy - r * 0.15); g.lineTo(cx, cy + r * 0.85); g.lineTo(cx - r * 0.8, cy - r * 0.15); g.closePath(); g.fill();
+        g.fillStyle = '#ffffff88';
+        g.beginPath(); g.moveTo(cx, cy - r * 0.8); g.lineTo(cx + r * 0.3, cy - r * 0.15); g.lineTo(cx - r * 0.3, cy - r * 0.15); g.closePath(); g.fill();
+    }
+  }
+
+  const dirAngle = d => Math.atan2(d.y, d.x);
+
+  function drawActorWrapped(x, fn) {
+    fn(x);
+    if (x < 0.6) fn(x + COLS);
+    if (x > COLS - 1.6) fn(x - COLS);
+  }
+
+  function chaserLook(ch) {
+    if (ch.state === 'eyes' || ch.state === 'enter') return 'eyes';
+    if (!ch.fright) return 'normal';
+    const flashFrom = Math.min(2, G.spec.fright * 0.4);
+    return G.frightT < flashFrom && Math.floor(G.frightT * 6) % 2 === 0 ? 'flash' : 'fright';
+  }
+
+  function draw(time) {
+    if (!G) return;
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx.fillStyle = G.theme.bg;
+    ctx.fillRect(0, 0, W, H);
+    const clearing = G.phase === 'clear' && G.phaseT > 0.7;
+    const flash = clearing && !reduceMotion && Math.floor((G.phaseT - 0.7) / 0.2) % 2 === 0;
+    ctx.drawImage(flash ? flashCv : wallCv, 0, 0, W, H);
+
+    // dots
+    ctx.fillStyle = '#ffe6c2';
+    ctx.beginPath();
+    const pellets = [];
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const c = G.cells[y][x];
+      if (c === '.') { const cx = (x + 0.5) * T, cy = (y + 0.5) * T; ctx.moveTo(cx + T * 0.13, cy); ctx.arc(cx, cy, T * 0.13, 0, Math.PI * 2); }
+      else if (c === 'o') pellets.push([x, y]);
+    }
+    ctx.fill();
+    const pulse = reduceMotion ? 1 : 0.82 + Math.sin(time * 7) * 0.18;
+    for (const [x, y] of pellets) {
+      const cx = (x + 0.5) * T, cy = (y + 0.5) * T;
+      ctx.fillStyle = '#fff3a044';
+      ctx.beginPath(); ctx.arc(cx, cy, T * 0.48 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff3a0';
+      ctx.beginPath(); ctx.arc(cx, cy, T * 0.32 * pulse, 0, Math.PI * 2); ctx.fill();
+    }
+
+    if (G.fruit) {
+      const f = G.maze.fruit, bob = reduceMotion ? 0 : Math.sin(time * 4) * T * 0.06;
+      if (G.fruit.t > 2 || Math.floor(time * 8) % 2) drawFruit(ctx, G.fruit.kind, (f.x + 0.5) * T, (f.y + 0.5) * T + bob, T * 0.62);
+    }
+
+    const showChasers = !(G.phase === 'dying' && G.phaseT > 0.6) && !clearing && G.phase !== 'over';
+    if (showChasers) {
+      for (const ch of G.chasers) {
+        if (G.phase === 'eat' && G.eaten && G.eaten.ch === ch) continue;
+        const bob = ch.state === 'home' && !reduceMotion ? Math.sin(time * 6 + ch.id * 2) * 0.22 : 0;
+        const look = chaserLook(ch);
+        drawActorWrapped(ch.x, x => drawChaser(ctx, (x + 0.5) * T, (ch.y + bob + 0.5) * T, T * 0.6, ch.id, ch.dir, look, time + ch.id * 0.3));
+      }
+    }
+
+    const p = G.player;
+    if (G.phase !== 'over') {
+      const dying = G.phase === 'dying' ? Math.max(0, (G.phaseT - 0.6) / 1.2) : 0;
+      if (dying < 1) {
+        const open = G.phase === 'ready' ? 0.35 : p.moving || G.phase !== 'play' ? 0.06 + 0.5 * Math.abs(Math.sin(p.chew * Math.PI)) : 0.3;
+        drawActorWrapped(p.x, x => drawMuncher(ctx, (x + 0.5) * T, (p.y + 0.5) * T, T * 0.6, dirAngle(p.dir), open, dying));
+      }
+    }
+
+    if (G.phase === 'eat' && G.eaten) drawText(String(G.eaten.points), (G.eaten.x + 0.5) * T, (G.eaten.y + 0.5) * T, '#8fe9ff', T * 0.8);
+    for (const q of G.pops) { ctx.globalAlpha = Math.min(1, q.life * 2); drawText(q.text, (q.x + 0.5) * T, (q.y + 0.5) * T, q.color, T * 0.75); }
+    ctx.globalAlpha = 1;
+    for (const q of G.parts) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 2));
+      ctx.fillStyle = q.color;
+      ctx.fillRect((q.x + 0.5) * T - 1.2, (q.y + 0.5) * T - 1.2, 2.4, 2.4);
+    }
+    ctx.globalAlpha = 1;
+    if (G.phase === 'ready') {
+      const f = G.maze.fruit;
+      drawText(t.ready, W / 2, (f.y + 0.5) * T, '#ffd23f', T * 0.95, W * 0.42);
+    }
+  }
+
+  function drawText(text, x, y, color, size, maxW) {
+    ctx.font = `900 ${size}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = size * 0.28;
+    ctx.strokeStyle = '#0b0920';
+    ctx.lineJoin = 'round';
+    ctx.strokeText(text, x, y, maxW);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y, maxW);
+  }
+
+  // Small canvases for the lives and fruit rows.
+  function paintStrip(cv, items, drawItem) {
+    const r = cv.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const s = r.height, gap = s * 0.28;
+    items.forEach((item, i) => { const cx = s / 2 + i * (s + gap); if (cx + s / 2 <= r.width + 0.5) drawItem(g, item, cx, s / 2, s * 0.46); });
+  }
+  function paintLives() {
+    if (!G) return;
+    const n = Math.max(0, G.lives - (G.phase === 'over' ? 0 : 1));
+    paintStrip(els.lives, Array.from({ length: Math.min(n, 6) }), (g, _, cx, cy, r) => drawMuncher(g, cx, cy, r, 0, 0.32));
+    els.lives.setAttribute('aria-label', t.lives(G.lives));
+  }
+  function paintFruits() {
+    if (!G) return;
+    paintStrip(els.fruits, G.fruitsGot.slice(-7), (g, kind, cx, cy, r) => drawFruit(g, kind, cx, cy, r));
+  }
+
+  // ---------- HUD / panels ----------
+  function updateHud() {
+    els.score.textContent = G.score;
+    els.level.textContent = G.level;
+    els.best.textContent = G.best;
+    els.dots.textContent = G.dotsLeft;
+    canvas.setAttribute('aria-label', t.canvas(G.score, G.lives, G.level, t.mazes[G.mazeIdx]));
+  }
+
+  let lastMode = '';
+  function updateStatus() {
+    if (!G) return;
+    const m = mode();
+    if (m !== lastMode) { lastMode = m; els.modeText.textContent = t[m]; els.modeText.className = m; }
+    els.modeBar.style.transform = `scaleX(${m === 'fright' ? Math.max(0, G.frightT / G.spec.fright).toFixed(3) : 0})`;
+  }
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function showBanner(title, text, ms = 2000) {
+    els.bannerTitle.textContent = title;
+    els.bannerText.textContent = text;
+    els.banner.hidden = false;
+    clearTimeout(showBanner.timer);
+    showBanner.timer = setTimeout(() => { els.banner.hidden = true; }, ms);
+  }
+
+  function hideOverlays() { els.start.hidden = true; els.paused.hidden = true; els.over.hidden = true; }
+
+  function chaserIcon(color, id) {
+    const extra = id === 0 ? `<path d="M5.6 8.5 6.2 2.6 9.2 5.6zM18.4 8.5 17.8 2.6 14.8 5.6z" fill="${color}"/>` : id === 2 ? `<path d="M12 4 13.8 1.4" stroke="${color}" stroke-width="1.4"/><circle cx="14" cy="1.6" r="1.4" fill="${color}"/>` : '';
+    const top = id === 1 ? '<path d="M15.6 5 12.6 2.6l.5 4.4zM15.6 5l3.3-2.2-.1 4.6z" fill="#ffd23f"/>' : id === 3 ? `<path d="M6.8 10.2a2.3 2.3 0 0 1 4.6 0zM12.6 10.2a2.3 2.3 0 0 1 4.6 0z" fill="${color}"/>` : '';
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${extra}<ellipse cx="7.6" cy="20.6" rx="2.8" ry="1.8" fill="${color}"/><ellipse cx="16.4" cy="20.6" rx="2.8" ry="1.8" fill="${color}"/><circle cx="12" cy="12.4" r="8.4" fill="${color}"/><ellipse cx="9" cy="11" rx="2.3" ry="2.8" fill="#fff"/><ellipse cx="15" cy="11" rx="2.3" ry="2.8" fill="#fff"/><circle cx="9.8" cy="11.4" r="1.2" fill="#1d2a6b"/><circle cx="15.8" cy="11.4" r="1.2" fill="#1d2a6b"/>${top}</svg>`;
+  }
+  function buildLegend(ul) {
+    ul.innerHTML = CHASERS.map((c, i) => `<li>${chaserIcon(c.color, i)}<b style="color:${c.color}">${c.name}</b><span>${t.chaserDesc[i]}</span></li>`).join('');
+  }
+
+  function paintThumb(cv, maze) {
+    const s = 2;
+    cv.width = COLS * s; cv.height = ROWS * s;
+    const g = cv.getContext('2d'), th = THEMES[maze.id];
+    g.fillStyle = th.bg; g.fillRect(0, 0, cv.width, cv.height);
+    maze.rows.forEach((r, y) => [...r].forEach((c, x) => {
+      if (c === '#') { g.fillStyle = th.wall; g.fillRect(x * s, y * s, s, s); }
+      else if (c === 'o') { g.fillStyle = '#fff3a0'; g.fillRect(x * s, y * s, s, s); }
+    }));
+  }
+
+  function buildMenu() {
+    const pick = $('maze-pick');
+    pick.innerHTML = '';
+    MAZES.forEach((m, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.maze = i;
+      const cv = document.createElement('canvas');
+      paintThumb(cv, m);
+      const num = document.createElement('i');
+      num.textContent = i + 1;
+      b.append(cv, num);
+      b.addEventListener('click', () => { pref.maze = i; write('maze', i); refreshMenu(); });
+      pick.append(b);
+    });
+    for (const b of document.querySelectorAll('#diff-seg button')) b.addEventListener('click', () => { pref.diff = b.dataset.diff; write('diff', pref.diff); refreshMenu(); });
+  }
+
+  function refreshMenu() {
+    for (const b of document.querySelectorAll('#diff-seg button')) {
+      b.setAttribute('aria-pressed', String(b.dataset.diff === pref.diff));
+      b.querySelector('small').textContent = t.bestShort(readBest(b.dataset.diff));
+    }
+    $('diff-hint').textContent = t.diffDesc[pref.diff];
+    for (const b of document.querySelectorAll('#maze-pick button')) {
+      const i = Number(b.dataset.maze), open = Boolean(unlocked & (1 << i));
+      b.disabled = !open;
+      b.setAttribute('aria-pressed', String(i === pref.maze));
+      b.setAttribute('aria-label', open ? t.mazeLabel(i + 1, t.mazes[i]) : t.locked(i + 1));
+      b.title = open ? t.mazeLabel(i + 1, t.mazes[i]) : t.locked(i + 1);
+    }
+    $('maze-hint').textContent = t.mazeLabel(pref.maze + 1, t.mazes[pref.maze]);
+  }
+
+  function showMenu() {
+    if (G) { G.paused = false; setPhase('menu'); }
+    hideOverlays();
+    els.banner.hidden = true;
+    refreshMenu();
+    els.start.hidden = false;
+    $('play-btn').focus({ preventScroll: true });
+  }
+
+  function setPaused(on) {
+    if (!live()) return;
+    if (on && !G.paused) {
+      G.paused = true;
+      $('paused-score').textContent = t.finalScore(G.score);
+      els.paused.hidden = false;
+      $('resume-btn').focus({ preventScroll: true });
+      announce(t.paused);
+    } else if (!on && G.paused) {
+      G.paused = false;
+      els.paused.hidden = true;
+      canvas.focus({ preventScroll: true });
+    }
+  }
+
+  // ---------- Input ----------
+  function steer(name) {
+    if (!live() || G.paused) return;
+    const p = G.player;
+    p.want = DIRS[name];
+    p.wantT = 0.8;
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const dir = KEY_DIRS[event.key];
+    if (dir && live() && !G.paused) { event.preventDefault(); steer(dir); return; }
+    if ((event.key === 'p' || event.key === 'P' || event.key === ' ') && live()) {
+      // Space on a focused panel button should press that button instead.
+      if (event.key === ' ' && document.activeElement instanceof HTMLButtonElement && document.activeElement !== els.pause) return;
+      event.preventDefault();
+      setPaused(!G.paused);
+    }
+  });
+
+  let swipe = null;
+  $('app').addEventListener('pointerdown', event => {
+    if (event.target.closest('button') || !live()) return;
+    swipe = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  });
+  document.addEventListener('pointermove', event => {
+    if (!swipe || swipe.id !== event.pointerId) return;
+    const dx = event.clientX - swipe.x, dy = event.clientY - swipe.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+    steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    swipe.x = event.clientX; swipe.y = event.clientY;
+  });
+  const endSwipe = event => { if (swipe && swipe.id === event.pointerId) swipe = null; };
+  document.addEventListener('pointerup', endSwipe);
+  document.addEventListener('pointercancel', endSwipe);
+
+  for (const b of document.querySelectorAll('.dpad button')) {
+    b.addEventListener('pointerdown', event => { event.preventDefault(); b.classList.add('hit'); steer(b.dataset.dir); });
+    const up = () => b.classList.remove('hit');
+    b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+    b.addEventListener('click', event => { if (event.detail === 0) steer(b.dataset.dir); });
+  }
+  const coarse = matchMedia('(any-pointer: coarse)').matches;
+  function setDpad(on) {
+    document.body.classList.toggle('dpad-on', on);
+    els.dpadToggle.setAttribute('aria-pressed', String(on));
+  }
+  els.dpadToggle.hidden = !coarse;
+  setDpad(coarse && read('dpad') !== 'off');
+  els.dpadToggle.addEventListener('click', () => {
+    const on = !document.body.classList.contains('dpad-on');
+    setDpad(on);
+    write('dpad', on ? 'on' : 'off');
+  });
+
+  els.pause.addEventListener('click', () => { if (live()) setPaused(!G.paused); });
+  $('resume-btn').addEventListener('click', () => setPaused(false));
+  $('restart-btn').addEventListener('click', newGame);
+  $('again-btn').addEventListener('click', newGame);
+  $('play-btn').addEventListener('click', newGame);
+  for (const b of document.querySelectorAll('[data-action="menu"]')) b.addEventListener('click', showMenu);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && live()) setPaused(true); });
+  window.addEventListener('blur', () => { swipe = null; });
+
+  let last = performance.now();
+  function frame(now) {
+    // Clamp dt so a stalled or hidden tab never fast-forwards the chase.
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (G) update(dt * speedScale);
+    draw(now / 1000);
+    updateStatus();
+    requestAnimationFrame(frame);
+  }
+
+  // Read-only state for automated tests, plus helpers to shorten a level or fast-forward time.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__mazeMuncher = {
+    state: () => G && {
+      phase: G.phase, paused: G.paused, level: G.level, score: G.score, lives: G.lives, dotsLeft: G.dotsLeft, maze: G.maze.id, mazeIdx: G.mazeIdx, mode: mode(), frightT: G.frightT,
+      player: { x: G.player.x, y: G.player.y, dir: G.player.dir.n, moving: G.player.moving },
+      chasers: G.chasers.map(c => ({ x: c.x, y: c.y, state: c.state, fright: c.fright, dir: c.dir.n })),
+      fruit: G.fruit && { kind: G.fruit.kind, ...G.maze.fruit }, grid: G.cells.map(r => r.join('')), stats: { ...G.stats }, unlocked,
+      overlay: [els.start, els.paused, els.over].find(o => !o.hidden)?.id || null,
+    },
+    leaveDots: n => {
+      const p = G.player, list = [];
+      G.cells.forEach((r, y) => r.forEach((c, x) => { if (c === '.' || c === 'o') list.push({ x, y, d: Math.abs(x - p.x) + Math.abs(y - p.y) }); }));
+      list.sort((a, b) => a.d - b.d).slice(n).forEach(({ x, y }) => { G.cells[y][x] = ' '; G.dotsLeft--; G.dotsEaten++; });
+      updateHud();
+    },
+    speed: k => { speedScale = k; },
+  };
+
+  buildLegend($('side-legend'));
+  buildLegend($('start-legend'));
+  buildMenu();
+  new ResizeObserver(resize).observe($('stage'));
+  new ResizeObserver(() => { paintLives(); paintFruits(); }).observe(document.querySelector('.foot'));
+  // A demo game sits behind the start panel so the maze is visible.
+  newGame();
+  showMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

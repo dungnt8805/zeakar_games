@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sea Battle</title>
+<style>
+:root {
+  --bg: #071c33;
+  --bg-2: #0f3a63;
+  --text: #eaf6ff;
+  --muted: #95bdd9;
+  --sea: #1e6e9f;
+  --sea-deep: #11507e;
+  --sea-line: #ffffff26;
+  --accent: #ffd166;
+  --accent-dark: #d4a33a;
+  --hit: #ff5a3c;
+  --hit-dark: #b3261e;
+  --coral: #ff7a59;
+  --coral-dark: #cf4f2f;
+  --paper: #f3f8fd;
+  --ink: #0d2742;
+  --ink-muted: #5b7490;
+  --steel-1: #e2e9f1;
+  --steel-2: #a8b8c9;
+  --steel-3: #73869b;
+  --cell: 30px;
+  --lab: 18px;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: radial-gradient(120% 80% at 50% 0%, var(--bg-2), transparent 70%), repeating-radial-gradient(circle at 50% 120%, #ffffff06 0 2px, transparent 2px 26px);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.icon-btn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.side { display: contents; }
+.top { order: 1; display: flex; align-items: center; gap: 8px; }
+.status { order: 2; }
+.hud { order: 3; }
+.play { order: 4; }
+.fleets { order: 5; }
+.dock-wrap { order: 6; }
+.actions { order: 7; }
+.tip { order: 8; }
+
+h1 { flex: 1; min-width: 0; font-size: clamp(22px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--accent); }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: #ffffff1c; font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 #00000045; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #00000045; }
+
+.status { height: 2.6em; display: flex; align-items: center; justify-content: center; padding: 0 4px; text-align: center; font-size: 14px; font-weight: 800; line-height: 1.25; overflow: hidden; }
+.status[data-tone="hit"] { color: #ffb08f; }
+.status[data-tone="miss"] { color: var(--muted); }
+.status[data-tone="win"] { color: var(--accent); }
+.status[data-tone="lose"] { color: #ff8a7a; }
+
+.hud { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.stat { min-width: 0; padding: 5px 6px; border-radius: 12px; background: #00000033; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); line-height: 1.2; }
+.stat strong { display: block; font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+.fleets { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.fleet-row { min-width: 0; padding: 5px 8px; border-radius: 12px; background: #00000029; }
+.fleet-row small { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.fleet-row small b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pips { display: flex; flex-wrap: wrap; gap: 3px 5px; margin-top: 4px; }
+.pip-ship { display: flex; gap: 1px; }
+.pip-ship i { width: 6px; height: 8px; border-radius: 2px; background: var(--steel-2); }
+.pip-ship.sunk i { background: var(--hit); opacity: .6; }
+
+.play { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.tabs { display: none; gap: 4px; padding: 4px; border-radius: 14px; background: #00000033; }
+.app[data-arr="tabs"] .tabs { display: flex; }
+.tabs button { flex: 1; min-width: 0; min-height: 32px; padding: 6px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.15; }
+.tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 #00000030; }
+.stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.app[data-arr="col"] .stage { flex-direction: column; }
+.app[data-arr="tabs"] .sea:not(.active), .app[data-phase="place"] #sea-enemy { display: none; }
+.app[data-arr="tabs"] .sea-title { display: none; }
+.sea { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sea-title { height: 20px; display: flex; align-items: center; font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; transition: color .2s; }
+.sea.turn .sea-title { color: var(--accent); }
+.frame { display: grid; grid-template-columns: var(--lab) calc(var(--cell) * 10); grid-template-rows: var(--lab) calc(var(--cell) * 10); }
+.lab-top { grid-column: 2; display: grid; grid-template-columns: repeat(10, 1fr); }
+.lab-left { grid-row: 2; display: grid; grid-template-rows: repeat(10, 1fr); }
+.lab-top span, .lab-left span { display: grid; place-items: center; font-size: max(10px, calc(var(--cell) * .34)); font-weight: 800; color: var(--muted); }
+.board { grid-column: 2; grid-row: 2; position: relative; border-radius: calc(var(--cell) * .2); background: radial-gradient(circle at 25% 15%, #ffffff17, transparent 45%), repeating-linear-gradient(170deg, #ffffff07 0 3px, transparent 3px 11px), linear-gradient(160deg, var(--sea), var(--sea-deep)); box-shadow: 0 0 0 3px #0a3456, 0 14px 30px #0009; transition: box-shadow .3s; }
+.sea.turn .board { box-shadow: 0 0 0 3px var(--accent), 0 0 26px #ffd16650, 0 14px 30px #0009; }
+#sea-mine.turn .board { box-shadow: 0 0 0 3px var(--hit), 0 0 26px #ff5a3c50, 0 14px 30px #0009; }
+.board.jolt { animation: jolt .35s; }
+@keyframes jolt { 25% { transform: translate(-3px, 2px); } 50% { transform: translate(3px, -2px); } 75% { transform: translate(-2px, -1px); } }
+.cells { position: absolute; inset: 0; z-index: 1; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); border-radius: inherit; overflow: hidden; touch-action: manipulation; }
+.ships { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.app[data-phase="place"] .ships { z-index: 2; }
+.app[data-phase="place"] .ships .ship { pointer-events: auto; cursor: grab; touch-action: none; }
+
+.cell { position: relative; padding: 0; box-shadow: inset 0 0 0 .5px var(--sea-line); transition: background-color .15s; }
+.cell:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 3; }
+.app[data-phase="battle"] #cells-enemy .cell { cursor: crosshair; }
+.app[data-phase="battle"] #cells-enemy .cell:not(.miss):not(.hit):not(.clear):hover { background-color: #ffffff22; }
+.cell::after { content: ''; position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-radius: 50%; transform: translate(-50%, -50%); }
+.cell.miss::after { width: 26%; height: 26%; background: #e3f4ff; box-shadow: 0 0 0 calc(var(--cell) * .07) #ffffff30; }
+.cell.clear { background-color: #04294a40; }
+.cell.clear::after { width: 13%; height: 13%; background: #ffffff5c; }
+.cell.hit::after { width: 56%; height: 56%; background: radial-gradient(circle at 40% 35%, #fff4c2, #ffc04d 28%, var(--hit) 58%, var(--hit-dark)); box-shadow: 0 0 calc(var(--cell) * .28) #ff6b3daa; }
+.cell.sunk { background-color: #3c0f1430; }
+.cell.sunk::after { width: 42%; height: 42%; background: radial-gradient(circle at 40% 35%, #ffb59a, #e2462c 50%, #7d1a14); box-shadow: none; }
+.cell.sel::before { content: ''; position: absolute; inset: 13%; border-radius: 50%; border: 2px solid var(--accent); box-shadow: 0 0 0 2px #0005; animation: aim .8s ease-in-out infinite alternate; }
+.cell.sel::after { width: 16%; height: 16%; background: var(--accent); }
+@keyframes aim { to { transform: scale(.8); } }
+.cell.pv { background-color: #ffd16670; }
+.cell.pv.bad { background-color: #ff5a3c70; }
+.cell.fx-hit::before { content: ''; position: absolute; inset: -25%; z-index: 2; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, #ffe9a0, #ff6a3d 42%, transparent 70%); animation: burst .55s ease-out forwards; }
+.cell.fx-miss::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; pointer-events: none; border: 2px solid #e3f4ff; animation: ripple .6s ease-out forwards; }
+@keyframes burst { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.35); opacity: 0; } }
+@keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.7); opacity: 0; } }
+
+.ship { position: absolute; left: calc(var(--cell) * var(--c)); top: calc(var(--cell) * var(--r)); padding: calc(var(--cell) * .12); transition: opacity .2s; }
+.ship.h { width: calc(var(--cell) * var(--len)); height: var(--cell); }
+.ship.v { width: var(--cell); height: calc(var(--cell) * var(--len)); }
+.ship b { position: relative; display: block; width: 100%; height: 100%; background: linear-gradient(var(--steel-1), var(--steel-2) 55%, var(--steel-3)); box-shadow: inset 0 0 0 1px #ffffff55, 0 2px 0 #0005; }
+.ship.h b { border-radius: calc(var(--cell) * .18) calc(var(--cell) * .62) calc(var(--cell) * .62) calc(var(--cell) * .18) / calc(var(--cell) * .18) 50% 50% calc(var(--cell) * .18); }
+.ship.v b { background: linear-gradient(90deg, var(--steel-1), var(--steel-2) 55%, var(--steel-3)); border-radius: 50% 50% calc(var(--cell) * .18) calc(var(--cell) * .18) / calc(var(--cell) * .62) calc(var(--cell) * .62) calc(var(--cell) * .18) calc(var(--cell) * .18); }
+.ship b::before, .ship b::after { content: ''; position: absolute; }
+.ship b::before { border-radius: 99px; background: #5d7086; }
+.ship.h b::before { left: 12%; right: 24%; top: 40%; bottom: 40%; }
+.ship.v b::before { top: 24%; bottom: 12%; left: 40%; right: 40%; }
+.ship b::after { border-radius: 3px; background: #f4f8fb; box-shadow: 0 1px 0 #0004; }
+.ship.h b::after { left: calc(50% - var(--cell) * .17); width: calc(var(--cell) * .34); top: 24%; bottom: 24%; }
+.ship.v b::after { top: calc(50% - var(--cell) * .17); height: calc(var(--cell) * .34); left: 24%; right: 24%; }
+.ship.sunk b { background: linear-gradient(#a3554b, #6b2a25); }
+.ship.sunk.v b { background: linear-gradient(90deg, #a3554b, #6b2a25); }
+.ship.sunk b::after { background: #d9b2a8; }
+.ship.revealed { opacity: .62; }
+.ship.revealed b { outline: 2px dashed #ffffffb0; outline-offset: 1px; }
+.ship.sel b { box-shadow: 0 0 0 2px var(--accent), 0 0 14px #ffd166a0; }
+.ship.lifted { opacity: .25; }
+.ship.ghost { position: fixed; z-index: 60; pointer-events: none; opacity: .9; }
+.ship.shake { animation: shake .3s; }
+.ship.boom b { animation: sink .8s ease-out; }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes sink { 0% { filter: brightness(2.2); transform: scale(1.08); } 100% { filter: none; transform: none; } }
+
+.dock-wrap { display: none; flex-direction: column; gap: 8px; }
+.app[data-phase="place"] .dock-wrap { display: flex; }
+.app[data-phase="place"] .hud, .app[data-phase="place"] .fleets { display: none; }
+.dock { --dc: 18px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 32px; }
+.piece { padding: 6px 7px; border-radius: 10px; background: #ffffff16; touch-action: none; cursor: grab; }
+.piece[aria-pressed="true"] { background: #ffd16630; box-shadow: 0 0 0 2px var(--accent); }
+.ship.mini { --cell: var(--dc); position: relative; left: auto; top: auto; display: block; padding: 2px; }
+.dock-done { align-self: center; padding: 6px; font-size: 13px; font-weight: 800; color: var(--accent); text-align: center; }
+.tools { display: flex; gap: 6px; }
+.tool { flex: 1 1 0; min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border-radius: 12px; background: #ffffff1c; font-size: 13px; font-weight: 800; line-height: 1.1; box-shadow: 0 3px 0 #00000045; }
+.tool:active { transform: translateY(2px); box-shadow: 0 1px 0 #00000045; }
+.tool .ico { flex: 0 0 auto; display: inline-block; font-size: 16px; line-height: 1; transition: transform .2s; }
+#rotate-btn[data-vert="true"] .ico { transform: rotate(90deg); }
+.ready { flex: 1.5 1 0; min-width: 0; min-height: 40px; padding: 6px 10px; border-radius: 12px; background: var(--coral); color: #fff; font-size: 16px; font-weight: 900; box-shadow: 0 4px 0 var(--coral-dark); }
+.ready:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--coral-dark); }
+.ready:disabled { opacity: .45; transform: none; }
+
+.actions { display: none; }
+.app.salvo[data-phase="battle"] .actions { display: flex; }
+.fire { flex: 1; min-height: 44px; padding: 8px; border-radius: 14px; background: var(--coral); color: #fff; font-size: 17px; font-weight: 900; box-shadow: 0 4px 0 var(--coral-dark); }
+.fire:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--coral-dark); }
+.fire:disabled { opacity: .45; transform: none; box-shadow: 0 4px 0 var(--coral-dark); }
+.fire.ready-glow { animation: glow .9s ease-in-out infinite alternate; }
+@keyframes glow { to { box-shadow: 0 4px 0 var(--coral-dark), 0 0 22px #ff7a59aa; } }
+.tip { display: none; font-size: 12px; line-height: 1.4; color: var(--muted); text-align: center; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); background: #04122299; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 4px); overflow-y: auto; background: var(--paper); color: var(--ink); border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.logo { display: block; width: 120px; height: 52px; margin: 0 auto 4px; }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: #1d6fa5; }
+.text { margin-top: 6px; font-size: 14px; color: var(--ink-muted); line-height: 1.4; }
+.fields { margin-top: 12px; display: grid; gap: 10px; text-align: left; }
+.field[hidden] { display: none; }
+.label { margin-bottom: 5px; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-muted); }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #e1ecf7; }
+.seg button { flex: 1; min-width: 0; min-height: 34px; padding: 7px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--ink-muted); line-height: 1.15; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #c3d4e6; }
+.hint { margin-top: 4px; font-size: 12px; color: var(--ink-muted); line-height: 1.3; }
+.btn-row { display: flex; gap: 10px; margin-top: 16px; }
+.btn-row > * { margin-top: 0 !important; }
+.cta { flex: 2; width: 100%; margin-top: 18px; padding: 14px; border-radius: 16px; background: var(--coral); color: #fff; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 var(--coral-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--coral-dark); }
+.ghost-btn { flex: 1; width: 100%; margin-top: 10px; padding: 11px 10px; border-radius: 14px; background: #e1ecf7; color: var(--ink); font-size: 15px; font-weight: 800; box-shadow: 0 4px 0 #c3d4e6; }
+.ghost-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #c3d4e6; }
+.ghost-btn[hidden] { display: none; }
+.emoji { font-size: 46px; line-height: 1.2; }
+.result-score { margin-top: 10px; font-size: 16px; font-weight: 800; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--accent); color: #4a3500; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.stats-table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.stats-table th { padding: 6px 3px; font-size: 11px; font-weight: 800; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .02em; }
+.stats-table td { padding: 8px 3px; border-top: 1px solid #dbe6f1; font-weight: 800; }
+.stats-table td:first-child { text-align: left; color: #1d6fa5; }
+.small { font-size: 12px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Narrow phones: icon-only placement tools */
+@media (max-width: 420px) and (max-aspect-ratio: 5/4) {
+  .tool .lbl { display: none; }
+  .tool { flex: 0 0 44px; }
+  .stat small { letter-spacing: 0; }
+}
+@media (max-height: 600px) and (max-aspect-ratio: 5/4) {
+  .app { gap: 6px; }
+  .app[data-phase="battle"] .hud, .app[data-phase="over"] .hud { display: none; }
+  h1 { font-size: 22px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .status { font-size: 13px; }
+  .dock { --dc: 15px; gap: 4px; }
+  .piece { padding: 5px 6px; }
+}
+@media (min-height: 820px) and (max-aspect-ratio: 5/4) { .tip { display: block; } }
+
+/* Wide frames: info column on the left, both seas side by side at full height */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; display: grid; grid-template-columns: clamp(190px, 24vw, 300px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px; }
+  .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px; }
+  .status { height: auto; min-height: 3.8em; justify-content: flex-start; text-align: left; padding: 8px 10px; border-radius: 14px; background: #00000033; font-size: 15px; }
+  .fleets { grid-template-columns: 1fr; }
+  .pip-ship i { width: 8px; height: 10px; }
+  .play { min-height: 0; }
+  .tip { display: block; margin-top: auto; text-align: left; }
+  .tools { flex-wrap: wrap; }
+  .ready { flex: 1 1 100%; min-height: 46px; }
+  .dock { justify-content: flex-start; }
+  #setup .panel { width: min(100%, 660px); }
+  #setup .fields { grid-template-columns: 1fr 1fr; column-gap: 14px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 480px) {
+  .app { gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .side { gap: 6px; }
+  h1 { font-size: 21px; }
+  .icon-btn { width: 34px; height: 34px; font-size: 18px; }
+  .status { min-height: 2.8em; padding: 5px 8px; font-size: 13px; }
+  .stat { padding: 3px 4px; }
+  .stat strong { font-size: 15px; }
+  .stat small { letter-spacing: 0; }
+  .fleet-row { padding: 4px 8px; }
+  .tip { display: none; }
+  .dock { --dc: 14px; gap: 4px; }
+  .piece { padding: 4px 5px; }
+  .tools { flex-wrap: nowrap; }
+  .tool { flex: 0 0 38px; min-height: 36px; padding: 4px; }
+  .tool .lbl { display: none; }
+  .ready { flex: 1 1 0; min-height: 36px; font-size: 15px; }
+  .fire { min-height: 38px; font-size: 15px; }
+}
+@media (max-height: 560px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 16px; border-radius: 20px; }
+  .logo { width: 90px; height: 38px; margin-bottom: 0; }
+  .panel h2 { font-size: 22px; }
+  .text { margin-top: 3px; font-size: 13px; line-height: 1.3; }
+  .fields { margin-top: 8px; gap: 6px; }
+  .label { margin-bottom: 3px; font-size: 11px; }
+  .seg button { min-height: 32px; padding: 5px 4px; font-size: 13px; }
+  .hint { display: none; }
+  .btn-row { margin-top: 10px; }
+  .cta { margin-top: 12px; padding: 10px; font-size: 17px; }
+  .ghost-btn { margin-top: 8px; padding: 8px; font-size: 14px; }
+  .emoji { font-size: 32px; }
+  .result-score { margin-top: 6px; font-size: 15px; }
+  .stats-table td { padding: 5px 3px; }
+}
+@media (max-height: 640px) { .logo { display: none; } }
+@media (max-height: 520px) { #setup .text { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app" data-phase="place" data-arr="one">
+  <div class="side" id="side">
+    <header class="top">
+      <h1>Sea <span>Battle</span></h1>
+      <button type="button" class="icon-btn" id="menu-btn" data-i18n-label="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg></button>
+      <button type="button" class="icon-btn" id="new-btn" data-i18n-label="newGame">↻</button>
+    </header>
+    <p class="status" id="status"></p>
+    <div class="hud">
+      <div class="stat"><small data-i18n="shots"></small><strong id="st-shots">0</strong></div>
+      <div class="stat"><small data-i18n="hits"></small><strong id="st-hits">0</strong></div>
+      <div class="stat"><small data-i18n="accuracy"></small><strong id="st-acc">–</strong></div>
+    </div>
+    <div class="fleets">
+      <div class="fleet-row"><small><span data-i18n="enemyFleet"></span><b id="count-ai"></b></small><div class="pips" id="pips-ai" aria-hidden="true"></div></div>
+      <div class="fleet-row"><small><span data-i18n="yourFleet"></span><b id="count-me"></b></small><div class="pips" id="pips-me" aria-hidden="true"></div></div>
+    </div>
+    <div class="dock-wrap">
+      <div class="dock" id="dock" role="group" data-i18n-label="dockLabel"></div>
+      <div class="tools">
+        <button type="button" class="tool" id="rotate-btn" data-i18n-label="rotate"><span class="ico" aria-hidden="true">↔</span><span class="lbl" data-i18n="rotate"></span></button>
+        <button type="button" class="tool" id="random-btn" data-i18n-label="random"><span class="ico" aria-hidden="true">🎲</span><span class="lbl" data-i18n="random"></span></button>
+        <button type="button" class="tool" id="clear-btn" data-i18n-label="clear"><span class="ico" aria-hidden="true">✕</span><span class="lbl" data-i18n="clear"></span></button>
+        <button type="button" class="ready" id="ready-btn" data-i18n="ready"></button>
+      </div>
+    </div>
+    <div class="actions"><button type="button" class="fire" id="fire-btn"></button></div>
+    <p class="tip" id="tip"></p>
+  </div>
+  <div class="play" id="play">
+    <div class="tabs" role="tablist" data-i18n-label="boards">
+      <button type="button" role="tab" id="tab-enemy" aria-controls="sea-enemy" data-tab="enemy" data-i18n="enemyWaters"></button>
+      <button type="button" role="tab" id="tab-mine" aria-controls="sea-mine" data-tab="mine" data-i18n="yourFleet"></button>
+    </div>
+    <div class="stage" id="stage">
+      <section class="sea" id="sea-enemy" data-key="enemy">
+        <h2 class="sea-title" data-i18n="enemyWaters"></h2>
+        <div class="frame"><div class="lab-top" aria-hidden="true"></div><div class="lab-left" aria-hidden="true"></div>
+          <div class="board" id="board-enemy"><div class="ships" id="ships-enemy" aria-hidden="true"></div><div class="cells" id="cells-enemy" role="group" data-i18n-label="enemyBoard"></div></div>
+        </div>
+      </section>
+      <section class="sea" id="sea-mine" data-key="mine">
+        <h2 class="sea-title" data-i18n="yourFleet"></h2>
+        <div class="frame"><div class="lab-top" aria-hidden="true"></div><div class="lab-left" aria-hidden="true"></div>
+          <div class="board" id="board-mine"><div class="ships" id="ships-mine" aria-hidden="true"></div><div class="cells" id="cells-mine" role="group" data-i18n-label="myBoard"></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <svg class="logo" viewBox="0 0 120 52" aria-hidden="true">
+      <path d="M4 44c8 0 8-4 16-4s8 4 16 4 8-4 16-4 8 4 16 4 8-4 16-4 8 4 16 4 8-4 16-4" fill="none" stroke="#5fb4e6" stroke-width="3" stroke-linecap="round"/>
+      <path d="M14 28h92l-10 13H24z" fill="#a8b8c9"/>
+      <path d="M14 28h92l-3 4H17z" fill="#e2e9f1"/>
+      <rect x="50" y="14" width="22" height="14" rx="3" fill="#f3f8fd" stroke="#73869b" stroke-width="2"/>
+      <rect x="27" y="22" width="15" height="6" rx="3" fill="#73869b"/>
+      <rect x="79" y="22" width="15" height="6" rx="3" fill="#73869b"/>
+      <path d="M61 14V3" stroke="#0d2742" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M62 3l10 3.5-10 3.5z" fill="#ff7a59"/>
+    </svg>
+    <h2 id="setup-title">Sea <span>Battle</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="fields">
+      <div class="field"><p class="label" id="l-mode" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="l-mode" data-key="mode"><button type="button" data-value="classic" data-i18n="classic"></button><button type="button" data-value="salvo" data-i18n="salvo"></button></div><p class="hint" id="h-mode"></p></div>
+      <div class="field"><p class="label" id="l-level" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="l-level" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div><p class="hint" id="h-level"></p></div>
+      <div class="field"><p class="label" id="l-fleet" data-i18n="fleet"></p><div class="seg" role="group" aria-labelledby="l-fleet" data-key="fleet"><button type="button" data-value="classic" data-i18n="fleet5"></button><button type="button" data-value="flotilla" data-i18n="fleet10"></button></div><p class="hint" id="h-fleet"></p></div>
+      <div class="field" id="field-bonus"><p class="label" id="l-bonus" data-i18n="bonus"></p><div class="seg" role="group" aria-labelledby="l-bonus" data-key="bonus"><button type="button" data-value="off" data-i18n="off"></button><button type="button" data-value="on" data-i18n="on"></button></div></div>
+      <div class="field"><p class="label" id="l-first" data-i18n="first"></p><div class="seg" role="group" aria-labelledby="l-first" data-key="first"><button type="button" data-value="you" data-i18n="you"></button><button type="button" data-value="coin" data-i18n="coin"></button></div></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="cta" id="start" data-i18n="start"></button>
+      <button type="button" class="ghost-btn" id="stats-btn" data-i18n="stats"></button>
+    </div>
+    <button type="button" class="ghost-btn" id="resume" data-i18n="resume" hidden></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <p class="emoji" id="result-emoji" aria-hidden="true"></p>
+    <h2 id="result-title"></h2>
+    <p class="text" id="result-text"></p>
+    <p class="result-score" id="result-score"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="again" data-i18n="playAgain"></button>
+    <div class="btn-row">
+      <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+      <button type="button" class="ghost-btn" id="view" data-i18n="viewBoard"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="stats" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+    <h2 id="stats-title" data-i18n="statsTitle"></h2>
+    <p class="text" id="stats-for"></p>
+    <table class="stats-table">
+      <thead><tr><th scope="col"><span class="sr-only" data-i18n="difficulty"></span></th><th scope="col" data-i18n="played"></th><th scope="col" data-i18n="won"></th><th scope="col" data-i18n="best"></th><th scope="col" data-i18n="accuracy"></th></tr></thead>
+      <tbody id="stats-body"></tbody>
+    </table>
+    <p class="text small" data-i18n="bestHint"></p>
+    <button type="button" class="cta" id="stats-close" data-i18n="close"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Hide your fleet, hunt down the enemy ships and sink them all before they find yours.',
+      mode: 'Mode', classic: 'Classic', salvo: 'Salvo', classicHint: 'One shot per turn.', salvoHint: 'One shot per turn for every ship you still have afloat.',
+      difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', easyHint: 'Fires mostly at random.', normalHint: 'Searches, then closes in after a hit.', hardHint: 'Plays the odds on every single shot.',
+      fleet: 'Fleet', fleet5: '5 ships', fleet10: '10 ships', fleet5Hint: 'Ships may touch each other.', fleet10Hint: 'Ships may not touch — the water around a sunk ship is revealed.',
+      bonus: 'Hit = shoot again', off: 'Off', on: 'On', first: 'First shot', you: 'You', coin: 'Coin toss',
+      start: 'Set sail', stats: 'Stats', close: 'Close', resume: 'Back to the game', menu: 'Settings', newGame: 'New game',
+      enemyWaters: 'Enemy waters', yourFleet: 'Your fleet', enemyFleet: 'Enemy fleet', boards: 'Boards', dockLabel: 'Ships to place',
+      placeHint: 'Drag your ships onto the grid. Tap a placed ship to rotate it.', toPlace: n => n === 1 ? '1 ship left to place' : `${n} ships left to place`, allPlaced: 'Fleet in position — ready?',
+      rotate: 'Rotate', random: 'Random', clear: 'Clear', ready: 'Ready!', cantPlace: 'A ship can’t go there.',
+      shipBtn: (n, len) => `${n} (${len} ${len === 1 ? 'square' : 'squares'})`, placed: (n, c) => `${n} placed at ${c}`, picked: n => `${n} picked up — choose a square`, rotated: n => `${n} rotated`,
+      yourTurn: 'Your turn — pick a target', aiTurn: 'The enemy is taking aim…', pickMore: n => n === 1 ? 'Pick 1 more target' : `Pick ${n} more targets`, salvoReady: n => `Fire your ${n}-shot salvo!`, fire: 'Fire!', fireN: n => `Fire ×${n}`,
+      youHit: c => `${c}: hit!`, youMiss: c => `${c}: miss`, youSunk: n => `You sank the enemy ${n}!`, again: 'Hit — shoot again!',
+      aiHit: c => `The enemy hit your ship at ${c}`, aiMiss: c => `The enemy missed at ${c}`, aiSunk: n => `Your ${n} was sunk!`,
+      salvoResult: (h, n) => `Salvo: ${h} of ${n} hit`, aiSalvo: (h, n) => `Enemy salvo: ${h} of ${n} hit`, youFirst: 'You fire first.', aiFirst: 'The enemy fires first.',
+      youWin: 'Victory!', youLose: 'Fleet lost', winText: n => `You sank the entire enemy fleet in ${n} shots.`, loseText: 'The enemy sank your whole fleet. Their surviving ships are now revealed.',
+      shots: 'Shots', hits: 'Hits', accuracy: 'Accuracy', summary: (s, h, a) => `${s} shots · ${h} hits · ${a}% accuracy`,
+      playAgain: 'Play again', change: 'Change settings', viewBoard: 'See the boards', newBest: 'New record: fewest shots!',
+      statsTitle: 'Your stats', played: 'Played', won: 'Won', best: 'Best', bestHint: 'Best = fewest shots needed to win.',
+      enemyBoard: 'Enemy waters, 10 by 10 grid', myBoard: 'Your fleet, 10 by 10 grid',
+      st: { unknown: 'not fired at', miss: 'miss', hit: 'hit', sunk: 'sunk', clear: 'open water', ship: 'your ship', water: 'water', target: 'targeted' },
+      ships: { carrier: 'Carrier', cruiser: 'Cruiser', submarine: 'Submarine', frigate: 'Frigate', destroyer: 'Destroyer', patrol: 'Patrol boat' },
+      keysPlace: 'Keys: 1–0 pick a ship · arrows move · Enter places · R rotates', keysBattle: 'Tap a square to fire · arrows + Enter · F fires a salvo',
+    },
+    vi: {
+      tagline: 'Giấu kín hạm đội, truy lùng tàu địch và đánh chìm tất cả trước khi chúng tìm ra bạn.',
+      mode: 'Chế độ', classic: 'Cổ điển', salvo: 'Loạt bắn', classicHint: 'Mỗi lượt bắn một phát.', salvoHint: 'Mỗi tàu còn nổi cho bạn một phát bắn mỗi lượt.',
+      difficulty: 'Độ khó', easy: 'Dễ', normal: 'Vừa', hard: 'Khó', easyHint: 'Chủ yếu bắn ngẫu nhiên.', normalHint: 'Dò tìm, trúng rồi thì bám đuổi.', hardHint: 'Tính xác suất cho từng phát bắn.',
+      fleet: 'Hạm đội', fleet5: '5 tàu', fleet10: '10 tàu', fleet5Hint: 'Các tàu được đặt sát nhau.', fleet10Hint: 'Các tàu không được chạm nhau — vùng nước quanh tàu chìm sẽ lộ ra.',
+      bonus: 'Trúng được bắn tiếp', off: 'Tắt', on: 'Bật', first: 'Bắn trước', you: 'Bạn', coin: 'Tung đồng xu',
+      start: 'Ra khơi', stats: 'Thống kê', close: 'Đóng', resume: 'Quay lại ván chơi', menu: 'Cài đặt', newGame: 'Ván mới',
+      enemyWaters: 'Vùng biển địch', yourFleet: 'Hạm đội của bạn', enemyFleet: 'Hạm đội địch', boards: 'Bàn chơi', dockLabel: 'Tàu cần đặt',
+      placeHint: 'Kéo tàu vào lưới. Chạm vào tàu đã đặt để xoay.', toPlace: n => `Còn ${n} tàu cần đặt`, allPlaced: 'Hạm đội đã vào vị trí — sẵn sàng chưa?',
+      rotate: 'Xoay', random: 'Ngẫu nhiên', clear: 'Xóa', ready: 'Sẵn sàng!', cantPlace: 'Không thể đặt tàu ở đó.',
+      shipBtn: (n, len) => `${n} (${len} ô)`, placed: (n, c) => `Đã đặt ${n} tại ${c}`, picked: n => `Đã nhấc ${n} — chọn ô mới`, rotated: n => `Đã xoay ${n}`,
+      yourTurn: 'Lượt của bạn — chọn mục tiêu', aiTurn: 'Địch đang ngắm bắn…', pickMore: n => `Chọn thêm ${n} mục tiêu`, salvoReady: n => `Khai hỏa loạt ${n} phát!`, fire: 'Khai hỏa!', fireN: n => `Khai hỏa ×${n}`,
+      youHit: c => `${c}: trúng!`, youMiss: c => `${c}: trượt`, youSunk: n => `Bạn đã đánh chìm ${n} của địch!`, again: 'Trúng rồi — bắn tiếp!',
+      aiHit: c => `Địch bắn trúng tàu bạn tại ${c}`, aiMiss: c => `Địch bắn trượt tại ${c}`, aiSunk: n => `${n} của bạn đã bị đánh chìm!`,
+      salvoResult: (h, n) => `Loạt bắn: trúng ${h}/${n}`, aiSalvo: (h, n) => `Loạt bắn của địch: trúng ${h}/${n}`, youFirst: 'Bạn được bắn trước.', aiFirst: 'Địch được bắn trước.',
+      youWin: 'Chiến thắng!', youLose: 'Hạm đội bị đánh chìm', winText: n => `Bạn đã đánh chìm toàn bộ hạm đội địch sau ${n} phát bắn.`, loseText: 'Địch đã đánh chìm cả hạm đội của bạn. Các tàu địch còn lại giờ đã lộ diện.',
+      shots: 'Phát bắn', hits: 'Trúng', accuracy: 'Chính xác', summary: (s, h, a) => `${s} phát · ${h} trúng · chính xác ${a}%`,
+      playAgain: 'Chơi lại', change: 'Đổi cài đặt', viewBoard: 'Xem bàn chơi', newBest: 'Kỷ lục mới: ít phát bắn nhất!',
+      statsTitle: 'Thống kê của bạn', played: 'Đã chơi', won: 'Thắng', best: 'Tốt nhất', bestHint: 'Tốt nhất = ít phát bắn nhất để giành chiến thắng.',
+      enemyBoard: 'Vùng biển địch, lưới 10 × 10', myBoard: 'Hạm đội của bạn, lưới 10 × 10',
+      st: { unknown: 'chưa bắn', miss: 'trượt', hit: 'trúng', sunk: 'đã chìm', clear: 'nước trống', ship: 'tàu của bạn', water: 'nước', target: 'đã nhắm' },
+      ships: { carrier: 'Tàu sân bay', cruiser: 'Tuần dương hạm', submarine: 'Tàu ngầm', frigate: 'Khinh hạm', destroyer: 'Khu trục hạm', patrol: 'Tàu tuần tra' },
+      keysPlace: 'Phím: 1–0 chọn tàu · mũi tên di chuyển · Enter đặt · R xoay', keysBattle: 'Chạm vào ô để bắn · mũi tên + Enter · F để khai hỏa loạt bắn',
+    },
+    zh: {
+      tagline: '藏好你的舰队，搜寻敌舰，赶在被发现之前将它们全部击沉。',
+      mode: '模式', classic: '经典', salvo: '齐射', classicHint: '每回合射击一次。', salvoHint: '每艘未沉的舰船每回合可射击一次。',
+      difficulty: '难度', easy: '简单', normal: '普通', hard: '困难', easyHint: '基本随机开火。', normalHint: '先搜索，命中后紧追不放。', hardHint: '每一炮都计算概率。',
+      fleet: '舰队', fleet5: '5 艘舰船', fleet10: '10 艘舰船', fleet5Hint: '舰船之间可以相邻。', fleet10Hint: '舰船之间不能相邻——击沉后周围海域会被揭示。',
+      bonus: '命中后再射一次', off: '关', on: '开', first: '先手', you: '你', coin: '掷硬币',
+      start: '起航', stats: '统计', close: '关闭', resume: '返回游戏', menu: '设置', newGame: '新游戏',
+      enemyWaters: '敌方海域', yourFleet: '我方舰队', enemyFleet: '敌方舰队', boards: '棋盘', dockLabel: '待部署舰船',
+      placeHint: '把舰船拖到网格上。点击已放置的舰船可旋转。', toPlace: n => `还有 ${n} 艘舰船待部署`, allPlaced: '舰队已就位——准备好了吗？',
+      rotate: '旋转', random: '随机', clear: '清空', ready: '准备完毕！', cantPlace: '那里无法放置舰船。',
+      shipBtn: (n, len) => `${n}（${len} 格）`, placed: (n, c) => `${n}已部署在 ${c}`, picked: n => `已拿起${n}——请选择新位置`, rotated: n => `${n}已旋转`,
+      yourTurn: '轮到你——选择目标', aiTurn: '敌人正在瞄准…', pickMore: n => `再选择 ${n} 个目标`, salvoReady: n => `发射 ${n} 发齐射！`, fire: '开火！', fireN: n => `开火 ×${n}`,
+      youHit: c => `${c}：命中！`, youMiss: c => `${c}：未命中`, youSunk: n => `你击沉了敌方${n}！`, again: '命中——再射一次！',
+      aiHit: c => `敌人在 ${c} 击中了你的舰船`, aiMiss: c => `敌人在 ${c} 未命中`, aiSunk: n => `你的${n}被击沉了！`,
+      salvoResult: (h, n) => `齐射：${n} 发命中 ${h} 发`, aiSalvo: (h, n) => `敌方齐射：${n} 发命中 ${h} 发`, youFirst: '你先开火。', aiFirst: '敌人先开火。',
+      youWin: '胜利！', youLose: '舰队覆没', winText: n => `你用 ${n} 发炮弹击沉了全部敌舰。`, loseText: '敌人击沉了你的整支舰队。敌方幸存的舰船现已显示。',
+      shots: '射击', hits: '命中', accuracy: '命中率', summary: (s, h, a) => `射击 ${s} 次 · 命中 ${h} 次 · 命中率 ${a}%`,
+      playAgain: '再玩一次', change: '更改设置', viewBoard: '查看棋盘', newBest: '新纪录：射击次数最少！',
+      statsTitle: '我的统计', played: '场次', won: '胜场', best: '最佳', bestHint: '最佳 = 获胜所用的最少射击次数。',
+      enemyBoard: '敌方海域，10 × 10 网格', myBoard: '我方舰队，10 × 10 网格',
+      st: { unknown: '未射击', miss: '未命中', hit: '命中', sunk: '已击沉', clear: '空海域', ship: '我方舰船', water: '海水', target: '已瞄准' },
+      ships: { carrier: '航空母舰', cruiser: '巡洋舰', submarine: '潜艇', frigate: '护卫舰', destroyer: '驱逐舰', patrol: '巡逻艇' },
+      keysPlace: '按键：1–0 选择舰船 · 方向键移动 · Enter 放置 · R 旋转', keysBattle: '点击格子开火 · 方向键 + Enter · F 发射齐射',
+    },
+    fr: {
+      tagline: 'Cachez votre flotte, traquez les navires ennemis et coulez-les tous avant qu’ils ne trouvent les vôtres.',
+      mode: 'Mode', classic: 'Classique', salvo: 'Salve', classicHint: 'Un tir par tour.', salvoHint: 'Un tir par tour pour chaque navire encore à flot.',
+      difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile', easyHint: 'Tire surtout au hasard.', normalHint: 'Cherche, puis s’acharne après une touche.', hardHint: 'Calcule les probabilités à chaque tir.',
+      fleet: 'Flotte', fleet5: '5 navires', fleet10: '10 navires', fleet5Hint: 'Les navires peuvent se toucher.', fleet10Hint: 'Les navires ne peuvent pas se toucher — l’eau autour d’un navire coulé est révélée.',
+      bonus: 'Touché = on rejoue', off: 'Non', on: 'Oui', first: 'Premier tir', you: 'Vous', coin: 'Pile ou face',
+      start: 'Larguer les amarres', stats: 'Stats', close: 'Fermer', resume: 'Reprendre la partie', menu: 'Réglages', newGame: 'Nouvelle partie',
+      enemyWaters: 'Eaux ennemies', yourFleet: 'Votre flotte', enemyFleet: 'Flotte ennemie', boards: 'Grilles', dockLabel: 'Navires à placer',
+      placeHint: 'Glissez vos navires sur la grille. Touchez un navire placé pour le tourner.', toPlace: n => n === 1 ? 'Encore 1 navire à placer' : `Encore ${n} navires à placer`, allPlaced: 'Flotte en position — prêt ?',
+      rotate: 'Tourner', random: 'Au hasard', clear: 'Vider', ready: 'Prêt !', cantPlace: 'Impossible de placer un navire ici.',
+      shipBtn: (n, len) => `${n} (${len} ${len === 1 ? 'case' : 'cases'})`, placed: (n, c) => `${n} placé en ${c}`, picked: n => `${n} soulevé — choisissez une case`, rotated: n => `${n} tourné`,
+      yourTurn: 'À vous — choisissez une cible', aiTurn: 'L’ennemi ajuste son tir…', pickMore: n => n === 1 ? 'Encore 1 cible à choisir' : `Encore ${n} cibles à choisir`, salvoReady: n => `Lancez votre salve de ${n} tirs !`, fire: 'Feu !', fireN: n => `Feu ×${n}`,
+      youHit: c => `${c} : touché !`, youMiss: c => `${c} : à l’eau`, youSunk: n => `Coulé ! Navire ennemi envoyé par le fond : ${n}.`, again: 'Touché — rejouez !',
+      aiHit: c => `L’ennemi a touché votre navire en ${c}`, aiMiss: c => `L’ennemi a tiré dans l’eau en ${c}`, aiSunk: n => `Coulé : votre ${n} a sombré !`,
+      salvoResult: (h, n) => `Salve : ${h} sur ${n} au but`, aiSalvo: (h, n) => `Salve ennemie : ${h} sur ${n} au but`, youFirst: 'Vous tirez en premier.', aiFirst: 'L’ennemi tire en premier.',
+      youWin: 'Victoire !', youLose: 'Flotte coulée', winText: n => `Vous avez coulé toute la flotte ennemie en ${n} tirs.`, loseText: 'L’ennemi a coulé toute votre flotte. Ses navires restants sont maintenant révélés.',
+      shots: 'Tirs', hits: 'Touchés', accuracy: 'Précision', summary: (s, h, a) => `${s} tirs · ${h} touchés · ${a} % de précision`,
+      playAgain: 'Rejouer', change: 'Modifier les réglages', viewBoard: 'Voir les grilles', newBest: 'Record : le moins de tirs !',
+      statsTitle: 'Vos statistiques', played: 'Parties', won: 'Victoires', best: 'Record', bestHint: 'Record = le moins de tirs pour gagner.',
+      enemyBoard: 'Eaux ennemies, grille de 10 sur 10', myBoard: 'Votre flotte, grille de 10 sur 10',
+      st: { unknown: 'pas encore visé', miss: 'à l’eau', hit: 'touché', sunk: 'coulé', clear: 'eau libre', ship: 'votre navire', water: 'eau', target: 'ciblé' },
+      ships: { carrier: 'Porte-avions', cruiser: 'Croiseur', submarine: 'Sous-marin', frigate: 'Frégate', destroyer: 'Destroyer', patrol: 'Patrouilleur' },
+      keysPlace: 'Touches : 1–0 choisir un navire · flèches déplacer · Entrée placer · R tourner', keysBattle: 'Touchez une case pour tirer · flèches + Entrée · F tire la salve',
+    },
+    th: {
+      tagline: 'ซ่อนกองเรือของคุณ ตามล่าเรือศัตรู แล้วจมให้หมดก่อนที่พวกเขาจะหาคุณเจอ',
+      mode: 'โหมด', classic: 'คลาสสิก', salvo: 'ยิงชุด', classicHint: 'ยิงได้ตาละหนึ่งนัด', salvoHint: 'ทุกตาได้ยิงหนึ่งนัดต่อเรือที่ยังลอยอยู่หนึ่งลำ',
+      difficulty: 'ระดับความยาก', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก', easyHint: 'ยิงแบบสุ่มเป็นส่วนใหญ่', normalHint: 'ค้นหา แล้วไล่ยิงเมื่อโดนเป้า', hardHint: 'คำนวณความน่าจะเป็นทุกนัด',
+      fleet: 'กองเรือ', fleet5: '5 ลำ', fleet10: '10 ลำ', fleet5Hint: 'วางเรือชิดกันได้', fleet10Hint: 'เรือห้ามชิดกัน — น่านน้ำรอบเรือที่จมจะถูกเปิดเผย',
+      bonus: 'ยิงโดนได้ยิงต่อ', off: 'ปิด', on: 'เปิด', first: 'ใครยิงก่อน', you: 'คุณ', coin: 'โยนเหรียญ',
+      start: 'ออกเรือ', stats: 'สถิติ', close: 'ปิด', resume: 'กลับไปที่เกม', menu: 'ตั้งค่า', newGame: 'เกมใหม่',
+      enemyWaters: 'น่านน้ำศัตรู', yourFleet: 'กองเรือของคุณ', enemyFleet: 'กองเรือศัตรู', boards: 'กระดาน', dockLabel: 'เรือที่ต้องวาง',
+      placeHint: 'ลากเรือลงบนตาราง แตะเรือที่วางแล้วเพื่อหมุน', toPlace: n => `เหลือเรือที่ต้องวาง ${n} ลำ`, allPlaced: 'กองเรือพร้อมแล้ว — เริ่มเลยไหม?',
+      rotate: 'หมุน', random: 'สุ่ม', clear: 'ล้าง', ready: 'พร้อม!', cantPlace: 'วางเรือตรงนั้นไม่ได้',
+      shipBtn: (n, len) => `${n} (${len} ช่อง)`, placed: (n, c) => `วาง${n}ที่ ${c}`, picked: n => `ยก${n}ขึ้นแล้ว — เลือกช่องใหม่`, rotated: n => `หมุน${n}แล้ว`,
+      yourTurn: 'ตาของคุณ — เลือกเป้าหมาย', aiTurn: 'ศัตรูกำลังเล็ง…', pickMore: n => `เลือกเป้าหมายอีก ${n} ช่อง`, salvoReady: n => `ยิงชุด ${n} นัดได้เลย!`, fire: 'ยิง!', fireN: n => `ยิง ×${n}`,
+      youHit: c => `${c}: โดน!`, youMiss: c => `${c}: พลาด`, youSunk: n => `คุณจม${n}ของศัตรูแล้ว!`, again: 'โดน — ยิงต่อได้!',
+      aiHit: c => `ศัตรูยิงโดนเรือของคุณที่ ${c}`, aiMiss: c => `ศัตรูยิงพลาดที่ ${c}`, aiSunk: n => `${n}ของคุณถูกจมแล้ว!`,
+      salvoResult: (h, n) => `ยิงชุด: โดน ${h} จาก ${n} นัด`, aiSalvo: (h, n) => `ศัตรูยิงชุด: โดน ${h} จาก ${n} นัด`, youFirst: 'คุณได้ยิงก่อน', aiFirst: 'ศัตรูได้ยิงก่อน',
+      youWin: 'ชนะแล้ว!', youLose: 'กองเรือถูกจม', winText: n => `คุณจมกองเรือศัตรูทั้งหมดด้วยการยิง ${n} นัด`, loseText: 'ศัตรูจมกองเรือของคุณจนหมด เรือที่เหลือของศัตรูถูกเปิดเผยแล้ว',
+      shots: 'นัดที่ยิง', hits: 'โดน', accuracy: 'ความแม่น', summary: (s, h, a) => `ยิง ${s} นัด · โดน ${h} · แม่นยำ ${a}%`,
+      playAgain: 'เล่นอีกครั้ง', change: 'เปลี่ยนการตั้งค่า', viewBoard: 'ดูกระดาน', newBest: 'สถิติใหม่: ยิงน้อยที่สุด!',
+      statsTitle: 'สถิติของคุณ', played: 'เล่น', won: 'ชนะ', best: 'ดีที่สุด', bestHint: 'ดีที่สุด = จำนวนนัดน้อยที่สุดที่ใช้จนชนะ',
+      enemyBoard: 'น่านน้ำศัตรู ตาราง 10 × 10', myBoard: 'กองเรือของคุณ ตาราง 10 × 10',
+      st: { unknown: 'ยังไม่ได้ยิง', miss: 'พลาด', hit: 'โดน', sunk: 'จมแล้ว', clear: 'น้ำว่าง', ship: 'เรือของคุณ', water: 'น้ำ', target: 'เล็งไว้' },
+      ships: { carrier: 'เรือบรรทุกเครื่องบิน', cruiser: 'เรือลาดตระเวน', submarine: 'เรือดำน้ำ', frigate: 'เรือฟริเกต', destroyer: 'เรือพิฆาต', patrol: 'เรือตรวจการณ์' },
+      keysPlace: 'ปุ่ม: 1–0 เลือกเรือ · ลูกศรเลื่อน · Enter วาง · R หมุน', keysBattle: 'แตะช่องเพื่อยิง · ลูกศร + Enter · F ยิงชุด',
+    },
+    ja: {
+      tagline: '艦隊を隠し、敵艦を探し出して、見つかる前にすべて沈めよう。',
+      mode: 'モード', classic: 'クラシック', salvo: '一斉射撃', classicHint: '1ターンに1発。', salvoHint: '残っている艦1隻につき、1ターンに1発撃てます。',
+      difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', easyHint: 'ほぼランダムに撃ちます。', normalHint: '探索し、命中したら追い込みます。', hardHint: '毎回、確率を計算して撃ちます。',
+      fleet: '艦隊', fleet5: '5隻', fleet10: '10隻', fleet5Hint: '艦同士を隣接させて置けます。', fleet10Hint: '艦同士は隣接できません。撃沈した艦の周りの海域が明らかになります。',
+      bonus: '命中したらもう1発', off: 'オフ', on: 'オン', first: '先攻', you: 'あなた', coin: 'コイントス',
+      start: '出航', stats: '成績', close: '閉じる', resume: 'ゲームに戻る', menu: '設定', newGame: '新しいゲーム',
+      enemyWaters: '敵の海域', yourFleet: 'あなたの艦隊', enemyFleet: '敵艦隊', boards: 'ボード', dockLabel: '配置する艦',
+      placeHint: '艦をグリッドにドラッグ。配置した艦をタップすると回転します。', toPlace: n => `あと${n}隻配置してください`, allPlaced: '艦隊の配置完了 — 準備はいい？',
+      rotate: '回転', random: 'ランダム', clear: 'クリア', ready: '準備完了！', cantPlace: 'そこには置けません。',
+      shipBtn: (n, len) => `${n}（${len}マス）`, placed: (n, c) => `${n}を${c}に配置`, picked: n => `${n}を持ち上げました — マスを選んでください`, rotated: n => `${n}を回転`,
+      yourTurn: 'あなたの番 — 目標を選ぼう', aiTurn: '敵が狙いを定めています…', pickMore: n => `あと${n}か所選んでください`, salvoReady: n => `${n}発の一斉射撃！`, fire: '発射！', fireN: n => `発射 ×${n}`,
+      youHit: c => `${c}：命中！`, youMiss: c => `${c}：はずれ`, youSunk: n => `敵の${n}を撃沈！`, again: '命中 — もう1発！',
+      aiHit: c => `敵の砲撃が${c}であなたの艦に命中`, aiMiss: c => `敵の砲撃は${c}ではずれ`, aiSunk: n => `あなたの${n}が撃沈されました！`,
+      salvoResult: (h, n) => `一斉射撃：${n}発中${h}発命中`, aiSalvo: (h, n) => `敵の一斉射撃：${n}発中${h}発命中`, youFirst: 'あなたが先攻です。', aiFirst: '敵が先攻です。',
+      youWin: '勝利！', youLose: '艦隊全滅', winText: n => `${n}発で敵艦隊をすべて撃沈しました。`, loseText: 'あなたの艦隊は全滅しました。生き残った敵艦の位置が表示されています。',
+      shots: '射撃数', hits: '命中', accuracy: '命中率', summary: (s, h, a) => `${s}発 · 命中${h} · 命中率${a}%`,
+      playAgain: 'もう一度', change: '設定を変える', viewBoard: 'ボードを見る', newBest: '新記録：最少射撃数！',
+      statsTitle: 'あなたの成績', played: 'プレイ', won: '勝利', best: 'ベスト', bestHint: 'ベスト = 勝利までの最少射撃数。',
+      enemyBoard: '敵の海域、10×10マス', myBoard: 'あなたの艦隊、10×10マス',
+      st: { unknown: '未攻撃', miss: 'はずれ', hit: '命中', sunk: '撃沈', clear: '何もない海域', ship: 'あなたの艦', water: '海', target: '照準中' },
+      ships: { carrier: '空母', cruiser: '巡洋艦', submarine: '潜水艦', frigate: 'フリゲート', destroyer: '駆逐艦', patrol: '哨戒艇' },
+      keysPlace: 'キー：1–0 艦を選択 · 矢印で移動 · Enterで配置 · Rで回転', keysBattle: 'マスをタップして発射 · 矢印 + Enter · Fで一斉射撃',
+    },
+    ko: {
+      tagline: '함대를 숨기고 적 함선을 찾아내, 들키기 전에 모두 격침하세요.',
+      mode: '모드', classic: '클래식', salvo: '일제 사격', classicHint: '한 턴에 한 발.', salvoHint: '떠 있는 함선 한 척당 한 턴에 한 발씩 쏩니다.',
+      difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', easyHint: '대부분 무작위로 쏩니다.', normalHint: '탐색하다가 명중하면 몰아붙입니다.', hardHint: '매번 확률을 계산해 쏩니다.',
+      fleet: '함대', fleet5: '5척', fleet10: '10척', fleet5Hint: '함선끼리 붙여 놓을 수 있어요.', fleet10Hint: '함선끼리 닿을 수 없어요. 격침된 함선 주변 바다가 드러납니다.',
+      bonus: '명중 시 한 번 더', off: '끔', on: '켬', first: '선공', you: '나', coin: '동전 던지기',
+      start: '출항', stats: '기록', close: '닫기', resume: '게임으로 돌아가기', menu: '설정', newGame: '새 게임',
+      enemyWaters: '적 해역', yourFleet: '내 함대', enemyFleet: '적 함대', boards: '게임판', dockLabel: '배치할 함선',
+      placeHint: '함선을 격자로 끌어다 놓으세요. 배치한 함선을 탭하면 회전합니다.', toPlace: n => `배치할 함선 ${n}척 남음`, allPlaced: '함대 배치 완료 — 준비됐나요?',
+      rotate: '회전', random: '무작위', clear: '비우기', ready: '준비 완료!', cantPlace: '그곳에는 놓을 수 없어요.',
+      shipBtn: (n, len) => `${n} (${len}칸)`, placed: (n, c) => `${n} ${c}에 배치`, picked: n => `${n} 들어 올림 — 칸을 고르세요`, rotated: n => `${n} 회전`,
+      yourTurn: '내 차례 — 목표를 고르세요', aiTurn: '적이 조준 중…', pickMore: n => `목표 ${n}곳을 더 고르세요`, salvoReady: n => `${n}발 일제 사격!`, fire: '발사!', fireN: n => `발사 ×${n}`,
+      youHit: c => `${c}: 명중!`, youMiss: c => `${c}: 빗나감`, youSunk: n => `적 ${n} 격침!`, again: '명중 — 한 번 더!',
+      aiHit: c => `적이 ${c}에서 내 함선을 맞혔어요`, aiMiss: c => `적의 포탄이 ${c}에서 빗나갔어요`, aiSunk: n => `내 ${n} 격침됨!`,
+      salvoResult: (h, n) => `일제 사격: ${n}발 중 ${h}발 명중`, aiSalvo: (h, n) => `적 일제 사격: ${n}발 중 ${h}발 명중`, youFirst: '내가 먼저 쏩니다.', aiFirst: '적이 먼저 쏩니다.',
+      youWin: '승리!', youLose: '함대 전멸', winText: n => `${n}발 만에 적 함대를 모두 격침했어요.`, loseText: '적이 내 함대를 모두 격침했어요. 살아남은 적 함선의 위치가 공개됩니다.',
+      shots: '사격', hits: '명중', accuracy: '명중률', summary: (s, h, a) => `${s}발 · 명중 ${h} · 명중률 ${a}%`,
+      playAgain: '다시 하기', change: '설정 변경', viewBoard: '게임판 보기', newBest: '신기록: 최소 사격!',
+      statsTitle: '내 기록', played: '플레이', won: '승리', best: '최고', bestHint: '최고 = 승리까지 가장 적은 사격 수.',
+      enemyBoard: '적 해역, 10×10 격자', myBoard: '내 함대, 10×10 격자',
+      st: { unknown: '미사격', miss: '빗나감', hit: '명중', sunk: '격침', clear: '빈 바다', ship: '내 함선', water: '바다', target: '조준됨' },
+      ships: { carrier: '항공모함', cruiser: '순양함', submarine: '잠수함', frigate: '호위함', destroyer: '구축함', patrol: '초계정' },
+      keysPlace: '키: 1–0 함선 선택 · 화살표 이동 · Enter 배치 · R 회전', keysBattle: '칸을 탭해 발사 · 화살표 + Enter · F 일제 사격',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = { cell: (c, s) => `${c}, ${s}`, statsFor: (m, f, l) => `${m} · ${f}`, ...I18N[lang] };
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // ---- Board model -----------------------------------------------------------------------------
+  const N = 10, CELLS = N * N, LETTERS = 'ABCDEFGHIJ';
+  // What the attacker knows about a cell. PEND only exists in the AI's scratch copy while it plans a salvo.
+  const UNKNOWN = 0, MISS = 1, HIT = 2, SUNK = 3, CLEAR = 4, PEND = 5;
+  const LEN = { carrier: 5, cruiser: 4, submarine: 3, frigate: 3, destroyer: 2, patrol: 1 };
+  const FLEETS = {
+    classic: ['carrier', 'cruiser', 'submarine', 'frigate', 'destroyer'],
+    flotilla: ['cruiser', 'frigate', 'frigate', 'destroyer', 'destroyer', 'destroyer', 'patrol', 'patrol', 'patrol', 'patrol'],
+  };
+  const OPTIONS = { mode: ['classic', 'salvo'], level: ['easy', 'normal', 'hard'], fleet: ['classic', 'flotilla'], bonus: ['off', 'on'], first: ['you', 'coin'] };
+  const STORE = { settings: 'milaan.seaBattle.settings', stats: 'milaan.seaBattle.stats' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const rowOf = i => (i / N) | 0;
+  const colOf = i => i % N;
+  const coord = i => LETTERS[colOf(i)] + (rowOf(i) + 1);
+  const step = (i, dr, dc) => { const r = rowOf(i) + dr, c = colOf(i) + dc; return r < 0 || r >= N || c < 0 || c >= N ? -1 : r * N + c; };
+  const DIR4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const NB4 = [], NB8 = [], DIAG = [];
+  for (let i = 0; i < CELLS; i++) {
+    NB4[i] = []; NB8[i] = []; DIAG[i] = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const j = (dr || dc) ? step(i, dr, dc) : -1;
+      if (j < 0) continue;
+      NB8[i].push(j);
+      (dr && dc ? DIAG[i] : NB4[i]).push(j);
+    }
+  }
+  function lineCells(r, c, len, vert) {
+    if (r < 0 || c < 0 || (vert ? r + len > N || c >= N : c + len > N || r >= N)) return null;
+    return Array.from({ length: len }, (_, k) => vert ? (r + k) * N + c : r * N + c + k);
+  }
+  const PLACEMENTS = {};
+  for (let len = 1; len <= 5; len++) {
+    PLACEMENTS[len] = [];
+    for (const vert of len === 1 ? [false] : [false, true]) for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const cells = lineCells(r, c, len, vert);
+      if (cells) PLACEMENTS[len].push(cells);
+    }
+  }
+
+  function makeSide(fleet) {
+    return {
+      ships: FLEETS[fleet].map((type, k) => ({ k, type, len: LEN[type], cells: [], r: 0, c: 0, vert: false, hits: 0, sunk: false })),
+      owner: new Int8Array(CELLS).fill(-1),
+      view: new Uint8Array(CELLS),
+    };
+  }
+  const isPlaced = ship => ship.cells.length > 0;
+  const afloat = side => side.ships.filter(s => !s.sunk).length;
+  const remainingLens = side => side.ships.filter(s => !s.sunk).map(s => s.len);
+  const countView = (view, v) => view.reduce((n, x) => n + (x === v), 0);
+  const shipName = ship => t.ships[ship.type];
+
+  function fits(side, k, cells, touch) {
+    if (!cells) return false;
+    for (const i of cells) {
+      const o = side.owner[i];
+      if (o >= 0 && o !== k) return false;
+      if (!touch) for (const j of NB8[i]) { const o2 = side.owner[j]; if (o2 >= 0 && o2 !== k) return false; }
+    }
+    return true;
+  }
+  function liftShip(side, k) {
+    const ship = side.ships[k];
+    for (const i of ship.cells) side.owner[i] = -1;
+    ship.cells = [];
+  }
+  function setShip(side, k, r, c, vert) {
+    const ship = side.ships[k];
+    liftShip(side, k);
+    Object.assign(ship, { r, c, vert, cells: lineCells(r, c, ship.len, vert) });
+    for (const i of ship.cells) side.owner[i] = k;
+  }
+  // Uniform over all legal spots for each ship, biggest first; restart in the rare dead end.
+  function autoPlace(side, touch) {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      side.ships.forEach(s => liftShip(side, s.k));
+      let ok = true;
+      for (const ship of [...side.ships].sort((a, b) => b.len - a.len)) {
+        const options = PLACEMENTS[ship.len].filter(cells => fits(side, ship.k, cells, touch));
+        if (!options.length) { ok = false; break; }
+        const cells = options[Math.floor(Math.random() * options.length)];
+        setShip(side, ship.k, rowOf(cells[0]), colOf(cells[0]), cells.length > 1 && cells[1] - cells[0] === N);
+      }
+      if (ok) return;
+    }
+  }
+  function fireAt(side, i, touch) {
+    const k = side.owner[i];
+    if (k < 0) { side.view[i] = MISS; return { i, hit: false, sunk: null }; }
+    side.view[i] = HIT;
+    const ship = side.ships[k];
+    ship.hits++;
+    if (ship.hits < ship.len) return { i, hit: true, sunk: null };
+    ship.sunk = true;
+    for (const j of ship.cells) side.view[j] = SUNK;
+    if (!touch) for (const j of ship.cells) for (const n of NB8[j]) if (side.view[n] === UNKNOWN) side.view[n] = CLEAR;
+    return { i, hit: true, sunk: ship };
+  }
+
+  // ---- Computer player -------------------------------------------------------------------------
+  // The AI only ever reads the public view of your waters (misses, hits, sunk ships) plus the list
+  // of ship lengths still afloat — never where your ships actually are.
+  const pickRandom = arr => arr.length ? arr[Math.floor(Math.random() * arr.length)] : -1;
+  const cellsWith = (view, v) => { const out = []; for (let i = 0; i < CELLS; i++) if (view[i] === v) out.push(i); return out; };
+
+  function easyPick(view) {
+    const hits = cellsWith(view, HIT);
+    if (hits.length && Math.random() < 0.2) {
+      const near = hits.flatMap(h => NB4[h]).filter(j => view[j] === UNKNOWN);
+      if (near.length) return pickRandom(near);
+    }
+    return pickRandom(cellsWith(view, UNKNOWN));
+  }
+
+  // Hunt at random; after a hit, try its neighbours, preferring cells that extend a line of hits.
+  function huntTargetPick(view) {
+    const line = [], near = [];
+    for (const h of cellsWith(view, HIT)) for (const [dr, dc] of DIR4) {
+      const n = step(h, dr, dc);
+      if (n < 0 || view[n] !== UNKNOWN) continue;
+      const back = step(h, -dr, -dc);
+      (back >= 0 && view[back] === HIT ? line : near).push(n);
+    }
+    return pickRandom(line.length ? line : near.length ? near : cellsWith(view, UNKNOWN));
+  }
+
+  function touchesOtherHit(cells, view) {
+    for (const i of cells) for (const j of NB8[i]) if (view[j] === HIT && !cells.includes(j)) return true;
+    return false;
+  }
+
+  // Probability density: count every way each remaining ship could still lie. While there are
+  // unsunk hits only layouts through them count, weighted steeply by how many hits they explain.
+  function density(view, remaining, touch, useHits = true) {
+    const hits = cellsWith(view, HIT);
+    const target = useHits && hits.length > 0;
+    const blocked = new Uint8Array(CELLS);
+    for (let i = 0; i < CELLS; i++) if (view[i] !== UNKNOWN && (view[i] !== HIT || !useHits)) blocked[i] = 1;
+    // Ships can't touch: the diagonal neighbours of any hit must be water.
+    if (!touch) for (const h of hits) for (const d of DIAG[h]) if (view[d] === UNKNOWN) blocked[d] = 1;
+    const w = new Float64Array(CELLS);
+    let any = false;
+    for (const len of remaining) for (const cells of PLACEMENTS[len]) {
+      let h = 0, ok = true;
+      for (const i of cells) { if (blocked[i]) { ok = false; break; } if (view[i] === HIT) h++; }
+      if (!ok || (target && !h)) continue;
+      if (!touch && h && touchesOtherHit(cells, view)) continue;
+      const weight = h ? 40 ** h : 1;
+      for (const i of cells) if (view[i] === UNKNOWN) { w[i] += weight; any = true; }
+    }
+    if (!any && target) return density(view, remaining, touch, false);
+    return w;
+  }
+
+  function densityPick(view, remaining, touch) {
+    const w = density(view, remaining, touch);
+    let max = 0, ties = [];
+    for (let i = 0; i < CELLS; i++) {
+      if (w[i] > max * 1.0000001) { max = w[i]; ties = [i]; }
+      else if (max > 0 && w[i] >= max * 0.9999999) ties.push(i);
+    }
+    return ties.length ? pickRandom(ties) : huntTargetPick(view);
+  }
+
+  function aiPick(view, remaining, level, touch) {
+    if (level === 'easy') return easyPick(view);
+    if (level === 'normal') return huntTargetPick(view);
+    return densityPick(view, remaining, touch);
+  }
+
+  // A salvo is planned on a scratch copy: each chosen cell is marked pending so the next pick spreads out.
+  function aiVolley(view, remaining, n, level, touch) {
+    const scratch = Uint8Array.from(view), out = [];
+    while (out.length < n) {
+      const i = aiPick(scratch, remaining, level, touch);
+      if (i < 0) break;
+      out.push(i);
+      scratch[i] = PEND;
+    }
+    return out;
+  }
+
+  // ---- State -----------------------------------------------------------------------------------
+  const $ = id => document.getElementById(id);
+  const app = $('app');
+  const els = {
+    play: $('play'), status: $('status'), announcer: $('announcer'), tip: $('tip'), dock: $('dock'),
+    rotate: $('rotate-btn'), random: $('random-btn'), clear: $('clear-btn'), ready: $('ready-btn'), fire: $('fire-btn'),
+    shots: $('st-shots'), hits: $('st-hits'), acc: $('st-acc'), pipsAi: $('pips-ai'), pipsMe: $('pips-me'), countAi: $('count-ai'), countMe: $('count-me'),
+    setup: $('setup'), result: $('result'), stats: $('stats'), start: $('start'), resume: $('resume'),
+    resultEmoji: $('result-emoji'), resultTitle: $('result-title'), resultText: $('result-text'), resultScore: $('result-score'), newBest: $('new-best'), again: $('again'),
+    tabEnemy: $('tab-enemy'), tabMine: $('tab-mine'),
+  };
+  const boards = {
+    enemy: { sea: $('sea-enemy'), board: $('board-enemy'), cells: $('cells-enemy'), ships: $('ships-enemy'), btns: [] },
+    mine: { sea: $('sea-mine'), board: $('board-mine'), cells: $('cells-mine'), ships: $('ships-mine'), btns: [] },
+  };
+
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+
+  const settings = { mode: 'classic', level: 'normal', fleet: 'classic', bonus: 'off', first: 'you', ...read(STORE.settings, {}) };
+  for (const [key, list] of Object.entries(OPTIONS)) if (!list.includes(settings[key])) settings[key] = key === 'level' ? 'normal' : list[0];
+  let stats = read(STORE.stats, {});
+  if (!stats || typeof stats !== 'object') stats = {};
+
+  let game = null, seq = 0, started = false, pendingRun = null, drag = null, preview = [];
+  const lastLayout = {};
+  const cursor = { enemy: 44, mine: 44 };
+
+  function newGameState() {
+    return {
+      id: ++seq, phase: 'place', mode: settings.mode, level: settings.level, fleet: settings.fleet,
+      touch: settings.fleet === 'classic', bonus: settings.mode === 'classic' && settings.bonus === 'on',
+      me: makeSide(settings.fleet), ai: makeSide(settings.fleet), turn: 'me', busy: false,
+      sel: new Set(), selK: 0, vert: false, tab: 'enemy', shots: 0, hits: 0, aiShots: 0, won: null, timers: [],
+    };
+  }
+
+  // Timers belong to one game; they wait while the tab is hidden so nothing happens unseen.
+  function later(ms, fn) {
+    const g = game;
+    const run = () => {
+      if (game !== g) return;
+      if (document.hidden) { pendingRun = run; return; }
+      fn();
+    };
+    g.timers.push(setTimeout(run, ms));
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !pendingRun) return;
+    const run = pendingRun;
+    pendingRun = null;
+    setTimeout(run, 250);
+  });
+  function stopTimers() { if (game) game.timers.forEach(clearTimeout); pendingRun = null; }
+
+  const setStatus = (text, tone = '') => { els.status.textContent = text; els.status.dataset.tone = tone; };
+  const announce = text => { els.announcer.textContent = text; };
+  const accuracy = () => game.shots ? Math.round(game.hits / game.shots * 100) : 0;
+  const shotsFor = (attacker, defender) => game.mode === 'salvo' ? Math.min(afloat(attacker), countView(defender.view, UNKNOWN)) : 1;
+  const nextUnplaced = () => game.me.ships.findIndex(s => !isPlaced(s));
+
+  // ---- Layout ----------------------------------------------------------------------------------
+  const TITLE_H = 24, TABS_H = 46, GAP = 14;
+  const fitCell = (w, h) => { const a = Math.min(w, h); return Math.min(a / 10.62, (a - 16) / 10); };
+  function layout() {
+    const W = els.play.clientWidth, H = els.play.clientHeight;
+    if (!W || !H || !game) return;
+    let arr, cell;
+    if (game.phase === 'place') { arr = 'one'; cell = fitCell(W, H - TITLE_H); }
+    else {
+      const row = fitCell((W - GAP) / 2, H - TITLE_H);
+      const col = fitCell(W, (H - GAP) / 2 - TITLE_H);
+      const tabs = fitCell(W, H - TABS_H);
+      const both = Math.max(row, col);
+      // Show both seas when they stay comfortably tappable; otherwise one big sea with tabs.
+      if (both >= 24 || both >= tabs * 0.8) { arr = row >= col ? 'row' : 'col'; cell = both; }
+      else { arr = 'tabs'; cell = tabs; }
+    }
+    cell = Math.max(12, Math.min(58, Math.floor(cell)));
+    app.dataset.arr = arr;
+    app.style.setProperty('--cell', `${cell}px`);
+    app.style.setProperty('--lab', `${Math.max(16, Math.round(cell * 0.62))}px`);
+  }
+  new ResizeObserver(layout).observe(els.play);
+
+  // ---- Rendering -------------------------------------------------------------------------------
+  function buildBoards() {
+    for (const [key, b] of Object.entries(boards)) {
+      b.btns = Array.from({ length: CELLS }, (_, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cell';
+        btn.dataset.i = i;
+        btn.tabIndex = i === cursor[key] ? 0 : -1;
+        return btn;
+      });
+      b.cells.replaceChildren(...b.btns);
+      const frame = b.sea.querySelector('.frame');
+      frame.querySelector('.lab-top').replaceChildren(...[...LETTERS].map(ch => Object.assign(document.createElement('span'), { textContent: ch })));
+      frame.querySelector('.lab-left').replaceChildren(...Array.from({ length: N }, (_, r) => Object.assign(document.createElement('span'), { textContent: r + 1 })));
+    }
+  }
+
+  function renderBoard(key) {
+    const side = key === 'enemy' ? game.ai : game.me;
+    const { btns } = boards[key];
+    for (let i = 0; i < CELLS; i++) {
+      const v = side.view[i], b = btns[i];
+      const sel = key === 'enemy' && game.sel.has(i);
+      b.classList.toggle('miss', v === MISS);
+      b.classList.toggle('hit', v === HIT || v === SUNK);
+      b.classList.toggle('sunk', v === SUNK);
+      b.classList.toggle('clear', v === CLEAR);
+      b.classList.toggle('sel', sel);
+      const own = key === 'mine' && side.owner[i] >= 0;
+      let st = v === MISS ? t.st.miss : v === HIT ? t.st.hit : v === SUNK ? t.st.sunk : v === CLEAR ? t.st.clear : null;
+      if (own) st = st ? `${t.st.ship}, ${st}` : t.st.ship;
+      else if (!st) st = key === 'enemy' ? (sel ? t.st.target : t.st.unknown) : t.st.water;
+      b.setAttribute('aria-label', t.cell(coord(i), st));
+    }
+  }
+
+  function shipEl(ship, extra = '') {
+    const el = document.createElement('div');
+    el.className = `ship ${ship.vert ? 'v' : 'h'}${extra}`;
+    el.style.cssText = `--r:${ship.r};--c:${ship.c};--len:${ship.len}`;
+    el.dataset.k = ship.k;
+    el.append(document.createElement('b'));
+    return el;
+  }
+
+  function renderShips(key) {
+    const mine = key === 'mine';
+    const side = mine ? game.me : game.ai;
+    // Enemy ships only ever reach the DOM once sunk, or when the game is over.
+    const list = side.ships.filter(s => isPlaced(s) && (mine || s.sunk || game.phase === 'over'));
+    boards[key].ships.replaceChildren(...list.map(s => {
+      const el = shipEl(s, `${s.sunk ? ' sunk' : ''}${!mine && !s.sunk ? ' revealed' : ''}${mine && game.phase === 'place' && game.selK === s.k ? ' sel' : ''}`);
+      if (mine) el.addEventListener('pointerdown', e => startDrag(e, s.k, 'board'));
+      return el;
+    }));
+  }
+
+  function renderPips(side, el, countEl) {
+    el.replaceChildren(...side.ships.map(s => {
+      const span = document.createElement('span');
+      span.className = `pip-ship${s.sunk ? ' sunk' : ''}`;
+      for (let k = 0; k < s.len; k++) span.append(document.createElement('i'));
+      return span;
+    }));
+    countEl.textContent = `${afloat(side)}/${side.ships.length}`;
+  }
+
+  function renderDock() {
+    if (game.phase !== 'place') return;
+    const todo = game.me.ships.filter(s => !isPlaced(s));
+    if (!todo.length) {
+      const done = document.createElement('p');
+      done.className = 'dock-done';
+      done.textContent = t.allPlaced;
+      els.dock.replaceChildren(done);
+    } else {
+      els.dock.replaceChildren(...todo.map(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'piece';
+        btn.dataset.k = s.k;
+        btn.setAttribute('aria-pressed', String(game.selK === s.k));
+        btn.setAttribute('aria-label', t.shipBtn(shipName(s), s.len));
+        const mini = shipEl({ ...s, vert: false, r: 0, c: 0 }, ' mini');
+        btn.append(mini);
+        btn.addEventListener('pointerdown', e => startDrag(e, s.k, 'dock'));
+        // Pointer taps are handled on pointerup; this click covers keyboard activation.
+        btn.addEventListener('click', e => { if (e.detail === 0) selectShip(s.k); });
+        return btn;
+      }));
+    }
+    els.ready.disabled = todo.length > 0;
+    els.rotate.dataset.vert = String(game.selK >= 0 && isPlaced(game.me.ships[game.selK]) ? game.me.ships[game.selK].vert : game.vert);
+  }
+
+  function render() {
+    app.dataset.phase = game.phase;
+    app.classList.toggle('salvo', game.mode === 'salvo');
+    renderBoard('enemy');
+    renderBoard('mine');
+    renderShips('enemy');
+    renderShips('mine');
+    renderPips(game.ai, els.pipsAi, els.countAi);
+    renderPips(game.me, els.pipsMe, els.countMe);
+    els.shots.textContent = String(game.shots);
+    els.hits.textContent = String(game.hits);
+    els.acc.textContent = game.shots ? `${accuracy()}%` : '–';
+    renderDock();
+    const myTurn = game.phase === 'battle' && game.turn === 'me';
+    const need = game.phase === 'battle' ? shotsFor(game.me, game.ai) : 1;
+    els.fire.textContent = t.fireN(need);
+    els.fire.disabled = !myTurn || game.busy || game.sel.size !== need;
+    els.fire.classList.toggle('ready-glow', !els.fire.disabled);
+    boards.enemy.sea.classList.toggle('turn', myTurn);
+    boards.mine.sea.classList.toggle('turn', game.phase === 'battle' && game.turn === 'ai');
+    for (const [key, tab] of [['enemy', els.tabEnemy], ['mine', els.tabMine]]) {
+      tab.setAttribute('aria-selected', String(game.tab === key));
+      tab.tabIndex = game.tab === key ? 0 : -1;
+      boards[key].sea.classList.toggle('active', game.tab === key);
+    }
+    els.tip.textContent = game.phase === 'place' ? t.keysPlace : t.keysBattle;
+  }
+
+  function showTab(tab) {
+    if (game.tab === tab) return;
+    game.tab = tab;
+    render();
+  }
+
+  function fx(key, i, cls) {
+    if (reducedMotion.matches) return;
+    const b = boards[key].btns[i];
+    b.classList.remove('fx-hit', 'fx-miss');
+    void b.offsetWidth;
+    b.classList.add(cls);
+    setTimeout(() => b.classList.remove(cls), 650);
+  }
+  function sinkFx(key, k) {
+    if (reducedMotion.matches) return;
+    boards[key].ships.querySelector(`[data-k="${k}"]`)?.classList.add('boom');
+    const board = boards[key].board;
+    board.classList.remove('jolt');
+    void board.offsetWidth;
+    board.classList.add('jolt');
+  }
+
+  function setCursor(key, i, focus) {
+    const { btns } = boards[key];
+    btns[cursor[key]].tabIndex = -1;
+    cursor[key] = i;
+    btns[i].tabIndex = 0;
+    if (focus) btns[i].focus({ preventScroll: true });
+  }
+
+  // ---- Placement -------------------------------------------------------------------------------
+  function clearPreview() { for (const i of preview) boards.mine.btns[i].classList.remove('pv', 'bad'); preview = []; }
+  function showPreview(cells, ok) {
+    clearPreview();
+    preview = cells;
+    for (const i of cells) { boards.mine.btns[i].classList.add('pv'); boards.mine.btns[i].classList.toggle('bad', !ok); }
+  }
+  // Clamp the origin so a ship dropped near the edge still fits on the grid.
+  function originFor(len, i, vert) {
+    let r = rowOf(i), c = colOf(i);
+    if (vert) r = Math.min(r, N - len); else c = Math.min(c, N - len);
+    return { r, c };
+  }
+  function hoverPreview(i) {
+    if (game.phase !== 'place' || game.selK < 0) return clearPreview();
+    const ship = game.me.ships[game.selK];
+    const vert = isPlaced(ship) ? ship.vert : game.vert;
+    const { r, c } = originFor(ship.len, i, vert);
+    const cells = lineCells(r, c, ship.len, vert);
+    showPreview(cells, fits(game.me, ship.k, cells, game.touch));
+  }
+
+  function placeStatus() {
+    const left = game.me.ships.filter(s => !isPlaced(s)).length;
+    setStatus(left ? t.toPlace(left) : t.allPlaced, left ? '' : 'win');
+  }
+
+  function selectShip(k) {
+    if (game.phase !== 'place') return;
+    game.selK = k;
+    render();
+  }
+
+  function placeAt(k, i, vert) {
+    const ship = game.me.ships[k];
+    const { r, c } = originFor(ship.len, i, vert);
+    const cells = lineCells(r, c, ship.len, vert);
+    if (!fits(game.me, k, cells, game.touch)) { setStatus(t.cantPlace, 'lose'); announce(t.cantPlace); showPreview(cells, false); return false; }
+    setShip(game.me, k, r, c, vert);
+    game.selK = nextUnplaced();
+    clearPreview();
+    render();
+    placeStatus();
+    announce(t.placed(shipName(ship), coord(cells[0])));
+    return true;
+  }
+
+  function rotateShip(k) {
+    const ship = game.me.ships[k], vert = !ship.vert;
+    game.selK = k;
+    for (let s = 0; s < ship.len; s++) {
+      const r = ship.r - (vert ? s : 0), c = ship.c - (vert ? 0 : s);
+      const cells = lineCells(r, c, ship.len, vert);
+      if (cells && fits(game.me, k, cells, game.touch)) {
+        setShip(game.me, k, r, c, vert);
+        render();
+        placeStatus();
+        announce(t.rotated(shipName(ship)));
+        return true;
+      }
+    }
+    render();
+    const el = boards.mine.ships.querySelector(`[data-k="${k}"]`);
+    if (el && !reducedMotion.matches) el.classList.add('shake');
+    setStatus(t.cantPlace, 'lose');
+    announce(t.cantPlace);
+    return false;
+  }
+
+  function rotateAction() {
+    if (game.phase !== 'place') return;
+    const k = game.selK;
+    if (k >= 0 && isPlaced(game.me.ships[k])) return rotateShip(k);
+    game.vert = !game.vert;
+    render();
+    hoverPreview(cursor.mine);
+  }
+
+  function onMineCell(i) {
+    if (game.phase !== 'place') return;
+    const owner = game.me.owner[i];
+    if (owner >= 0) {
+      // Keyboard path: Enter on a placed ship picks it up so it can be moved.
+      const ship = game.me.ships[owner];
+      game.vert = ship.vert;
+      liftShip(game.me, owner);
+      game.selK = owner;
+      render();
+      placeStatus();
+      hoverPreview(i);
+      announce(t.picked(shipName(ship)));
+      return;
+    }
+    if (game.selK < 0) return;
+    const ship = game.me.ships[game.selK];
+    placeAt(game.selK, i, isPlaced(ship) ? ship.vert : game.vert);
+  }
+
+  function cellAt(x, y) {
+    const rect = boards.mine.cells.getBoundingClientRect();
+    if (x < rect.left || y < rect.top || x >= rect.right || y >= rect.bottom) return -1;
+    return Math.floor((y - rect.top) / rect.height * N) * N + Math.floor((x - rect.left) / rect.width * N);
+  }
+
+  function startDrag(e, k, from) {
+    if (game.phase !== 'place' || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const ship = game.me.ships[k];
+    let off = 0, vert;
+    if (from === 'board') {
+      vert = ship.vert;
+      const i = cellAt(e.clientX, e.clientY);
+      if (i >= 0) off = Math.max(0, Math.min(ship.len - 1, vert ? rowOf(i) - ship.r : colOf(i) - ship.c));
+    } else {
+      vert = game.vert;
+      const rect = e.currentTarget.querySelector('.ship').getBoundingClientRect();
+      off = Math.max(0, Math.min(ship.len - 1, Math.floor((e.clientX - rect.left) / rect.width * ship.len)));
+    }
+    drag = { k, from, off, vert, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId, src: e.currentTarget, ghost: null, target: null };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+  }
+
+  function moveDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const ship = game.me.ships[drag.k];
+    if (!drag.moved) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+      drag.moved = true;
+      const cell = boards.mine.btns[0].getBoundingClientRect().width;
+      drag.cell = cell;
+      drag.ghost = shipEl({ ...ship, vert: drag.vert, r: 0, c: 0 }, ' ghost');
+      drag.ghost.style.setProperty('--cell', `${cell}px`);
+      document.body.append(drag.ghost);
+      if (drag.from === 'board') drag.src.classList.add('lifted');
+      game.selK = drag.k;
+    }
+    const { cell, off, vert } = drag;
+    drag.ghost.style.left = `${e.clientX - (vert ? 0.5 : off + 0.5) * cell}px`;
+    drag.ghost.style.top = `${e.clientY - (vert ? off + 0.5 : 0.5) * cell}px`;
+    const i = cellAt(e.clientX, e.clientY);
+    drag.target = null;
+    if (i < 0) return clearPreview();
+    const r = rowOf(i) - (vert ? off : 0), c = colOf(i) - (vert ? 0 : off);
+    const cells = lineCells(r, c, ship.len, vert);
+    if (!cells) {
+      const o = originFor(ship.len, Math.max(0, r) * N + Math.max(0, c), vert);
+      return showPreview(lineCells(o.r, o.c, ship.len, vert), false);
+    }
+    const ok = fits(game.me, drag.k, cells, game.touch);
+    showPreview(cells, ok);
+    if (ok) drag.target = { r, c };
+  }
+
+  function endDrag(e, cancelled) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    d.ghost?.remove();
+    d.src.classList.remove('lifted');
+    clearPreview();
+    if (game.phase !== 'place') return;
+    const ship = game.me.ships[d.k];
+    if (!d.moved) {
+      if (cancelled) return;
+      if (d.from === 'board') rotateShip(d.k); else selectShip(d.k);
+      return;
+    }
+    if (d.target && !cancelled) {
+      setShip(game.me, d.k, d.target.r, d.target.c, d.vert);
+      game.selK = nextUnplaced();
+      announce(t.placed(shipName(ship), coord(ship.cells[0])));
+      render();
+      placeStatus();
+    } else {
+      render();
+      if (!cancelled) setStatus(t.cantPlace, 'lose');
+    }
+  }
+  window.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', e => endDrag(e, false));
+  window.addEventListener('pointercancel', e => endDrag(e, true));
+
+  function readyUp() {
+    if (game.phase !== 'place' || nextUnplaced() >= 0) return;
+    autoPlace(game.ai, game.touch);
+    lastLayout[game.fleet] = game.me.ships.map(s => ({ r: s.r, c: s.c, vert: s.vert }));
+    game.phase = 'battle';
+    game.selK = -1;
+    clearPreview();
+    const meFirst = settings.first === 'you' || Math.random() < 0.5;
+    game.turn = meFirst ? 'me' : 'ai';
+    game.tab = meFirst ? 'enemy' : 'mine';
+    game.busy = true;
+    render();
+    layout();
+    const msg = meFirst ? t.youFirst : t.aiFirst;
+    setStatus(msg);
+    announce(msg);
+    if (meFirst) later(700, beginMyTurn);
+    else later(900, aiTurn);
+    if (meFirst) boards.enemy.btns[cursor.enemy].focus({ preventScroll: true });
+  }
+
+  // ---- Battle ----------------------------------------------------------------------------------
+  function myPrompt() {
+    if (game.mode !== 'salvo') return t.yourTurn;
+    const need = shotsFor(game.me, game.ai), left = need - game.sel.size;
+    return left > 0 ? t.pickMore(left) : t.salvoReady(need);
+  }
+
+  function beginMyTurn() {
+    game.turn = 'me';
+    game.busy = false;
+    game.sel.clear();
+    game.tab = 'enemy';
+    render();
+    setStatus(myPrompt());
+  }
+
+  function onEnemyCell(i) {
+    if (!game || game.phase !== 'battle' || game.turn !== 'me' || game.busy) return;
+    if (game.ai.view[i] !== UNKNOWN) return;
+    if (game.mode === 'salvo') {
+      const need = shotsFor(game.me, game.ai);
+      if (game.sel.has(i)) game.sel.delete(i);
+      else if (game.sel.size < need) game.sel.add(i);
+      else return;
+      render();
+      setStatus(myPrompt());
+      return;
+    }
+    fireVolley([i]);
+  }
+
+  function fireSalvo() {
+    if (game.phase !== 'battle' || game.turn !== 'me' || game.busy || game.mode !== 'salvo') return;
+    if (game.sel.size !== shotsFor(game.me, game.ai)) return;
+    fireVolley([...game.sel]);
+  }
+
+  function fireVolley(cells) {
+    game.busy = true;
+    game.sel.clear();
+    let k = 0, hits = 0;
+    const sunk = [];
+    const shoot = () => {
+      const res = fireAt(game.ai, cells[k++], game.touch);
+      game.shots++;
+      if (res.hit) { hits++; game.hits++; }
+      if (res.sunk) sunk.push(res.sunk);
+      render();
+      fx('enemy', res.i, res.hit ? 'fx-hit' : 'fx-miss');
+      if (res.sunk) sinkFx('enemy', res.sunk.k);
+      if (cells.length === 1) {
+        const msg = res.sunk ? t.youSunk(shipName(res.sunk)) : res.hit ? (game.bonus ? t.again : t.youHit(coord(res.i))) : t.youMiss(coord(res.i));
+        setStatus(msg, res.hit ? 'hit' : 'miss');
+        announce(msg);
+      }
+      if (k < cells.length) return later(220, shoot);
+      if (cells.length > 1) {
+        const msg = [t.salvoResult(hits, cells.length), ...sunk.map(s => t.youSunk(shipName(s)))].join(' · ');
+        setStatus(msg, hits ? 'hit' : 'miss');
+        announce(msg);
+      }
+      if (!afloat(game.ai)) return later(700, () => endGame(true));
+      if (game.bonus && hits) return later(350, () => { game.busy = false; render(); });
+      later(950, aiTurn);
+    };
+    shoot();
+  }
+
+  function aiTurn() {
+    game.turn = 'ai';
+    game.busy = true;
+    game.sel.clear();
+    game.tab = 'mine';
+    render();
+    setStatus(t.aiTurn);
+    const picks = aiVolley(game.me.view, remainingLens(game.me), shotsFor(game.ai, game.me), game.level, game.touch);
+    let k = 0, hits = 0;
+    const sunk = [];
+    const shoot = () => {
+      const res = fireAt(game.me, picks[k++], game.touch);
+      game.aiShots++;
+      if (res.hit) hits++;
+      if (res.sunk) sunk.push(res.sunk);
+      render();
+      fx('mine', res.i, res.hit ? 'fx-hit' : 'fx-miss');
+      if (res.sunk) sinkFx('mine', res.sunk.k);
+      if (picks.length === 1) {
+        const msg = res.sunk ? t.aiSunk(shipName(res.sunk)) : res.hit ? t.aiHit(coord(res.i)) : t.aiMiss(coord(res.i));
+        setStatus(msg, res.hit ? 'lose' : 'miss');
+        announce(msg);
+      }
+      if (k < picks.length) return later(300, shoot);
+      if (picks.length > 1) {
+        const msg = [t.aiSalvo(hits, picks.length), ...sunk.map(s => t.aiSunk(shipName(s)))].join(' · ');
+        setStatus(msg, hits ? 'lose' : 'miss');
+        announce(msg);
+      }
+      if (!afloat(game.me)) return later(900, () => endGame(false));
+      if (game.bonus && hits) return later(850, aiTurn);
+      later(1000, beginMyTurn);
+    };
+    later(650, shoot);
+  }
+
+  function recordResult(win) {
+    const key = `${game.mode}-${game.fleet}-${game.level}`;
+    const s = { p: 0, w: 0, best: 0, shots: 0, hits: 0, ...stats[key] };
+    s.p++;
+    s.shots += game.shots;
+    s.hits += game.hits;
+    let newBest = false;
+    if (win) {
+      s.w++;
+      if (!s.best || game.shots < s.best) { s.best = game.shots; newBest = true; }
+    }
+    stats[key] = s;
+    write(STORE.stats, stats);
+    return newBest;
+  }
+
+  function endGame(win) {
+    game.phase = 'over';
+    game.busy = true;
+    game.won = win;
+    game.tab = 'enemy';
+    const newBest = recordResult(win);
+    render();
+    const title = win ? t.youWin : t.youLose;
+    const text = win ? t.winText(game.shots) : t.loseText;
+    const summary = t.summary(game.shots, game.hits, accuracy());
+    setStatus(title, win ? 'win' : 'lose');
+    els.resultEmoji.textContent = win ? '🏆' : '🌊';
+    els.resultTitle.textContent = title;
+    els.resultText.textContent = text;
+    els.resultScore.textContent = summary;
+    els.newBest.hidden = !newBest;
+    announce(`${title} ${text} ${summary}`);
+    later(win ? 1100 : 1700, () => {
+      els.result.hidden = false;
+      els.again.focus({ preventScroll: true });
+    });
+  }
+
+  // ---- Game flow & panels ----------------------------------------------------------------------
+  function startGame(keepLayout) {
+    stopTimers();
+    if (drag) { drag.ghost?.remove(); drag = null; }
+    game = newGameState();
+    const saved = keepLayout && lastLayout[game.fleet];
+    if (saved) saved.forEach((p, k) => {
+      const cells = lineCells(p.r, p.c, game.me.ships[k].len, p.vert);
+      if (fits(game.me, k, cells, game.touch)) setShip(game.me, k, p.r, p.c, p.vert);
+    });
+    game.selK = nextUnplaced();
+    started = true;
+    els.setup.hidden = els.result.hidden = els.stats.hidden = true;
+    clearPreview();
+    render();
+    layout();
+    if (nextUnplaced() < 0) placeStatus(); else setStatus(t.placeHint);
+    announce(t.placeHint);
+    boards.mine.btns[cursor.mine].focus({ preventScroll: true });
+  }
+
+  function renderSetup() {
+    for (const group of document.querySelectorAll('#setup .seg')) {
+      for (const btn of group.children) btn.setAttribute('aria-pressed', String(settings[group.dataset.key] === btn.dataset.value));
+    }
+    $('field-bonus').hidden = settings.mode !== 'classic';
+    $('h-mode').textContent = settings.mode === 'classic' ? t.classicHint : t.salvoHint;
+    $('h-level').textContent = t[`${settings.level}Hint`];
+    $('h-fleet').textContent = settings.fleet === 'classic' ? t.fleet5Hint : t.fleet10Hint;
+    els.resume.hidden = !started || game.phase === 'over';
+  }
+
+  function openSetup() {
+    renderSetup();
+    els.result.hidden = true;
+    els.stats.hidden = true;
+    els.setup.hidden = false;
+    els.start.focus({ preventScroll: true });
+  }
+
+  function openStats() {
+    const modeName = settings.mode === 'classic' ? t.classic : t.salvo;
+    const fleetName = settings.fleet === 'classic' ? t.fleet5 : t.fleet10;
+    $('stats-for').textContent = t.statsFor(modeName, fleetName);
+    $('stats-body').replaceChildren(...OPTIONS.level.map(level => {
+      const s = stats[`${settings.mode}-${settings.fleet}-${level}`] || { p: 0, w: 0, best: 0, shots: 0, hits: 0 };
+      const tr = document.createElement('tr');
+      const cells = [t[level], s.p, s.p ? `${s.w} (${Math.round(s.w / s.p * 100)}%)` : '–', s.best || '–', s.shots ? `${Math.round(s.hits / s.shots * 100)}%` : '–'];
+      cells.forEach((v, n) => { const td = document.createElement(n ? 'td' : 'th'); if (!n) td.scope = 'row'; td.textContent = String(v); tr.append(td); });
+      return tr;
+    }));
+    els.setup.hidden = true;
+    els.stats.hidden = false;
+    $('stats-close').focus({ preventScroll: true });
+  }
+
+  for (const group of document.querySelectorAll('#setup .seg')) {
+    group.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      settings[group.dataset.key] = btn.dataset.value;
+      renderSetup();
+    });
+  }
+  els.start.addEventListener('click', () => { write(STORE.settings, settings); startGame(true); });
+  els.resume.addEventListener('click', () => { els.setup.hidden = true; });
+  $('stats-btn').addEventListener('click', openStats);
+  $('stats-close').addEventListener('click', openSetup);
+  $('menu-btn').addEventListener('click', openSetup);
+  $('new-btn').addEventListener('click', () => startGame(true));
+  els.again.addEventListener('click', () => startGame(true));
+  $('change').addEventListener('click', openSetup);
+  $('view').addEventListener('click', () => { els.result.hidden = true; $('new-btn').focus({ preventScroll: true }); });
+  els.rotate.addEventListener('click', rotateAction);
+  els.random.addEventListener('click', () => {
+    if (game.phase !== 'place') return;
+    autoPlace(game.me, game.touch);
+    game.selK = -1;
+    clearPreview();
+    render();
+    placeStatus();
+  });
+  els.clear.addEventListener('click', () => {
+    if (game.phase !== 'place') return;
+    game.me.ships.forEach(s => liftShip(game.me, s.k));
+    game.selK = 0;
+    clearPreview();
+    render();
+    placeStatus();
+  });
+  els.ready.addEventListener('click', readyUp);
+  els.fire.addEventListener('click', fireSalvo);
+  for (const tab of [els.tabEnemy, els.tabMine]) tab.addEventListener('click', () => showTab(tab.dataset.tab));
+
+  boards.enemy.cells.addEventListener('click', e => { const b = e.target.closest('.cell'); if (b) onEnemyCell(Number(b.dataset.i)); });
+  boards.mine.cells.addEventListener('click', e => { const b = e.target.closest('.cell'); if (b) onMineCell(Number(b.dataset.i)); });
+  for (const key of ['enemy', 'mine']) {
+    boards[key].cells.addEventListener('focusin', e => {
+      const b = e.target.closest('.cell');
+      if (!b) return;
+      setCursor(key, Number(b.dataset.i), false);
+      if (key === 'mine' && !drag) hoverPreview(Number(b.dataset.i));
+    });
+  }
+  boards.mine.cells.addEventListener('pointermove', e => {
+    if (drag || e.pointerType === 'touch') return;
+    const b = e.target.closest('.cell');
+    if (b) hoverPreview(Number(b.dataset.i));
+  });
+  boards.mine.cells.addEventListener('pointerleave', () => { if (!drag) clearPreview(); });
+  boards.mine.cells.addEventListener('focusout', e => { if (!boards.mine.cells.contains(e.relatedTarget) && !drag) clearPreview(); });
+
+  const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  const overlayOpen = () => !els.setup.hidden || !els.result.hidden || !els.stats.hidden;
+  document.addEventListener('keydown', e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || !game || overlayOpen()) return;
+    const key = e.key;
+    if (ARROWS[key]) {
+      const focused = document.activeElement?.closest?.('.cells');
+      let bk = focused === boards.enemy.cells ? 'enemy' : focused === boards.mine.cells ? 'mine' : null;
+      if (!bk && document.activeElement?.closest?.('.tabs')) return;
+      e.preventDefault();
+      if (!bk) bk = game.phase === 'place' ? 'mine' : 'enemy';
+      if (game.phase !== 'place' && app.dataset.arr === 'tabs' && game.tab !== bk) showTab(bk);
+      const [dr, dc] = ARROWS[key];
+      const n = focused ? step(cursor[bk], dr, dc) : cursor[bk];
+      setCursor(bk, n < 0 ? cursor[bk] : n, true);
+      return;
+    }
+    if (game.phase === 'place') {
+      if (key === 'r' || key === 'R') { e.preventDefault(); rotateAction(); }
+      else if (/^[0-9]$/.test(key)) {
+        const k = key === '0' ? 9 : Number(key) - 1;
+        if (k < game.me.ships.length) { e.preventDefault(); selectShip(k); hoverPreview(cursor.mine); }
+      } else if ((key === 'Delete' || key === 'Backspace') && game.selK >= 0 && isPlaced(game.me.ships[game.selK])) {
+        e.preventDefault();
+        liftShip(game.me, game.selK);
+        render();
+        placeStatus();
+      }
+    } else if ((key === 'f' || key === 'F') && game.phase === 'battle' && game.mode === 'salvo') {
+      e.preventDefault();
+      fireSalvo();
+    }
+  });
+
+  // Read-only state for automated checks, plus an AI benchmark on fresh random fleets.
+  // The computer's fleet layout is deliberately not exposed.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__seaBattle = Object.freeze({
+    snapshot: () => ({
+      phase: game.phase, turn: game.turn, busy: game.busy, mode: game.mode, level: game.level, fleet: game.fleet, bonus: game.bonus,
+      shots: game.shots, hits: game.hits, aiShots: game.aiShots, won: game.won, tab: game.tab, arrangement: app.dataset.arr,
+      salvoShots: game.phase === 'battle' ? shotsFor(game.me, game.ai) : 0, selected: [...game.sel],
+      enemyView: Array.from(game.ai.view), enemyShips: game.ai.ships.map(s => ({ type: s.type, len: s.len, sunk: s.sunk })),
+      myView: Array.from(game.me.view), myShips: game.me.ships.map(s => ({ type: s.type, len: s.len, cells: [...s.cells], vert: s.vert, sunk: s.sunk })),
+    }),
+    simulate(level = 'hard', games = 100, fleet = 'classic') {
+      const touch = fleet === 'classic';
+      let total = 0, min = Infinity, max = 0;
+      for (let g = 0; g < games; g++) {
+        const side = makeSide(fleet);
+        autoPlace(side, touch);
+        let shots = 0;
+        while (afloat(side) && shots < CELLS) {
+          const i = aiPick(side.view, remainingLens(side), level, touch);
+          if (i < 0 || side.view[i] !== UNKNOWN) break;
+          fireAt(side, i, touch);
+          shots++;
+        }
+        total += shots; min = Math.min(min, shots); max = Math.max(max, shots);
+      }
+      return { avg: total / games, min, max };
+    },
+  });
+
+  buildBoards();
+  game = newGameState();
+  render();
+  layout();
+  setStatus(t.placeHint);
+  renderSetup();
+  els.start.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

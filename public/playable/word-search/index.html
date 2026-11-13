@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Search</title>
+<style>
+:root {
+  --bg: #fcefe0;
+  --bg-2: #fff9f1;
+  --ink: #2b2550;
+  --muted: #6f6990;
+  --accent: #ff7a45;
+  --accent-dark: #d65a27;
+  --violet: #6b56e8;
+  --violet-dark: #4c39c2;
+  --paper: #fffdf9;
+  --line: #efdcc6;
+  --soft: #f7eadb;
+  --red: #e5484d;
+  --green: #279667;
+  --side: clamp(220px, 27vw, 330px);
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 1px 1px, #2b255012 1px, transparent 1.6px), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg) 72%);
+  background-size: 18px 18px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+
+.app { height: 100%; max-width: 640px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "top" "hud" "stage" "list"; gap: 10px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.top { grid-area: top; display: flex; align-items: center; gap: 8px; min-width: 0; }
+h1 { flex: none; font-size: clamp(22px, 6.4vw, 30px); font-weight: 900; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+h1 span { color: var(--accent); }
+.chip { min-width: 0; padding: 5px 10px; border-radius: 99px; background: #fff; box-shadow: 0 2px 0 var(--line); color: var(--violet-dark); font-size: 12px; font-weight: 800; line-height: 1.25; white-space: nowrap; }
+.spacer { flex: 1; }
+.icon-btn { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 var(--line); }
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+
+.hud { grid-area: hud; display: flex; gap: 8px; }
+.stat { flex: 1 1 0; min-width: 0; padding: 5px 6px; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 var(--line); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); line-height: 1.2; }
+.stat strong { display: block; font-size: 19px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.stat.low strong { color: var(--red); animation: tick 1s infinite; }
+@keyframes tick { 50% { opacity: .55; } }
+.hint-btn { flex: 0 0 auto; min-width: 72px; padding-inline: 10px; background: var(--accent); box-shadow: 0 3px 0 var(--accent-dark); color: #fff; }
+.hint-btn small { color: #fff; opacity: .9; }
+.hint-btn strong { font-size: 18px; }
+.hint-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+.hint-btn:disabled { opacity: .5; }
+
+.stage { grid-area: stage; position: relative; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { display: block; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); border-radius: 18px; background: var(--paper); box-shadow: 0 5px 0 var(--line), 0 14px 30px #2b255016; touch-action: none; cursor: crosshair; }
+.board:focus-visible { outline-offset: 4px; }
+.board .paper { fill: var(--paper); }
+.board .guide { fill: #2b255006; }
+.board .letters text { font-family: var(--font); font-size: .6px; font-weight: 800; fill: var(--ink); text-anchor: middle; dominant-baseline: central; pointer-events: none; transform-box: fill-box; transform-origin: center; }
+.board.big .letters text { font-size: .64px; }
+.board line { stroke-linecap: round; fill: none; }
+.board .found line { stroke-width: .8; opacity: .62; }
+.board .sel { stroke-width: .8; opacity: .55; }
+.board .bad { stroke: var(--red); stroke-width: .8; opacity: 0; }
+.board .bad.on { animation: bad .55s ease-out; }
+@keyframes bad { 0% { opacity: .5; } 100% { opacity: 0; } }
+.board .miss .o { stroke: var(--red); stroke-width: .84; opacity: .8; }
+.board .miss .i { stroke: var(--paper); stroke-width: .68; }
+.board .anchor { fill: none; stroke: var(--violet); stroke-width: .09; stroke-dasharray: .2 .12; opacity: 0; }
+.board .anchor.on { opacity: 1; }
+.board .hint-ring { fill: #ffd23f; stroke: var(--accent); stroke-width: .08; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.board .hint-ring.on { animation: ring 1s ease-in-out 3; }
+@keyframes ring { 0%, 100% { opacity: .95; transform: scale(1); } 50% { opacity: .35; transform: scale(1.18); } }
+.board .cursor { fill: none; stroke: var(--violet); stroke-width: .08; opacity: 0; }
+.board.kb .cursor { opacity: 1; }
+.board.win .letters text { animation: hop .6s var(--d) both; }
+@keyframes hop { 40% { transform: translateY(-.22px) scale(1.28); fill: var(--violet-dark); } }
+
+.toast { position: absolute; left: 50%; top: 10px; z-index: 3; max-width: calc(100% - 24px); padding: 7px 14px; border-radius: 99px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 800; text-align: center; line-height: 1.25; transform: translate(-50%, -8px); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.good { background: var(--green); }
+.toast.bad { background: var(--red); }
+.toast.warn { background: var(--accent-dark); }
+
+.list { grid-area: list; min-height: 0; display: flex; flex-direction: column; }
+.list-head { display: none; }
+.words { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 6px; max-height: 27dvh; overflow-y: auto; padding: 2px; }
+.words li { position: relative; padding: 3px 9px; border-radius: 9px; background: #ffffffc0; box-shadow: 0 2px 0 var(--line); font-size: 13px; font-weight: 800; letter-spacing: .05em; line-height: 1.3; white-space: nowrap; }
+.words li.found { background: var(--hl); box-shadow: none; color: #2b2550a6; text-decoration: line-through; text-decoration-thickness: 2px; }
+.words li.hinted { box-shadow: 0 0 0 2px var(--accent); animation: tick 1s 3; }
+
+.overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); background: #2b255070; }
+.panel { width: min(100%, 380px); max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: 22px 18px; border-radius: 26px; background: var(--paper); text-align: center; box-shadow: 0 20px 50px #2b255055; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--accent); }
+.panel .emoji { font-size: 42px; line-height: 1.2; }
+.panel p { margin-top: 6px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.panel .sub { font-weight: 800; color: var(--violet-dark); }
+.panel .result { color: var(--ink); font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.stars { margin-top: 8px; font-size: 34px; letter-spacing: 4px; color: #e9dcc9; line-height: 1.1; }
+.stars i { font-style: normal; }
+.stars i.on { color: #ffb627; text-shadow: 0 2px 0 #d68a00; }
+.badge { display: inline-block; margin-top: 8px; padding: 5px 14px; border-radius: 99px; background: var(--accent); color: #fff !important; font-size: 14px; font-weight: 800; }
+.cta { display: block; width: 100%; margin-top: 16px; padding: 14px 10px; border-radius: 16px; background: var(--violet); color: #fff; font-size: 18px; font-weight: 900; line-height: 1.15; box-shadow: 0 5px 0 var(--violet-dark); }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--violet-dark); }
+.secondary { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 14px; font-size: 15px; font-weight: 800; box-shadow: inset 0 0 0 2px #2b255024; }
+.panel :focus-visible { outline-color: var(--accent); }
+
+/* Menu: header, modes and buttons stay put; the theme grid scrolls */
+.panel.menu { width: min(100%, 460px); display: flex; flex-direction: column; overflow: hidden; padding: 18px 16px 14px; text-align: left; }
+.m-head { text-align: center; }
+.m-head p { margin-top: 4px; font-size: 14px; }
+.modes { flex: none; margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: var(--soft); }
+.modes button { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 6px 2px; border-radius: 12px; font-size: 12.5px; font-weight: 800; line-height: 1.15; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.modes button b { font-size: 18px; line-height: 1.2; }
+.modes button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.intro { flex: none; margin-top: 10px !important; font-size: 13px !important; line-height: 1.35 !important; text-align: center; }
+.field { flex: none; margin-top: 10px; }
+.field > span { display: block; margin: 0 4px 4px; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.f-theme { flex: 0 1 auto; min-height: 96px; display: flex; flex-direction: column; }
+.themes { min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 6px; padding: 2px 2px 4px; }
+.themes button { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 8px; border-radius: 12px; background: #fff; box-shadow: 0 2px 0 var(--line), inset 0 0 0 1.5px var(--line); font-size: 13px; font-weight: 800; line-height: 1.15; text-align: left; }
+.themes button b { flex: none; font-size: 18px; line-height: 1; }
+.themes button span { min-width: 0; overflow-wrap: anywhere; }
+.themes button[aria-pressed="true"] { background: #efebff; box-shadow: inset 0 0 0 2.5px var(--violet); color: var(--violet-dark); }
+.seg { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 4px; padding: 4px; border-radius: 14px; background: var(--soft); }
+.seg button { min-width: 0; padding: 7px 2px; border-radius: 10px; font-size: 14px; font-weight: 900; line-height: 1.15; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.seg button small { display: block; font-size: 11px; font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.desc { margin: 5px 4px 0 !important; font-size: 12.5px !important; line-height: 1.3 !important; min-height: 2.6em; }
+.day { flex: none; margin-top: 12px; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px; background: linear-gradient(135deg, #fff0e2, #efeaff); }
+.cal { flex: none; width: 66px; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 2px 0 var(--line); text-align: center; }
+.cal b { display: block; padding: 3px 0; background: var(--accent); color: #fff; font-size: 11px; text-transform: uppercase; }
+.cal strong { display: block; padding: 4px 0 6px; font-size: 28px; line-height: 1; }
+.day-info { min-width: 0; }
+.day-info .d-theme { margin-top: 0; font-size: 16px; font-weight: 900; color: var(--ink); }
+.day-info p { margin-top: 3px; font-size: 13px; }
+.day-info .d-streak { font-weight: 800; color: var(--accent-dark); }
+.day-info .d-status { font-weight: 800; color: var(--ink); }
+.m-foot { flex: none; }
+.m-foot .cta { margin-top: 12px; }
+.m-foot .secondary { margin-top: 8px; }
+.m-stats { margin-top: 8px !important; font-size: 12.5px !important; text-align: center; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (min-width: 480px) and (max-aspect-ratio: 5/4) {
+  .words li { font-size: 14px; padding: 4px 10px; }
+}
+@media (max-width: 360px) {
+  .hud { gap: 6px; }
+  .stat small { letter-spacing: 0; }
+  .hint-btn { min-width: 62px; padding-inline: 6px; }
+  .words { gap: 4px; }
+  .words li { padding: 2px 6px; font-size: 12px; letter-spacing: .02em; }
+  .modes button { font-size: 11.5px; }
+}
+/* Short portrait phones: smaller header, tighter word chips so the grid keeps its size */
+@media (max-height: 620px) and (max-aspect-ratio: 5/4) {
+  .app { gap: 7px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 21px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .stat { padding: 3px 6px; }
+  .stat strong { font-size: 16px; }
+  .words { max-height: 24dvh; gap: 4px; }
+  .words li { padding: 2px 6px; font-size: 12px; letter-spacing: .02em; }
+}
+@media (max-height: 640px) {
+  .m-head p { display: none; }
+  .desc { min-height: 0; }
+}
+@media (max-height: 560px) and (max-aspect-ratio: 5/4) {
+  .intro { display: none; }
+  .field { margin-top: 6px; }
+  .seg button small { display: none; }
+}
+@media (max-height: 600px) {
+  .overlay { padding: 10px; }
+  .panel { padding: 16px 14px; }
+  .panel.menu { padding: 12px 12px 10px; }
+  .cta { margin-top: 12px; padding: 11px; font-size: 17px; }
+  .modes { margin-top: 8px; }
+  .modes button b { font-size: 16px; }
+}
+
+/* Wide frames: the grid fills the height on the left; HUD and word list live in a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: calc(100dvh + var(--side) + 12px); grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "stage top" "stage hud" "stage list"; column-gap: 18px; row-gap: 10px; }
+  .top { padding-top: 2px; }
+  h1 { font-size: clamp(22px, 2.4vw, 32px); }
+  .top .chip { display: none; }
+  .list { border-radius: 18px; background: #ffffffa8; box-shadow: 0 3px 0 var(--line); padding: 10px 10px 8px; }
+  .list-head { display: flex; align-items: baseline; gap: 8px; padding: 0 4px 8px; margin-bottom: 6px; border-bottom: 2px dashed var(--line); }
+  .list-head b { min-width: 0; flex: 1; font-size: 15px; font-weight: 900; color: var(--violet-dark); overflow-wrap: anywhere; }
+  .list-head span { flex: none; font-size: 14px; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .words { max-height: none; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; align-content: start; justify-content: stretch; gap: 6px; }
+  .words li { font-size: clamp(12px, 1.25vw, 16px); padding: 4px 8px; text-align: center; overflow: hidden; text-overflow: clip; }
+  .panel.menu { width: min(100%, 860px); height: min(100%, 600px); display: grid; grid-template-columns: minmax(250px, .85fr) minmax(0, 1.15fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto; grid-template-areas: "head side" "modes side" "intro side" "size side" "diff side" ". side" "foot side"; column-gap: 18px; padding: 16px 16px 14px; }
+  .m-head { grid-area: head; }
+  .modes { grid-area: modes; }
+  .intro { grid-area: intro; }
+  .f-size { grid-area: size; }
+  .f-diff { grid-area: diff; }
+  .f-theme, .day { grid-area: side; }
+  .f-theme { margin-top: 0; min-height: 0; }
+  .day { align-self: center; flex-direction: column; text-align: center; padding: 20px; }
+  .day .cal { width: 86px; }
+  .day .cal strong { font-size: 36px; }
+  .m-foot { grid-area: foot; }
+  .themes { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+  .panel.menu.is-daily { height: auto; width: min(100%, 720px); grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "head side" "modes side" ". side" "foot side"; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { --side: clamp(200px, 30vw, 270px); column-gap: 12px; row-gap: 6px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 20px; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 12px; }
+  .hud { gap: 6px; }
+  .stat { padding: 2px 4px; border-radius: 12px; }
+  .stat small { font-size: 10px; letter-spacing: 0; }
+  .stat strong { font-size: 15px; }
+  .hint-btn { min-width: 54px; padding-inline: 6px; }
+  .hint-btn strong { font-size: 15px; }
+  .list { padding: 6px 6px 4px; border-radius: 14px; }
+  .list-head { padding: 0 2px 4px; margin-bottom: 4px; }
+  .list-head b { font-size: 13px; }
+  .list-head span { font-size: 12px; }
+  .words { gap: 4px; }
+  .words li { font-size: 12px; padding: 2px 4px; letter-spacing: .02em; }
+  .board { border-radius: 14px; }
+}
+@media (max-height: 420px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 12px 16px; border-radius: 20px; }
+  .panel h2 { font-size: 21px; }
+  .panel .emoji { font-size: 28px; }
+  .panel p { margin-top: 3px; font-size: 13px; line-height: 1.3; }
+  .stars { margin-top: 2px; font-size: 26px; }
+  .badge { margin-top: 4px; padding: 3px 12px; font-size: 13px; }
+  .cta { margin-top: 8px; padding: 9px; font-size: 16px; }
+  .secondary { margin-top: 6px; padding: 7px; font-size: 14px; }
+  .panel.menu { padding: 10px 12px; column-gap: 14px; }
+  .m-head h2 { font-size: 20px; }
+  .modes { margin-top: 6px; }
+  .modes button { padding: 3px 2px; font-size: 11px; }
+  .modes button b { font-size: 14px; }
+  .intro { display: none; }
+  .field { margin-top: 5px; }
+  .field > span { margin-bottom: 2px; font-size: 10px; }
+  .seg button { padding: 5px 2px; font-size: 13px; }
+  .seg button small { display: none; }
+  .desc { display: none; }
+  .themes button { padding: 5px 6px; font-size: 12px; }
+  .themes button b { font-size: 15px; }
+  .m-foot .cta { margin-top: 6px; }
+  .m-foot .secondary { margin-top: 5px; }
+  .m-stats { margin-top: 4px !important; font-size: 11px !important; }
+  .day { padding: 10px; gap: 8px; }
+  .day .cal { width: 64px; }
+  .day .cal strong { font-size: 26px; }
+  #win .panel, #lose .panel { width: min(100%, 560px); display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 18px; align-items: center; }
+  #win .panel > *, #lose .panel > * { grid-column: 2; }
+  #win .panel > .emoji, #lose .panel > .emoji { grid-column: 1; grid-row: 1 / span 8; font-size: 52px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .board .hint-ring.on { opacity: .9; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="top">
+    <h1>Word <span>Search</span></h1>
+    <span class="chip" id="chip"></span>
+    <span class="spacer"></span>
+    <button type="button" class="icon-btn" id="open-menu" data-i18n-label="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+  </div>
+  <div class="hud">
+    <div class="stat" id="time-card"><small id="time-label" data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="found"></small><strong id="found">0/0</strong></div>
+    <button type="button" class="stat hint-btn" id="hint"><small data-i18n="hint"></small><strong aria-hidden="true">💡</strong></button>
+  </div>
+  <div class="stage">
+    <svg class="board" id="board" tabindex="0" role="application" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+  </div>
+  <section class="list" aria-labelledby="list-title">
+    <div class="list-head"><b id="list-title"></b><span id="list-count"></span></div>
+    <ul class="words" id="words"></ul>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="menu" hidden>
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="m-head">
+      <h2 id="menu-title">Word <span>Search</span></h2>
+      <p data-i18n="tagline"></p>
+    </div>
+    <div class="modes" id="modes" role="group" data-i18n-label="modeLabel">
+      <button type="button" data-mode="classic"><b aria-hidden="true">🔎</b><span data-i18n="mClassic"></span></button>
+      <button type="button" data-mode="daily"><b aria-hidden="true">📅</b><span data-i18n="mDaily"></span></button>
+      <button type="button" data-mode="timed"><b aria-hidden="true">⏱️</b><span data-i18n="mTimed"></span></button>
+    </div>
+    <p class="intro" id="intro"></p>
+    <div class="field f-theme" id="f-theme"><span id="theme-label" data-i18n="theme"></span><div class="themes" id="themes" role="group" aria-labelledby="theme-label"></div></div>
+    <div class="field f-size" id="f-size"><span id="size-label" data-i18n="size"></span><div class="seg" id="sizes" role="group" aria-labelledby="size-label"></div></div>
+    <div class="field f-diff" id="f-diff"><span id="diff-label" data-i18n="difficulty"></span><div class="seg" id="diffs" role="group" aria-labelledby="diff-label"></div><p class="desc" id="diff-desc"></p></div>
+    <div class="day" id="day">
+      <div class="cal" aria-hidden="true"><b id="cal-month"></b><strong id="cal-day"></strong></div>
+      <div class="day-info">
+        <p class="d-theme" id="d-theme"></p>
+        <p data-i18n="dailyInfo"></p>
+        <p class="d-streak" id="d-streak"></p>
+        <p class="d-status" id="d-status"></p>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+      <button type="button" class="cta" id="play"></button>
+      <button type="button" class="secondary" id="close-menu" data-i18n="close"></button>
+      <p class="m-stats" id="m-stats"></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title"></h2>
+    <p class="sub" id="win-sub"></p>
+    <div class="stars" id="win-stars"></div>
+    <p class="result" id="win-result"></p>
+    <p id="win-best"></p>
+    <p class="badge" id="win-badge" hidden></p>
+    <button type="button" class="cta" id="next"></button>
+    <button type="button" class="secondary" id="win-menu" data-i18n="menu"></button>
+  </div>
+</div>
+
+<div class="overlay" id="lose" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lose-title">
+    <p class="emoji" aria-hidden="true">⏰</p>
+    <h2 id="lose-title" data-i18n="timeUp"></h2>
+    <p id="lose-text"></p>
+    <button type="button" class="cta" id="retry" data-i18n="retry"></button>
+    <button type="button" class="secondary" id="lose-menu" data-i18n="menu"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Find every hidden English word — across, down and diagonal.', modeLabel: 'Mode', mClassic: 'Classic', mDaily: 'Daily', mTimed: 'Time Attack',
+      introClassic: 'Pick a theme, a grid size and how cleverly the words are hidden.', introTimed: 'Find every word before the clock runs out. Each hint costs 15 seconds.',
+      theme: 'Theme', random: 'Surprise me', size: 'Grid size', difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard',
+      dEasy: 'Words read → and ↓ only and never cross', dNormal: 'Diagonals too, and words can share letters', dHard: 'All 8 directions — backwards too — with lots of crossings',
+      wordsN: n => `${n} words`, play: 'Play', newPuzzle: 'New puzzle', resume: 'Resume', close: 'Back to the puzzle', menu: 'Menu', hint: 'Hint', time: 'Time', left: 'Left', found: 'Found', words: 'Words',
+      foundWord: (w, n, total) => `Found ${w}! ${n} of ${total}`, already: w => `${w} is already found`, notWord: 'That word isn’t on the list', hintMsg: w => `Hint: ${w} starts at the flashing letter`, hintCost: '+15 s',
+      won: 'All words found!', wonDaily: 'Daily puzzle solved!', timeUp: 'Time’s up!', timeUpText: (n, total) => `You found ${n} of ${total} words. The missing ones are circled on the grid.`, timeLow: 'Ten seconds left!',
+      result: (time, hints) => `${time} · ${hints} hint${hints === 1 ? '' : 's'}`, best: time => `Best: ${time}`, newBest: 'New best time!', stars: n => `${n} of 3 stars`, next: 'Next puzzle', retry: 'Try again',
+      dailyTheme: name => `Today’s theme: ${name}`, dailyInfo: '12×12 · Normal · the same puzzle for everyone', streak: n => `🔥 ${n}-day streak`, streak0: 'Start a streak today!',
+      dailyDone: time => `Solved today in ${time}`, dailyNotYet: 'Not solved yet', dailyBack: 'A new puzzle arrives tomorrow.', practice: 'Play again', solvedN: n => `${n} puzzle${n === 1 ? '' : 's'} solved`,
+      board: n => `Letter grid, ${n} by ${n}. Drag across a word, or use the arrow keys and Enter to choose its first and last letter. H gives a hint.`,
+      cell: (r, c, l) => `Row ${r}, column ${c}: ${l}`, anchor: l => `Started at ${l}. Now pick the last letter.`,
+      themes: { animals: 'Animals', ocean: 'Ocean', birds: 'Birds', bugs: 'Bugs', fruits: 'Fruits', veggies: 'Vegetables', sweets: 'Sweets', kitchen: 'Kitchen', space: 'Space', weather: 'Weather', garden: 'Garden', sports: 'Sports', music: 'Music', colors: 'Colors', jobs: 'Jobs', body: 'Body', home: 'Home', school: 'School', travel: 'Travel', transport: 'Transport', clothes: 'Clothes', fantasy: 'Fantasy', science: 'Science', tech: 'Tech', camping: 'Camping', countries: 'Countries' },
+    },
+    vi: {
+      tagline: 'Tìm mọi từ tiếng Anh bị giấu — ngang, dọc và chéo.', modeLabel: 'Chế độ', mClassic: 'Cổ điển', mDaily: 'Hằng ngày', mTimed: 'Đua giờ',
+      introClassic: 'Chọn chủ đề, cỡ lưới và mức độ giấu từ khéo léo.', introTimed: 'Tìm hết các từ trước khi hết giờ. Mỗi lần gợi ý mất 15 giây.',
+      theme: 'Chủ đề', random: 'Ngẫu nhiên', size: 'Cỡ lưới', difficulty: 'Độ khó', easy: 'Dễ', normal: 'Thường', hard: 'Khó',
+      dEasy: 'Từ chỉ đọc → và ↓, không bắt chéo nhau', dNormal: 'Có cả đường chéo, các từ có thể dùng chung chữ', dHard: 'Đủ 8 hướng — cả đọc ngược — và bắt chéo nhiều',
+      wordsN: n => `${n} từ`, play: 'Chơi', newPuzzle: 'Lưới mới', resume: 'Chơi tiếp', close: 'Quay lại lưới chữ', menu: 'Menu', hint: 'Gợi ý', time: 'Thời gian', left: 'Còn lại', found: 'Đã tìm', words: 'Danh sách từ',
+      foundWord: (w, n, total) => `Tìm thấy ${w}! ${n}/${total}`, already: w => `${w} đã được tìm rồi`, notWord: 'Từ này không có trong danh sách', hintMsg: w => `Gợi ý: ${w} bắt đầu ở chữ đang nhấp nháy`, hintCost: '+15 giây',
+      won: 'Đã tìm đủ các từ!', wonDaily: 'Đã giải xong câu đố hôm nay!', timeUp: 'Hết giờ!', timeUpText: (n, total) => `Bạn tìm được ${n}/${total} từ. Các từ còn thiếu được khoanh trên lưới.`, timeLow: 'Còn 10 giây!',
+      result: (time, hints) => `${time} · ${hints} lần gợi ý`, best: time => `Nhanh nhất: ${time}`, newBest: 'Kỷ lục thời gian mới!', stars: n => `${n}/3 sao`, next: 'Lưới tiếp theo', retry: 'Thử lại',
+      dailyTheme: name => `Chủ đề hôm nay: ${name}`, dailyInfo: '12×12 · Thường · mọi người cùng một câu đố', streak: n => `🔥 Chuỗi ${n} ngày`, streak0: 'Bắt đầu chuỗi ngày từ hôm nay!',
+      dailyDone: time => `Hôm nay đã giải trong ${time}`, dailyNotYet: 'Chưa giải', dailyBack: 'Ngày mai sẽ có câu đố mới.', practice: 'Chơi lại', solvedN: n => `Đã giải ${n} lưới`,
+      board: n => `Lưới chữ ${n} × ${n}. Kéo qua một từ, hoặc dùng phím mũi tên và Enter để chọn chữ đầu và chữ cuối. Phím H để gợi ý.`,
+      cell: (r, c, l) => `Hàng ${r}, cột ${c}: ${l}`, anchor: l => `Bắt đầu ở ${l}. Giờ hãy chọn chữ cuối.`,
+      themes: { animals: 'Động vật', ocean: 'Đại dương', birds: 'Loài chim', bugs: 'Côn trùng', fruits: 'Trái cây', veggies: 'Rau củ', sweets: 'Đồ ngọt', kitchen: 'Nhà bếp', space: 'Vũ trụ', weather: 'Thời tiết', garden: 'Khu vườn', sports: 'Thể thao', music: 'Âm nhạc', colors: 'Màu sắc', jobs: 'Nghề nghiệp', body: 'Cơ thể', home: 'Ngôi nhà', school: 'Trường học', travel: 'Du lịch', transport: 'Phương tiện', clothes: 'Quần áo', fantasy: 'Kỳ ảo', science: 'Khoa học', tech: 'Công nghệ', camping: 'Cắm trại', countries: 'Quốc gia' },
+    },
+    zh: {
+      tagline: '找出藏在字母格里的英文单词——横、竖、斜都有。', modeLabel: '模式', mClassic: '经典', mDaily: '每日', mTimed: '限时挑战',
+      introClassic: '选择主题、网格大小，以及单词藏得有多巧妙。', introTimed: '在时间耗尽前找出所有单词。每次提示扣 15 秒。',
+      theme: '主题', random: '随机', size: '网格大小', difficulty: '难度', easy: '简单', normal: '普通', hard: '困难',
+      dEasy: '单词只朝 → 和 ↓ 方向，互不交叉', dNormal: '加入斜向，单词可以共用字母', dHard: '全部 8 个方向，也有倒着写的，大量交叉',
+      wordsN: n => `${n} 个词`, play: '开始', newPuzzle: '新谜题', resume: '继续', close: '返回谜题', menu: '菜单', hint: '提示', time: '时间', left: '剩余', found: '已找到', words: '单词表',
+      foundWord: (w, n, total) => `找到 ${w}！${n}/${total}`, already: w => `${w} 已经找到了`, notWord: '这个词不在单词表里', hintMsg: w => `提示：${w} 从闪烁的字母开始`, hintCost: '+15 秒',
+      won: '全部找到！', wonDaily: '今日谜题完成！', timeUp: '时间到！', timeUpText: (n, total) => `你找到了 ${n}/${total} 个单词，没找到的已在网格中圈出。`, timeLow: '只剩 10 秒！',
+      result: (time, hints) => `${time} · 提示 ${hints} 次`, best: time => `最快：${time}`, newBest: '新的最快纪录！', stars: n => `${n}/3 颗星`, next: '下一题', retry: '再试一次',
+      dailyTheme: name => `今日主题：${name}`, dailyInfo: '12×12 · 普通 · 所有人同一题', streak: n => `🔥 连续 ${n} 天`, streak0: '从今天开始连续挑战吧！',
+      dailyDone: time => `今天用时 ${time} 完成`, dailyNotYet: '尚未完成', dailyBack: '明天会有新谜题。', practice: '再玩一次', solvedN: n => `已完成 ${n} 题`,
+      board: n => `字母网格，${n} × ${n}。拖动划过单词，或用方向键和回车键选择首字母和尾字母。按 H 获取提示。`,
+      cell: (r, c, l) => `第 ${r} 行第 ${c} 列：${l}`, anchor: l => `从 ${l} 开始，请选择最后一个字母。`,
+      themes: { animals: '动物', ocean: '海洋', birds: '鸟类', bugs: '昆虫', fruits: '水果', veggies: '蔬菜', sweets: '甜点', kitchen: '厨房', space: '太空', weather: '天气', garden: '花园', sports: '运动', music: '音乐', colors: '颜色', jobs: '职业', body: '身体', home: '家居', school: '学校', travel: '旅行', transport: '交通工具', clothes: '服装', fantasy: '奇幻', science: '科学', tech: '科技', camping: '露营', countries: '国家' },
+    },
+    fr: {
+      tagline: 'Trouvez tous les mots anglais cachés — en ligne, en colonne et en diagonale.', modeLabel: 'Mode', mClassic: 'Classique', mDaily: 'Du jour', mTimed: 'Contre-la-montre',
+      introClassic: 'Choisissez un thème, une taille de grille et l’art avec lequel les mots sont cachés.', introTimed: 'Trouvez tous les mots avant la fin du chrono. Chaque indice coûte 15 secondes.',
+      theme: 'Thème', random: 'Au hasard', size: 'Taille de grille', difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile',
+      dEasy: 'Mots dans le sens → et ↓ seulement, sans croisement', dNormal: 'Diagonales en plus, les mots peuvent partager des lettres', dHard: 'Les 8 directions — à l’envers aussi — et beaucoup de croisements',
+      wordsN: n => `${n} mots`, play: 'Jouer', newPuzzle: 'Nouvelle grille', resume: 'Reprendre', close: 'Retour à la grille', menu: 'Menu', hint: 'Indice', time: 'Temps', left: 'Reste', found: 'Trouvés', words: 'Mots',
+      foundWord: (w, n, total) => `${w} trouvé ! ${n} sur ${total}`, already: w => `${w} est déjà trouvé`, notWord: 'Ce mot n’est pas dans la liste', hintMsg: w => `Indice : ${w} commence à la lettre qui clignote`, hintCost: '+15 s',
+      won: 'Tous les mots trouvés !', wonDaily: 'Grille du jour résolue !', timeUp: 'Temps écoulé !', timeUpText: (n, total) => `Vous avez trouvé ${n} mot${n > 1 ? 's' : ''} sur ${total}. Les mots manquants sont entourés sur la grille.`, timeLow: 'Plus que 10 secondes !',
+      result: (time, hints) => `${time} · ${hints} indice${hints > 1 ? 's' : ''}`, best: time => `Meilleur temps : ${time}`, newBest: 'Nouveau meilleur temps !', stars: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, next: 'Grille suivante', retry: 'Réessayer',
+      dailyTheme: name => `Thème du jour : ${name}`, dailyInfo: '12×12 · Normal · la même grille pour tous', streak: n => `🔥 Série de ${n} jour${n > 1 ? 's' : ''}`, streak0: 'Commencez une série aujourd’hui !',
+      dailyDone: time => `Résolue aujourd’hui en ${time}`, dailyNotYet: 'Pas encore résolue', dailyBack: 'Une nouvelle grille arrive demain.', practice: 'Rejouer', solvedN: n => `${n} grille${n > 1 ? 's' : ''} résolue${n > 1 ? 's' : ''}`,
+      board: n => `Grille de lettres de ${n} sur ${n}. Glissez sur un mot, ou utilisez les flèches et Entrée pour choisir sa première et sa dernière lettre. H donne un indice.`,
+      cell: (r, c, l) => `Ligne ${r}, colonne ${c} : ${l}`, anchor: l => `Départ sur ${l}. Choisissez maintenant la dernière lettre.`,
+      themes: { animals: 'Animaux', ocean: 'Océan', birds: 'Oiseaux', bugs: 'Insectes', fruits: 'Fruits', veggies: 'Légumes', sweets: 'Douceurs', kitchen: 'Cuisine', space: 'Espace', weather: 'Météo', garden: 'Jardin', sports: 'Sports', music: 'Musique', colors: 'Couleurs', jobs: 'Métiers', body: 'Corps humain', home: 'Maison', school: 'École', travel: 'Voyage', transport: 'Transports', clothes: 'Vêtements', fantasy: 'Fantastique', science: 'Sciences', tech: 'High-tech', camping: 'Camping', countries: 'Pays' },
+    },
+    th: {
+      tagline: 'หาคำภาษาอังกฤษที่ซ่อนอยู่ให้ครบ ทั้งแนวนอน แนวตั้ง และแนวทแยง', modeLabel: 'โหมด', mClassic: 'คลาสสิก', mDaily: 'รายวัน', mTimed: 'แข่งเวลา',
+      introClassic: 'เลือกหมวด ขนาดตาราง และความแนบเนียนในการซ่อนคำ', introTimed: 'หาคำให้ครบก่อนหมดเวลา ใช้คำใบ้แต่ละครั้งเสีย 15 วินาที',
+      theme: 'หมวด', random: 'สุ่มให้', size: 'ขนาดตาราง', difficulty: 'ความยาก', easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก',
+      dEasy: 'คำเรียงแค่ → และ ↓ ไม่ซ้อนทับกัน', dNormal: 'มีแนวทแยงด้วย และคำอาจใช้ตัวอักษรร่วมกัน', dHard: 'ครบ 8 ทิศ รวมถึงอ่านย้อนกลับ และซ้อนทับกันมาก',
+      wordsN: n => `${n} คำ`, play: 'เล่น', newPuzzle: 'ตารางใหม่', resume: 'เล่นต่อ', close: 'กลับไปที่ตาราง', menu: 'เมนู', hint: 'คำใบ้', time: 'เวลา', left: 'เหลือ', found: 'เจอแล้ว', words: 'รายการคำ',
+      foundWord: (w, n, total) => `เจอ ${w}! ${n}/${total}`, already: w => `${w} หาเจอไปแล้ว`, notWord: 'คำนี้ไม่อยู่ในรายการ', hintMsg: w => `คำใบ้: ${w} เริ่มที่ตัวอักษรที่กะพริบ`, hintCost: '+15 วินาที',
+      won: 'หาคำครบแล้ว!', wonDaily: 'ไขปริศนาประจำวันสำเร็จ!', timeUp: 'หมดเวลา!', timeUpText: (n, total) => `คุณหาเจอ ${n} จาก ${total} คำ คำที่เหลือถูกวงไว้บนตาราง`, timeLow: 'เหลือ 10 วินาที!',
+      result: (time, hints) => `${time} · ใช้คำใบ้ ${hints} ครั้ง`, best: time => `เร็วที่สุด: ${time}`, newBest: 'ทำเวลาดีที่สุดใหม่!', stars: n => `${n} จาก 3 ดาว`, next: 'ตารางถัดไป', retry: 'ลองอีกครั้ง',
+      dailyTheme: name => `หมวดวันนี้: ${name}`, dailyInfo: '12×12 · ปกติ · ทุกคนได้ปริศนาเดียวกัน', streak: n => `🔥 ต่อเนื่อง ${n} วัน`, streak0: 'เริ่มสถิติต่อเนื่องวันนี้เลย!',
+      dailyDone: time => `วันนี้ไขสำเร็จใน ${time}`, dailyNotYet: 'ยังไม่ได้ไข', dailyBack: 'พรุ่งนี้มีปริศนาใหม่', practice: 'เล่นอีกครั้ง', solvedN: n => `ไขแล้ว ${n} ตาราง`,
+      board: n => `ตารางตัวอักษร ${n} × ${n} ลากผ่านคำ หรือใช้ปุ่มลูกศรกับ Enter เพื่อเลือกตัวแรกและตัวสุดท้าย กด H เพื่อขอคำใบ้`,
+      cell: (r, c, l) => `แถว ${r} คอลัมน์ ${c}: ${l}`, anchor: l => `เริ่มที่ ${l} ต่อไปเลือกตัวสุดท้าย`,
+      themes: { animals: 'สัตว์', ocean: 'มหาสมุทร', birds: 'นก', bugs: 'แมลง', fruits: 'ผลไม้', veggies: 'ผัก', sweets: 'ขนมหวาน', kitchen: 'ห้องครัว', space: 'อวกาศ', weather: 'สภาพอากาศ', garden: 'สวน', sports: 'กีฬา', music: 'ดนตรี', colors: 'สี', jobs: 'อาชีพ', body: 'ร่างกาย', home: 'บ้าน', school: 'โรงเรียน', travel: 'ท่องเที่ยว', transport: 'ยานพาหนะ', clothes: 'เสื้อผ้า', fantasy: 'แฟนตาซี', science: 'วิทยาศาสตร์', tech: 'เทคโนโลยี', camping: 'ตั้งแคมป์', countries: 'ประเทศ' },
+    },
+    ja: {
+      tagline: '隠れた英単語をぜんぶ探そう。ヨコ・タテ・ナナメに隠れています。', modeLabel: 'モード', mClassic: 'クラシック', mDaily: 'デイリー', mTimed: 'タイムアタック',
+      introClassic: 'テーマ、グリッドの大きさ、単語の隠し方の難しさを選ぼう。', introTimed: '時間切れになる前にすべての単語を見つけよう。ヒントは1回につき15秒減ります。',
+      theme: 'テーマ', random: 'おまかせ', size: 'グリッドの大きさ', difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい',
+      dEasy: '単語は → と ↓ だけ、重なりなし', dNormal: 'ナナメもあり、単語が文字を共有することも', dHard: '全8方向、逆向きもあり、重なりもたくさん',
+      wordsN: n => `${n}語`, play: 'プレイ', newPuzzle: '新しいパズル', resume: '続きから', close: 'パズルに戻る', menu: 'メニュー', hint: 'ヒント', time: 'タイム', left: '残り', found: '発見', words: '単語リスト',
+      foundWord: (w, n, total) => `${w} を発見！ ${n}/${total}`, already: w => `${w} はもう見つけています`, notWord: 'その単語はリストにありません', hintMsg: w => `ヒント：${w} は点滅している文字から始まります`, hintCost: '+15秒',
+      won: '全部見つけた！', wonDaily: '今日のパズルクリア！', timeUp: 'タイムアップ！', timeUpText: (n, total) => `${total}語中 ${n}語を見つけました。残りの単語はグリッドに丸で示しています。`, timeLow: '残り10秒！',
+      result: (time, hints) => `${time} · ヒント ${hints}回`, best: time => `ベスト：${time}`, newBest: 'ベストタイム更新！', stars: n => `星 ${n}/3`, next: '次のパズル', retry: 'もう一度',
+      dailyTheme: name => `今日のテーマ：${name}`, dailyInfo: '12×12 · ふつう · 全員同じパズル', streak: n => `🔥 ${n}日連続`, streak0: '今日から連続記録を始めよう！',
+      dailyDone: time => `今日は ${time} でクリア`, dailyNotYet: 'まだクリアしていません', dailyBack: '明日また新しいパズルが届きます。', practice: 'もう一度遊ぶ', solvedN: n => `クリアしたパズル ${n}個`,
+      board: n => `${n} × ${n} の文字グリッド。単語をなぞるか、矢印キーと Enter で最初と最後の文字を選んでください。H でヒント。`,
+      cell: (r, c, l) => `${r}行 ${c}列：${l}`, anchor: l => `${l} から開始。最後の文字を選んでください。`,
+      themes: { animals: '動物', ocean: '海', birds: '鳥', bugs: '虫', fruits: 'フルーツ', veggies: '野菜', sweets: 'スイーツ', kitchen: 'キッチン', space: '宇宙', weather: '天気', garden: 'ガーデン', sports: 'スポーツ', music: '音楽', colors: '色', jobs: '職業', body: '体', home: '家', school: '学校', travel: '旅行', transport: '乗り物', clothes: '服', fantasy: 'ファンタジー', science: '科学', tech: 'テクノロジー', camping: 'キャンプ', countries: '国' },
+    },
+    ko: {
+      tagline: '숨은 영어 단어를 모두 찾아보세요. 가로, 세로, 대각선 어디든!', modeLabel: '모드', mClassic: '클래식', mDaily: '오늘의 퍼즐', mTimed: '타임 어택',
+      introClassic: '주제와 격자 크기, 단어를 얼마나 교묘하게 숨길지 고르세요.', introTimed: '시간이 끝나기 전에 모든 단어를 찾으세요. 힌트를 쓰면 15초가 줄어요.',
+      theme: '주제', random: '무작위', size: '격자 크기', difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움',
+      dEasy: '단어는 → 와 ↓ 방향만, 서로 겹치지 않음', dNormal: '대각선도 있고, 단어끼리 글자를 공유할 수 있음', dHard: '8방향 모두, 거꾸로도 숨고, 많이 겹침',
+      wordsN: n => `${n}단어`, play: '시작', newPuzzle: '새 퍼즐', resume: '이어 하기', close: '퍼즐로 돌아가기', menu: '메뉴', hint: '힌트', time: '시간', left: '남은 시간', found: '찾음', words: '단어 목록',
+      foundWord: (w, n, total) => `${w} 찾음! ${n}/${total}`, already: w => `이미 찾은 단어예요: ${w}`, notWord: '목록에 없는 단어예요', hintMsg: w => `힌트: 깜빡이는 글자가 ${w}의 첫 글자예요`, hintCost: '+15초',
+      won: '모든 단어를 찾았어요!', wonDaily: '오늘의 퍼즐 완료!', timeUp: '시간 종료!', timeUpText: (n, total) => `${total}개 중 ${n}개를 찾았어요. 못 찾은 단어는 격자에 표시해 두었어요.`, timeLow: '10초 남았어요!',
+      result: (time, hints) => `${time} · 힌트 ${hints}회`, best: time => `최고 기록: ${time}`, newBest: '최고 기록 경신!', stars: n => `별 ${n}/3`, next: '다음 퍼즐', retry: '다시 하기',
+      dailyTheme: name => `오늘의 주제: ${name}`, dailyInfo: '12×12 · 보통 · 모두 같은 퍼즐', streak: n => `🔥 ${n}일 연속`, streak0: '오늘부터 연속 기록을 시작해 보세요!',
+      dailyDone: time => `오늘 ${time} 만에 완료`, dailyNotYet: '아직 풀지 않음', dailyBack: '내일 새 퍼즐이 나와요.', practice: '다시 플레이', solvedN: n => `완료한 퍼즐 ${n}개`,
+      board: n => `${n} × ${n} 글자 격자. 단어를 드래그하거나, 방향키와 Enter로 첫 글자와 마지막 글자를 고르세요. H 키는 힌트.`,
+      cell: (r, c, l) => `${r}행 ${c}열: ${l}`, anchor: l => `${l}에서 시작. 이제 마지막 글자를 고르세요.`,
+      themes: { animals: '동물', ocean: '바다', birds: '새', bugs: '곤충', fruits: '과일', veggies: '채소', sweets: '디저트', kitchen: '주방', space: '우주', weather: '날씨', garden: '정원', sports: '스포츠', music: '음악', colors: '색깔', jobs: '직업', body: '신체', home: '집', school: '학교', travel: '여행', transport: '탈것', clothes: '옷', fantasy: '판타지', science: '과학', tech: '기술', camping: '캠핑', countries: '나라' },
+    },
+  };
+  const LOCALES = { en: 'en-US', vi: 'vi-VN', zh: 'zh-CN', fr: 'fr-FR', th: 'th-TH', ja: 'ja-JP', ko: 'ko-KR' };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const THEMES = [
+    ['animals', '🦁', 'LION TIGER ZEBRA GIRAFFE ELEPHANT MONKEY PANDA KOALA RABBIT HORSE CAMEL BEAR WOLF FOX DEER MOOSE OTTER BEAVER HIPPO RHINO KANGAROO SQUIRREL LEOPARD CHEETAH GORILLA BUFFALO HEDGEHOG RACCOON LLAMA BADGER JAGUAR SLOTH'],
+    ['ocean', '🐳', 'WHALE SHARK DOLPHIN OCTOPUS SQUID CRAB LOBSTER SHRIMP CORAL REEF SEAL WALRUS TURTLE JELLYFISH STARFISH SEAHORSE OYSTER CLAM KELP WAVE TIDE SALMON TUNA MANTA ORCA PLANKTON URCHIN LAGOON CURRENT SEAWEED'],
+    ['birds', '🦜', 'EAGLE OWL PARROT PENGUIN ROBIN SPARROW PIGEON CROW RAVEN FALCON HAWK SWAN GOOSE DUCK HERON STORK FLAMINGO PELICAN OSTRICH PEACOCK TOUCAN WREN FINCH CANARY MAGPIE SEAGULL KIWI CONDOR VULTURE HUMMINGBIRD WOODPECKER KINGFISHER'],
+    ['bugs', '🐞', 'ANT BEE WASP BEETLE LADYBUG MOTH BUTTERFLY CRICKET GRASSHOPPER DRAGONFLY FIREFLY MOSQUITO SPIDER SCORPION TERMITE FLEA TICK CATERPILLAR CENTIPEDE LOCUST APHID HORNET BUMBLEBEE MANTIS COCKROACH GNAT SNAIL SLUG WORM CICADA LARVA'],
+    ['fruits', '🍓', 'APPLE BANANA CHERRY GRAPE LEMON LIME MANGO MELON ORANGE PEACH PEAR PLUM KIWI PAPAYA GUAVA LYCHEE FIG DATE APRICOT COCONUT PINEAPPLE STRAWBERRY BLUEBERRY RASPBERRY WATERMELON POMEGRANATE TANGERINE AVOCADO DURIAN CRANBERRY NECTARINE QUINCE'],
+    ['veggies', '🥕', 'CARROT POTATO TOMATO ONION GARLIC PEPPER CABBAGE LETTUCE SPINACH BROCCOLI CELERY CUCUMBER PUMPKIN SQUASH RADISH BEET TURNIP PEA BEAN CORN LEEK KALE ZUCCHINI EGGPLANT ASPARAGUS ARTICHOKE CAULIFLOWER GINGER YAM OKRA PARSNIP MUSHROOM'],
+    ['sweets', '🧁', 'CAKE CANDY COOKIE CUPCAKE DONUT MUFFIN BROWNIE PIE TART PUDDING CUSTARD FUDGE TOFFEE CARAMEL CHOCOLATE LOLLIPOP MARSHMALLOW WAFFLE PANCAKE CROISSANT MACARON SORBET GELATO ICING SPRINKLES SUNDAE TRUFFLE MERINGUE CHEESECAKE CREPE JELLY HONEY'],
+    ['kitchen', '🍳', 'SPOON FORK KNIFE PLATE BOWL CUP MUG KETTLE TOASTER OVEN STOVE FRIDGE BLENDER WHISK LADLE SPATULA PAN POT SKILLET COLANDER GRATER PEELER APRON NAPKIN TEAPOT JAR SINK TRAY MICROWAVE CHOPSTICKS TONGS SIEVE'],
+    ['space', '🚀', 'PLANET STAR MOON SUN COMET METEOR ASTEROID GALAXY NEBULA ORBIT ROCKET SATELLITE ASTRONAUT MERCURY VENUS EARTH MARS JUPITER SATURN URANUS NEPTUNE PLUTO ECLIPSE TELESCOPE CRATER COSMOS GRAVITY QUASAR PULSAR SUPERNOVA SHUTTLE LUNAR'],
+    ['weather', '⛅', 'RAIN SNOW CLOUD STORM THUNDER LIGHTNING WIND BREEZE FOG MIST HAIL SLEET FROST TORNADO HURRICANE TYPHOON MONSOON DRIZZLE RAINBOW BLIZZARD HEATWAVE DROUGHT HUMID SUNNY FORECAST CLIMATE TEMPERATURE DEW GALE SHOWER ICICLE PUDDLE'],
+    ['garden', '🌻', 'ROSE TULIP DAISY LILY ORCHID SUNFLOWER LAVENDER POPPY IRIS VIOLET LILAC PEONY MARIGOLD DAHLIA JASMINE HIBISCUS LOTUS CACTUS FERN MOSS IVY HEDGE SEED SOIL ROOT PETAL STEM BLOSSOM SHOVEL RAKE BUD BULB'],
+    ['sports', '⚽', 'SOCCER TENNIS GOLF HOCKEY RUGBY CRICKET BASEBALL BASKETBALL VOLLEYBALL BADMINTON BOXING KARATE JUDO FENCING ROWING SKIING SURFING CYCLING SWIMMING ARCHERY BOWLING POLO DIVING SAILING SKATING CLIMBING MARATHON SPRINT JAVELIN HANDBALL TRIATHLON WRESTLING'],
+    ['music', '🎵', 'PIANO GUITAR VIOLIN CELLO FLUTE DRUM TRUMPET TROMBONE SAXOPHONE CLARINET HARP BANJO UKULELE OBOE TUBA ORGAN MELODY RHYTHM CHORD TEMPO CHORUS LYRICS CONCERT ORCHESTRA OPERA JAZZ BLUES BALLAD SONG BEAT HARMONY ACCORDION XYLOPHONE'],
+    ['colors', '🎨', 'RED BLUE GREEN YELLOW ORANGE PURPLE PINK BROWN BLACK WHITE GRAY VIOLET INDIGO CYAN MAGENTA TEAL NAVY MAROON BEIGE IVORY GOLD SILVER BRONZE CRIMSON SCARLET TURQUOISE LAVENDER OLIVE AMBER CORAL EMERALD SAPPHIRE RUBY MINT KHAKI'],
+    ['jobs', '👩‍🍳', 'DOCTOR NURSE TEACHER CHEF BAKER FARMER PILOT DRIVER POLICE FIREFIGHTER DENTIST LAWYER JUDGE ARTIST SINGER ACTOR DANCER WRITER EDITOR ENGINEER ARCHITECT PLUMBER CARPENTER MECHANIC SCIENTIST PAINTER TAILOR BARBER WAITER CASHIER LIBRARIAN BANKER SAILOR'],
+    ['body', '💪', 'HEAD HAND FOOT ARM LEG KNEE ELBOW SHOULDER NECK BACK CHEST HEART LUNG BRAIN LIVER KIDNEY STOMACH FINGER THUMB TOE ANKLE WRIST HIP CHIN CHEEK NOSE EYEBROW MOUTH TOOTH TONGUE SKIN BONE MUSCLE SKULL SPINE'],
+    ['home', '🏠', 'BEDROOM BATHROOM ATTIC BASEMENT GARAGE HALLWAY STAIRS DOOR WINDOW ROOF WALL FLOOR CEILING CHIMNEY BALCONY PORCH SOFA TABLE CHAIR BED LAMP CARPET CURTAIN SHELF MIRROR PILLOW BLANKET CLOSET DRAWER FIREPLACE CUSHION RUG'],
+    ['school', '🎒', 'PENCIL ERASER RULER BOOK DESK CHALK CLASS LESSON EXAM QUIZ HOMEWORK BACKPACK MARKER CRAYON SCISSORS GLUE PAPER LIBRARY RECESS MATH SCIENCE HISTORY MUSIC ART LOCKER GRADE STUDENT PRINCIPAL CALCULATOR DICTIONARY GLOBE ATLAS BELL DIPLOMA'],
+    ['travel', '✈️', 'PASSPORT TICKET LUGGAGE SUITCASE AIRPORT HOTEL HOSTEL MAP COMPASS TOURIST CAMERA BEACH CRUISE JOURNEY VOYAGE ADVENTURE VISA SOUVENIR POSTCARD GUIDE TOUR HIKE EXPLORE ITINERARY BACKPACK MUSEUM RESORT VACATION HOLIDAY BORDER DEPARTURE ARRIVAL'],
+    ['transport', '🚲', 'CAR BUS TRAIN TRAM TAXI TRUCK VAN BICYCLE SCOOTER PLANE JET HELICOPTER BOAT SHIP YACHT CANOE SUBMARINE ROCKET TRACTOR AMBULANCE LIMOUSINE SKATEBOARD GONDOLA SLED WAGON CARRIAGE TANKER FERRY BLIMP MONORAIL RICKSHAW SUBWAY TRAILER'],
+    ['clothes', '👕', 'SHIRT PANTS JEANS DRESS SKIRT JACKET COAT SWEATER HOODIE SCARF GLOVES MITTENS HAT CAP BOOTS SHOES SANDALS SOCKS BELT TIE VEST BLOUSE SHORTS PAJAMAS UNIFORM TUXEDO KIMONO POCKET BUTTON ZIPPER COLLAR SLEEVE SNEAKERS'],
+    ['fantasy', '🐉', 'DRAGON WIZARD WITCH KNIGHT CASTLE PRINCESS QUEEN KING UNICORN FAIRY GOBLIN TROLL GIANT DWARF ELF OGRE PHOENIX GRIFFIN MERMAID SORCERER SPELL POTION WAND CROWN SWORD SHIELD TREASURE QUEST MAGIC LEGEND PEGASUS CENTAUR'],
+    ['science', '🔬', 'ATOM MOLECULE CELL GENE DNA ENERGY FORCE GRAVITY MAGNET LASER PROTON NEUTRON ELECTRON PHOTON OXYGEN CARBON HYDROGEN NITROGEN ACID CRYSTAL FOSSIL LAB MICROSCOPE EXPERIMENT THEORY FORMULA PLASMA VIRUS BACTERIA ENZYME VOLTAGE CIRCUIT BEAKER'],
+    ['tech', '💻', 'COMPUTER LAPTOP TABLET PHONE KEYBOARD MOUSE SCREEN MONITOR PRINTER ROUTER CABLE BATTERY CHARGER SPEAKER HEADPHONES CAMERA ROBOT PIXEL EMAIL WEBSITE BROWSER PASSWORD SOFTWARE HARDWARE CODE APP DATA CLOUD NETWORK SERVER MODEM WIFI DOWNLOAD'],
+    ['camping', '⛺', 'TENT CAMPFIRE LANTERN FLASHLIGHT COMPASS MAP HIKING BACKPACK CANOE TRAIL FOREST RIVER LAKE MOUNTAIN CABIN LOG AXE ROPE KNOT MARSHMALLOW STARS OWL BEAR CANTEEN BINOCULARS HAMMOCK FISHING CAMPSITE PINECONE WILDERNESS SUNSET FIREWOOD'],
+    ['countries', '🌍', 'FRANCE SPAIN ITALY GERMANY JAPAN CHINA KOREA VIETNAM THAILAND INDIA BRAZIL MEXICO CANADA PERU CHILE EGYPT KENYA GREECE TURKEY NORWAY SWEDEN FINLAND IRELAND POLAND PORTUGAL AUSTRALIA ARGENTINA MOROCCO NEPAL CUBA ICELAND INDONESIA MALAYSIA SINGAPORE'],
+  ].map(([id, emoji, words]) => ({ id, emoji, words: words.split(' ') }));
+  const THEME = Object.fromEntries(THEMES.map(th => [th.id, th]));
+  const SIZES = [8, 10, 12, 15];
+  const WORD_COUNT = { 8: 7, 10: 10, 12: 13, 15: 18 };
+  const DIRS = [[0, 1], [1, 0], [1, 1], [-1, 1], [0, -1], [-1, 0], [-1, -1], [1, -1]];
+  // overlap: chance to prefer a crossing spot; decoy: share of filler letters drawn from the hidden words
+  const DIFFS = {
+    easy: { dirs: DIRS.slice(0, 2), overlap: 0, decoy: 0, spw: 15 },
+    normal: { dirs: DIRS.slice(0, 4), overlap: .3, decoy: .2, spw: 20 },
+    hard: { dirs: DIRS, overlap: .7, decoy: .45, spw: 26 },
+  };
+  const FILL = 'EEEEEEEAAAAAIIIIIOOOOOTTTTTNNNNNSSSSRRRRRHHLLLLDDDCCCUUUMMPPGGBBFWYYVKJXQZ';
+  const HL = ['#ffd23f', '#7bdff2', '#ff9fb2', '#b5e48c', '#c3a6ff', '#ffb870', '#8fe3cf', '#f7a6e0'];
+  const HINT_COST = 15000;
+  const PAD = .3;
+  const DAILY = { size: 12, diff: 'normal' };
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    board: $('board'), toast: $('toast'), words: $('words'), chip: $('chip'), time: $('time'), timeCard: $('time-card'), timeLabel: $('time-label'), found: $('found'), hint: $('hint'),
+    listTitle: $('list-title'), listCount: $('list-count'), announcer: $('announcer'),
+    menu: $('menu'), modes: $('modes'), intro: $('intro'), themes: $('themes'), sizes: $('sizes'), diffs: $('diffs'), diffDesc: $('diff-desc'), fTheme: $('f-theme'), fSize: $('f-size'), fDiff: $('f-diff'),
+    day: $('day'), calMonth: $('cal-month'), calDay: $('cal-day'), dTheme: $('d-theme'), dStreak: $('d-streak'), dStatus: $('d-status'), resume: $('resume'), play: $('play'), closeMenu: $('close-menu'), mStats: $('m-stats'),
+    win: $('win'), winTitle: $('win-title'), winSub: $('win-sub'), winStars: $('win-stars'), winResult: $('win-result'), winBest: $('win-best'), winBadge: $('win-badge'), next: $('next'),
+    lose: $('lose'), loseText: $('lose-text'),
+  };
+  const overlays = [els.menu, els.win, els.lose];
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const store = {
+    get(name, fallback) { try { const raw = localStorage.getItem(`milaan.wordSearch.${name}`); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } },
+    set(name, value) { try { localStorage.setItem(`milaan.wordSearch.${name}`, JSON.stringify(value)); } catch {} },
+  };
+  const prefs = { mode: 'classic', theme: 'random', size: 10, diff: 'normal', ...store.get('prefs', {}) };
+  if (!['classic', 'daily', 'timed'].includes(prefs.mode)) prefs.mode = 'classic';
+  if (prefs.theme !== 'random' && !THEME[prefs.theme]) prefs.theme = 'random';
+  if (!SIZES.includes(prefs.size)) prefs.size = 10;
+  if (!DIFFS[prefs.diff]) prefs.diff = 'normal';
+  const stats = { solved: 0, best: {}, taWins: 0, taBest: {}, ...store.get('stats', {}) };
+  stats.daily = { last: '', streak: 0, top: 0, times: {}, ...(stats.daily || {}) };
+  const saves = store.get('saves', {}) || {};
+
+  // ---------- puzzle generation (seeded, so a seed always rebuilds the same grid) ----------
+  const mulberry32 = a => () => { a = (a + 0x6D2B79F5) | 0; let x = Math.imul(a ^ (a >>> 15), 1 | a); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const shuffle = (list, rand) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const reverse = w => [...w].reverse().join('');
+
+  function countOccurrences(grid, n, word) {
+    let count = 0;
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] !== word[0]) continue;
+      const r = Math.floor(i / n), c = i % n;
+      for (const [dr, dc] of DIRS) {
+        const er = r + dr * (word.length - 1), ec = c + dc * (word.length - 1);
+        if (er < 0 || er >= n || ec < 0 || ec >= n) continue;
+        let k = 1;
+        while (k < word.length && grid[(r + dr * k) * n + c + dc * k] === word[k]) k++;
+        if (k === word.length) count++;
+      }
+    }
+    return count;
+  }
+
+  function choosePlacement(word, grid, n, cfg, rand) {
+    const plain = [], crossing = [];
+    for (const [dr, dc] of cfg.dirs) {
+      for (let r = 0; r < n; r++) {
+        const er = r + dr * (word.length - 1);
+        if (er < 0 || er >= n) continue;
+        for (let c = 0; c < n; c++) {
+          const ec = c + dc * (word.length - 1);
+          if (ec < 0 || ec >= n) continue;
+          let shared = 0, ok = true;
+          for (let i = 0; i < word.length && ok; i++) {
+            const ch = grid[(r + dr * i) * n + c + dc * i];
+            if (ch) { if (ch === word[i]) shared++; else ok = false; }
+          }
+          if (!ok || shared === word.length) continue;
+          if (!shared) plain.push({ r, c, dr, dc });
+          else if (cfg.overlap) crossing.push({ r, c, dr, dc });
+        }
+      }
+    }
+    const pick = list => list[Math.floor(rand() * list.length)];
+    if (crossing.length && (!plain.length || rand() < cfg.overlap)) return pick(crossing);
+    return plain.length ? pick(plain) : null;
+  }
+
+  function tryBuild(pool, n, target, cfg, rand) {
+    // Drop words hidden inside another chosen word (STAR / STARFISH) — they would appear twice.
+    const cand = [];
+    for (const w of shuffle(pool.slice(), rand)) {
+      const rw = reverse(w);
+      if (cand.some(p => p.includes(w) || p.includes(rw) || w.includes(p) || rw.includes(p))) continue;
+      cand.push(w);
+    }
+    const head = cand.slice(0, target + 3).sort((a, b) => b.length - a.length);
+    const order = [...head, ...cand.slice(target + 3)];
+    const grid = new Array(n * n).fill('');
+    const words = [];
+    for (const w of order) {
+      if (words.length >= target) break;
+      const p = choosePlacement(w, grid, n, cfg, rand);
+      if (!p) continue;
+      const cells = [];
+      for (let i = 0; i < w.length; i++) { const idx = (p.r + p.dr * i) * n + p.c + p.dc * i; grid[idx] = w[i]; cells.push(idx); }
+      words.push({ word: w, cells, dir: DIRS.findIndex(([dr, dc]) => dr === p.dr && dc === p.dc) });
+    }
+    const letters = words.map(w => w.word).join('');
+    const free = [];
+    grid.forEach((ch, i) => { if (!ch) free.push(i); });
+    for (let attempt = 0; attempt < 30; attempt++) {
+      for (const i of free) grid[i] = rand() < cfg.decoy ? letters[Math.floor(rand() * letters.length)] : FILL[Math.floor(rand() * FILL.length)];
+      if (words.every(w => countOccurrences(grid, n, w.word) === 1)) return { grid: grid.slice(), words };
+    }
+    return null;
+  }
+
+  function generate({ seed, theme, size, diff }) {
+    const rand = mulberry32(seed);
+    const cfg = DIFFS[diff];
+    const target = WORD_COUNT[size];
+    const pool = THEME[theme].words.filter(w => w.length >= 3 && w.length <= size);
+    let best = null;
+    for (let attempt = 0; attempt < 40 && !(best && best.words.length >= target); attempt++) {
+      const built = tryBuild(pool, size, target, cfg, rand);
+      if (built && (!best || built.words.length > best.words.length)) best = built;
+    }
+    const order = best.words.map((_, i) => i).sort((a, b) => best.words[a].word.localeCompare(best.words[b].word));
+    return { seed, theme, size, diff, grid: best.grid, words: best.words, order };
+  }
+
+  // ---------- dates & daily ----------
+  const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayNumber = key => { const [y, m, d] = key.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000); };
+  const dailySpec = key => ({ seed: hashStr(`word-search:${key}`), theme: THEMES[dayNumber(key) % THEMES.length].id, size: DAILY.size, diff: DAILY.diff, date: key });
+  const currentStreak = () => { const s = stats.daily; if (!s.last) return 0; const gap = dayNumber(dateKey()) - dayNumber(s.last); return gap <= 1 ? s.streak : 0; };
+
+  // ---------- helpers ----------
+  const formatTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const formatLeft = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const themeName = id => t.themes[id];
+  const announce = text => { els.announcer.textContent = ''; requestAnimationFrame(() => { els.announcer.textContent = text; }); };
+  let toastTimer = 0;
+  function toast(text, kind = '') {
+    els.toast.textContent = text;
+    els.toast.className = `toast show ${kind}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { els.toast.className = `toast ${kind}`; }, 1500);
+  }
+  const overlayOpen = () => overlays.some(o => !o.hidden);
+  function showOverlay(el) { for (const o of overlays) o.hidden = o !== el; }
+  const hideOverlays = () => { for (const o of overlays) o.hidden = true; };
+  const savePrefs = () => store.set('prefs', prefs);
+  const saveStats = () => store.set('stats', stats);
+
+  // ---------- game state ----------
+  let G = null;
+  let drag = null;
+  let anchor = null;
+  let cursor = 0;
+  let lastSave = 0;
+  const svg = els.board;
+  const svgEl = (tag, attrs, parent) => { const el = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.append(el); return el; };
+  const B = {};
+
+  const inProgress = () => G && !G.done && !G.lost && (G.found.length > 0 || G.elapsed > 1500 || G.hints > 0);
+
+  function newGame(mode, spec, resume) {
+    const puz = generate(spec);
+    G = {
+      mode, spec, puz, found: [], elapsed: 0, hints: 0, hinted: -1, done: false, lost: false, warned: false,
+      practice: mode === 'daily' && !!stats.daily.times[spec.date],
+      limit: mode === 'timed' ? puz.words.length * DIFFS[spec.diff].spw * 1000 : 0,
+    };
+    if (resume) {
+      G.found = (resume.found || []).filter((i, k, list) => Number.isInteger(i) && i >= 0 && i < puz.words.length && list.indexOf(i) === k);
+      G.elapsed = Math.max(0, +resume.elapsed || 0);
+      G.hints = Math.max(0, resume.hints | 0);
+    }
+    anchor = null;
+    drag = null;
+    cursor = Math.floor(puz.size / 2) * puz.size + Math.floor(puz.size / 2);
+    buildBoard();
+    renderAll();
+  }
+
+  function buildBoard() {
+    const n = G.puz.size;
+    svg.replaceChildren();
+    svg.classList.remove('win', 'kb');
+    svg.classList.toggle('big', n <= 10);
+    svg.setAttribute('viewBox', `${-PAD} ${-PAD} ${n + 2 * PAD} ${n + 2 * PAD}`);
+    svg.setAttribute('aria-label', t.board(n));
+    svgEl('rect', { class: 'paper', x: -PAD, y: -PAD, width: n + 2 * PAD, height: n + 2 * PAD, rx: .5 }, svg);
+    for (let r = 1; r < n; r += 2) svgEl('rect', { class: 'guide', x: -PAD / 2, y: r, width: n + PAD, height: 1, rx: .5 }, svg);
+    B.miss = svgEl('g', { class: 'miss' }, svg);
+    B.found = svgEl('g', { class: 'found' }, svg);
+    B.sel = svgEl('line', { class: 'sel', x1: 0, y1: 0, x2: 0, y2: 0, visibility: 'hidden' }, svg);
+    B.bad = svgEl('line', { class: 'bad', x1: 0, y1: 0, x2: 0, y2: 0 }, svg);
+    B.hint = svgEl('circle', { class: 'hint-ring', r: .44, cx: -5, cy: -5 }, svg);
+    B.anchor = svgEl('circle', { class: 'anchor', r: .43, cx: -5, cy: -5 }, svg);
+    B.letters = svgEl('g', { class: 'letters', 'aria-hidden': 'true' }, svg);
+    G.puz.grid.forEach((ch, i) => {
+      const r = Math.floor(i / n), c = i % n;
+      const text = svgEl('text', { x: c + .5, y: r + .53, style: `--d:${(r + c) * 26}ms` }, B.letters);
+      text.textContent = ch;
+    });
+    B.cursor = svgEl('rect', { class: 'cursor', width: .9, height: .9, rx: .2, x: -5, y: -5 }, svg);
+  }
+
+  const center = i => [i % G.puz.size + .5, Math.floor(i / G.puz.size) + .5];
+  function setLine(line, cells) {
+    const [x1, y1] = center(cells[0]), [x2, y2] = center(cells[cells.length - 1]);
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  }
+  const colorOf = k => HL[k % HL.length];
+
+  function renderFound() {
+    B.found.replaceChildren();
+    G.found.forEach((wi, k) => { const line = svgEl('line', { stroke: colorOf(k) }, B.found); setLine(line, G.puz.words[wi].cells); });
+  }
+  function renderMissing() {
+    B.miss.replaceChildren();
+    if (!G.lost) return;
+    G.puz.words.forEach((w, i) => {
+      if (G.found.includes(i)) return;
+      setLine(svgEl('line', { class: 'o' }, B.miss), w.cells);
+      setLine(svgEl('line', { class: 'i' }, B.miss), w.cells);
+    });
+  }
+  function renderSel(cells) {
+    if (!cells || !cells.length) { B.sel.setAttribute('visibility', 'hidden'); return; }
+    B.sel.setAttribute('visibility', 'visible');
+    B.sel.setAttribute('stroke', colorOf(G.found.length));
+    setLine(B.sel, cells);
+    B.sel.style.opacity = cells.length > 1 ? '' : '.4';
+  }
+  function renderAnchor() {
+    const [x, y] = anchor === null ? [-5, -5] : center(anchor);
+    B.anchor.setAttribute('cx', x); B.anchor.setAttribute('cy', y);
+    B.anchor.classList.toggle('on', anchor !== null);
+  }
+  function renderCursor() {
+    const [x, y] = center(cursor);
+    B.cursor.setAttribute('x', x - .45); B.cursor.setAttribute('y', y - .45);
+  }
+  function renderList() {
+    const total = G.puz.words.length;
+    els.words.replaceChildren(...G.puz.order.map(i => {
+      const li = document.createElement('li');
+      const k = G.found.indexOf(i);
+      li.textContent = G.puz.words[i].word;
+      if (k >= 0) { li.className = 'found'; li.style.setProperty('--hl', colorOf(k)); li.setAttribute('aria-label', `${G.puz.words[i].word}, ${t.found}`); }
+      else if (i === G.hinted) li.className = 'hinted';
+      return li;
+    }));
+    els.found.textContent = `${G.found.length}/${total}`;
+    els.listCount.textContent = `${G.found.length}/${total}`;
+  }
+  function renderHeader() {
+    const th = THEME[G.puz.theme];
+    const icon = G.mode === 'daily' ? '📅' : G.mode === 'timed' ? '⏱️' : th.emoji;
+    els.chip.textContent = `${icon} ${themeName(th.id)}`;
+    els.listTitle.textContent = `${th.emoji} ${themeName(th.id)}`;
+    els.timeLabel.textContent = G.mode === 'timed' ? t.left : t.time;
+  }
+  function renderTime() {
+    if (G.mode === 'timed') {
+      const left = G.limit - G.elapsed;
+      els.time.textContent = formatLeft(left);
+      els.timeCard.classList.toggle('low', left <= 10000 && !G.done && !G.lost);
+    } else {
+      els.time.textContent = formatTime(G.elapsed);
+      els.timeCard.classList.remove('low');
+    }
+    els.hint.disabled = G.done || G.lost;
+  }
+  function renderAll() { renderHeader(); renderFound(); renderMissing(); renderSel(null); renderAnchor(); renderCursor(); renderList(); renderTime(); }
+
+  // ---------- saving ----------
+  function saveGame() {
+    lastSave = performance.now();
+    if (!G || G.mode === 'timed') return;
+    if (G.done) delete saves[G.mode];
+    else if (inProgress()) saves[G.mode] = { spec: G.spec, found: G.found, elapsed: Math.round(G.elapsed), hints: G.hints };
+    store.set('saves', saves);
+  }
+
+  // ---------- timer ----------
+  let lastTick = performance.now();
+  const running = () => G && !G.done && !G.lost && !document.hidden && !overlayOpen();
+  function tick() {
+    const now = performance.now();
+    const dt = Math.min(now - lastTick, 250);
+    lastTick = now;
+    if (!running()) return;
+    G.elapsed += dt;
+    if (G.mode === 'timed') {
+      if (!G.warned && G.limit - G.elapsed <= 10000) { G.warned = true; announce(t.timeLow); }
+      if (G.elapsed >= G.limit) { G.elapsed = G.limit; timeUp(); }
+    }
+    renderTime();
+    if (now - lastSave > 4000) saveGame();
+  }
+  setInterval(tick, 200);
+  document.addEventListener('visibilitychange', () => { lastTick = performance.now(); if (document.hidden) saveGame(); });
+  addEventListener('pagehide', saveGame);
+
+  // ---------- play ----------
+  function lineFrom(start, fx, fy) {
+    const n = G.puz.size;
+    const sr = Math.floor(start / n), sc = start % n;
+    const dx = fx - (sc + .5), dy = fy - (sr + .5);
+    if (Math.hypot(dx, dy) < .55) return [start];
+    const oct = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+    const dc = Math.round(Math.cos(oct * Math.PI / 4)), dr = Math.round(Math.sin(oct * Math.PI / 4));
+    let len = Math.max(0, Math.round((dx * dc + dy * dr) / (dc * dc + dr * dr)));
+    const inside = k => { const r = sr + dr * k, c = sc + dc * k; return r >= 0 && r < n && c >= 0 && c < n; };
+    while (len > 0 && !inside(len)) len--;
+    return Array.from({ length: len + 1 }, (_, k) => (sr + dr * k) * n + sc + dc * k);
+  }
+  function lineBetween(a, b) {
+    const n = G.puz.size;
+    const dr = Math.floor(b / n) - Math.floor(a / n), dc = b % n - a % n;
+    if (!(dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc))) return null;
+    const len = Math.max(Math.abs(dr), Math.abs(dc));
+    return Array.from({ length: len + 1 }, (_, k) => a + (Math.sign(dr) * n + Math.sign(dc)) * k);
+  }
+
+  function submit(cells) {
+    if (!G || G.done || G.lost || cells.length < 2) return false;
+    const key = cells.join(','), rkey = cells.slice().reverse().join(',');
+    const idx = G.puz.words.findIndex(w => { const k = w.cells.join(','); return k === key || k === rkey; });
+    if (idx < 0) {
+      setLine(B.bad, cells);
+      B.bad.classList.remove('on'); void B.bad.getBBox(); B.bad.classList.add('on');
+      toast(t.notWord, 'bad');
+      return false;
+    }
+    const word = G.puz.words[idx].word;
+    if (G.found.includes(idx)) { toast(t.already(word)); return false; }
+    G.found.push(idx);
+    if (G.hinted === idx) { G.hinted = -1; B.hint.classList.remove('on'); }
+    renderFound();
+    renderList();
+    const total = G.puz.words.length;
+    toast(t.foundWord(word, G.found.length, total), 'good');
+    announce(t.foundWord(word, G.found.length, total));
+    if (G.found.length === total) win();
+    else saveGame();
+    return true;
+  }
+
+  let hintTimer = 0;
+  function hint() {
+    if (!G || G.done || G.lost || overlayOpen()) return;
+    const left = G.puz.words.map((_, i) => i).filter(i => !G.found.includes(i));
+    if (!left.length) return;
+    const wi = left.includes(G.hinted) ? G.hinted : left[Math.floor(Math.random() * left.length)];
+    G.hinted = wi;
+    G.hints++;
+    G.elapsed += HINT_COST;
+    const [x, y] = center(G.puz.words[wi].cells[0]);
+    B.hint.setAttribute('cx', x); B.hint.setAttribute('cy', y);
+    B.hint.classList.remove('on'); void B.hint.getBBox(); B.hint.classList.add('on');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => B.hint.classList.remove('on'), 3200);
+    renderList();
+    toast(t.hintCost, 'warn');
+    announce(t.hintMsg(G.puz.words[wi].word));
+    if (G.mode === 'timed' && G.elapsed >= G.limit) { G.elapsed = G.limit; timeUp(); }
+    renderTime();
+    saveGame();
+  }
+
+  function win() {
+    G.done = true;
+    anchor = null;
+    renderAnchor();
+    const ms = G.elapsed;
+    const stars = G.hints === 0 ? 3 : G.hints <= 2 ? 2 : 1;
+    const key = `${G.puz.size}-${G.puz.diff}`;
+    let prev = 0, better = false, streakText = '';
+    if (G.mode === 'daily') {
+      if (!G.practice) {
+        stats.solved++;
+        const d = stats.daily;
+        const gap = d.last ? dayNumber(G.spec.date) - dayNumber(d.last) : 99;
+        d.streak = gap === 1 ? d.streak + 1 : gap === 0 ? d.streak : 1;
+        d.last = G.spec.date;
+        d.top = Math.max(d.top, d.streak);
+        d.times[G.spec.date] = Math.round(ms);
+        // keep the record small: only the last 60 days
+        for (const k of Object.keys(d.times)) if (dayNumber(G.spec.date) - dayNumber(k) > 60) delete d.times[k];
+        streakText = t.streak(d.streak);
+      }
+    } else {
+      stats.solved++;
+      const table = G.mode === 'timed' ? stats.taBest : stats.best;
+      if (G.mode === 'timed') stats.taWins++;
+      prev = table[key] || 0;
+      better = !prev || ms < prev;
+      if (better) table[key] = Math.round(ms);
+    }
+    saveStats();
+    saveGame();
+    renderTime();
+    svg.classList.add('win');
+    els.winTitle.textContent = G.mode === 'daily' ? t.wonDaily : t.won;
+    els.winSub.textContent = `${THEME[G.puz.theme].emoji} ${themeName(G.puz.theme)} · ${G.puz.size}×${G.puz.size} · ${t[G.puz.diff]}`;
+    els.winStars.innerHTML = [0, 1, 2].map(k => `<i class="${k < stars ? 'on' : ''}">★</i>`).join('');
+    els.winStars.setAttribute('aria-label', t.stars(stars));
+    els.winStars.setAttribute('role', 'img');
+    els.winResult.textContent = t.result(formatTime(ms), G.hints);
+    const table = G.mode === 'timed' ? stats.taBest : stats.best;
+    els.winBest.textContent = G.mode === 'daily' ? (streakText || t.dailyBack) : better && prev ? '' : t.best(formatTime(table[key]));
+    els.winBadge.hidden = !(better && prev);
+    els.winBadge.textContent = t.newBest;
+    els.next.textContent = G.mode === 'daily' ? t.newPuzzle : t.next;
+    announce(`${els.winTitle.textContent} ${t.result(formatTime(ms), G.hints)}`);
+    setTimeout(() => { if (G.done) { showOverlay(els.win); els.next.focus({ preventScroll: true }); } }, reducedMotion.matches ? 300 : 1100);
+  }
+
+  function timeUp() {
+    G.lost = true;
+    anchor = null;
+    drag = null;
+    renderSel(null);
+    renderAnchor();
+    renderMissing();
+    renderTime();
+    const text = t.timeUpText(G.found.length, G.puz.words.length);
+    els.loseText.textContent = text;
+    announce(`${t.timeUp} ${text}`);
+    setTimeout(() => { if (G.lost) { showOverlay(els.lose); $('retry').focus({ preventScroll: true }); } }, 900);
+  }
+
+  // ---------- pointer input ----------
+  function pointCell(e) {
+    const rect = svg.getBoundingClientRect();
+    const span = G.puz.size + 2 * PAD;
+    return { fx: (e.clientX - rect.left) / rect.width * span - PAD, fy: (e.clientY - rect.top) / rect.height * span - PAD };
+  }
+  svg.addEventListener('pointerdown', e => {
+    if (!G || G.done || G.lost || e.button > 0 || drag) return;
+    const n = G.puz.size;
+    const { fx, fy } = pointCell(e);
+    const r = Math.floor(fy), c = Math.floor(fx);
+    if (r < 0 || r >= n || c < 0 || c >= n) return;
+    e.preventDefault();
+    try { svg.setPointerCapture(e.pointerId); } catch {}
+    svg.classList.remove('kb');
+    drag = { id: e.pointerId, start: r * n + c, cells: [r * n + c], moved: false };
+    renderSel(anchor === null ? drag.cells : null);
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { fx, fy } = pointCell(e);
+    drag.cells = lineFrom(drag.start, fx, fy);
+    if (drag.cells.length > 1) drag.moved = true;
+    renderSel(drag.moved ? drag.cells : anchor === null ? drag.cells : null);
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    renderSel(null);
+    if (e.type === 'pointercancel' || !G || G.done || G.lost) return;
+    if (d.moved) {
+      anchor = null;
+      if (d.cells.length > 1) submit(d.cells);
+    } else {
+      // Tap-tap selection: first tap marks a start, second tap on the same line selects it.
+      const cell = d.start;
+      const line = anchor !== null && anchor !== cell ? lineBetween(anchor, cell) : null;
+      if (line) { anchor = null; submit(line); }
+      else anchor = anchor === cell ? null : cell;
+    }
+    renderAnchor();
+  }
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+
+  // ---------- keyboard ----------
+  const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  function keySelect() {
+    if (anchor === null) { anchor = cursor; renderAnchor(); announce(t.anchor(G.puz.grid[cursor])); return; }
+    const line = anchor !== cursor ? lineBetween(anchor, cursor) : null;
+    if (line) { anchor = null; renderSel(null); submit(line); }
+    else anchor = anchor === cursor ? null : cursor;
+    renderAnchor();
+  }
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || overlayOpen() || !G || G.done || G.lost) return;
+    const n = G.puz.size;
+    if (ARROWS[e.key]) {
+      e.preventDefault();
+      const [dr, dc] = ARROWS[e.key];
+      const r = Math.min(n - 1, Math.max(0, Math.floor(cursor / n) + dr)), c = Math.min(n - 1, Math.max(0, cursor % n + dc));
+      cursor = r * n + c;
+      if (document.activeElement !== svg) svg.focus({ preventScroll: true });
+      svg.classList.add('kb');
+      renderCursor();
+      renderSel(anchor !== null ? lineBetween(anchor, cursor) : null);
+      announce(t.cell(r + 1, c + 1, G.puz.grid[cursor]));
+    } else if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === svg) {
+      e.preventDefault();
+      svg.classList.add('kb');
+      renderCursor();
+      keySelect();
+    } else if ((e.key === 'Backspace' || e.key === 'Delete') && anchor !== null) {
+      e.preventDefault();
+      anchor = null;
+      renderAnchor();
+      renderSel(null);
+    } else if ((e.key === 'h' || e.key === 'H') && !e.repeat) {
+      e.preventDefault();
+      hint();
+    }
+  });
+
+  // ---------- menu ----------
+  let menuMode = prefs.mode;
+  function buildMenu() {
+    const random = document.createElement('button');
+    random.type = 'button';
+    random.dataset.theme = 'random';
+    random.innerHTML = '<b aria-hidden="true">🎲</b><span></span>';
+    random.querySelector('span').textContent = t.random;
+    els.themes.replaceChildren(random, ...THEMES.map(th => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.theme = th.id;
+      b.innerHTML = '<b aria-hidden="true"></b><span></span>';
+      b.querySelector('b').textContent = th.emoji;
+      b.querySelector('span').textContent = themeName(th.id);
+      return b;
+    }));
+    els.sizes.replaceChildren(...SIZES.map(s => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.size = s;
+      b.innerHTML = `${s}×${s}<small></small>`;
+      b.querySelector('small').textContent = t.wordsN(WORD_COUNT[s]);
+      return b;
+    }));
+    els.diffs.replaceChildren(...Object.keys(DIFFS).map(d => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.diff = d;
+      b.textContent = t[d];
+      return b;
+    }));
+  }
+  function renderMenu() {
+    for (const b of els.modes.children) b.setAttribute('aria-pressed', String(b.dataset.mode === menuMode));
+    for (const b of els.themes.children) b.setAttribute('aria-pressed', String(b.dataset.theme === prefs.theme));
+    for (const b of els.sizes.children) b.setAttribute('aria-pressed', String(+b.dataset.size === prefs.size));
+    for (const b of els.diffs.children) b.setAttribute('aria-pressed', String(b.dataset.diff === prefs.diff));
+    els.diffDesc.textContent = t[`d${prefs.diff[0].toUpperCase()}${prefs.diff.slice(1)}`];
+    const daily = menuMode === 'daily';
+    els.fTheme.hidden = els.fSize.hidden = els.fDiff.hidden = daily;
+    els.day.hidden = !daily;
+    els.menu.firstElementChild.classList.toggle('is-daily', daily);
+    els.intro.textContent = menuMode === 'timed' ? t.introTimed : daily ? '' : t.introClassic;
+    els.intro.hidden = daily;
+    const today = dateKey();
+    if (daily) {
+      const spec = dailySpec(today);
+      const now = new Date();
+      els.calMonth.textContent = now.toLocaleDateString(LOCALES[lang], { month: 'short' });
+      els.calDay.textContent = now.getDate();
+      els.dTheme.textContent = t.dailyTheme(`${THEME[spec.theme].emoji} ${themeName(spec.theme)}`);
+      const streak = currentStreak();
+      els.dStreak.textContent = streak ? t.streak(streak) : t.streak0;
+      const done = stats.daily.times[today];
+      els.dStatus.textContent = done ? `${t.dailyDone(formatTime(done))} · ${t.dailyBack}` : t.dailyNotYet;
+    }
+    const resumable = resumeTarget();
+    els.resume.hidden = !resumable;
+    const doneToday = daily && stats.daily.times[today];
+    els.play.textContent = daily ? (doneToday || resumable ? t.practice : t.play) : resumable ? t.newPuzzle : t.play;
+    els.play.className = resumable ? 'secondary' : 'cta';
+    // Browsing another mode's tab mid-game: offer a way back to the live puzzle.
+    els.closeMenu.hidden = !(inProgress() && G.mode !== menuMode);
+    if (!daily) {
+      const best = (menuMode === 'timed' ? stats.taBest : stats.best)[`${prefs.size}-${prefs.diff}`];
+      els.mStats.textContent = [t.solvedN(stats.solved), best ? t.best(formatTime(best)) : ''].filter(Boolean).join(' · ');
+    } else {
+      els.mStats.textContent = t.solvedN(stats.solved);
+    }
+  }
+  // Which game "Resume" continues for the selected mode: the live game, or one saved earlier.
+  function resumeTarget() {
+    if (G && G.mode === menuMode && inProgress()) return { live: true };
+    if (menuMode === 'timed') return null;
+    const save = saves[menuMode];
+    if (!save || !save.spec || !THEME[save.spec.theme]) return null;
+    if (menuMode === 'daily' && save.spec.date !== dateKey()) return null;
+    return { save };
+  }
+  function openMenu(mode = G && inProgress() ? G.mode : prefs.mode) {
+    menuMode = mode;
+    drag = null;
+    renderSel(null);
+    renderMenu();
+    showOverlay(els.menu);
+    const focus = !els.resume.hidden ? els.resume : els.play;
+    focus.focus({ preventScroll: true });
+  }
+  function startFromMenu(resume) {
+    prefs.mode = menuMode;
+    savePrefs();
+    if (resume) {
+      const target = resumeTarget();
+      if (target && target.save) newGame(menuMode, target.save.spec, target.save);
+    } else if (menuMode === 'daily') {
+      delete saves.daily;
+      newGame('daily', dailySpec(dateKey()));
+    } else {
+      const theme = prefs.theme === 'random' ? pickRandomTheme() : prefs.theme;
+      newGame(menuMode, { seed: Math.floor(Math.random() * 2 ** 32), theme, size: prefs.size, diff: prefs.diff });
+    }
+    hideOverlays();
+    lastTick = performance.now();
+    svg.focus({ preventScroll: true });
+  }
+  function pickRandomTheme() {
+    const others = THEMES.filter(th => !G || th.id !== G.puz.theme);
+    return others[Math.floor(Math.random() * others.length)].id;
+  }
+
+  els.modes.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; menuMode = b.dataset.mode; renderMenu(); });
+  els.themes.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prefs.theme = b.dataset.theme; savePrefs(); renderMenu(); });
+  els.sizes.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prefs.size = +b.dataset.size; savePrefs(); renderMenu(); });
+  els.diffs.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prefs.diff = b.dataset.diff; savePrefs(); renderMenu(); });
+  els.play.addEventListener('click', () => startFromMenu(false));
+  els.resume.addEventListener('click', () => { const target = resumeTarget(); if (target && target.live) { hideOverlays(); lastTick = performance.now(); svg.focus({ preventScroll: true }); } else startFromMenu(true); });
+  els.closeMenu.addEventListener('click', () => { hideOverlays(); lastTick = performance.now(); svg.focus({ preventScroll: true }); });
+  $('open-menu').addEventListener('click', () => { saveGame(); openMenu(); });
+  els.hint.addEventListener('click', hint);
+  els.next.addEventListener('click', () => {
+    if (G.mode === 'daily') { menuMode = 'classic'; startFromMenu(false); return; }
+    menuMode = G.mode;
+    startFromMenu(false);
+  });
+  $('win-menu').addEventListener('click', () => openMenu(G.mode));
+  $('retry').addEventListener('click', () => { menuMode = 'timed'; startFromMenu(false); });
+  $('lose-menu').addEventListener('click', () => openMenu('timed'));
+
+  // ---------- boot: show the saved or a fresh puzzle behind the menu ----------
+  buildMenu();
+  const bootSave = saves.classic && saves.classic.spec && THEME[saves.classic.spec.theme] && SIZES.includes(saves.classic.spec.size) && DIFFS[saves.classic.spec.diff] ? saves.classic : null;
+  if (bootSave) newGame('classic', bootSave.spec, bootSave);
+  else newGame('classic', { seed: Math.floor(Math.random() * 2 ** 32), theme: prefs.theme === 'random' ? pickRandomTheme() : prefs.theme, size: prefs.size, diff: prefs.diff });
+  openMenu(prefs.mode);
+
+  // Read-only hooks for automated tests (no way to change the score or solve a puzzle from here).
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__wordSearch = {
+    state: () => G && { mode: G.mode, theme: G.puz.theme, size: G.puz.size, diff: G.puz.diff, seed: G.puz.seed, words: G.puz.words.length, found: G.found.length, elapsed: Math.round(G.elapsed), limit: G.limit, hints: G.hints, done: G.done, lost: G.lost, practice: G.practice, anchor, cursor, overlay: overlays.find(o => !o.hidden)?.id || null },
+    words: () => G && G.puz.words.map(w => ({ word: w.word, cells: w.cells.slice(), dir: w.dir })),
+    grid: () => G && G.puz.grid.join(''),
+    cellPoint: i => { const r = svg.getBoundingClientRect(); const span = G.puz.size + 2 * PAD; const [x, y] = center(i); return { x: r.left + (x + PAD) / span * r.width, y: r.top + (y + PAD) / span * r.height }; },
+    generate: spec => { const p = generate(spec); return { grid: p.grid.join(''), words: p.words.map(w => ({ word: w.word, cells: w.cells.slice(), dir: w.dir })) }; },
+    count: (grid, n, word) => countOccurrences([...grid], n, word),
+    themes: () => THEMES.map(th => ({ id: th.id, words: th.words.slice() })),
+    dailySpec: key => dailySpec(key),
+  };
+})();
+</script>
+</body>
+</html>

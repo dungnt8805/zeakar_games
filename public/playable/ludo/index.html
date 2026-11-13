@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ludo</title>
+<style>
+:root {
+  --ink: #2b2445;
+  --muted: #7a7092;
+  --bg: #1c2244;
+  --bg2: #2f2a6a;
+  --paper: #fffaf1;
+  --line: #eadfca;
+  --c0: #ec4d4d; --c0d: #b23230; --c0l: #ffd4d0;
+  --c1: #22b06c; --c1d: #157f4d; --c1l: #c9f1dc;
+  --c2: #ffbf2e; --c2d: #d18f12; --c2l: #ffefc2;
+  --c3: #3b84f4; --c3d: #2160c4; --c3l: #d3e4ff;
+  --accent: #8a5cf6;
+  --accent-d: #6a3dd6;
+  --gold: #ffd257;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: #fff;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 50% 40%, #3a3480 0, transparent 70%), repeating-linear-gradient(45deg, #ffffff06 0 2px, transparent 2px 22px), repeating-linear-gradient(-45deg, #ffffff06 0 2px, transparent 2px 22px);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.ic { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 600px; margin: auto; display: flex; flex-direction: column; gap: 9px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(24px, 7vw, 32px); font-weight: 900; letter-spacing: -.02em; line-height: 1; white-space: nowrap; }
+.word span:nth-child(1) { color: var(--c0); } .word span:nth-child(2) { color: var(--c1); } .word span:nth-child(3) { color: var(--c2); } .word span:nth-child(4) { color: var(--c3); }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: #ffffff1c; box-shadow: inset 0 0 0 1px #ffffff22, 0 3px 0 #0003; }
+.icon-btn:active { transform: translateY(2px); }
+.icon-btn[aria-pressed="true"] { background: var(--gold); color: #4a3500; }
+
+.players { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 6px; }
+.pl { min-width: 0; display: flex; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 14px; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff1a; transition: box-shadow .2s, background .2s; }
+.pl .dot { font-style: normal; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 1px 0 #0004; }
+.pl div { min-width: 0; flex: 1; }
+.pl b, .pl small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl b { font-size: 13px; line-height: 1.2; }
+.pl small { font-size: 10.5px; color: #ffffffa8; font-weight: 700; }
+.pl.turn { background: #ffffff2e; box-shadow: inset 0 0 0 2px var(--pc), 0 0 14px -2px var(--pc); }
+.pl.done { opacity: .65; }
+.pl .medal { font-size: 14px; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --size: min(100cqw, 100cqh); position: relative; width: var(--size); height: var(--size); padding: calc(var(--size) * .022); border-radius: calc(var(--size) * .04); background: linear-gradient(150deg, #6b4fd8, #4a32a8); box-shadow: inset 0 0 0 2px #ffffff26, 0 calc(var(--size) * .016) 0 #2e1f75, 0 18px 40px #0007; }
+.field { position: relative; width: 100%; height: 100%; touch-action: manipulation; cursor: default; }
+.field svg { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: calc(var(--size) * .025); transition: transform .5s; }
+.glow { position: absolute; width: 40%; height: 40%; border-radius: calc(var(--size) * .03); box-shadow: 0 0 0 calc(var(--size) * .008) #fff, 0 0 calc(var(--size) * .04) calc(var(--size) * .006) var(--pc); pointer-events: none; animation: breathe 1.4s ease-in-out infinite alternate; }
+.glow[hidden] { display: none; }
+@keyframes breathe { to { opacity: .45; } }
+.layer { position: absolute; inset: 0; }
+.mark { position: absolute; width: calc(100% / 15 * .78); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; border: calc(var(--size) * .005) dashed var(--pc); background: color-mix(in srgb, var(--pc) 28%, transparent); pointer-events: auto; cursor: pointer; animation: breathe .9s ease-in-out infinite alternate; }
+.tok { position: absolute; left: calc(var(--x) * 100% / 15); top: calc(var(--y) * 100% / 15); width: calc(100% / 15 * .86); aspect-ratio: 1; transform: translate(-50%, -50%) scale(var(--s, 1)); border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 36% 30%, var(--tl) 0, var(--tc) 52%, var(--td) 100%); box-shadow: 0 calc(var(--size) * .005) 0 var(--td), 0 calc(var(--size) * .009) calc(var(--size) * .012) #0006; transition: left .13s ease-out, top .13s ease-out, transform .2s; z-index: 2; cursor: default; }
+.tok b { width: 62%; height: 62%; border-radius: 50%; display: grid; place-items: center; background: #ffffff38; box-shadow: inset 0 0 0 calc(var(--size) * .0035) #ffffffd0; color: #fff; font-size: max(9px, calc(var(--size) * .026)); font-weight: 900; line-height: 1; text-shadow: 0 1px 0 #0005; }
+.tok.c0 { --tc: var(--c0); --td: var(--c0d); --tl: #ff9d96; }
+.tok.c1 { --tc: var(--c1); --td: var(--c1d); --tl: #8ff0bd; }
+.tok.c2 { --tc: var(--c2); --td: var(--c2d); --tl: #fff0a8; }
+.tok.c2 b { color: #6a4700; text-shadow: none; }
+.tok.c3 { --tc: var(--c3); --td: var(--c3d); --tl: #a7cbff; }
+.tok.can { z-index: 4; cursor: pointer; }
+.tok.can::after { content: ''; position: absolute; inset: -16%; border-radius: 50%; border: calc(var(--size) * .006) solid #fff; box-shadow: 0 0 calc(var(--size) * .012) #fff; animation: breathe .7s ease-in-out infinite alternate; }
+.tok.sel { z-index: 5; transform: translate(-50%, -50%) scale(calc(var(--s, 1) * 1.15)); }
+.tok.sel::after { border-color: var(--gold); box-shadow: 0 0 calc(var(--size) * .02) var(--gold); animation: none; }
+.tok.hop { animation: hop .13s ease-out; }
+.tok.hop2 { animation: hop2 .13s ease-out; }
+@keyframes hop { 50% { transform: translate(-50%, -62%) scale(calc(var(--s, 1) * 1.2)); } }
+@keyframes hop2 { 50% { transform: translate(-50%, -62%) scale(calc(var(--s, 1) * 1.2)); } }
+.tok.fly { transition: left .45s cubic-bezier(.3, .1, .3, 1), top .45s cubic-bezier(.3, .1, .3, 1), transform .2s; z-index: 6; }
+.tok.out { opacity: .55; }
+.tok:focus-visible { outline: calc(var(--size) * .006) solid var(--gold); outline-offset: 2px; }
+
+.ctrl { display: flex; align-items: center; gap: 10px; min-height: 64px; }
+.roll { --pc: var(--c3); --pcd: var(--c3d); flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 20px; background: var(--paper); color: var(--ink); box-shadow: 0 5px 0 var(--pcd), inset 0 0 0 3px var(--pc); font-size: 17px; font-weight: 900; }
+.roll:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--pcd), inset 0 0 0 3px var(--pc); }
+.roll:disabled { box-shadow: 0 5px 0 #0003, inset 0 0 0 3px #d9d0e6; }
+.roll:disabled .roll-label { opacity: .45; }
+.roll.ready { animation: nudge 1.2s ease-in-out infinite; }
+@keyframes nudge { 0%, 70%, 100% { transform: none; } 80% { transform: rotate(-4deg); } 90% { transform: rotate(4deg); } }
+.die { width: 48px; height: 48px; border-radius: 12px; background: #fff; box-shadow: inset 0 -4px 0 #0000001c, inset 0 0 0 2px var(--pc); display: block; }
+.die svg { width: 100%; height: 100%; display: block; }
+.die circle { fill: var(--ink); }
+.die.spin { animation: spin .52s ease-out; }
+@keyframes spin { 0% { transform: rotate(0) scale(1); } 40% { transform: rotate(200deg) scale(1.15); } 100% { transform: rotate(360deg) scale(1); } }
+.msg { flex: 1; min-width: 0; }
+.status { font-size: 16px; font-weight: 800; line-height: 1.25; }
+.sub { margin-top: 2px; font-size: 12px; color: #ffffffa8; font-weight: 700; line-height: 1.3; min-height: 1.3em; }
+.sub.flash { color: var(--gold); }
+.log { display: none; list-style: none; }
+.foot { text-align: center; font-size: 12px; color: #ffffff99; line-height: 1.45; }
+.foot strong { color: #fff; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #120f2ccc; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--paper); color: var(--ink); border-radius: 26px; padding: 20px 18px; text-align: center; box-shadow: 0 8px 0 #d8c9ec, 0 24px 60px #000a; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.logo { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.logo i { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 -3px 0 #0002; }
+.text { margin-top: 6px; font-size: 14px; color: var(--muted); line-height: 1.45; }
+.field-row { margin-top: 12px; text-align: left; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.seats { display: grid; gap: 6px; }
+.seat { display: grid; grid-template-columns: minmax(84px, 36%) 1fr; align-items: center; gap: 8px; }
+.seat-name { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; min-width: 0; }
+.seat-name span { overflow-wrap: anywhere; line-height: 1.1; }
+.seat-name i { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 -3px 0 #0002; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #efe6f6; }
+.seg button { flex: 1; min-width: 0; min-height: 34px; padding: 6px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.15; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #d9cce9; }
+.seat .seg { padding: 3px; }
+.seat .seg button { min-height: 32px; padding: 4px 3px; font-size: 13px; }
+.note { margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.warn { margin-top: 8px; font-size: 13px; font-weight: 800; color: var(--c0d); }
+.warn[hidden] { display: none; }
+.rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; align-items: end; }
+.rules-grid .done-row, .rules-grid .wide-row { grid-column: 1 / -1; }
+.rules-grid .field-row { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.emoji { font-size: 44px; line-height: 1.2; }
+.rank { margin-top: 10px; display: grid; gap: 5px; list-style: none; text-align: left; }
+.rank li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: #f3ecf9; font-weight: 800; font-size: 15px; }
+.rank li b { flex: 0 0 auto; width: 1.3em; text-align: center; }
+.rank li i { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; }
+.rank li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank li span::first-letter { text-transform: uppercase; }
+.rank li small { font-size: 12px; color: var(--muted); }
+.result-score { margin-top: 10px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--gold); color: #4a3500; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 16px; width: 100%; padding: 14px; border-radius: 18px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 6px 0 var(--accent-d); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-d); }
+.ghost-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; background: #efe6f6; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #d9cce9; }
+.ghost-btn[hidden] { display: none; }
+.ghost-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #d9cce9; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn-row .ghost-btn { margin-top: 10px; }
+.sw0 { background: var(--c0); } .sw1 { background: var(--c1); } .sw2 { background: var(--c2); } .sw3 { background: var(--c3); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Narrow and short portrait */
+@media (max-width: 400px) { .pl { flex-direction: column; padding: 4px 2px; gap: 2px; text-align: center; } .pl div { width: 100%; } .pl small { display: none; } .pl .dot { width: 20px; height: 20px; font-size: 11px; } .pl b { font-size: 12px; } }
+.pl small .h { display: none; }
+@media (max-height: 700px) { .foot { display: none; } .panel { padding: 16px 16px; } .field-row { margin-top: 9px; } .cta { margin-top: 12px; padding: 12px; } }
+@media (max-height: 560px) {
+  .app { gap: 6px; }
+  .ctrl { min-height: 54px; }
+  .die { width: 40px; height: 40px; }
+  .roll { padding: 4px 12px 4px 4px; font-size: 15px; }
+  .status { font-size: 14px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .logo { display: none; }
+  .panel h2 { font-size: 24px; }
+  .text { font-size: 13px; line-height: 1.35; margin-top: 4px; }
+  .label { font-size: 11px; margin-bottom: 4px; }
+  .seat .seg button, .seg button { min-height: 30px; padding: 3px; }
+  .emoji { font-size: 32px; }
+  .rank li { padding: 4px 8px; font-size: 14px; }
+  #setup .text, .rules-grid .note { display: none; }
+}
+
+/* Wide frames: board at full height on the left, everything else in a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { --side: clamp(214px, calc(100vw - 100dvh - 24px), 360px); max-width: none; width: min(100%, calc(100dvh + var(--side) + 12px)); display: grid; grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto auto minmax(0, 1fr) auto; grid-template-areas: "board top" "board players" "board ctrl" "board log" "board foot"; column-gap: 16px; row-gap: 10px; }
+  .top { grid-area: top; }
+  .players { grid-area: players; grid-template-columns: 1fr; gap: 5px; }
+  .pl { padding: 6px 10px; }
+  .pl small { display: block; }
+  .pl small .h { display: inline; }
+  .board-wrap { grid-area: board; }
+  .ctrl { grid-area: ctrl; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; border-radius: 18px; background: #00000026; box-shadow: inset 0 0 0 1px #ffffff14; }
+  .roll { justify-content: center; padding: 8px 16px 8px 8px; font-size: 20px; }
+  .die { width: 58px; height: 58px; border-radius: 14px; }
+  .msg { text-align: center; }
+  .log { grid-area: log; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; overflow: hidden; font-size: 13px; font-weight: 700; color: #ffffffb8; min-height: 0; }
+  .log li { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 6px; border-radius: 8px; }
+  .log li:last-child { background: #ffffff12; color: #fff; }
+  .log li i { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; }
+  .foot { grid-area: foot; text-align: left; }
+}
+@media (min-aspect-ratio: 5/4) and (min-height: 700px) { .foot { display: block; } }
+@media (min-aspect-ratio: 5/4) and (max-height: 620px) {
+  .players { grid-template-columns: 1fr 1fr; }
+  .pl small { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 480px) {
+  .app { row-gap: 6px; column-gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 24px; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 12px; }
+  .pl { padding: 3px 6px; }
+  .pl .dot { width: 20px; height: 20px; font-size: 10px; }
+  .pl b { font-size: 12px; }
+  .ctrl { flex-direction: row; padding: 6px; gap: 8px; }
+  .roll { padding: 4px 10px 4px 4px; font-size: 15px; }
+  .die { width: 42px; height: 42px; border-radius: 11px; }
+  .msg { text-align: left; }
+  .status { font-size: 13px; }
+  .sub { font-size: 11px; }
+  .log { font-size: 12px; }
+  .overlay { padding: 6px; }
+  .panel { max-height: calc(100dvh - 12px); padding: 10px 14px; border-radius: 20px; }
+  .panel h2 { font-size: 21px; }
+  .text { display: none; }
+  #setup .panel { width: min(100%, 700px); display: grid; grid-template-columns: 1.25fr 1fr; column-gap: 16px; align-items: start; text-align: left; }
+  #setup h2, #setup .warn { grid-column: 1 / -1; }
+  #setup h2 { text-align: center; }
+  #setup .seat-field { grid-row: span 3; }
+  #rules .panel { width: min(100%, 760px); }
+  #rules .rules-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #rules .done-row { grid-column: auto; }
+  #result .panel { width: min(100%, 560px); display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; align-items: center; }
+  #result .panel > * { grid-column: 2; }
+  #result .rank { grid-column: 1; grid-row: 1 / span 6; margin-top: 0; }
+  #rules .rules-grid .wide-row { grid-column: auto; }
+  .note { font-size: 11px; }
+  .field-row { margin-top: 6px; }
+  .cta { margin-top: 8px; padding: 9px; font-size: 17px; }
+  .ghost-btn { margin-top: 6px; padding: 7px; font-size: 15px; }
+  .emoji { font-size: 28px; }
+  .result-score, .badge { margin-top: 4px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 360px) {
+  .log { display: none; }
+  .players { gap: 4px; }
+}
+@media (max-height: 480px) and (max-aspect-ratio: 5/4) { .panel .text { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1 class="word" aria-label="Ludo"><span>L</span><span>u</span><span>d</span><span>o</span></h1>
+    <button type="button" class="icon-btn" id="speed" aria-pressed="false" data-i18n-label="speed"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l7 6-7 6zM13 6l7 6-7 6z"/></svg></button>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="menu"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg></button>
+  </header>
+  <section class="players" id="players"></section>
+  <div class="board-wrap">
+    <div class="board" id="board">
+      <div class="field" id="field" role="group" data-i18n-label="board">
+        <svg id="board-svg" viewBox="0 0 15 15" aria-hidden="true"></svg>
+        <div class="glow" id="glow" hidden></div>
+        <div class="layer" id="marks"></div>
+        <div class="layer" id="tokens"></div>
+      </div>
+    </div>
+  </div>
+  <div class="ctrl">
+    <button type="button" class="roll" id="roll" data-i18n-label="rollAria"><span class="die" id="die"></span><span class="roll-label" data-i18n="roll"></span></button>
+    <div class="msg"><p class="status" id="status"></p><p class="sub" id="sub"></p></div>
+  </div>
+  <ol class="log" id="log" aria-hidden="true"></ol>
+  <p class="foot"><strong id="stats-line"></strong><br><span data-i18n="hintKeys"></span></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true"><i class="sw0"></i><i class="sw1"></i><i class="sw2"></i><i class="sw3"></i></div>
+    <h2 id="setup-title" class="word"><span>L</span><span>u</span><span>d</span><span>o</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field-row seat-field"><p class="label" id="players-label" data-i18n="players"></p><div class="seats" id="seats" role="group" aria-labelledby="players-label"></div></div>
+    <div class="field-row"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <div class="field-row"><button type="button" class="ghost-btn" id="open-rules" data-i18n="ruleOptions"></button></div>
+    <p class="warn" id="warn" data-i18n="needTwo" hidden></p>
+    <div class="field-row"><button type="button" class="cta" id="start" data-i18n="start"></button><button type="button" class="ghost-btn" id="resume" data-i18n="resume" hidden></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="rules" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+    <h2 id="rules-title" data-i18n="ruleOptions"></h2>
+    <div class="rules-grid">
+      <div class="field-row"><p class="label" id="r-leave" data-i18n="leaveBase"></p><div class="seg" role="group" aria-labelledby="r-leave" data-rule="one"><button type="button" data-value="0" data-i18n="six"></button><button type="button" data-value="1" data-i18n="sixOne"></button></div></div>
+      <div class="field-row"><p class="label" id="r-tokens" data-i18n="tokensEach"></p><div class="seg" role="group" aria-labelledby="r-tokens" data-rule="tokens"><button type="button" data-value="4">4</button><button type="button" data-value="2">2</button></div></div>
+      <div class="field-row"><p class="label" id="r-safe" data-i18n="safe"></p><div class="seg" role="group" aria-labelledby="r-safe" data-rule="safe"><button type="button" data-value="1" data-i18n="on"></button><button type="button" data-value="0" data-i18n="off"></button></div></div>
+      <div class="field-row"><p class="label" id="r-bonus" data-i18n="bonus"></p><div class="seg" role="group" aria-labelledby="r-bonus" data-rule="bonus"><button type="button" data-value="1" data-i18n="on"></button><button type="button" data-value="0" data-i18n="off"></button></div></div>
+      <div class="field-row"><p class="label" id="r-three" data-i18n="three"></p><div class="seg" role="group" aria-labelledby="r-three" data-rule="three"><button type="button" data-value="1" data-i18n="on"></button><button type="button" data-value="0" data-i18n="off"></button></div></div>
+      <div class="field-row"><p class="label" id="r-blocks" data-i18n="blocks"></p><div class="seg" role="group" aria-labelledby="r-blocks" data-rule="blocks"><button type="button" data-value="1" data-i18n="on"></button><button type="button" data-value="0" data-i18n="off"></button></div><p class="note" data-i18n="blocksNote"></p></div>
+      <div class="field-row wide-row"><p class="label" id="r-end" data-i18n="ends"></p><div class="seg" role="group" aria-labelledby="r-end" data-rule="all"><button type="button" data-value="0" data-i18n="first"></button><button type="button" data-value="1" data-i18n="all"></button></div></div>
+      <div class="field-row done-row"><button type="button" class="cta" id="rules-done" data-i18n="done"></button></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <p class="emoji" id="result-emoji" aria-hidden="true"></p>
+    <h2 id="result-title"></h2>
+    <p class="text" id="result-text"></p>
+    <ol class="rank" id="rank"></ol>
+    <p class="result-score" id="result-score"></p>
+    <p class="badge" id="new-best" hidden></p>
+    <div><button type="button" class="cta" id="again" data-i18n="playAgain"></button><button type="button" class="ghost-btn" id="change" data-i18n="change"></button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Race your tokens around the board and bring them all home. Roll a 6 to get out, and land on rivals to send them back to base!',
+      players: 'Players', human: 'Player', cpu: 'CPU', off: 'Off', difficulty: 'CPU level', easy: 'Easy', normal: 'Normal', hard: 'Hard',
+      ruleOptions: 'Rule options', start: 'Start game', resume: 'Resume game', needTwo: 'Pick at least two players.',
+      leaveBase: 'Leave base with', six: '6 only', sixOne: '6 or 1', tokensEach: 'Tokens each', safe: 'Safe squares (★ and starts)', blocks: 'Blockades',
+      blocksNote: 'Two tokens of one colour on a square cannot be passed or captured.', bonus: 'Extra roll for a capture or a token home', three: 'Three 6s in a row lose the turn',
+      ends: 'Game ends', first: 'First player home', all: 'All places decided', on: 'On', off2: 'Off', done: 'Done',
+      colors: ['Red', 'Green', 'Yellow', 'Blue'], you: 'You', menu: 'Menu', speed: 'Fast CPU moves', board: 'Ludo board', roll: 'Roll', rollAria: 'Roll the die',
+      yourRoll: 'Your turn — roll the die!', rollOf: n => `${n}: roll the die`, rolling: n => `${n} is rolling…`, thinking: n => `${n} is thinking…`,
+      pick: d => `You rolled ${d} — pick a token`, pickOf: (n, d) => `${n} rolled ${d} — pick a token`, rolled: (n, d) => `${n} rolled ${d}`,
+      noMove: d => `Rolled ${d} — no move possible`, lost: 'Third 6 in a row — turn lost!', extra: 'Extra roll!', starts: n => `${n} goes first`,
+      captured: (a, b) => `${a} sent ${b} back to base!`, home: n => `${n} brought a token home!`, finished: (n, p) => `${n} finished ${p}!`,
+      ord: k => ['1st', '2nd', '3rd', '4th'][k - 1], youPlaced: p => `You placed ${p}`,
+      token: (c, k) => `${c} token ${k}`, inBase: 'in base', toGo: k => `${k} steps to go`, tokHome: 'home', canMove: 'can move', moveTo: 'target square',
+      youWin: 'You win!', wins: n => `${n} wins!`, gameOver: 'Game over', playAgain: 'Play again', change: 'Change players',
+      stats: (w, p) => `Wins vs CPU: ${w} of ${p}`, hardWin: k => `Win vs Hard #${k}!`, homeCount: (h, n) => `${h}/${n} home`,
+      hintKeys: 'Space: roll · 1–4 or ←/→: pick · Enter: move', hintTap: 'Tap a glowing token or its target', logNone: (n, d) => `${n} ${d} · no move`,
+    },
+    vi: {
+      tagline: 'Cờ cá ngựa: đưa các quân đi hết vòng bàn cờ và về đích. Gieo được 6 mới ra quân, đi trúng quân đối thủ để đá về chuồng!',
+      players: 'Người chơi', human: 'Người', cpu: 'Máy', off: 'Tắt', difficulty: 'Cấp độ máy', easy: 'Dễ', normal: 'Vừa', hard: 'Khó',
+      ruleOptions: 'Tùy chọn luật', start: 'Bắt đầu', resume: 'Chơi tiếp', needTwo: 'Chọn ít nhất hai người chơi.',
+      leaveBase: 'Ra quân khi gieo', six: 'Chỉ 6', sixOne: '6 hoặc 1', tokensEach: 'Số quân mỗi bên', safe: 'Ô an toàn (★ và ô xuất phát)', blocks: 'Chặn đường',
+      blocksNote: 'Hai quân cùng màu trên một ô thì không thể đi qua hay đá được.', bonus: 'Thêm lượt khi đá quân hoặc về đích', three: 'Ba lần 6 liên tiếp thì mất lượt',
+      ends: 'Kết thúc khi', first: 'Có người về đích đầu tiên', all: 'Xếp hạng đủ mọi người', on: 'Bật', off2: 'Tắt', done: 'Xong',
+      colors: ['Đỏ', 'Xanh lá', 'Vàng', 'Xanh dương'], you: 'Bạn', menu: 'Menu', speed: 'Máy đi nhanh', board: 'Bàn cờ cá ngựa', roll: 'Gieo', rollAria: 'Gieo xúc xắc',
+      yourRoll: 'Lượt của bạn — gieo xúc xắc!', rollOf: n => `${n}: gieo xúc xắc`, rolling: n => `${n} đang gieo…`, thinking: n => `${n} đang suy nghĩ…`,
+      pick: d => `Bạn gieo được ${d} — chọn quân`, pickOf: (n, d) => `${n} gieo được ${d} — chọn quân`, rolled: (n, d) => `${n} gieo được ${d}`,
+      noMove: d => `Gieo ${d} — không có nước đi`, lost: 'Ba lần 6 liên tiếp — mất lượt!', extra: 'Được gieo thêm!', starts: n => `${n} đi trước`,
+      captured: (a, b) => `${a} đá quân ${b} về chuồng!`, home: n => `${n} đưa một quân về đích!`, finished: (n, p) => `${n} về đích ${p}!`,
+      ord: k => `hạng ${k}`, youPlaced: p => `Bạn về ${p}`,
+      token: (c, k) => `Quân ${c} số ${k}`, inBase: 'trong chuồng', toGo: k => `còn ${k} bước`, tokHome: 'đã về đích', canMove: 'có thể đi', moveTo: 'ô đích',
+      youWin: 'Bạn thắng!', wins: n => `${n} thắng!`, gameOver: 'Kết thúc ván', playAgain: 'Chơi lại', change: 'Đổi người chơi',
+      stats: (w, p) => `Thắng máy: ${w}/${p} ván`, hardWin: k => `Thắng máy Khó lần thứ ${k}!`, homeCount: (h, n) => `${h}/${n} về đích`,
+      hintKeys: 'Space: gieo · 1–4 hoặc ←/→: chọn quân · Enter: đi', hintTap: 'Chạm quân đang sáng hoặc ô đích của nó', logNone: (n, d) => `${n} ${d} · không đi được`,
+    },
+    zh: {
+      tagline: '让你的棋子绕棋盘一圈，全部回到终点！掷出 6 才能出发，踩中对手就把它送回基地。',
+      players: '玩家', human: '玩家', cpu: '电脑', off: '关闭', difficulty: '电脑难度', easy: '简单', normal: '普通', hard: '困难',
+      ruleOptions: '规则选项', start: '开始游戏', resume: '继续游戏', needTwo: '请至少选择两名玩家。',
+      leaveBase: '出发需要掷出', six: '仅 6', sixOne: '6 或 1', tokensEach: '每方棋子数', safe: '安全格（★ 与起点）', blocks: '叠子阻挡',
+      blocksNote: '同色两枚棋子在同一格时，对手无法越过，也无法吃掉。', bonus: '吃子或棋子到家可再掷一次', three: '连续三次掷出 6 则失去本轮',
+      ends: '结束方式', first: '第一位玩家到家', all: '决出全部名次', on: '开', off2: '关', done: '完成',
+      colors: ['红方', '绿方', '黄方', '蓝方'], you: '你', menu: '菜单', speed: '电脑快速行棋', board: 'Ludo 棋盘', roll: '掷骰', rollAria: '掷骰子',
+      yourRoll: '轮到你了——掷骰子！', rollOf: n => `${n}：请掷骰子`, rolling: n => `${n}正在掷骰…`, thinking: n => `${n}思考中…`,
+      pick: d => `你掷出了 ${d}——请选择棋子`, pickOf: (n, d) => `${n}掷出了 ${d}——请选择棋子`, rolled: (n, d) => `${n}掷出了 ${d}`,
+      noMove: d => `掷出 ${d}——无棋可走`, lost: '连续第三个 6——失去本轮！', extra: '再掷一次！', starts: n => `${n}先行`,
+      captured: (a, b) => `${a}把${b}送回了基地！`, home: n => `${n}有一枚棋子到家了！`, finished: (n, p) => `${n}全部到家，获得${p}！`,
+      ord: k => `第 ${k} 名`, youPlaced: p => `你获得${p}`,
+      token: (c, k) => `${c} ${k} 号棋子`, inBase: '在基地', toGo: k => `还差 ${k} 步`, tokHome: '已到家', canMove: '可移动', moveTo: '目标格',
+      youWin: '你赢了！', wins: n => `${n}获胜！`, gameOver: '游戏结束', playAgain: '再来一局', change: '更改玩家',
+      stats: (w, p) => `战胜电脑：${w}/${p} 局`, hardWin: k => `第 ${k} 次战胜困难电脑！`, homeCount: (h, n) => `${h}/${n} 到家`,
+      hintKeys: '空格：掷骰 · 1–4 或 ←/→：选子 · Enter：走棋', hintTap: '点击发光的棋子或它的目标格', logNone: (n, d) => `${n} ${d} · 无棋可走`,
+    },
+    fr: {
+      tagline: 'Faites le tour du plateau avec vos pions et ramenez-les tous à la maison. Un 6 pour sortir, et renvoyez les rivaux à leur base !',
+      players: 'Joueurs', human: 'Joueur', cpu: 'Ordi', off: 'Absent', difficulty: 'Niveau de l’ordi', easy: 'Facile', normal: 'Normal', hard: 'Difficile',
+      ruleOptions: 'Options de règles', start: 'Lancer la partie', resume: 'Reprendre la partie', needTwo: 'Choisissez au moins deux joueurs.',
+      leaveBase: 'Sortir de la base avec', six: '6 seulement', sixOne: '6 ou 1', tokensEach: 'Pions par joueur', safe: 'Cases refuges (★ et départs)', blocks: 'Barrages',
+      blocksNote: 'Deux pions de même couleur sur une case ne peuvent être ni dépassés ni pris.', bonus: 'Rejouer après une prise ou un pion arrivé', three: 'Trois 6 de suite : tour perdu',
+      ends: 'Fin de partie', first: 'Au premier arrivé', all: 'Tous les rangs joués', on: 'Oui', off2: 'Non', done: 'OK',
+      colors: ['Rouge', 'Vert', 'Jaune', 'Bleu'], you: 'Vous', menu: 'Menu', speed: 'Ordi rapide', board: 'Plateau de Ludo', roll: 'Lancer', rollAria: 'Lancer le dé',
+      yourRoll: 'À vous — lancez le dé !', rollOf: n => `${n} : lancez le dé`, rolling: n => `${n} lance le dé…`, thinking: n => `${n} réfléchit…`,
+      pick: d => `Vous avez fait ${d} — choisissez un pion`, pickOf: (n, d) => `${n} a fait ${d} — choisissez un pion`, rolled: (n, d) => `${n} a fait ${d}`,
+      noMove: d => `${d} — aucun coup possible`, lost: 'Troisième 6 d’affilée — tour perdu !', extra: 'Rejouez !', starts: n => `${n} commence`,
+      captured: (a, b) => `${a} renvoie ${b} à sa base !`, home: n => `${n} ramène un pion à la maison !`, finished: (n, p) => `${n} termine ${p} !`,
+      ord: k => k === 1 ? '1er' : `${k}e`, youPlaced: p => `Vous terminez ${p}`,
+      token: (c, k) => `Pion ${k} (${c})`, inBase: 'à la base', toGo: k => `encore ${k} cases`, tokHome: 'arrivé', canMove: 'peut avancer', moveTo: 'case d’arrivée',
+      youWin: 'Vous gagnez !', wins: n => `${n} gagne !`, gameOver: 'Partie terminée', playAgain: 'Rejouer', change: 'Changer les joueurs',
+      stats: (w, p) => `Victoires contre l’ordi : ${w} sur ${p}`, hardWin: k => `Victoire n° ${k} en Difficile !`, homeCount: (h, n) => `${h}/${n} arrivés`,
+      hintKeys: 'Espace : lancer · 1–4 ou ←/→ : choisir · Entrée : jouer', hintTap: 'Touchez un pion lumineux ou sa case d’arrivée', logNone: (n, d) => `${n} ${d} · bloqué`,
+    },
+    th: {
+      tagline: 'พาหมากเดินรอบกระดานแล้วกลับเข้าบ้านให้ครบ ต้องทอยได้ 6 จึงออกจากฐาน และเดินทับคู่แข่งเพื่อส่งกลับฐาน!',
+      players: 'ผู้เล่น', human: 'คน', cpu: 'คอม', off: 'ปิด', difficulty: 'ระดับคอม', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก',
+      ruleOptions: 'ตัวเลือกกติกา', start: 'เริ่มเกม', resume: 'เล่นต่อ', needTwo: 'เลือกผู้เล่นอย่างน้อยสองคน',
+      leaveBase: 'ออกจากฐานเมื่อทอยได้', six: '6 เท่านั้น', sixOne: '6 หรือ 1', tokensEach: 'หมากต่อคน', safe: 'ช่องปลอดภัย (★ และจุดเริ่ม)', blocks: 'ตั้งด่าน',
+      blocksNote: 'หมากสีเดียวกันสองตัวในช่องเดียว จะเดินผ่านหรือกินไม่ได้', bonus: 'ทอยเพิ่มเมื่อกินหมากหรือเข้าบ้าน', three: 'ทอยได้ 6 สามครั้งติดเสียตา',
+      ends: 'จบเกมเมื่อ', first: 'มีคนเข้าบ้านครบคนแรก', all: 'จัดอันดับครบทุกคน', on: 'เปิด', off2: 'ปิด', done: 'เสร็จ',
+      colors: ['แดง', 'เขียว', 'เหลือง', 'น้ำเงิน'], you: 'คุณ', menu: 'เมนู', speed: 'คอมเดินเร็ว', board: 'กระดานลูโด้', roll: 'ทอย', rollAria: 'ทอยลูกเต๋า',
+      yourRoll: 'ตาของคุณ ทอยลูกเต๋าเลย!', rollOf: n => `${n}: ทอยลูกเต๋า`, rolling: n => `${n} กำลังทอย…`, thinking: n => `${n} กำลังคิด…`,
+      pick: d => `คุณทอยได้ ${d} เลือกหมาก`, pickOf: (n, d) => `${n} ทอยได้ ${d} เลือกหมาก`, rolled: (n, d) => `${n} ทอยได้ ${d}`,
+      noMove: d => `ทอยได้ ${d} แต่ไม่มีตาเดิน`, lost: 'ได้ 6 สามครั้งติด เสียตา!', extra: 'ได้ทอยอีกครั้ง!', starts: n => `${n} เริ่มก่อน`,
+      captured: (a, b) => `${a} ส่ง${b}กลับฐาน!`, home: n => `${n} พาหมากเข้าบ้านได้หนึ่งตัว!`, finished: (n, p) => `${n} เข้าบ้านครบ ได้${p}!`,
+      ord: k => `อันดับ ${k}`, youPlaced: p => `คุณได้${p}`,
+      token: (c, k) => `หมาก${c} ตัวที่ ${k}`, inBase: 'อยู่ในฐาน', toGo: k => `อีก ${k} ช่อง`, tokHome: 'เข้าบ้านแล้ว', canMove: 'เดินได้', moveTo: 'ช่องปลายทาง',
+      youWin: 'คุณชนะ!', wins: n => `${n} ชนะ!`, gameOver: 'จบเกม', playAgain: 'เล่นอีกครั้ง', change: 'เปลี่ยนผู้เล่น',
+      stats: (w, p) => `ชนะคอม: ${w} จาก ${p} เกม`, hardWin: k => `ชนะระดับยากครั้งที่ ${k}!`, homeCount: (h, n) => `เข้าบ้าน ${h}/${n}`,
+      hintKeys: 'Space: ทอย · 1–4 หรือ ←/→: เลือก · Enter: เดิน', hintTap: 'แตะหมากที่เรืองแสงหรือช่องปลายทาง', logNone: (n, d) => `${n} ${d} · เดินไม่ได้`,
+    },
+    ja: {
+      tagline: 'コマで盤をひと回りして、全部ゴールへ！ 6が出たらスタート、相手のコマに止まれば基地へ送り返せます。',
+      players: 'プレイヤー', human: '人', cpu: 'CPU', off: 'なし', difficulty: 'CPUの強さ', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい',
+      ruleOptions: 'ルール設定', start: 'ゲーム開始', resume: '続きから', needTwo: '2人以上選んでください。',
+      leaveBase: '基地から出る目', six: '6のみ', sixOne: '6か1', tokensEach: 'コマの数', safe: '安全マス（★とスタート）', blocks: 'ブロック',
+      blocksNote: '同じ色のコマが2つあるマスは、通り抜けも取ることもできません。', bonus: 'コマを取るかゴールでもう一度', three: '6が3回続いたら手番終了',
+      ends: '終了条件', first: '最初の1人がゴール', all: '全員の順位が決まるまで', on: 'あり', off2: 'なし', done: '決定',
+      colors: ['赤', '緑', '黄', '青'], you: 'あなた', menu: 'メニュー', speed: 'CPUを速く', board: 'ルドーの盤', roll: '振る', rollAria: 'サイコロを振る',
+      yourRoll: 'あなたの番 — サイコロを振ろう！', rollOf: n => `${n}：サイコロを振ってください`, rolling: n => `${n}がサイコロを振っています…`, thinking: n => `${n}が考え中…`,
+      pick: d => `${d}が出ました — コマを選んでください`, pickOf: (n, d) => `${n}は${d} — コマを選んでください`, rolled: (n, d) => `${n}は${d}`,
+      noMove: d => `${d} — 動かせるコマがありません`, lost: '6が3回連続 — 手番終了！', extra: 'もう一度！', starts: n => `${n}が先攻`,
+      captured: (a, b) => `${a}が${b}を基地へ送り返した！`, home: n => `${n}のコマがゴール！`, finished: (n, p) => `${n}が全コマゴール、${p}！`,
+      ord: k => `${k}位`, youPlaced: p => `あなたは${p}`,
+      token: (c, k) => `${c}のコマ${k}`, inBase: '基地', toGo: k => `ゴールまで${k}マス`, tokHome: 'ゴール済み', canMove: '動かせる', moveTo: '行き先',
+      youWin: 'あなたの勝ち！', wins: n => `${n}の勝ち！`, gameOver: 'ゲーム終了', playAgain: 'もう一度', change: 'プレイヤー変更',
+      stats: (w, p) => `CPUに勝利：${p}戦${w}勝`, hardWin: k => `むずかしいで${k}勝目！`, homeCount: (h, n) => `ゴール ${h}/${n}`,
+      hintKeys: 'Space：振る · 1–4 / ←→：選ぶ · Enter：動かす', hintTap: '光るコマか行き先をタップ', logNone: (n, d) => `${n} ${d} · 動けず`,
+    },
+    ko: {
+      tagline: '말을 판 한 바퀴 돌려 모두 집으로! 6이 나와야 출발하고, 상대 말이 있는 칸에 서면 기지로 돌려보내요.',
+      players: '플레이어', human: '사람', cpu: '컴퓨터', off: '없음', difficulty: '컴퓨터 난이도', easy: '쉬움', normal: '보통', hard: '어려움',
+      ruleOptions: '규칙 옵션', start: '게임 시작', resume: '이어서 하기', needTwo: '플레이어를 두 명 이상 고르세요.',
+      leaveBase: '출발 가능한 눈', six: '6만', sixOne: '6 또는 1', tokensEach: '말 개수', safe: '안전 칸 (★와 출발 칸)', blocks: '블록',
+      blocksNote: '같은 색 말 두 개가 있는 칸은 지나가거나 잡을 수 없어요.', bonus: '잡거나 골인하면 한 번 더', three: '6이 세 번 연속이면 차례 끝',
+      ends: '게임 종료', first: '첫 골인 시', all: '모든 순위가 정해질 때', on: '켜기', off2: '끄기', done: '완료',
+      colors: ['빨강', '초록', '노랑', '파랑'], you: '나', menu: '메뉴', speed: '컴퓨터 빠르게', board: '루도 판', roll: '굴리기', rollAria: '주사위 굴리기',
+      yourRoll: '내 차례 — 주사위를 굴리세요!', rollOf: n => `${n}: 주사위를 굴리세요`, rolling: n => `${n} 주사위 굴리는 중…`, thinking: n => `${n} 생각 중…`,
+      pick: d => `${d} 나옴 — 말을 고르세요`, pickOf: (n, d) => `${n}: ${d} — 말을 고르세요`, rolled: (n, d) => `${n}: ${d}`,
+      noMove: d => `${d} — 움직일 수 있는 말이 없어요`, lost: '6이 세 번 연속 — 차례 끝!', extra: '한 번 더!', starts: n => `${n} 먼저 시작`,
+      captured: (a, b) => `${a}, ${b} 말을 잡았어요!`, home: n => `${n} 말 하나 골인!`, finished: (n, p) => `${n} 모두 골인, ${p}!`,
+      ord: k => `${k}등`, youPlaced: p => `내 순위: ${p}`,
+      token: (c, k) => `${c} 말 ${k}`, inBase: '기지에 있음', toGo: k => `골까지 ${k}칸`, tokHome: '골인', canMove: '이동 가능', moveTo: '도착 칸',
+      youWin: '승리!', wins: n => `${n} 승리!`, gameOver: '게임 종료', playAgain: '다시 하기', change: '플레이어 변경',
+      stats: (w, p) => `컴퓨터 상대 ${p}판 ${w}승`, hardWin: k => `어려움 ${k}번째 승리!`, homeCount: (h, n) => `골인 ${h}/${n}`,
+      hintKeys: 'Space: 굴리기 · 1–4 또는 ←/→: 선택 · Enter: 이동', hintTap: '빛나는 말이나 도착 칸을 탭하세요', logNone: (n, d) => `${n} ${d} · 이동 불가`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+  // "Off" in the seat picker and "Off" for a rule can differ in some languages.
+  for (const el of document.querySelectorAll('#rules [data-i18n="off"]')) el.textContent = t.off2;
+
+  // ---- Board geometry ---------------------------------------------------------------------
+  // 15×15 grid, columns x and rows y. Colours 0–3 = red (top-left), green (top-right), yellow (bottom-right), blue (bottom-left), playing clockwise.
+  // A token's progress p: -1 in base, 0–50 on the shared track, 51–55 in its home column, 56 finished.
+  const HEX = ['#ec4d4d', '#22b06c', '#ffbf2e', '#3b84f4'];
+  const DARK = ['#b23230', '#157f4d', '#d18f12', '#2160c4'];
+  const LIGHT = ['#ffd4d0', '#c9f1dc', '#ffefc2', '#d3e4ff'];
+  const MID = ['#f79a94', '#7fd8a9', '#ffd879', '#8fb8fb'];
+  const START = [0, 13, 26, 39];
+  const SAFE = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+  const FINISH = 56, LAST_TRACK = 50;
+  const TRACK = (() => {
+    const p = [];
+    const run = (x, y, dx, dy, n) => { for (let k = 0; k < n; k++) p.push([x + dx * k, y + dy * k]); };
+    run(1, 6, 1, 0, 5); run(6, 5, 0, -1, 6); run(7, 0, 0, 0, 1); run(8, 0, 0, 1, 6); run(9, 6, 1, 0, 6); run(14, 7, 0, 0, 1);
+    run(14, 8, -1, 0, 6); run(8, 9, 0, 1, 6); run(7, 14, 0, 0, 1); run(6, 14, 0, -1, 6); run(5, 8, -1, 0, 6); run(0, 7, 0, 0, 1); run(0, 6, 0, 0, 1);
+    return p;
+  })();
+  const HOME_COL = [0, 1, 2, 3].map(c => [1, 2, 3, 4, 5].map(k => [[k, 7], [7, k], [14 - k, 7], [7, 14 - k]][c]));
+  const BASE = [[0, 0], [9, 0], [9, 9], [0, 9]];
+  const SPOTS = [[2, 2], [4, 2], [2, 4], [4, 4]];
+  const FIN = [[6.55, 7.5], [7.5, 6.55], [8.45, 7.5], [7.5, 8.45]];
+  const LEVELS = ['easy', 'normal', 'hard'];
+
+  const STORE = { settings: 'milaan.ludo.settings', stats: 'milaan.ludo.stats' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = {
+    board: $('board'), svg: $('board-svg'), field: $('field'), tokens: $('tokens'), marks: $('marks'), glow: $('glow'), players: $('players'),
+    roll: $('roll'), die: $('die'), status: $('status'), sub: $('sub'), log: $('log'), statsLine: $('stats-line'), announcer: $('announcer'),
+    setup: $('setup'), rules: $('rules'), result: $('result'), seats: $('seats'), warn: $('warn'), start: $('start'), resume: $('resume'),
+    rank: $('rank'), resultEmoji: $('result-emoji'), resultTitle: $('result-title'), resultText: $('result-text'), resultScore: $('result-score'), newBest: $('new-best'), again: $('again'), speed: $('speed'),
+  };
+
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+
+  const DEFAULTS = { seats: ['cpu', 'cpu', 'cpu', 'human'], level: 'normal', fast: false, rules: { one: false, tokens: 4, safe: true, bonus: true, three: true, blocks: false, all: false } };
+  const saved = read(STORE.settings, {}) || {};
+  const settings = { ...DEFAULTS, ...saved, rules: { ...DEFAULTS.rules, ...(saved.rules || {}) } };
+  if (!Array.isArray(settings.seats) || settings.seats.length !== 4) settings.seats = DEFAULTS.seats.slice();
+  if (!LEVELS.includes(settings.level)) settings.level = 'normal';
+  const stats = { played: 0, wins: 0, hardWins: 0, ...(read(STORE.stats, {}) || {}) };
+
+  let game = null;
+  let testPace = null;
+  const rigged = [];
+  const held = [];
+
+  // ---- Rules engine (pure: works on a tokens array so the AI and tests can use it) ----------
+  const absIdx = (c, p) => (START[c] + p) % 52;
+  const isSafe = (rules, idx) => rules.safe && SAFE.has(idx);
+
+  function occupancy(tokens) {
+    const occ = new Map();
+    tokens.forEach((list, c) => {
+      if (!list) return;
+      list.forEach((p, i) => {
+        if (p < 0 || p > LAST_TRACK) return;
+        const idx = absIdx(c, p);
+        if (!occ.has(idx)) occ.set(idx, []);
+        occ.get(idx).push([c, i]);
+      });
+    });
+    return occ;
+  }
+
+  function blockedBy(occ, idx, c) {
+    const counts = [0, 0, 0, 0];
+    for (const [cc] of occ.get(idx) || []) if (cc !== c && ++counts[cc] >= 2) return true;
+    return false;
+  }
+
+  function legalMoves(tokens, c, d, rules) {
+    const occ = occupancy(tokens);
+    const moves = [];
+    tokens[c].forEach((p, i) => {
+      if (p === FINISH) return;
+      let to;
+      if (p < 0) { if (d !== 6 && !(rules.one && d === 1)) return; to = 0; }
+      else { to = p + d; if (to > FINISH) return; }
+      if (rules.blocks) {
+        for (let s = p < 0 ? 0 : p + 1; s <= Math.min(to, LAST_TRACK); s++) if (blockedBy(occ, absIdx(c, s), c)) return;
+      }
+      const caps = [];
+      if (to <= LAST_TRACK) {
+        const idx = absIdx(c, to);
+        if (!isSafe(rules, idx)) for (const [cc, ii] of occ.get(idx) || []) if (cc !== c) caps.push([cc, ii]);
+      }
+      moves.push({ c, i, from: p, to, caps });
+    });
+    return moves;
+  }
+
+  function applyMove(tokens, m) {
+    tokens[m.c][m.i] = m.to;
+    for (const [cc, ii] of m.caps) tokens[cc][ii] = -1;
+  }
+
+  const allHome = list => list.every(p => p === FINISH);
+  const progressOf = list => list.reduce((a, p) => a + p + 1, 0);
+
+  // ---- Computer player ----------------------------------------------------------------------
+  // Chance that a token of colour c at progress p is hit before c moves again (opponents within 1–6, plus 7–12 via a 6 when deep).
+  function danger(tokens, c, p, rules, deep) {
+    if (p < 0 || p > LAST_TRACK) return 0;
+    const idx = absIdx(c, p);
+    if (isSafe(rules, idx)) return 0;
+    if (rules.blocks && tokens[c].filter(q => q >= 0 && q <= LAST_TRACK && absIdx(c, q) === idx).length >= 2) return 0;
+    let miss = 1;
+    tokens.forEach((list, oc) => {
+      if (!list || oc === c || allHome(list)) return;
+      let hit = 0;
+      if (idx === START[oc] && list.some(q => q < 0)) hit += rules.one ? 1 / 3 : 1 / 6;
+      for (const q of list) {
+        if (q < 0 || q > LAST_TRACK) continue;
+        const rel = (idx - START[oc] + 52) % 52;
+        if (rel <= q || rel > LAST_TRACK) continue;
+        const dist = rel - q;
+        if (dist <= 6) hit += 1 / 6;
+        else if (deep && dist <= 12) hit += 1 / 36;
+      }
+      miss *= 1 - Math.min(hit, 0.95);
+    });
+    return 1 - miss;
+  }
+
+  const worth = p => p < 0 ? 0 : p > LAST_TRACK ? 0 : 8 + p;
+
+  function totalRisk(tokens, c, rules) {
+    return tokens[c].reduce((a, p) => a + danger(tokens, c, p, rules, true) * worth(p), 0);
+  }
+
+  function scoreMove(tokens, m, rules, deep) {
+    const after = tokens.map(l => l && l.slice());
+    applyMove(after, m);
+    const c = m.c;
+    let s = 0;
+    const leader = Math.max(...tokens.map((l, cc) => l && cc !== c ? progressOf(l) : -1));
+    for (const [cc, ii] of m.caps) s += 22 + tokens[cc][ii] * 0.9 + (deep && progressOf(tokens[cc]) === leader ? 8 : 0);
+    if (m.to === FINISH) s += 26;
+    if (m.from < 0) s += 16 + (tokens[c].some(p => p >= 0 && p <= LAST_TRACK) ? 0 : 12);
+    if (m.from <= LAST_TRACK && m.to > LAST_TRACK && m.to < FINISH) s += 14;
+    s += (m.to - Math.max(m.from, 0)) * 0.5;
+    if (deep) {
+      s += (totalRisk(tokens, c, rules) - totalRisk(after, c, rules)) * 1.4;
+      // Threats: rivals the moved token can hit with the next roll.
+      if (m.to <= LAST_TRACK) {
+        const idx = absIdx(c, m.to);
+        after.forEach((list, oc) => {
+          if (!list || oc === c) return;
+          for (const q of list) {
+            if (q < 0 || q > LAST_TRACK) continue;
+            const qi = absIdx(oc, q);
+            const ahead = (qi - idx + 52) % 52;
+            if (ahead >= 1 && ahead <= 6 && m.to + ahead <= LAST_TRACK && !isSafe(rules, qi)) s += 2 + q * 0.06;
+          }
+        });
+        if (rules.blocks && after[c].filter(q => q >= 0 && q <= LAST_TRACK && absIdx(c, q) === idx).length >= 2) s += 6;
+      }
+      // Late in the race, finishing safely beats wandering.
+      if (m.from > 40 && m.from <= LAST_TRACK) s += 3;
+    } else {
+      s += (danger(tokens, c, m.from, rules, false) * worth(m.from) - danger(after, c, m.to, rules, false) * worth(m.to)) * 1.1;
+    }
+    return s;
+  }
+
+  function aiChoose(tokens, moves, level, rules) {
+    if (moves.length === 1) return moves[0];
+    if (level === 'easy') {
+      if (Math.random() < 0.6) return moves[Math.floor(Math.random() * moves.length)];
+      return best(moves, m => scoreMove(tokens, m, rules, false) + Math.random() * 18);
+    }
+    if (level === 'normal') return best(moves, m => scoreMove(tokens, m, rules, false) + Math.random() * 5);
+    return best(moves, m => scoreMove(tokens, m, rules, true) + Math.random() * 0.01);
+  }
+
+  function best(list, fn) {
+    let top = list[0], v = -Infinity;
+    for (const x of list) { const s = fn(x); if (s > v) { v = s; top = x; } }
+    return top;
+  }
+
+  // Headless game for tests: returns the colour that finishes first.
+  function simulate(levels, rules) {
+    const n = rules.tokens;
+    const tokens = levels.map(l => l ? Array(n).fill(-1) : null);
+    const active = [0, 1, 2, 3].filter(c => levels[c]);
+    let turn = active[Math.floor(Math.random() * active.length)], sixes = 0;
+    for (let guard = 0; guard < 20000; guard++) {
+      const d = 1 + Math.floor(Math.random() * 6);
+      sixes = d === 6 ? sixes + 1 : 0;
+      let extra = d === 6;
+      if (rules.three && sixes === 3) extra = false;
+      else {
+        const moves = legalMoves(tokens, turn, d, rules);
+        if (moves.length) {
+          const m = aiChoose(tokens, moves, levels[turn], rules);
+          applyMove(tokens, m);
+          if (rules.bonus && (m.caps.length || m.to === FINISH)) extra = true;
+          if (allHome(tokens[turn])) return turn;
+        }
+      }
+      if (!extra) { sixes = 0; turn = active[(active.indexOf(turn) + 1) % active.length]; }
+    }
+    return -1;
+  }
+
+  // ---- Display positions ------------------------------------------------------------------
+  function rawPos(c, i, p) {
+    if (p < 0) { const [ox, oy] = BASE[c], s = SPOTS[game.rules.tokens === 2 ? [0, 3][i] : i]; return [ox + s[0], oy + s[1]]; }
+    if (p <= LAST_TRACK) { const [x, y] = TRACK[absIdx(c, p)]; return [x + .5, y + .5]; }
+    if (p < FINISH) { const [x, y] = HOME_COL[c][p - 51]; return [x + .5, y + .5]; }
+    return FIN[c].slice();
+  }
+
+  // The board turns so a lone human player always sits bottom-left.
+  function rot([x, y]) {
+    let px = x, py = y;
+    for (let k = 0; k < game.rot; k++) [px, py] = [15 - py, px];
+    return [px, py];
+  }
+
+  const OFFS4 = [[-.22, -.22], [.22, -.22], [-.22, .22], [.22, .22]];
+  const OFFS9 = [[-.3, -.3], [0, -.3], [.3, -.3], [-.3, 0], [0, 0], [.3, 0], [-.3, .3], [0, .3], [.3, .3]];
+
+  function layout() {
+    const groups = new Map();
+    for (const tk of game.toks) {
+      const p = game.tokens[tk.c][tk.i];
+      const key = p < 0 ? `b${tk.c}${tk.i}` : p === FINISH ? `f${tk.c}` : rawPos(tk.c, tk.i, p).join(',');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(tk);
+    }
+    for (const [key, list] of groups) {
+      const n = list.length;
+      list.forEach((tk, k) => {
+        const [x, y] = rawPos(tk.c, tk.i, game.tokens[tk.c][tk.i]);
+        let ox = 0, oy = 0, s = 1;
+        if (key[0] === 'f') { s = .5; [ox, oy] = OFFS4[k % 4].map(v => v * 1.1); }
+        else if (n > 4) { s = .44; [ox, oy] = OFFS9[k % 9]; }
+        else if (n > 1) { s = .62; [ox, oy] = OFFS4[k]; }
+        tk.pos = rot([x + ox, y + oy]);
+        tk.el.style.setProperty('--x', tk.pos[0].toFixed(3));
+        tk.el.style.setProperty('--y', tk.pos[1].toFixed(3));
+        tk.el.style.setProperty('--s', s);
+      });
+    }
+  }
+
+  // ---- Board drawing ----------------------------------------------------------------------
+  function star(cx, cy, r) {
+    const pts = [];
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * .45 : r; pts.push(`${(cx + Math.cos(a) * rr).toFixed(3)},${(cy + Math.sin(a) * rr).toFixed(3)}`); }
+    return `<polygon points="${pts.join(' ')}"`;
+  }
+
+  function drawBoard(rules) {
+    const P = ['<rect width="15" height="15" rx=".3" fill="#fffaf1"/>', '<rect x="6" y="0" width="3" height="15" fill="#efe3cc"/><rect x="0" y="6" width="15" height="3" fill="#efe3cc"/>'];
+    const cell = (x, y, fill) => `<rect x="${x + .05}" y="${y + .05}" width=".9" height=".9" rx=".14" fill="${fill}"/>`;
+    for (let c = 0; c < 4; c++) {
+      const [ox, oy] = BASE[c];
+      P.push(`<rect x="${ox + .1}" y="${oy + .1}" width="5.8" height="5.8" rx=".55" fill="${HEX[c]}"/>`, `<rect x="${ox + .1}" y="${oy + .1}" width="5.8" height="5.8" rx=".55" fill="none" stroke="${DARK[c]}" stroke-width=".08"/>`);
+      P.push(`<rect x="${ox + .8}" y="${oy + .8}" width="4.4" height="4.4" rx=".6" fill="#fffaf1"/>`);
+      for (const [sx, sy] of SPOTS) P.push(`<circle cx="${ox + sx}" cy="${oy + sy}" r=".62" fill="${LIGHT[c]}" stroke="${MID[c]}" stroke-width=".08"/>`);
+      for (const [x, y] of HOME_COL[c]) P.push(cell(x, y, MID[c]));
+    }
+    TRACK.forEach(([x, y], idx) => {
+      const owner = START.indexOf(idx);
+      P.push(cell(x, y, owner >= 0 ? HEX[owner] : '#ffffff'));
+      if (owner >= 0) {
+        const [nx, ny] = TRACK[(idx + 1) % 52];
+        const dx = nx - x, dy = ny - y, cx = x + .5, cy = y + .5;
+        P.push(`<polygon points="${cx + dx * .28},${cy + dy * .28} ${cx - dx * .2 - dy * .22},${cy - dy * .2 + dx * .22} ${cx - dx * .2 + dy * .22},${cy - dy * .2 - dx * .22}" fill="#fff" opacity="${rules.safe ? .95 : .55}"/>`);
+      } else if (SAFE.has(idx)) {
+        P.push(`${star(x + .5, y + .5, .34)} fill="${rules.safe ? '#c9b98f' : '#e9e1cf'}"/>`);
+      }
+    });
+    P.push(`<polygon points="6,6 6,9 7.5,7.5" fill="${HEX[0]}"/><polygon points="6,6 9,6 7.5,7.5" fill="${HEX[1]}"/><polygon points="9,6 9,9 7.5,7.5" fill="${HEX[2]}"/><polygon points="6,9 9,9 7.5,7.5" fill="${HEX[3]}"/>`);
+    P.push('<path d="M6 6 9 9M9 6 6 9" stroke="#ffffff88" stroke-width=".05"/><rect x="6" y="6" width="3" height="3" fill="none" stroke="#ffffffaa" stroke-width=".06"/>');
+    els.svg.innerHTML = P.join('');
+  }
+
+  const PIPS = { 1: [[2, 2]], 2: [[1, 1], [3, 3]], 3: [[1, 1], [2, 2], [3, 3]], 4: [[1, 1], [3, 1], [1, 3], [3, 3]], 5: [[1, 1], [3, 1], [2, 2], [1, 3], [3, 3]], 6: [[1, 1], [3, 1], [1, 2], [3, 2], [1, 3], [3, 3]] };
+  function drawDie(v) {
+    els.die.innerHTML = `<svg viewBox="0 0 4 4" aria-hidden="true">${(PIPS[v] || []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".38"/>`).join('')}</svg>`;
+  }
+
+  // ---- Names --------------------------------------------------------------------------------
+  const humans = () => game.seats.filter(s => s === 'human').length;
+  const isCpu = c => game.seats[c] === 'cpu';
+  const nameOf = c => game.seats[c] === 'human' && humans() === 1 ? t.you : t.colors[c];
+
+  // ---- Timers (held while the tab is hidden) -----------------------------------------------
+  const pace = () => testPace ?? (game?.fast ? .45 : 1);
+  function later(fn, ms) {
+    const g = game, gen = g.gen;
+    const run = () => { if (game === g && g.gen === gen && !g.over) fn(); };
+    setTimeout(() => { if (document.hidden) held.push(run); else run(); }, ms * pace());
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) held.splice(0).forEach(fn => fn()); });
+
+  // ---- Game flow ----------------------------------------------------------------------------
+  function newGame() {
+    const rules = { ...settings.rules };
+    const seats = settings.seats.slice();
+    const active = [0, 1, 2, 3].filter(c => seats[c] !== 'off');
+    const humanSeats = active.filter(c => seats[c] === 'human');
+    game = {
+      seats, rules, active, level: settings.level, fast: settings.fast,
+      tokens: seats.map(s => s === 'off' ? null : Array(rules.tokens).fill(-1)),
+      turn: active[Math.floor(Math.random() * active.length)], sixes: 0, dice: 0, phase: 'idle', moves: [], choices: [], sel: -1,
+      places: [], over: false, toks: [], rot: humanSeats.length === 1 ? (3 - humanSeats[0] + 4) % 4 : 0, gen: 0,
+    };
+    held.length = 0;
+    drawBoard(rules);
+    els.svg.style.transform = `rotate(${game.rot * 90}deg)`;
+    buildTokens();
+    els.log.replaceChildren();
+    closePanels();
+    drawDie(6);
+    flash(t.starts(nameOf(game.turn)));
+    startTurn();
+  }
+
+  function buildTokens() {
+    const nodes = [];
+    game.toks = [];
+    for (const c of game.active) {
+      for (let i = 0; i < game.rules.tokens; i++) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = `tok c${c}`;
+        el.tabIndex = -1;
+        el.innerHTML = `<b>${i + 1}</b>`;
+        el.dataset.c = c;
+        el.dataset.i = i;
+        game.toks.push({ c, i, el, pos: [0, 0] });
+        nodes.push(el);
+      }
+    }
+    els.tokens.replaceChildren(...nodes);
+    layout();
+  }
+
+  const tokEl = (c, i) => game.toks.find(tk => tk.c === c && tk.i === i).el;
+
+  function startTurn() {
+    game.phase = 'roll';
+    game.moves = [];
+    game.choices = [];
+    game.sel = -1;
+    render();
+    if (isCpu(game.turn)) {
+      setStatus(t.rolling(nameOf(game.turn)));
+      later(roll, 520);
+    } else {
+      setStatus(humans() === 1 ? t.yourRoll : t.rollOf(nameOf(game.turn)));
+      if (humans() > 1) announce(t.rollOf(nameOf(game.turn)));
+    }
+  }
+
+  function nextDie() { return rigged.length ? rigged.shift() : 1 + Math.floor(Math.random() * 6); }
+
+  function roll() {
+    if (!game || game.phase !== 'roll') return;
+    game.phase = 'rolling';
+    const d = nextDie();
+    render();
+    if (reducedMotion.matches || testPace === 0) { drawDie(d); return later(() => afterRoll(d), 120); }
+    els.die.classList.remove('spin');
+    void els.die.offsetWidth;
+    els.die.classList.add('spin');
+    let k = 0;
+    const tumble = () => {
+      if (++k < 6) { drawDie(1 + Math.floor(Math.random() * 6)); later(tumble, 75); }
+      else { drawDie(d); afterRoll(d); }
+    };
+    tumble();
+  }
+
+  function afterRoll(d) {
+    const c = game.turn;
+    game.dice = d;
+    game.sixes = d === 6 ? game.sixes + 1 : 0;
+    if (game.rules.three && game.sixes === 3) {
+      setStatus(t.lost); announce(`${t.rolled(nameOf(c), d)}. ${t.lost}`); addLog(c, `${nameOf(c)} 6·6·6 ✕`);
+      game.phase = 'wait'; render();
+      return later(nextPlayer, 1100);
+    }
+    game.moves = legalMoves(game.tokens, c, d, game.rules);
+    if (!game.moves.length) {
+      setStatus(isCpu(c) || humans() > 1 ? `${nameOf(c)}: ${t.noMove(d)}` : t.noMove(d)); announce(`${t.rolled(nameOf(c), d)}. ${t.noMove(d)}`); addLog(c, t.logNone(nameOf(c), d));
+      game.phase = 'wait'; render();
+      return later(d === 6 ? bonusTurn : nextPlayer, 950);
+    }
+    // Moves that start and end on the same squares (tokens waiting in base) are one choice.
+    const seen = new Set();
+    game.choices = game.moves.filter(m => { const k = `${m.from}>${m.to}`; if (seen.has(k)) return false; seen.add(k); return true; });
+    game.phase = 'choose';
+    if (isCpu(c)) {
+      setStatus(t.rolled(nameOf(c), d));
+      render();
+      return later(() => play(aiChoose(game.tokens, game.moves, game.level, game.rules)), 420);
+    }
+    game.sel = 0;
+    setStatus(humans() === 1 ? t.pick(d) : t.pickOf(nameOf(c), d));
+    announce(humans() === 1 ? t.pick(d) : t.pickOf(nameOf(c), d));
+    render();
+    if (game.choices.length === 1) later(() => { if (game.phase === 'choose') play(game.choices[0]); }, 380);
+  }
+
+  function play(m) {
+    if (!game || game.phase !== 'choose') return;
+    game.phase = 'moving';
+    game.sel = -1;
+    render();
+    const el = tokEl(m.c, m.i);
+    const steps = [];
+    if (m.from < 0) steps.push(0); else for (let p = m.from + 1; p <= m.to; p++) steps.push(p);
+    const stepMs = reducedMotion.matches ? 0 : 135;
+    let k = 0;
+    const step = () => {
+      game.tokens[m.c][m.i] = steps[k];
+      layout();
+      if (stepMs) { el.classList.toggle('hop', k % 2 === 0); el.classList.toggle('hop2', k % 2 === 1); }
+      if (++k < steps.length) later(step, stepMs);
+      else later(() => { el.classList.remove('hop', 'hop2'); land(m); }, stepMs ? 150 : 30);
+    };
+    step();
+  }
+
+  function land(m) {
+    const c = m.c, name = nameOf(c);
+    let msg = `${name}: ${t.token(t.colors[c], m.i + 1)}`;
+    addLog(c, `${name} ${game.dice} → #${m.i + 1}`);
+    if (m.caps.length) {
+      const victims = [...new Set(m.caps.map(([cc]) => cc))];
+      for (const [cc, ii] of m.caps) {
+        const v = tokEl(cc, ii);
+        v.classList.add('fly');
+        setTimeout(() => v.classList.remove('fly'), 600);
+      }
+      applyMove(game.tokens, m);
+      layout();
+      const text = t.captured(name, victims.map(nameOf).join(', '));
+      msg = text;
+      flash(text);
+      addLog(c, `${name} ✕ ${victims.map(nameOf).join(', ')}`);
+    }
+    let finishedNow = false;
+    if (m.to === FINISH) {
+      flash(t.home(name));
+      msg = t.home(name);
+      addLog(c, `${name} 🏠 #${m.i + 1}`);
+      if (allHome(game.tokens[c])) {
+        game.places.push(c);
+        finishedNow = true;
+        msg = t.finished(name, t.ord(game.places.length));
+        flash(msg);
+      }
+    }
+    announce(msg);
+    render();
+    if (finishedNow && gameDecided()) return endGame();
+    let extra = game.dice === 6 || (game.rules.bonus && (m.caps.length > 0 || m.to === FINISH));
+    if (finishedNow) extra = false;
+    game.phase = 'wait';
+    later(extra ? bonusTurn : nextPlayer, m.caps.length ? 650 : 320);
+  }
+
+  function bonusTurn() {
+    flash(t.extra);
+    announce(t.extra);
+    startTurn();
+  }
+
+  function unfinished() { return game.active.filter(c => !game.places.includes(c)); }
+
+  function gameDecided() {
+    if (!game.rules.all) return true;
+    const left = unfinished();
+    if (left.length < 2) return true;
+    return humans() > 0 && !left.some(c => game.seats[c] === 'human');
+  }
+
+  function nextPlayer() {
+    game.sixes = 0;
+    const order = game.active;
+    let k = order.indexOf(game.turn);
+    do k = (k + 1) % order.length; while (game.places.includes(order[k]));
+    game.turn = order[k];
+    startTurn();
+  }
+
+  function ranking() {
+    const rest = unfinished().sort((a, b) => progressOf(game.tokens[b]) - progressOf(game.tokens[a]));
+    return [...game.places, ...rest];
+  }
+
+  function endGame() {
+    game.over = true;
+    game.phase = 'over';
+    render();
+    const order = ranking();
+    const winner = order[0];
+    const mixed = humans() > 0 && game.active.some(isCpu);
+    let newBest = false;
+    if (mixed) {
+      stats.played += 1;
+      if (game.seats[winner] === 'human') {
+        stats.wins += 1;
+        if (game.level === 'hard') { stats.hardWins += 1; newBest = true; }
+      }
+      write(STORE.stats, stats);
+    }
+    const humanWon = game.seats[winner] === 'human';
+    let title;
+    if (humanWon && humans() === 1) title = t.youWin;
+    else title = t.wins(nameOf(winner));
+    els.resultEmoji.textContent = humanWon ? '🏆' : humans() ? '🎲' : '👑';
+    els.resultTitle.textContent = title;
+    const me = humans() === 1 ? game.active.find(c => game.seats[c] === 'human') : -1;
+    els.resultText.textContent = me >= 0 && !humanWon ? t.youPlaced(t.ord(order.indexOf(me) + 1)) : '';
+    els.resultText.hidden = !els.resultText.textContent;
+    const medals = ['🥇', '🥈', '🥉', ''];
+    els.rank.replaceChildren(...order.map((c, k) => {
+      const li = document.createElement('li');
+      const home = game.tokens[c].filter(p => p === FINISH).length;
+      li.innerHTML = `<b aria-hidden="true">${medals[k]}</b><i class="sw${c}"></i><span></span><small></small>`;
+      li.querySelector('span').textContent = `${t.ord(k + 1)} · ${nameOf(c)}`;
+      li.querySelector('small').textContent = t.homeCount(home, game.rules.tokens);
+      return li;
+    }));
+    els.resultScore.textContent = mixed ? t.stats(stats.wins, stats.played) : '';
+    els.newBest.textContent = t.hardWin(stats.hardWins);
+    els.newBest.hidden = !newBest;
+    setStatus(title);
+    announce(`${title} ${els.resultText.textContent}`);
+    const g = game;
+    setTimeout(() => {
+      if (game !== g) return;
+      els.result.hidden = false;
+      els.again.focus({ preventScroll: true });
+    }, testPace === 0 ? 0 : 1100);
+  }
+
+  // ---- Rendering ----------------------------------------------------------------------------
+  function setStatus(text) { els.status.textContent = text; }
+  function flash(text) {
+    els.sub.textContent = text;
+    els.sub.classList.add('flash');
+    clearTimeout(flash.timer);
+    flash.timer = setTimeout(() => { els.sub.classList.remove('flash'); }, 1600);
+  }
+  function announce(text) { els.announcer.textContent = text; }
+
+  function addLog(c, text) {
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="sw${c}"></i><span></span>`;
+    li.querySelector('span').textContent = text;
+    els.log.append(li);
+    while (els.log.children.length > 14) els.log.firstChild.remove();
+  }
+
+  const choosing = () => game && game.phase === 'choose' && !isCpu(game.turn);
+
+  function render() {
+    const c = game.turn;
+    // Players
+    const chips = game.active.map(pc => {
+      const div = document.createElement('div');
+      const place = game.places.indexOf(pc);
+      div.className = `pl${pc === c && !game.over ? ' turn' : ''}${place >= 0 ? ' done' : ''}`;
+      div.style.setProperty('--pc', HEX[pc]);
+      const home = game.tokens[pc].filter(p => p === FINISH).length;
+      const kind = game.seats[pc] === 'cpu' ? `${t.cpu} · ${t[game.level]}` : t.human;
+      div.innerHTML = `<i class="dot sw${pc}"></i><div><b></b><small><span></span><span class="h"></span></small></div>`;
+      div.querySelector('.dot').textContent = place >= 0 ? ['🥇', '🥈', '🥉', '4'][place] : `${home}`;
+      div.querySelector('b').textContent = nameOf(pc);
+      div.querySelector('small span').textContent = kind;
+      div.querySelector('small .h').textContent = ` · ${t.homeCount(home, game.rules.tokens)}`;
+      div.setAttribute('aria-label', `${nameOf(pc)}, ${kind}, ${t.homeCount(home, game.rules.tokens)}`);
+      return div;
+    });
+    els.players.replaceChildren(...chips);
+    els.players.style.setProperty('--n', game.active.length);
+
+    // Roll button
+    const canRoll = game.phase === 'roll' && !isCpu(c) && !game.over;
+    els.roll.disabled = !canRoll;
+    els.roll.classList.toggle('ready', canRoll);
+    els.roll.style.setProperty('--pc', HEX[c]);
+    els.roll.style.setProperty('--pcd', DARK[c]);
+
+    // Turn glow on the mover's base
+    const [bx, by] = rot([BASE[c][0] + 3, BASE[c][1] + 3]);
+    els.glow.hidden = game.over;
+    els.glow.style.left = `${(bx - 3) / 15 * 100}%`;
+    els.glow.style.top = `${(by - 3) / 15 * 100}%`;
+    els.glow.style.setProperty('--pc', HEX[c]);
+
+    // Movable tokens and target marks
+    const human = choosing();
+    const movable = new Set(human ? game.moves.map(m => `${m.c},${m.i}`) : []);
+    const selMove = human ? game.choices[game.sel] : null;
+    for (const tk of game.toks) {
+      const can = movable.has(`${tk.c},${tk.i}`);
+      tk.el.classList.toggle('can', can);
+      tk.el.classList.toggle('sel', !!selMove && selMove.c === tk.c && selMove.i === tk.i);
+      tk.el.tabIndex = can ? 0 : -1;
+      const p = game.tokens[tk.c][tk.i];
+      const where = p < 0 ? t.inBase : p === FINISH ? t.tokHome : t.toGo(FINISH - p);
+      tk.el.setAttribute('aria-label', `${t.token(t.colors[tk.c], tk.i + 1)}, ${where}${can ? `, ${t.canMove}` : ''}`);
+    }
+    const marks = [];
+    if (human) {
+      for (const m of game.choices) {
+        const el = document.createElement('div');
+        el.className = 'mark';
+        const [x, y] = rot(rawPos(m.c, m.i, m.to));
+        el.style.left = `${x / 15 * 100}%`;
+        el.style.top = `${y / 15 * 100}%`;
+        el.style.setProperty('--pc', HEX[m.c]);
+        el.dataset.k = game.choices.indexOf(m);
+        el.setAttribute('aria-hidden', 'true');
+        marks.push(el);
+      }
+    }
+    els.marks.replaceChildren(...marks);
+    els.statsLine.textContent = stats.played ? t.stats(stats.wins, stats.played) : '';
+    if (human && !els.sub.classList.contains('flash')) els.sub.textContent = t.hintTap;
+  }
+
+  // ---- Input --------------------------------------------------------------------------------
+  function moveForToken(c, i) {
+    const m = game.moves.find(x => x.c === c && x.i === i);
+    return m || null;
+  }
+
+  els.field.addEventListener('click', event => {
+    if (!choosing()) return;
+    const tok = event.target.closest('.tok');
+    if (tok) { const m = moveForToken(+tok.dataset.c, +tok.dataset.i); if (m) return play(m); }
+    const mark = event.target.closest('.mark');
+    if (mark) return play(game.choices[+mark.dataset.k]);
+    // Small boards: take the nearest movable token or target to the tap.
+    const rect = els.field.getBoundingClientRect();
+    const fx = (event.clientX - rect.left) / rect.width * 15, fy = (event.clientY - rect.top) / rect.height * 15;
+    let pick = null, bestD = 1.7;
+    for (const m of game.choices) {
+      const cands = [rot(rawPos(m.c, m.i, m.to))];
+      for (const x of game.moves) if (x.from === m.from && x.to === m.to) cands.push(game.toks.find(tk => tk.c === x.c && tk.i === x.i).pos);
+      for (const [x, y] of cands) { const dd = Math.hypot(x - fx, y - fy); if (dd < bestD) { bestD = dd; pick = m; } }
+    }
+    if (!pick) {
+      // A tap anywhere in your base brings a token out.
+      const [bx, by] = rot([BASE[game.turn][0] + 3, BASE[game.turn][1] + 3]);
+      if (Math.abs(fx - bx) < 3 && Math.abs(fy - by) < 3) pick = game.choices.find(m => m.from < 0) || null;
+    }
+    if (pick) play(pick);
+  });
+
+  function cycle(dir) {
+    if (!choosing()) return;
+    const n = game.choices.length;
+    game.sel = ((game.sel < 0 ? 0 : game.sel + dir) % n + n) % n;
+    render();
+    const m = game.choices[game.sel];
+    tokEl(m.c, m.i).focus({ preventScroll: true });
+  }
+
+  const overlayOpen = () => !els.setup.hidden || !els.rules.hidden || !els.result.hidden;
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !game || overlayOpen()) return;
+    const k = event.key;
+    const onButton = event.target.closest && event.target.closest('button');
+    if (k === ' ' || k === 'Enter') {
+      // Let a focused control (menu, roll, a token) handle its own activation.
+      if (onButton && onButton !== els.roll && !onButton.classList.contains('tok')) return;
+      if (onButton && onButton.classList.contains('tok') && choosing()) {
+        event.preventDefault();
+        const m = moveForToken(+onButton.dataset.c, +onButton.dataset.i);
+        return play(m || game.choices[Math.max(0, game.sel)]);
+      }
+      event.preventDefault();
+      if (game.phase === 'roll' && !isCpu(game.turn)) roll();
+      else if (choosing()) play(game.choices[Math.max(0, game.sel)]);
+    } else if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowUp') {
+      if (!choosing()) return;
+      event.preventDefault();
+      cycle(k === 'ArrowRight' || k === 'ArrowDown' ? 1 : -1);
+    } else if (/^[1-4]$/.test(k)) {
+      if (!choosing()) return;
+      const m = moveForToken(game.turn, Number(k) - 1);
+      if (!m) return;
+      event.preventDefault();
+      play(m);
+    }
+  });
+
+  els.roll.addEventListener('click', () => { if (game && game.phase === 'roll' && !isCpu(game.turn)) roll(); });
+
+  // ---- Setup panels -------------------------------------------------------------------------
+  function renderSeats() {
+    els.seats.replaceChildren(...[0, 1, 2, 3].map(c => {
+      const row = document.createElement('div');
+      row.className = 'seat';
+      row.innerHTML = `<p class="seat-name" id="seat-${c}"><i class="sw${c}"></i><span></span></p><div class="seg" role="group" aria-labelledby="seat-${c}">${['human', 'cpu', 'off'].map(v => `<button type="button" data-value="${v}" aria-pressed="${settings.seats[c] === v}"></button>`).join('')}</div>`;
+      row.querySelector('span').textContent = t.colors[c];
+      const btns = row.querySelectorAll('button');
+      btns[0].textContent = t.human; btns[1].textContent = t.cpu; btns[2].textContent = t.off;
+      row.querySelector('.seg').addEventListener('click', event => {
+        const b = event.target.closest('button');
+        if (!b) return;
+        settings.seats[c] = b.dataset.value;
+        renderSetup();
+        row.querySelector(`[data-value="${b.dataset.value}"]`)?.focus({ preventScroll: true });
+      });
+      return row;
+    }));
+  }
+
+  function renderSetup() {
+    renderSeats();
+    for (const btn of document.querySelectorAll('[data-key="level"] button')) btn.setAttribute('aria-pressed', String(settings.level === btn.dataset.value));
+    const enough = settings.seats.filter(s => s !== 'off').length >= 2;
+    els.warn.hidden = enough;
+    els.start.disabled = !enough;
+    els.start.style.opacity = enough ? '' : '.5';
+    els.resume.hidden = !(game && !game.over && game.phase !== 'idle');
+    for (const group of document.querySelectorAll('[data-rule]')) {
+      const key = group.dataset.rule;
+      const val = key === 'tokens' ? String(settings.rules.tokens) : settings.rules[key] ? '1' : '0';
+      for (const btn of group.children) btn.setAttribute('aria-pressed', String(btn.dataset.value === val));
+    }
+  }
+
+  for (const group of document.querySelectorAll('[data-rule]')) {
+    group.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      const key = group.dataset.rule;
+      settings.rules[key] = key === 'tokens' ? Number(btn.dataset.value) : btn.dataset.value === '1';
+      renderSetup();
+    });
+  }
+  document.querySelector('[data-key="level"]').addEventListener('click', event => {
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    settings.level = btn.dataset.value;
+    renderSetup();
+  });
+
+  // A focused button inside a panel that just closed would otherwise keep catching Space/Enter.
+  function closePanels() {
+    const focused = document.activeElement;
+    els.setup.hidden = true;
+    els.rules.hidden = true;
+    els.result.hidden = true;
+    if (focused && focused.closest && focused.closest('.overlay')) focused.blur();
+  }
+
+  function openSetup() {
+    renderSetup();
+    els.result.hidden = true;
+    els.rules.hidden = true;
+    els.setup.hidden = false;
+    (els.resume.hidden ? els.start : els.resume).focus({ preventScroll: true });
+  }
+
+  els.start.addEventListener('click', () => {
+    if (settings.seats.filter(s => s !== 'off').length < 2) return;
+    write(STORE.settings, settings);
+    newGame();
+  });
+  els.resume.addEventListener('click', closePanels);
+  $('open-rules').addEventListener('click', () => { renderSetup(); els.setup.hidden = true; els.rules.hidden = false; $('rules-done').focus({ preventScroll: true }); });
+  $('rules-done').addEventListener('click', () => { write(STORE.settings, settings); els.rules.hidden = true; openSetup(); });
+  els.again.addEventListener('click', newGame);
+  $('change').addEventListener('click', openSetup);
+  $('menu').addEventListener('click', openSetup);
+  els.speed.addEventListener('click', () => {
+    settings.fast = !settings.fast;
+    if (game) game.fast = settings.fast;
+    els.speed.setAttribute('aria-pressed', String(settings.fast));
+    write(STORE.settings, settings);
+  });
+
+  // Test hook: lets automated checks rig the die, set up positions, run headless games and skip animations; harmless for players.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__ludo = {
+    get game() { return game; }, get stats() { return stats; }, settings,
+    rig(list) { rigged.push(...list); }, pace(v) { testPace = v; },
+    set(tokens, turn) { tokens.forEach((l, c) => { if (game.tokens[c] && l) game.tokens[c] = l.slice(); }); if (turn != null) game.turn = turn; game.sixes = 0; game.gen += 1; layout(); startTurn(); },
+    legalMoves, applyMove, aiChoose, simulate, danger, newGame,
+  };
+
+  // Idle board behind the start panel.
+  els.speed.setAttribute('aria-pressed', String(settings.fast));
+  game = { seats: settings.seats.slice(), rules: { ...settings.rules }, active: [0, 1, 2, 3], level: settings.level, fast: settings.fast, tokens: [0, 1, 2, 3].map(() => Array(settings.rules.tokens).fill(-1)), turn: 3, phase: 'idle', moves: [], choices: [], sel: -1, places: [], over: false, toks: [], rot: 0, gen: 0 };
+  game.seats = game.seats.map(s => s === 'off' ? 'cpu' : s);
+  drawBoard(game.rules);
+  buildTokens();
+  drawDie(6);
+  render();
+  game.over = true;
+  els.glow.hidden = true;
+  els.roll.disabled = true;
+  renderSetup();
+  els.resume.hidden = true;
+  els.start.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

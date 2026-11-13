@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Falling Blocks</title>
+<style>
+:root {
+  --bg: #071419;
+  --bg2: #0f3a44;
+  --panel: #0f2a33;
+  --panel2: #16404b;
+  --edge: #04100f;
+  --text: #eefcf8;
+  --muted: #8db8b2;
+  --accent: #ffd166;
+  --accent-dark: #c99a2e;
+  --mint: #4ff3c6;
+  --mint-dark: #1fae8a;
+  --danger: #ff5d73;
+  --cell: 20px;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- Layout: portrait stacks HUD over [hold | well | next]; wide frames use side columns ---------- */
+.app { position: relative; height: 100%; max-width: 620px; margin: auto; display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1fr) var(--wellw, 60%) minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top top top" "hud hud hud" "hold well next" "extra well next" "pad pad pad";
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.top { grid-area: top; display: flex; align-items: center; gap: 8px; min-width: 0; }
+h1 { flex: 1; min-width: 0; font-size: clamp(20px, 6.6vw, 28px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+h1 span { color: var(--mint); }
+.mode-chip { flex: 0 1 auto; min-width: 0; padding: 5px 10px; border-radius: 99px; background: var(--panel2); color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 13px; background: var(--panel); display: grid; place-items: center; box-shadow: 0 3px 0 var(--edge); }
+.icon-btn svg { width: 16px; height: 16px; fill: var(--text); }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
+
+.hud { grid-area: hud; display: grid; grid-template-columns: 1.3fr 1fr .9fr 1.2fr; gap: 6px; }
+.stat { min-width: 0; padding: 5px 6px; border-radius: 12px; background: var(--panel); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+
+.cap { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.hold { grid-area: hold; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+.hold .fill { position: relative; width: 100%; height: 40px; }
+.hold canvas { position: absolute; top: 0; right: 0; }
+.next { grid-area: next; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; min-height: 0; }
+.next .fill { position: relative; flex: 1; width: 100%; min-height: 0; }
+.next canvas { position: absolute; top: 0; left: 0; }
+.keys { display: none; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.extra { grid-area: extra; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; min-height: 0; overflow: hidden; text-align: right; }
+.extra .row { display: none; }
+.extra .row.always { display: block; }
+.extra .row b { display: block; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.extra .row .cap { white-space: normal; }
+
+.well-wrap { grid-area: well; position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; touch-action: none; cursor: pointer; }
+#well { display: block; border-radius: 10px; }
+#well:focus, #well:focus-visible { outline: none; }
+.callout { position: absolute; left: 0; right: 0; top: 24%; display: grid; justify-items: center; gap: 2px; text-align: center; pointer-events: none; opacity: 0; }
+.callout b { max-width: 96%; padding: 2px 8px; font-size: max(15px, calc(var(--cell) * .95)); font-weight: 900; line-height: 1.1; color: #fff; text-shadow: 0 2px 0 #0009, 0 0 16px var(--glow, #4ff3c6); }
+.callout b.gold { color: var(--accent); }
+.callout span { font-size: max(13px, calc(var(--cell) * .75)); font-weight: 900; color: var(--accent); text-shadow: 0 2px 0 #0009; }
+.callout.show { animation: callout 1.3s ease-out forwards; }
+@keyframes callout { 0% { opacity: 0; transform: scale(.7); } 12% { opacity: 1; transform: scale(1.06); } 22% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+.count { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-size: max(30px, calc(var(--cell) * 2.1)); font-weight: 900; letter-spacing: -.02em; color: #fff; text-shadow: 0 4px 0 #0008, 0 0 24px #4ff3c6aa; }
+.count[hidden] { display: none; }
+.count.pop { animation: count .55s ease-out both; }
+@keyframes count { from { opacity: 0; transform: scale(1.6); } to { opacity: 1; transform: scale(1); } }
+
+.pad { grid-area: pad; display: flex; justify-content: center; gap: 6px; }
+.grp { display: contents; }
+.grp.act > :first-child { margin-left: 8px; }
+.pbtn { flex: 1 1 0; min-width: 0; max-width: 64px; height: 46px; border-radius: 14px; background: var(--panel2); color: var(--text); display: grid; place-items: center; box-shadow: 0 3px 0 var(--edge); touch-action: none; }
+.pbtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.pbtn.hard { background: var(--mint-dark); }
+.pbtn.on { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); filter: brightness(1.25); }
+.app.no-pad .pad { display: none; }
+
+/* ---------- Panels ---------- */
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); background: #04101499; backdrop-filter: blur(2px); }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 22px 18px 18px; border-radius: 24px; background: var(--panel); text-align: center; box-shadow: 0 0 0 1px #ffffff17, 0 22px 50px #000b; animation: pop-in .28s ease-out; }
+@keyframes pop-in { from { transform: translateY(16px); opacity: 0; } }
+.logo-blocks { display: flex; justify-content: center; gap: 4px; margin-bottom: 8px; }
+.logo-blocks i { width: 16px; height: 16px; border-radius: 4px; background: var(--c); box-shadow: inset 0 -3px 0 #0004, inset 0 2px 0 #fff6; }
+.logo-blocks i:nth-child(2n) { transform: translateY(-5px); }
+.panel h2 { font-size: clamp(26px, 8vw, 34px); font-weight: 900; letter-spacing: -.03em; line-height: 1.1; }
+.panel h2 span { color: var(--mint); }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.mode { display: grid; justify-items: center; align-content: center; gap: 1px; min-width: 0; min-height: 78px; padding: 9px 6px; border-radius: 16px; background: var(--c); color: #082028; box-shadow: 0 4px 0 var(--d); }
+.mode b { font-size: 17px; font-weight: 900; line-height: 1.15; }
+.mode small { font-size: 11.5px; font-weight: 700; line-height: 1.2; opacity: .85; }
+.mode em { margin-top: 3px; padding: 1px 8px; border-radius: 99px; background: #0000001f; font-style: normal; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mode:active, .cta:active, .btn:active { transform: translateY(3px); box-shadow: none; }
+.lvl { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.step { width: 36px; height: 36px; border-radius: 11px; background: var(--panel2); color: var(--text); font-size: 20px; font-weight: 900; line-height: 1; }
+.step:disabled { opacity: .35; cursor: default; }
+.lvl output { min-width: 28px; font-size: 20px; font-weight: 900; color: var(--text); font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.cta { flex: 1 1 100%; min-height: 48px; padding: 12px; border-radius: 16px; background: var(--accent); color: #2a1c02; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.btn { flex: 1 1 120px; min-height: 42px; padding: 9px 10px; border-radius: 14px; background: var(--panel2); color: var(--text); font-size: 15px; font-weight: 800; box-shadow: 0 4px 0 var(--edge); }
+.btn[hidden], .cta[hidden] { display: none; }
+.badge { display: inline-block; margin-top: 10px; padding: 4px 14px; border-radius: 99px; background: var(--accent); color: #2a1c02 !important; font-size: 13px !important; font-weight: 800; }
+.badge[hidden] { display: none; }
+.result { color: var(--text) !important; font-size: 24px !important; font-weight: 900; font-variant-numeric: tabular-nums; }
+.sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.sum div { padding: 6px 8px; border-radius: 12px; background: #ffffff0d; text-align: left; min-width: 0; }
+.sum dt { font-size: 10.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.sum dd { font-size: 16px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.set { display: grid; gap: 10px; margin-top: 14px; text-align: left; }
+.set label, .set .lab { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; font-weight: 800; }
+.set output { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.set input[type=range] { width: 100%; margin-top: 4px; accent-color: var(--mint); height: 26px; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 5px; }
+.seg button, .tog { min-height: 34px; border-radius: 10px; background: var(--panel2); font-size: 13px; font-weight: 800; }
+.seg button[aria-pressed="true"] { background: var(--mint); color: #062018; }
+.tog { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 12px; text-align: left; }
+.tog b { flex: 0 0 auto; padding: 2px 9px; border-radius: 99px; background: #ffffff1c; color: var(--muted); font-size: 11.5px; }
+.tog[aria-pressed="true"] b { background: var(--mint); color: #062018; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 360px) {
+  .hud { gap: 4px; }
+  .stat { padding: 4px 4px; }
+  .stat strong { font-size: 16px; }
+  .stat small { letter-spacing: 0; }
+}
+@media (max-height: 560px) {
+  .panel { padding: 16px 16px 14px; }
+  .panel h2 { font-size: 26px; }
+  .logo-blocks { display: none; }
+  .panel p { font-size: 13px; }
+  .modes { margin-top: 10px; }
+  .mode { min-height: 64px; padding: 6px; }
+  .cta { min-height: 42px; padding: 9px; }
+}
+
+/* ---------- Wide frames: well at full height in the middle, side panels for HUD ---------- */
+@media (min-aspect-ratio: 1/1) {
+  .app { max-width: none; column-gap: clamp(12px, 2.4vw, 32px); row-gap: 10px;
+    grid-template-columns: minmax(0, 1fr) var(--wellw, 46vh) minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "top well next" "hud well next" "hold well next" "extra well next" "pmove well pact"; }
+  .top, .hud, .hold, .extra, .grp.move { justify-self: end; width: min(100%, 320px); }
+  .next, .grp.act { justify-self: start; width: min(100%, 320px); }
+  .top { flex-wrap: wrap; row-gap: 6px; }
+  h1 { flex: 1 0 100%; font-size: clamp(22px, 4.2vh, 36px); }
+  .mode-chip { flex: 0 1 auto; margin-right: auto; }
+  .hud { grid-template-columns: 1fr 1fr; }
+  .stat { text-align: left; padding: 6px 10px; }
+  .stat strong { font-size: clamp(18px, 3vh, 26px); }
+  .hold { align-items: flex-start; }
+  .hold canvas { left: 0; right: auto; }
+  .extra { align-items: stretch; text-align: left; gap: 0; padding: 4px 0; }
+  .extra .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 2px; border-bottom: 1px solid #ffffff12; }
+  .extra .row .cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .extra .row b { font-size: 15px; }
+  .keys { display: block; }
+  .pad { display: contents; }
+  .grp { display: flex; gap: 8px; }
+  .grp.move { grid-area: pmove; }
+  .grp.act { grid-area: pact; }
+  .grp.act > :first-child { margin-left: 0; }
+  .pbtn { height: 52px; max-width: 72px; }
+  .panel.wide-ok { width: min(100%, 640px); }
+  .panel.wide-ok .modes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .panel.wide-ok .sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-aspect-ratio: 1/1) and (max-height: 500px) {
+  .extra .row:not(.always) { display: none; }
+  .keys { font-size: 11px; line-height: 1.4; }
+}
+@media (min-aspect-ratio: 1/1) and (max-height: 460px) {
+  .app { row-gap: 6px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 20px; flex: 1 1 auto; }
+  .top { flex-wrap: nowrap; }
+  .mode-chip { flex: 0 1 auto; padding: 4px 8px; font-size: 11px; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 11px; }
+  .hud { gap: 4px; }
+  .stat { padding: 3px 8px; }
+  .stat strong { font-size: 16px; line-height: 1.15; }
+  .extra .row { padding: 2px; }
+  .extra .row b { font-size: 13px; }
+  .keys { display: none; }
+  .pbtn { height: 44px; }
+  .overlay { padding: 6px; }
+  .panel { padding: 12px 14px; border-radius: 18px; }
+  .panel h2 { font-size: 22px; }
+  .panel p { margin-top: 4px; font-size: 13px; }
+  .logo-blocks { display: none; }
+  .modes { margin-top: 8px; }
+  .mode { min-height: 56px; }
+  .mode small { font-size: 11px; }
+  .lvl { margin-top: 8px; }
+  .actions { margin-top: 8px; }
+  .set { gap: 6px; margin-top: 8px; }
+  .cta { flex: 2 1 160px; min-height: 40px; font-size: 16px; }
+  .btn { min-height: 40px; padding: 7px 10px; }
+  .result { font-size: 20px !important; }
+  .badge { margin-top: 4px; }
+  .sum { gap: 4px; margin-top: 6px; }
+  .sum div { padding: 3px 8px; }
+  .sum dd { font-size: 14px; }
+  #settings .panel { width: min(100%, 640px); }
+  .set { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .seg button, .tog { min-height: 32px; }
+}
+@media (min-aspect-ratio: 1/1) and (max-height: 460px) and (max-width: 700px) {
+  .mode-chip { display: none; }
+}
+@media (min-aspect-ratio: 1/1) and (max-height: 340px) {
+  .extra { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .callout.show { opacity: 1; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <div class="top">
+    <h1>Falling <span>Blocks</span></h1>
+    <span class="mode-chip" id="mode-chip"></span>
+    <button type="button" class="icon-btn" id="pause-btn" data-i18n-label="pause"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1.2"/><rect x="9.4" y="2" width="3.6" height="12" rx="1.2"/></svg></button>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="v-score">0</strong></div>
+    <div class="stat"><small id="l-lines" data-i18n="lines"></small><strong id="v-lines">0</strong></div>
+    <div class="stat"><small data-i18n="level"></small><strong id="v-level">1</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="v-time">0:00</strong></div>
+  </div>
+  <div class="hold"><span class="cap" data-i18n="hold"></span><div class="fill" id="hold-fill"><canvas id="hold-cv" role="img"></canvas></div></div>
+  <div class="extra" id="extra">
+    <div class="row always"><span class="cap" data-i18n="best"></span><b id="x-best">—</b></div>
+    <div class="row"><span class="cap" data-i18n="pieces"></span><b id="x-pieces">0</b></div>
+    <div class="row"><span class="cap" data-i18n="pps"></span><b id="x-pps">0.00</b></div>
+    <div class="row"><span class="cap" data-i18n="tspins"></span><b id="x-tspins">0</b></div>
+    <div class="row"><span class="cap" data-i18n="quads"></span><b id="x-quads">0</b></div>
+    <div class="row"><span class="cap" data-i18n="maxCombo"></span><b id="x-combo">0</b></div>
+  </div>
+  <div class="well-wrap" id="wrap">
+    <canvas id="well" tabindex="0" role="img" data-i18n-label="well"></canvas>
+    <div class="callout" id="callout" aria-hidden="true"></div>
+    <div class="count" id="count" aria-hidden="true" hidden></div>
+  </div>
+  <div class="next"><span class="cap" data-i18n="next"></span><div class="fill" id="next-fill"><canvas id="next-cv" role="img"></canvas></div><p class="keys" data-i18n="keys"></p></div>
+  <div class="pad" id="pad">
+    <div class="grp move">
+      <button type="button" class="pbtn" data-act="left" data-i18n-label="mvL"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button type="button" class="pbtn" data-act="down" data-i18n-label="soft"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg></button>
+      <button type="button" class="pbtn" data-act="right" data-i18n-label="mvR"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <div class="grp act">
+      <button type="button" class="pbtn" data-act="hold" data-i18n-label="holdBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M8 3h8"/></svg></button>
+      <button type="button" class="pbtn" data-act="ccw" data-i18n-label="rotL"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4L4 8l4 4"/><path d="M4 8h9a6 6 0 1 1-6 6"/></svg></button>
+      <button type="button" class="pbtn" data-act="cw" data-i18n-label="rotR"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4l4 4-4 4"/><path d="M20 8h-9a6 6 0 1 0 6 6"/></svg></button>
+      <button type="button" class="pbtn hard" data-act="hard" data-i18n-label="hard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5l6 6 6-6"/><path d="M6 12l6 6 6-6"/></svg></button>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="menu">
+  <div class="panel wide-ok" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="logo-blocks" aria-hidden="true"><i style="--c:#38d6f2"></i><i style="--c:#ffd23f"></i><i style="--c:#b36df2"></i><i style="--c:#55d46c"></i><i style="--c:#ff5468"></i><i style="--c:#4d7cff"></i><i style="--c:#ff9a3c"></i></div>
+    <h2 id="menu-title">Falling <span>Blocks</span></h2>
+    <p data-i18n="tagline"></p>
+    <div class="modes">
+      <button type="button" class="mode" id="play-marathon" data-mode="marathon" style="--c:#4ff3c6;--d:#1fae8a"><b data-i18n="marathon"></b><small data-i18n="marathonD"></small><em></em></button>
+      <button type="button" class="mode" id="play-sprint" data-mode="sprint" style="--c:#ffd166;--d:#c99a2e"><b data-i18n="sprint"></b><small data-i18n="sprintD"></small><em></em></button>
+      <button type="button" class="mode" id="play-ultra" data-mode="ultra" style="--c:#ff8fa3;--d:#d0566c"><b data-i18n="ultra"></b><small data-i18n="ultraD"></small><em></em></button>
+      <button type="button" class="mode" id="play-zen" data-mode="zen" style="--c:#9fb8ff;--d:#6380d6"><b data-i18n="zen"></b><small data-i18n="zenD"></small><em></em></button>
+    </div>
+    <div class="lvl"><span data-i18n="startLevel"></span><button type="button" class="step" id="lvl-down" data-i18n-label="lvlDown">−</button><output id="lvl-out">1</output><button type="button" class="step" id="lvl-up" data-i18n-label="lvlUp">+</button></div>
+    <div class="actions"><button type="button" class="btn" id="menu-settings" data-i18n="settings"></button></div>
+    <p class="small" id="menu-help"></p>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused"></h2>
+    <p class="small" id="pause-help"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+      <button type="button" class="btn" id="p-restart" data-i18n="restart"></button>
+      <button type="button" class="btn" id="p-settings" data-i18n="settings"></button>
+      <button type="button" class="btn" id="p-end" data-i18n="endZen" hidden></button>
+      <button type="button" class="btn" id="p-modes" data-i18n="modes"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settings" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="set-title">
+    <h2 id="set-title" data-i18n="settings"></h2>
+    <div class="set">
+      <div><label for="s-das"><span data-i18n="das"></span><output id="o-das"></output></label><input type="range" id="s-das" min="50" max="300" step="10"></div>
+      <div><label for="s-arr"><span data-i18n="arr"></span><output id="o-arr"></output></label><input type="range" id="s-arr" min="0" max="100" step="5"></div>
+      <div><span class="lab" id="sdf-lab" data-i18n="sdf"></span><div class="seg" role="group" aria-labelledby="sdf-lab"><button type="button" data-sdf="10">×10</button><button type="button" data-sdf="20">×20</button><button type="button" data-sdf="40">×40</button><button type="button" data-sdf="0" data-i18n="instant"></button></div></div>
+      <button type="button" class="tog" id="t-ghost"><span data-i18n="ghost"></span><b></b></button>
+      <button type="button" class="tog" id="t-pad"><span data-i18n="pad"></span><b></b></button>
+      <button type="button" class="tog" id="t-grid"><span data-i18n="grid"></span><b></b></button>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" id="s-reset" data-i18n="reset"></button>
+      <button type="button" class="cta" id="s-done" data-i18n="done"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel wide-ok" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <h2 id="over-title"></h2>
+    <p id="over-sub"></p>
+    <p class="result" id="over-result"></p>
+    <p class="badge" id="over-best-badge" data-i18n="newBest" hidden></p>
+    <p class="small" id="over-best"></p>
+    <dl class="sum" id="over-sum"></dl>
+    <div class="actions">
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+      <button type="button" class="btn" id="o-modes" data-i18n="modes"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Rotate and slide the falling pieces to complete rows. Chain combos, land T-spins and keep the stack low!',
+      marathon: 'Marathon', marathonD: '150 lines · 15 levels', sprint: 'Sprint', sprintD: 'Clear 40 lines fast', ultra: 'Ultra', ultraD: 'Top score in 2 min', zen: 'Zen', zenD: 'Relax · no game over',
+      best: 'Best', startLevel: 'Start level', lvlDown: 'Lower start level', lvlUp: 'Raise start level', settings: 'Settings',
+      keys: '← → move · ↓ soft drop · Space hard drop · ↑ / X rotate right · Z rotate left · C hold · P pause',
+      touch: 'Drag to move · tap the left or right half to rotate · flick down to drop · swipe up to hold',
+      score: 'Score', lines: 'Lines', left: 'Left', level: 'Level', time: 'Time', hold: 'Hold', next: 'Next',
+      pieces: 'Pieces', pps: 'Pieces/sec', tspins: 'T-spins', quads: 'Quads', maxCombo: 'Max combo',
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', restart: 'Restart', modes: 'Change mode', endZen: 'End session',
+      das: 'Auto-shift delay (DAS)', arr: 'Auto-repeat rate (ARR)', sdf: 'Soft drop speed', instant: 'Instant', ghost: 'Ghost piece', pad: 'On-screen buttons', grid: 'Grid lines', on: 'On', off: 'Off', reset: 'Reset defaults', done: 'Done',
+      over: 'Game over', overText: 'The stack reached the top.', sprintFail: 'The stack reached the top before 40 lines.', winMarathon: 'Marathon complete!', winSprint: 'Sprint complete!', ultraEnd: 'Time’s up!', zenEnd: 'Session over',
+      newBest: 'New best!', bestIs: v => `Best: ${v}`, again: 'Play again', ready: 'Ready', go: 'Go!',
+      clears: ['', 'Single', 'Double', 'Triple', 'Quad'], tspin: (n, mini) => `${mini ? 'Mini ' : ''}T-Spin${['', ' Single', ' Double', ' Triple'][n]}`,
+      b2b: 'Back-to-Back', combo: n => `Combo ×${n}`, allClear: 'All Clear!', levelUp: n => `Level ${n}`, fresh: 'Board cleared — keep going!',
+      well: 'Playfield, 10 columns by 20 rows', mvL: 'Move left', mvR: 'Move right', soft: 'Soft drop', hard: 'Hard drop', rotL: 'Rotate left', rotR: 'Rotate right', holdBtn: 'Hold piece',
+      linesOf: n => `${n} lines`, started: m => `${m} started`,
+    },
+    vi: {
+      tagline: 'Xoay và dịch các khối đang rơi để lấp kín hàng ngang. Nối combo, tung T-spin và giữ chồng khối thật thấp!',
+      marathon: 'Marathon', marathonD: '150 hàng · 15 cấp', sprint: 'Nước rút', sprintD: 'Xóa 40 hàng nhanh nhất', ultra: 'Ultra', ultraD: 'Điểm cao nhất trong 2 phút', zen: 'Zen', zenD: 'Thư giãn · không bao giờ thua',
+      best: 'Kỷ lục', startLevel: 'Cấp bắt đầu', lvlDown: 'Giảm cấp bắt đầu', lvlUp: 'Tăng cấp bắt đầu', settings: 'Cài đặt',
+      keys: '← → di chuyển · ↓ thả chậm · Space thả nhanh · ↑ / X xoay phải · Z xoay trái · C giữ khối · P tạm dừng',
+      touch: 'Kéo để di chuyển · chạm nửa trái hoặc phải để xoay · vuốt nhanh xuống để thả · vuốt lên để giữ khối',
+      score: 'Điểm', lines: 'Hàng', left: 'Còn lại', level: 'Cấp', time: 'Thời gian', hold: 'Giữ', next: 'Tiếp',
+      pieces: 'Số khối', pps: 'Khối/giây', tspins: 'T-spin', quads: 'Bốn hàng', maxCombo: 'Combo cao nhất',
+      pause: 'Tạm dừng', paused: 'Đang tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', modes: 'Đổi chế độ', endZen: 'Kết thúc lượt',
+      das: 'Độ trễ tự trượt (DAS)', arr: 'Tốc độ lặp (ARR)', sdf: 'Tốc độ thả chậm', instant: 'Tức thì', ghost: 'Bóng khối', pad: 'Nút trên màn hình', grid: 'Đường lưới', on: 'Bật', off: 'Tắt', reset: 'Khôi phục mặc định', done: 'Xong',
+      over: 'Kết thúc', overText: 'Chồng khối đã chạm đỉnh.', sprintFail: 'Chồng khối chạm đỉnh trước khi xóa đủ 40 hàng.', winMarathon: 'Hoàn thành Marathon!', winSprint: 'Về đích Nước rút!', ultraEnd: 'Hết giờ!', zenEnd: 'Kết thúc lượt chơi',
+      newBest: 'Kỷ lục mới!', bestIs: v => `Kỷ lục: ${v}`, again: 'Chơi lại', ready: 'Sẵn sàng', go: 'Bắt đầu!',
+      clears: ['', 'Một hàng', 'Hai hàng', 'Ba hàng', 'Bốn hàng'], tspin: (n, mini) => `T-spin${mini ? ' mini' : ''}${['', ' một hàng', ' hai hàng', ' ba hàng'][n]}`,
+      b2b: 'Liên hoàn', combo: n => `Combo ×${n}`, allClear: 'Sạch bảng!', levelUp: n => `Cấp ${n}`, fresh: 'Đã dọn sạch bảng, chơi tiếp nào!',
+      well: 'Khu vực chơi, 10 cột × 20 hàng', mvL: 'Sang trái', mvR: 'Sang phải', soft: 'Thả chậm', hard: 'Thả nhanh', rotL: 'Xoay trái', rotR: 'Xoay phải', holdBtn: 'Giữ khối',
+      linesOf: n => `${n} hàng`, started: m => `Bắt đầu ${m}`,
+    },
+    zh: {
+      tagline: '旋转、平移下落的方块，填满整行即可消除。打出连击和 T 旋，把方块堆得越低越好！',
+      marathon: '马拉松', marathonD: '150 行 · 15 级', sprint: '冲刺', sprintD: '最快消除 40 行', ultra: '限时', ultraD: '2 分钟冲高分', zen: '禅', zenD: '轻松玩 · 永不结束',
+      best: '最佳', startLevel: '起始等级', lvlDown: '降低起始等级', lvlUp: '提高起始等级', settings: '设置',
+      keys: '← → 移动 · ↓ 软降 · 空格 硬降 · ↑ / X 右转 · Z 左转 · C 暂存 · P 暂停',
+      touch: '拖动移动 · 点左/右半边旋转 · 向下快划直落 · 上划暂存',
+      score: '得分', lines: '行数', left: '剩余', level: '等级', time: '时间', hold: '暂存', next: '下一个',
+      pieces: '方块数', pps: '每秒方块', tspins: 'T 旋', quads: '四消', maxCombo: '最高连击',
+      pause: '暂停', paused: '已暂停', resume: '继续', restart: '重新开始', modes: '换模式', endZen: '结束本局',
+      das: '自动移动延迟 (DAS)', arr: '自动重复间隔 (ARR)', sdf: '软降速度', instant: '瞬间', ghost: '落点预览', pad: '屏幕按键', grid: '网格线', on: '开', off: '关', reset: '恢复默认', done: '完成',
+      over: '游戏结束', overText: '方块堆到顶了。', sprintFail: '还没消完 40 行，方块就堆到顶了。', winMarathon: '马拉松完成！', winSprint: '冲刺完成！', ultraEnd: '时间到！', zenEnd: '本局结束',
+      newBest: '新纪录！', bestIs: v => `最佳：${v}`, again: '再玩一次', ready: '准备', go: '开始！',
+      clears: ['', '单消', '双消', '三消', '四消'], tspin: (n, mini) => `${mini ? '迷你 ' : ''}T 旋${['', '单消', '双消', '三消'][n]}`,
+      b2b: '连续高难', combo: n => `${n} 连击`, allClear: '全部清空！', levelUp: n => `等级 ${n}`, fresh: '场地已清空，继续加油！',
+      well: '游戏区，10 列 × 20 行', mvL: '左移', mvR: '右移', soft: '软降', hard: '硬降', rotL: '向左旋转', rotR: '向右旋转', holdBtn: '暂存方块',
+      linesOf: n => `${n} 行`, started: m => `${m}模式开始`,
+    },
+    fr: {
+      tagline: 'Faites pivoter et glisser les pièces qui tombent pour compléter des lignes. Enchaînez les combos, réussissez des T-spins et gardez la pile basse !',
+      marathon: 'Marathon', marathonD: '150 lignes · 15 niveaux', sprint: 'Sprint', sprintD: '40 lignes au plus vite', ultra: 'Ultra', ultraD: 'Meilleur score en 2 min', zen: 'Zen', zenD: 'Détente · jamais perdu',
+      best: 'Record', startLevel: 'Niveau de départ', lvlDown: 'Baisser le niveau de départ', lvlUp: 'Monter le niveau de départ', settings: 'Réglages',
+      keys: '← → déplacer · ↓ chute douce · Espace chute rapide · ↑ / X tourner à droite · Z tourner à gauche · C réserve · P pause',
+      touch: 'Glissez pour déplacer · touchez la moitié gauche ou droite pour tourner · lancez vers le bas pour lâcher · balayez vers le haut pour la réserve',
+      score: 'Score', lines: 'Lignes', left: 'Reste', level: 'Niveau', time: 'Temps', hold: 'Réserve', next: 'Suite',
+      pieces: 'Pièces', pps: 'Pièces/s', tspins: 'T-spins', quads: 'Quadruples', maxCombo: 'Combo max',
+      pause: 'Pause', paused: 'En pause', resume: 'Reprendre', restart: 'Recommencer', modes: 'Changer de mode', endZen: 'Terminer la session',
+      das: 'Délai avant répétition (DAS)', arr: 'Vitesse de répétition (ARR)', sdf: 'Vitesse de chute douce', instant: 'Immédiat', ghost: 'Pièce fantôme', pad: 'Boutons à l’écran', grid: 'Quadrillage', on: 'Oui', off: 'Non', reset: 'Valeurs par défaut', done: 'OK',
+      over: 'Partie terminée', overText: 'La pile a atteint le sommet.', sprintFail: 'La pile a atteint le sommet avant les 40 lignes.', winMarathon: 'Marathon terminé !', winSprint: 'Sprint terminé !', ultraEnd: 'Temps écoulé !', zenEnd: 'Session terminée',
+      newBest: 'Nouveau record !', bestIs: v => `Record : ${v}`, again: 'Rejouer', ready: 'Prêts ?', go: 'Partez !',
+      clears: ['', 'Simple', 'Double', 'Triple', 'Quadruple'], tspin: (n, mini) => `T-spin${mini ? ' mini' : ''}${['', ' simple', ' double', ' triple'][n]}`,
+      b2b: 'Back-to-Back', combo: n => `Combo ×${n}`, allClear: 'Grille vidée !', levelUp: n => `Niveau ${n}`, fresh: 'Grille remise à zéro, on continue !',
+      well: 'Aire de jeu, 10 colonnes sur 20 lignes', mvL: 'Déplacer à gauche', mvR: 'Déplacer à droite', soft: 'Chute douce', hard: 'Chute rapide', rotL: 'Tourner à gauche', rotR: 'Tourner à droite', holdBtn: 'Mettre en réserve',
+      linesOf: n => `${n} lignes`, started: m => `${m} : c’est parti`,
+    },
+    th: {
+      tagline: 'หมุนและเลื่อนบล็อกที่ร่วงลงมาให้เต็มแถวเพื่อเคลียร์ ต่อคอมโบ ทำ T-Spin และอย่าปล่อยให้กองบล็อกสูงเกินไป!',
+      marathon: 'มาราธอน', marathonD: '150 แถว · 15 เลเวล', sprint: 'สปรินต์', sprintD: 'เคลียร์ 40 แถวให้เร็วที่สุด', ultra: 'อัลตร้า', ultraD: 'ทำแต้มสูงสุดใน 2 นาที', zen: 'เซน', zenD: 'เล่นชิล ๆ · ไม่มีวันแพ้',
+      best: 'สูงสุด', startLevel: 'เลเวลเริ่มต้น', lvlDown: 'ลดเลเวลเริ่มต้น', lvlUp: 'เพิ่มเลเวลเริ่มต้น', settings: 'ตั้งค่า',
+      keys: '← → เลื่อน · ↓ ดรอปช้า · Space ดรอปทันที · ↑ / X หมุนขวา · Z หมุนซ้าย · C เก็บ · P หยุดชั่วคราว',
+      touch: 'ลากเพื่อเลื่อน · แตะครึ่งซ้ายหรือขวาเพื่อหมุน · ปัดลงเร็ว ๆ เพื่อดรอป · ปัดขึ้นเพื่อเก็บ',
+      score: 'คะแนน', lines: 'แถว', left: 'เหลือ', level: 'เลเวล', time: 'เวลา', hold: 'เก็บ', next: 'ถัดไป',
+      pieces: 'จำนวนชิ้น', pps: 'ชิ้น/วินาที', tspins: 'T-Spin', quads: 'สี่แถว', maxCombo: 'คอมโบสูงสุด',
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', modes: 'เปลี่ยนโหมด', endZen: 'จบรอบนี้',
+      das: 'หน่วงก่อนเลื่อนอัตโนมัติ (DAS)', arr: 'ความถี่เลื่อนซ้ำ (ARR)', sdf: 'ความเร็วดรอปช้า', instant: 'ทันที', ghost: 'เงาจุดตก', pad: 'ปุ่มบนจอ', grid: 'เส้นตาราง', on: 'เปิด', off: 'ปิด', reset: 'คืนค่าเริ่มต้น', done: 'เสร็จสิ้น',
+      over: 'จบเกม', overText: 'บล็อกกองจนถึงด้านบนแล้ว', sprintFail: 'บล็อกกองถึงด้านบนก่อนเคลียร์ครบ 40 แถว', winMarathon: 'พิชิตมาราธอนแล้ว!', winSprint: 'สปรินต์สำเร็จ!', ultraEnd: 'หมดเวลา!', zenEnd: 'จบรอบแล้ว',
+      newBest: 'สถิติใหม่!', bestIs: v => `สูงสุด: ${v}`, again: 'เล่นอีกครั้ง', ready: 'เตรียมตัว', go: 'ไป!',
+      clears: ['', 'ซิงเกิล', 'ดับเบิล', 'ทริปเปิล', 'สี่แถว'], tspin: (n, mini) => `T-Spin${mini ? ' มินิ' : ''}${['', ' ซิงเกิล', ' ดับเบิล', ' ทริปเปิล'][n]}`,
+      b2b: 'แบ็กทูแบ็ก', combo: n => `คอมโบ ×${n}`, allClear: 'เคลียร์หมดกระดาน!', levelUp: n => `เลเวล ${n}`, fresh: 'ล้างกระดานแล้ว เล่นต่อได้เลย!',
+      well: 'พื้นที่เล่น 10 คอลัมน์ × 20 แถว', mvL: 'เลื่อนซ้าย', mvR: 'เลื่อนขวา', soft: 'ดรอปช้า', hard: 'ดรอปทันที', rotL: 'หมุนซ้าย', rotR: 'หมุนขวา', holdBtn: 'เก็บบล็อก',
+      linesOf: n => `${n} แถว`, started: m => `เริ่มโหมด${m}`,
+    },
+    ja: {
+      tagline: '落ちてくるブロックを回転・移動して横一列をそろえて消そう。コンボやTスピンを決めて、積み上がりを低く保とう！',
+      marathon: 'マラソン', marathonD: '150ライン · 15レベル', sprint: 'スプリント', sprintD: '40ラインを最速で', ultra: 'ウルトラ', ultraD: '2分間でハイスコア', zen: 'ゼン', zenD: 'のんびり · ゲームオーバーなし',
+      best: 'ベスト', startLevel: '開始レベル', lvlDown: '開始レベルを下げる', lvlUp: '開始レベルを上げる', settings: '設定',
+      keys: '← → 移動 · ↓ ソフトドロップ · スペース ハードドロップ · ↑ / X 右回転 · Z 左回転 · C ホールド · P 一時停止',
+      touch: 'ドラッグで移動 · 左右半分をタップで回転 · 下にはじいて落下 · 上スワイプでホールド',
+      score: 'スコア', lines: 'ライン', left: '残り', level: 'レベル', time: 'タイム', hold: 'ホールド', next: 'ネクスト',
+      pieces: 'ピース', pps: 'ピース/秒', tspins: 'Tスピン', quads: '4ライン消し', maxCombo: '最大コンボ',
+      pause: '一時停止', paused: '一時停止中', resume: '再開', restart: 'やり直す', modes: 'モード選択', endZen: '終了する',
+      das: '横移動の溜め (DAS)', arr: 'リピート間隔 (ARR)', sdf: 'ソフトドロップ速度', instant: '瞬時', ghost: 'ゴースト表示', pad: '画面ボタン', grid: 'グリッド線', on: 'オン', off: 'オフ', reset: '初期設定に戻す', done: '完了',
+      over: 'ゲームオーバー', overText: 'ブロックが一番上まで積み上がった。', sprintFail: '40ラインを消す前に積み上がってしまった。', winMarathon: 'マラソン達成！', winSprint: 'スプリント達成！', ultraEnd: 'タイムアップ！', zenEnd: 'セッション終了',
+      newBest: '自己ベスト更新！', bestIs: v => `ベスト：${v}`, again: 'もう一度', ready: 'レディ', go: 'ゴー！',
+      clears: ['', 'シングル', 'ダブル', 'トリプル', '4ライン消し'], tspin: (n, mini) => `Tスピン${mini ? 'ミニ' : ''}${['', ' シングル', ' ダブル', ' トリプル'][n]}`,
+      b2b: 'バック・トゥ・バック', combo: n => `${n} コンボ`, allClear: 'オールクリア！', levelUp: n => `レベル ${n}`, fresh: '盤面リセット、このまま続けよう！',
+      well: 'プレイフィールド（10列×20段）', mvL: '左へ移動', mvR: '右へ移動', soft: 'ソフトドロップ', hard: 'ハードドロップ', rotL: '左回転', rotR: '右回転', holdBtn: 'ホールド',
+      linesOf: n => `${n} ライン`, started: m => `${m} スタート`,
+    },
+    ko: {
+      tagline: '떨어지는 블록을 돌리고 옮겨 가로줄을 채워 지우세요. 콤보와 T-스핀을 노리고 블록 더미를 낮게 유지하세요!',
+      marathon: '마라톤', marathonD: '150줄 · 15레벨', sprint: '스프린트', sprintD: '40줄을 최대한 빨리', ultra: '울트라', ultraD: '2분 동안 최고 점수', zen: '젠', zenD: '느긋하게 · 게임 오버 없음',
+      best: '최고', startLevel: '시작 레벨', lvlDown: '시작 레벨 낮추기', lvlUp: '시작 레벨 높이기', settings: '설정',
+      keys: '← → 이동 · ↓ 소프트 드롭 · Space 하드 드롭 · ↑ / X 오른쪽 회전 · Z 왼쪽 회전 · C 홀드 · P 일시정지',
+      touch: '드래그로 이동 · 왼쪽/오른쪽 절반을 탭해 회전 · 아래로 튕겨 드롭 · 위로 스와이프해 홀드',
+      score: '점수', lines: '줄', left: '남은 줄', level: '레벨', time: '시간', hold: '홀드', next: '다음',
+      pieces: '블록 수', pps: '초당 블록', tspins: 'T-스핀', quads: '4줄 클리어', maxCombo: '최대 콤보',
+      pause: '일시정지', paused: '일시정지', resume: '계속하기', restart: '다시 시작', modes: '모드 변경', endZen: '세션 끝내기',
+      das: '자동 이동 지연 (DAS)', arr: '자동 반복 간격 (ARR)', sdf: '소프트 드롭 속도', instant: '즉시', ghost: '고스트 블록', pad: '화면 버튼', grid: '격자선', on: '켬', off: '끔', reset: '기본값으로', done: '완료',
+      over: '게임 오버', overText: '블록이 맨 위까지 쌓였어요.', sprintFail: '40줄을 지우기 전에 블록이 꼭대기에 닿았어요.', winMarathon: '마라톤 완주!', winSprint: '스프린트 완료!', ultraEnd: '시간 종료!', zenEnd: '세션 종료',
+      newBest: '최고 기록!', bestIs: v => `최고: ${v}`, again: '다시 하기', ready: '준비', go: '시작!',
+      clears: ['', '싱글', '더블', '트리플', '4줄 클리어'], tspin: (n, mini) => `T-스핀${mini ? ' 미니' : ''}${['', ' 싱글', ' 더블', ' 트리플'][n]}`,
+      b2b: '백투백', combo: n => `${n} 콤보`, allClear: '올 클리어!', levelUp: n => `레벨 ${n}`, fresh: '판을 비웠어요. 계속 가요!',
+      well: '플레이 영역, 10열 × 20줄', mvL: '왼쪽으로 이동', mvR: '오른쪽으로 이동', soft: '소프트 드롭', hard: '하드 드롭', rotL: '왼쪽으로 회전', rotR: '오른쪽으로 회전', holdBtn: '블록 홀드',
+      linesOf: n => `${n}줄`, started: m => `${m} 시작`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const $ = id => document.getElementById(id);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const WIDE = matchMedia('(min-aspect-ratio: 1/1)');
+  const numFmt = new Intl.NumberFormat(document.documentElement.lang);
+  const fmt = n => numFmt.format(n);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- Storage ----------
+  const PREFIX = 'milaan.fallingBlocks.';
+  const load = (name, fallback) => { try { const raw = localStorage.getItem(PREFIX + name); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } };
+  const save = (name, value) => { try { localStorage.setItem(PREFIX + name, JSON.stringify(value)); } catch {} };
+  const DEFAULTS = { das: 160, arr: 30, sdf: 20, ghost: true, pad: coarse, grid: true };
+  const settings = Object.assign({}, DEFAULTS, load('settings', {}));
+  const bests = Object.assign({ marathon: 0, sprint: 0, ultra: 0, zen: 0 }, load('best', {}));
+  let startLevel = clamp(Number(load('startLevel', 1)) || 1, 1, 15);
+
+  // ---------- Rules ----------
+  const COLS = 10, ROWS = 22, HIDDEN = 2;
+  const LOCK_MS = 500, MAX_RESETS = 15, CLEAR_MS = reduced ? 90 : 240, READY_MS = 800;
+  const SPRINT_LINES = 40, MARATHON_LINES = 150, ULTRA_MS = 120000;
+  const COLORS = { I: '#38d6f2', J: '#4d7cff', L: '#ff9a3c', O: '#ffd23f', S: '#55d46c', T: '#b36df2', Z: '#ff5468', G: '#56707a' };
+  const BASE = { I: [[0, 1], [1, 1], [2, 1], [3, 1]], J: [[0, 0], [0, 1], [1, 1], [2, 1]], L: [[2, 0], [0, 1], [1, 1], [2, 1]], O: [[1, 0], [2, 0], [1, 1], [2, 1]], S: [[1, 0], [2, 0], [0, 1], [1, 1]], T: [[1, 0], [0, 1], [1, 1], [2, 1]], Z: [[0, 0], [1, 0], [1, 1], [2, 1]] };
+  const SHAPES = {};
+  for (const type of Object.keys(BASE)) {
+    const n = type === 'I' ? 4 : 3;
+    const states = [BASE[type]];
+    for (let r = 1; r < 4; r++) states.push(type === 'O' ? BASE.O : states[r - 1].map(([x, y]) => [n - 1 - y, x]));
+    SHAPES[type] = states;
+  }
+  // SRS wall kicks, written y-up as in the guideline tables (applied as y - ky on our y-down board).
+  const KICKS = {
+    '01': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]], '10': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+    '12': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]], '21': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+    '23': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]], '32': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+    '30': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]], '03': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  };
+  const KICKS_I = {
+    '01': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]], '10': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+    '12': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]], '21': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+    '23': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]], '32': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+    '30': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]], '03': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+  };
+  const gravityMs = level => 1000 * Math.pow(0.8 - (level - 1) * 0.007, level - 1);
+  const emptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(''));
+
+  const els = {
+    app: $('app'), wrap: $('wrap'), well: $('well'), holdCv: $('hold-cv'), nextCv: $('next-cv'), holdFill: $('hold-fill'), nextFill: $('next-fill'),
+    score: $('v-score'), lines: $('v-lines'), linesLabel: $('l-lines'), level: $('v-level'), time: $('v-time'), chip: $('mode-chip'),
+    best: $('x-best'), pieces: $('x-pieces'), pps: $('x-pps'), tspins: $('x-tspins'), quads: $('x-quads'), combo: $('x-combo'),
+    callout: $('callout'), count: $('count'), announcer: $('announcer'),
+    menu: $('menu'), pause: $('pause'), settings: $('settings'), over: $('over'),
+  };
+  const ctx = els.well.getContext('2d');
+  const hctx = els.holdCv.getContext('2d');
+  const nctx = els.nextCv.getContext('2d');
+  const announce = text => { els.announcer.textContent = text; };
+
+  let G = null;
+  const inp = { left: false, right: false, down: false, dir: 0, das: 0, arr: 0, charged: false };
+
+  function makeGame(mode) {
+    return {
+      mode, board: emptyBoard(), queue: [], cur: null, hold: null, holdUsed: false,
+      startLevel: mode === 'marathon' ? startLevel : 1, level: mode === 'marathon' ? startLevel : 1,
+      lines: 0, score: 0, combo: -1, b2b: false, time: 0, pieces: 0, tspins: 0, quads: 0, maxCombo: 0,
+      acc: 0, lockT: 0, resets: 0, lowest: 0, lastRot: false, lastKick: 0,
+      phase: 'ready', phaseT: 0, clearRows: [], pending: null, paused: false, result: null, overT: 0,
+      fx: [], shake: 0,
+    };
+  }
+
+  function refillQueue() {
+    while (G.queue.length < 7) {
+      const bag = [...'IJLOSTZ'];
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      G.queue.push(...bag);
+    }
+  }
+
+  function fits(type, rot, x, y) {
+    for (const [cx, cy] of SHAPES[type][rot]) {
+      const bx = x + cx, by = y + cy;
+      if (bx < 0 || bx >= COLS || by >= ROWS) return false;
+      if (by >= 0 && G.board[by][bx]) return false;
+    }
+    return true;
+  }
+  const cellsOf = p => SHAPES[p.type][p.rot].map(([cx, cy]) => [p.x + cx, p.y + cy]);
+  const grounded = () => !fits(G.cur.type, G.cur.rot, G.cur.x, G.cur.y + 1);
+  const ghostY = () => { let y = G.cur.y; while (fits(G.cur.type, G.cur.rot, G.cur.x, y + 1)) y++; return y; };
+
+  function spawn(type) {
+    refillQueue();
+    const kind = type || G.queue.shift();
+    refillQueue();
+    const p = { type: kind, rot: 0, x: 3, y: kind === 'I' ? -1 : 0 };
+    if (!fits(p.type, 0, p.x, p.y)) { topOut(kind); return; }
+    if (fits(p.type, 0, p.x, p.y + 1)) p.y++;
+    G.cur = p;
+    G.lowest = p.y; G.lockT = 0; G.resets = 0; G.lastRot = false; G.lastKick = 0; G.acc = 0;
+    drawSide();
+  }
+
+  // Successful moves or rotations on the ground restart the lock timer, at most MAX_RESETS times per piece.
+  function afterManeuver(wasGrounded) {
+    if (wasGrounded || grounded()) { if (G.resets < MAX_RESETS) G.lockT = 0; G.resets++; }
+  }
+
+  function shift(dir) {
+    const p = G.cur;
+    if (!p || G.phase !== 'play' || !fits(p.type, p.rot, p.x + dir, p.y)) return false;
+    const was = grounded();
+    p.x += dir;
+    G.lastRot = false;
+    afterManeuver(was);
+    return true;
+  }
+
+  function stepDown() {
+    const p = G.cur;
+    if (!fits(p.type, p.rot, p.x, p.y + 1)) return false;
+    p.y++;
+    G.lastRot = false;
+    if (p.y > G.lowest) { G.lowest = p.y; G.resets = 0; G.lockT = 0; }
+    return true;
+  }
+
+  function rotate(d) {
+    const p = G.cur;
+    if (!p || G.phase !== 'play') return false;
+    const to = (p.rot + d + 4) % 4;
+    if (p.type === 'O') { p.rot = to; return true; }
+    const kicks = (p.type === 'I' ? KICKS_I : KICKS)[`${p.rot}${to}`];
+    const was = grounded();
+    for (let i = 0; i < kicks.length; i++) {
+      const [kx, ky] = kicks[i];
+      if (!fits(p.type, to, p.x + kx, p.y - ky)) continue;
+      p.x += kx; p.y -= ky; p.rot = to;
+      G.lastRot = true; G.lastKick = i;
+      if (p.y > G.lowest) { G.lowest = p.y; G.resets = 0; G.lockT = 0; }
+      afterManeuver(was);
+      return true;
+    }
+    return false;
+  }
+
+  function hardDrop() {
+    const p = G.cur;
+    if (!p || G.phase !== 'play') return;
+    const from = p.y;
+    while (stepDown()) G.score += 2;
+    if (p.y > from && !reduced) G.fx.push({ kind: 'trail', cells: cellsOf(p), from, rows: p.y - from, color: COLORS[p.type], life: 1 });
+    G.shake = reduced ? 0 : 0.5;
+    lock();
+  }
+
+  function holdPiece() {
+    if (!G.cur || G.phase !== 'play' || G.holdUsed) return;
+    const type = G.cur.type;
+    const swap = G.hold;
+    G.hold = type;
+    G.holdUsed = true;
+    G.cur = null;
+    spawn(swap || undefined);
+    drawSide();
+  }
+
+  function lock() {
+    const p = G.cur;
+    const cells = cellsOf(p);
+    let allHidden = true;
+    for (const [x, y] of cells) { if (y >= 0) G.board[y][x] = p.type; if (y >= HIDDEN) allHidden = false; }
+    G.cur = null;
+    G.pieces++;
+    G.fx.push({ kind: 'flash', cells, life: 1 });
+    if (allHidden || cells.some(([, y]) => y < 0)) { topOut(null); return; }
+
+    // T-spin: 3 of the 4 diagonal corners around the T's centre are blocked; both "front" corners (or the last kick) make it a full spin.
+    let spin = 0;
+    if (p.type === 'T' && G.lastRot) {
+      const cx = p.x + 1, cy = p.y + 1;
+      const occ = (x, y) => x < 0 || x >= COLS || y >= ROWS || (y >= 0 && !!G.board[y][x]);
+      const corners = [occ(cx - 1, cy - 1), occ(cx + 1, cy - 1), occ(cx + 1, cy + 1), occ(cx - 1, cy + 1)];
+      if (corners.filter(Boolean).length >= 3) {
+        const [a, b] = [[0, 1], [1, 2], [2, 3], [3, 0]][p.rot];
+        spin = (corners[a] && corners[b]) || G.lastKick === 4 ? 2 : 1;
+      }
+    }
+    const rows = [];
+    for (let y = 0; y < ROWS; y++) if (G.board[y].every(Boolean)) rows.push(y);
+    const n = rows.length;
+    let base = spin === 2 ? [400, 800, 1200, 1600][n] : spin === 1 ? [100, 200, 400, 400][n] : [0, 100, 300, 500, 800][n];
+    const difficult = n > 0 && (n === 4 || spin > 0);
+    const backToBack = difficult && G.b2b;
+    if (backToBack) base *= 1.5;
+    if (n > 0) G.b2b = difficult;
+    let gain = Math.floor(base * G.level);
+    if (n > 0) {
+      G.combo++;
+      if (G.combo > 0) gain += 50 * G.combo * G.level;
+      G.maxCombo = Math.max(G.maxCombo, G.combo);
+    } else G.combo = -1;
+    const allClear = n > 0 && G.board.every((row, y) => rows.includes(y) || row.every(v => !v));
+    if (allClear) gain += (n === 4 && backToBack ? 3200 : [0, 800, 1200, 1800, 2000][n]) * G.level;
+    G.score += gain;
+    G.lines += n;
+    if (spin && n) G.tspins++;
+    if (n === 4) G.quads++;
+    G.holdUsed = false;
+
+    const parts = [];
+    if (backToBack) parts.push([t.b2b, 'gold']);
+    if (spin) parts.push([t.tspin(n, spin === 1), '']);
+    else if (n >= 2) parts.push([t.clears[n], '']);
+    if (G.combo > 0) parts.push([t.combo(G.combo), 'gold']);
+    if (allClear) parts.push([t.allClear, 'gold']);
+    if (parts.length) callout(parts, gain);
+    if (spin && n || n === 4 || allClear) announce(parts.map(x => x[0]).join(', '));
+
+    if (G.mode === 'marathon' || G.mode === 'ultra') {
+      const level = Math.min(15, Math.max(G.startLevel, 1 + Math.floor(G.lines / 10)));
+      if (level > G.level) { G.level = level; announce(t.levelUp(level)); if (!parts.length) callout([[t.levelUp(level), 'gold']], 0); }
+    }
+    if (G.mode === 'marathon' && G.lines >= MARATHON_LINES) G.pending = 'win';
+    if (G.mode === 'sprint' && G.lines >= SPRINT_LINES) G.pending = 'win';
+    if (n) { G.clearRows = rows; G.phase = 'clear'; G.phaseT = CLEAR_MS; }
+    else if (G.pending) finish(G.pending);
+    else spawn();
+    drawSide();
+  }
+
+  function collapse() {
+    const keep = G.board.filter((_, y) => !G.clearRows.includes(y));
+    while (keep.length < ROWS) keep.unshift(Array(COLS).fill(''));
+    G.board = keep;
+    G.clearRows = [];
+    G.phase = 'play';
+    if (G.pending) finish(G.pending); else spawn();
+  }
+
+  function topOut(type) {
+    if (G.mode === 'zen') {
+      G.board = emptyBoard();
+      G.fx.push({ kind: 'wipe', life: 1 });
+      callout([[t.fresh, 'gold']], 0);
+      announce(t.fresh);
+      spawn(type || undefined);
+      return;
+    }
+    finish('topout');
+  }
+
+  // ---------- Flow ----------
+  function startGame(mode) {
+    G = makeGame(mode);
+    refillQueue();
+    hideAll();
+    els.chip.textContent = t[mode];
+    els.linesLabel.textContent = mode === 'sprint' ? t.left : t.lines;
+    showCount(t.ready);
+    announce(t.started(t[mode]));
+    hudCache = {};
+    updateHud(true);
+    drawSide();
+    els.well.focus({ preventScroll: true });
+  }
+
+  function showCount(text) {
+    els.count.hidden = false;
+    els.count.textContent = text;
+    els.count.classList.remove('pop'); void els.count.offsetWidth; els.count.classList.add('pop');
+  }
+
+  function finish(kind) {
+    G.phase = 'over';
+    G.result = kind;
+    G.cur = null;
+    G.overT = 0;
+    releaseAll();
+    const m = G.mode;
+    let value = 0, isBest = false;
+    if (m === 'sprint') { if (kind === 'win') { value = G.time; isBest = !bests.sprint || value < bests.sprint; } }
+    else if (m === 'zen') { value = G.lines; isBest = value > bests.zen; }
+    else { value = G.score; isBest = value > bests[m]; }
+    if (isBest && value > 0) { bests[m] = value; save('best', bests); } else isBest = false;
+    const titles = { win: m === 'sprint' ? t.winSprint : t.winMarathon, topout: t.over, time: t.ultraEnd, zen: t.zenEnd };
+    $('over-title').textContent = titles[kind];
+    $('over-sub').textContent = kind === 'topout' ? (m === 'sprint' ? t.sprintFail : t.overText) : '';
+    $('over-sub').hidden = kind !== 'topout';
+    $('over-result').textContent = m === 'sprint' ? (kind === 'win' ? fmtTime(G.time, true) : `${G.lines} / ${SPRINT_LINES}`) : m === 'zen' ? t.linesOf(G.lines) : fmt(G.score);
+    $('over-best-badge').hidden = !isBest;
+    $('over-best').textContent = !isBest && bests[m] ? t.bestIs(bestText(m)) : '';
+    const sum = [[t.score, fmt(G.score)], [t.lines, G.lines], [t.level, G.level], [t.time, fmtTime(G.time, m === 'sprint')], [t.pieces, G.pieces], [t.pps, pps()], [t.tspins, G.tspins], [t.maxCombo, Math.max(0, G.maxCombo)]];
+    $('over-sum').innerHTML = sum.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    announce(`${titles[kind]} ${$('over-result').textContent}${isBest ? `. ${t.newBest}` : ''}`);
+    updateHud(true);
+    setTimeout(() => { if (G && G.phase === 'over') showOverlay(els.over, $('again')); }, reduced ? 200 : 1100);
+  }
+
+  const pps = () => (G.time > 0 ? (G.pieces / (G.time / 1000)).toFixed(2) : '0.00');
+  function fmtTime(ms, fine) {
+    const total = Math.max(0, ms);
+    const m = Math.floor(total / 60000), s = Math.floor(total / 1000) % 60;
+    const base = `${m}:${String(s).padStart(2, '0')}`;
+    return fine ? `${base}.${String(Math.floor(total / 10) % 100).padStart(2, '0')}` : base;
+  }
+  const bestText = m => (!bests[m] ? '—' : m === 'sprint' ? fmtTime(bests[m], true) : m === 'zen' ? t.linesOf(bests[m]) : fmt(bests[m]));
+
+  // ---------- Overlays ----------
+  const overlays = () => [els.menu, els.pause, els.settings, els.over];
+  const overlayOpen = () => overlays().some(o => !o.hidden);
+  let settingsReturn = null;
+  function hideAll() { for (const o of overlays()) o.hidden = true; }
+  function showOverlay(el, focusEl) {
+    hideAll();
+    el.hidden = false;
+    if (focusEl) focusEl.focus({ preventScroll: true });
+  }
+  function showMenu() {
+    for (const btn of document.querySelectorAll('.mode')) btn.querySelector('em').textContent = `${t.best}: ${bestText(btn.dataset.mode)}`;
+    $('lvl-out').textContent = startLevel;
+    $('lvl-down').disabled = startLevel <= 1;
+    $('lvl-up').disabled = startLevel >= 15;
+    $('menu-help').textContent = coarse ? t.touch : t.keys;
+    showOverlay(els.menu, $('play-marathon'));
+  }
+  function pauseGame() {
+    if (!G || G.paused || !['ready', 'play', 'clear'].includes(G.phase)) return;
+    G.paused = true;
+    releaseAll();
+    $('p-end').hidden = G.mode !== 'zen';
+    $('pause-help').textContent = coarse ? t.touch : t.keys;
+    showOverlay(els.pause, $('resume'));
+    announce(t.paused);
+  }
+  function resumeGame() {
+    if (!G) return;
+    hideAll();
+    G.paused = false;
+    els.well.focus({ preventScroll: true });
+  }
+  function openSettings(from) {
+    settingsReturn = from;
+    syncSettings();
+    showOverlay(els.settings, $('s-done'));
+  }
+  function syncSettings() {
+    $('s-das').value = settings.das; $('o-das').textContent = `${settings.das} ms`;
+    $('s-arr').value = settings.arr; $('o-arr').textContent = `${settings.arr} ms`;
+    for (const b of document.querySelectorAll('[data-sdf]')) b.setAttribute('aria-pressed', String(Number(b.dataset.sdf) === settings.sdf));
+    for (const [id, key] of [['t-ghost', 'ghost'], ['t-pad', 'pad'], ['t-grid', 'grid']]) { $(id).setAttribute('aria-pressed', String(settings[key])); $(id).querySelector('b').textContent = settings[key] ? t.on : t.off; }
+    const padChanged = els.app.classList.contains('no-pad') === settings.pad;
+    els.app.classList.toggle('no-pad', !settings.pad);
+    save('settings', settings);
+    if (padChanged) layout();
+  }
+
+  // ---------- Input ----------
+  function press(dir) {
+    if (dir < 0) inp.left = true; else inp.right = true;
+    inp.dir = dir; inp.das = 0; inp.arr = 0; inp.charged = false;
+    if (G && !G.paused && G.phase === 'play') shift(dir);
+  }
+  function release(dir) {
+    if (dir < 0) inp.left = false; else inp.right = false;
+    if (inp.dir !== dir) return;
+    const other = dir < 0 ? inp.right : inp.left;
+    inp.dir = other ? -dir : 0; inp.das = 0; inp.arr = 0; inp.charged = false;
+  }
+  function releaseAll() { inp.left = inp.right = inp.down = false; inp.dir = 0; inp.das = 0; inp.charged = false; touch.id = null; for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on'); }
+  const active = () => G && !G.paused && !overlayOpen() && ['ready', 'play', 'clear'].includes(G.phase);
+
+  function act(name, down) {
+    if (name === 'left' || name === 'right') { const d = name === 'left' ? -1 : 1; if (down) press(d); else release(d); return; }
+    if (name === 'down') { inp.down = down; if (down && G) G.acc = Math.max(G.acc, softInterval()); return; }
+    if (!down) return;
+    if (name === 'pause') { if (G && G.paused) resumeGame(); else pauseGame(); return; }
+    if (name === 'restart') { if (G) startGame(G.mode); return; }
+    if (!active()) return;
+    if (name === 'cw') rotate(1);
+    else if (name === 'ccw') rotate(-1);
+    else if (name === 'hard') hardDrop();
+    else if (name === 'hold') holdPiece();
+  }
+
+  const KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'cw', x: 'cw', X: 'cw', z: 'ccw', Z: 'ccw', Control: 'ccw', ' ': 'hard', c: 'hold', C: 'hold', Shift: 'hold', p: 'pause', P: 'pause', r: 'restart', R: 'restart' };
+  document.addEventListener('keydown', event => {
+    const name = KEYS[event.key];
+    if (!name || event.altKey || event.metaKey || (event.ctrlKey && event.key !== 'Control')) return;
+    if (name === 'pause' && G && G.paused && !els.pause.hidden) { event.preventDefault(); resumeGame(); return; }
+    if (!active()) return;
+    if (event.target instanceof HTMLButtonElement && !event.target.dataset.act && (event.key === ' ' || event.key === 'Enter')) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    act(name, true);
+  });
+  document.addEventListener('keyup', event => {
+    const name = KEYS[event.key];
+    if (name === 'left' || name === 'right' || name === 'down') act(name, false);
+  });
+  window.addEventListener('blur', releaseAll);
+
+  for (const btn of document.querySelectorAll('[data-act]')) {
+    const name = btn.dataset.act;
+    let held = false;
+    btn.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      if (!active()) return;
+      try { btn.setPointerCapture(event.pointerId); } catch {}
+      held = true;
+      btn.classList.add('on');
+      act(name, true);
+    });
+    const up = () => { if (!held) return; held = false; btn.classList.remove('on'); act(name, false); };
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('lostpointercapture', up);
+    btn.addEventListener('click', event => { if (event.detail === 0 && active()) { act(name, true); act(name, false); } });
+  }
+
+  // Touch / mouse gestures on the well: drag to move, drag down to soft drop, flick down to hard drop, swipe up to hold, tap to rotate.
+  const touch = { id: null };
+  els.wrap.addEventListener('pointerdown', event => {
+    if (!active() || touch.id !== null) return;
+    touch.id = event.pointerId;
+    Object.assign(touch, { x0: event.clientX, y0: event.clientY, ax: event.clientX, ay: event.clientY, t0: performance.now(), moved: false, done: false, hist: [{ x: event.clientX, y: event.clientY, t: performance.now() }] });
+    try { els.wrap.setPointerCapture(event.pointerId); } catch {}
+  });
+  const velocity = () => { const h = touch.hist, a = h[0], b = h[h.length - 1]; const dt = b.t - a.t; return dt > 0 ? { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt } : { vx: 0, vy: 0 }; };
+  els.wrap.addEventListener('pointermove', event => {
+    if (event.pointerId !== touch.id || touch.done || !active()) return;
+    const now = performance.now();
+    touch.hist.push({ x: event.clientX, y: event.clientY, t: now });
+    while (touch.hist.length > 2 && now - touch.hist[0].t > 90) touch.hist.shift();
+    const step = clamp(view.cell * 0.95, 14, 30);
+    while (event.clientX - touch.ax >= step) { touch.ax += step; shift(1); touch.moved = true; }
+    while (event.clientX - touch.ax <= -step) { touch.ax -= step; shift(-1); touch.moved = true; }
+    const totalY = event.clientY - touch.y0, totalX = event.clientX - touch.x0;
+    const { vy } = velocity();
+    if (vy > 1.1 && totalY > step * 1.5 && Math.abs(totalY) > Math.abs(totalX) * 1.6) { hardDrop(); touch.done = true; return; }
+    if (vy < -0.7 && -totalY > step * 2 && Math.abs(totalY) > Math.abs(totalX) * 1.6) { holdPiece(); touch.done = true; return; }
+    while (event.clientY - touch.ay >= step) { touch.ay += step; if (G.cur && G.phase === 'play' && stepDown()) G.score += 1; touch.moved = true; }
+    if (event.clientY < touch.ay - step) touch.ay = event.clientY + step * 0.5;
+  });
+  function endTouch(event, cancelled) {
+    if (event.pointerId !== touch.id) return;
+    touch.id = null;
+    if (cancelled || touch.done || !active()) return;
+    const dx = event.clientX - touch.x0, dy = event.clientY - touch.y0;
+    const { vy } = velocity();
+    if (!touch.moved && Math.hypot(dx, dy) < 12 && performance.now() - touch.t0 < 400) {
+      const rect = els.well.getBoundingClientRect();
+      rotate(event.clientX < rect.left + rect.width / 2 ? -1 : 1);
+    } else if (vy > 0.9 && dy > 24 && Math.abs(dy) > Math.abs(dx) * 1.6) hardDrop();
+  }
+  els.wrap.addEventListener('pointerup', event => endTouch(event, false));
+  els.wrap.addEventListener('pointercancel', event => endTouch(event, true));
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); pauseGame(); } last = performance.now(); });
+
+  // ---------- Update ----------
+  const softInterval = () => { const g = gravityMs(G.level); return settings.sdf === 0 ? 0 : Math.min(g, g / settings.sdf); };
+
+  function autoShift(dt) {
+    if (!inp.dir) return;
+    inp.das += dt;
+    if (inp.das < settings.das) return;
+    if (G.phase !== 'play' || !G.cur) { inp.das = settings.das; return; }
+    if (settings.arr === 0) { while (shift(inp.dir)); return; }
+    if (!inp.charged) { inp.charged = true; inp.arr = settings.arr; } else inp.arr += dt;
+    while (inp.arr >= settings.arr) { inp.arr -= settings.arr; if (!shift(inp.dir)) { inp.arr = 0; break; } }
+  }
+
+  function update(dt) {
+    for (const f of G.fx) f.life -= dt / (f.kind === 'wipe' ? 600 : f.kind === 'trail' ? 220 : 160);
+    G.fx = G.fx.filter(f => f.life > 0);
+    if (G.shake > 0) G.shake = Math.max(0, G.shake - dt / 180);
+    if (G.phase === 'over') { G.overT += dt; return; }
+    if (G.phase === 'menu' || G.paused || overlayOpen()) return;
+    autoShift(dt);
+    if (G.phase === 'ready') {
+      G.phaseT += dt;
+      if (G.phaseT >= READY_MS) { G.phase = 'play'; showCount(t.go); setTimeout(() => { if (els.count.textContent === t.go) els.count.hidden = true; }, 520); spawn(); }
+      return;
+    }
+    if (!G.pending) G.time += dt;
+    if (G.mode === 'ultra' && G.time >= ULTRA_MS) { G.time = ULTRA_MS; finish('time'); return; }
+    if (G.phase === 'clear') {
+      G.phaseT -= dt;
+      if (G.phaseT <= 0) collapse();
+      return;
+    }
+    const p = G.cur;
+    if (!p) return;
+    const soft = inp.down;
+    const interval = soft ? softInterval() : gravityMs(G.level);
+    if (interval <= 0) { while (stepDown()) G.score += 1; }
+    else {
+      G.acc += dt;
+      while (G.acc >= interval) {
+        G.acc -= interval;
+        if (stepDown()) { if (soft) G.score += 1; } else { G.acc = 0; break; }
+      }
+    }
+    if (grounded()) {
+      G.lockT += dt;
+      if (G.lockT >= LOCK_MS || G.resets >= MAX_RESETS) lock();
+    } else G.lockT = 0;
+  }
+
+  // ---------- HUD ----------
+  let hudCache = {};
+  function setText(key, el, value) { if (hudCache[key] !== value) { hudCache[key] = value; el.textContent = value; } }
+  function updateHud(force) {
+    if (force) hudCache = {};
+    if (!G) return;
+    setText('score', els.score, String(G.score));
+    setText('lines', els.lines, String(G.mode === 'sprint' ? Math.max(0, SPRINT_LINES - G.lines) : G.lines));
+    setText('level', els.level, String(G.level));
+    const time = G.mode === 'ultra' ? fmtTime(ULTRA_MS - G.time + 999) : G.mode === 'sprint' ? fmtTime(G.time, true).slice(0, -1) : fmtTime(G.time);
+    setText('time', els.time, time);
+    setText('best', els.best, G.phase === 'menu' ? '—' : bestText(G.mode));
+    setText('pieces', els.pieces, String(G.pieces));
+    setText('pps', els.pps, pps());
+    setText('tspins', els.tspins, String(G.tspins));
+    setText('quads', els.quads, String(G.quads));
+    setText('combo', els.combo, String(Math.max(0, G.maxCombo)));
+  }
+
+  let calloutTimer = 0;
+  function callout(parts, gain) {
+    els.callout.innerHTML = parts.map(([text, cls]) => `<b class="${cls}">${text}</b>`).join('') + (gain ? `<span>+${fmt(gain)}</span>` : '');
+    els.callout.classList.remove('show'); void els.callout.offsetWidth; els.callout.classList.add('show');
+    clearTimeout(calloutTimer);
+    if (reduced) calloutTimer = setTimeout(() => { els.callout.classList.remove('show'); }, 1300);
+  }
+
+  // ---------- Rendering ----------
+  const view = { cell: 20, bw: 4, W: 208, H: 428, dpr: 1, sprites: {} };
+
+  function layout() {
+    const app = els.app;
+    const cs = getComputedStyle(app);
+    const wide = WIDE.matches;
+    const innerW = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const gap = parseFloat(cs.columnGap) || 8;
+    const wrapH = els.wrap.clientHeight;
+    const minSide = wide ? Math.min(230, innerW * 0.24) : 56;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let cell = Math.min(wrapH / 21.4, (innerW - 2 * minSide - 2 * gap) / 10.4);
+    cell = Math.max(6, Math.floor(cell * dpr) / dpr);
+    const bw = Math.max(2, Math.round(cell * 0.2 * dpr) / dpr);
+    view.cell = cell; view.bw = bw; view.dpr = dpr;
+    view.W = cell * 10 + bw * 2; view.H = cell * 21 + bw * 2;
+    app.style.setProperty('--wellw', `${Math.ceil(view.W)}px`);
+    app.style.setProperty('--cell', `${cell}px`);
+    sizeCanvas(els.well, ctx, view.W, view.H);
+    buildSprites();
+
+    const sideW = Math.max(40, (innerW - view.W - 2 * gap) / 2);
+    const capW = wide ? Math.min(sideW, 320) : sideW;
+    const holdCell = Math.max(6, Math.min(cell * (wide ? 1 : 0.8), capW / 4.8));
+    els.holdFill.style.height = `${Math.ceil(holdCell * 2.9)}px`;
+    view.hold = { c: holdCell, W: holdCell * 4.8, H: holdCell * 2.9 };
+    sizeCanvas(els.holdCv, hctx, view.hold.W, view.hold.H);
+    const nf = els.nextFill.getBoundingClientRect();
+    const nextCell = Math.max(5, Math.min(cell * (wide ? 1 : 0.8), capW / 4.8, nf.height / 10.6));
+    view.next = { c: nextCell, W: nextCell * 4.8, H: nextCell * 10.6 };
+    sizeCanvas(els.nextCv, nctx, view.next.W, view.next.H);
+    draw();
+    drawSide();
+  }
+
+  function sizeCanvas(cv, c, w, h) {
+    const dpr = view.dpr;
+    cv.style.width = `${w}px`;
+    cv.style.height = `${h}px`;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+
+  function paintBlock(g, x, y, s, color) {
+    const i = Math.max(0.5, s * 0.05), r = s * 0.2;
+    g.fillStyle = color;
+    rr(g, x + i, y + i, s - 2 * i, s - 2 * i, r); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.24)';
+    rr(g, x + i, y + s * 0.72, s - 2 * i, s * 0.28 - i, [0, 0, r, r]); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.38)';
+    rr(g, x + s * 0.16, y + s * 0.12, s * 0.68, s * 0.2, s * 0.1); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.16)';
+    rr(g, x + s * 0.16, y + s * 0.36, s * 0.24, s * 0.3, s * 0.08); g.fill();
+  }
+
+  function buildSprites() {
+    const s = view.cell, dpr = view.dpr;
+    view.sprites = {};
+    for (const [key, color] of Object.entries(COLORS)) {
+      const cv = document.createElement('canvas');
+      cv.width = Math.ceil(s * dpr); cv.height = Math.ceil(s * dpr);
+      const g = cv.getContext('2d');
+      g.scale(dpr, dpr);
+      paintBlock(g, 0, 0, s, color);
+      view.sprites[key] = cv;
+    }
+  }
+
+  const cellX = x => view.bw + x * view.cell;
+  const cellY = y => view.cell + view.bw + (y - HIDDEN) * view.cell;
+
+  function drawCell(x, y, key, alpha = 1) {
+    if (y < HIDDEN - 1) return;
+    const s = view.cell;
+    ctx.globalAlpha = alpha * (y < HIDDEN ? 0.55 : 1);
+    ctx.drawImage(view.sprites[key], cellX(x), cellY(y), s, s);
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    if (!G) return;
+    const { cell: s, bw, W, H } = view;
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (G.shake > 0) ctx.translate(0, G.shake * s * 0.18);
+    // Frame and well.
+    let top = ROWS;
+    for (let y = 0; y < ROWS; y++) if (G.board[y].some(Boolean)) { top = y; break; }
+    const danger = G.phase !== 'over' && G.phase !== 'menu' && top < HIDDEN + 4;
+    const pulse = danger ? 0.5 + 0.5 * Math.sin(performance.now() / 140) : 0;
+    ctx.fillStyle = danger ? `rgb(${Math.round(60 + 140 * pulse)}, ${Math.round(50 - 10 * pulse)}, ${Math.round(66 - 10 * pulse)})` : '#1d4a55';
+    rr(ctx, 0, s, W, H - s, bw * 2.2); ctx.fill();
+    ctx.fillStyle = '#061015';
+    rr(ctx, bw, s + bw, s * 10, s * 20, bw * 1.2); ctx.fill();
+    if (settings.grid) {
+      ctx.strokeStyle = 'rgba(255,255,255,.055)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 1; x < COLS; x++) { const px = Math.round((bw + x * s) * view.dpr) / view.dpr + 0.5 / view.dpr; ctx.moveTo(px, s + bw); ctx.lineTo(px, s + bw + 20 * s); }
+      for (let y = 1; y < 20; y++) { const py = Math.round((s + bw + y * s) * view.dpr) / view.dpr + 0.5 / view.dpr; ctx.moveTo(bw, py); ctx.lineTo(bw + 10 * s, py); }
+      ctx.stroke();
+    }
+    // Stack (turns grey row by row from the bottom after a top-out).
+    const greyFrom = G.phase === 'over' && G.result === 'topout' ? ROWS - Math.floor(G.overT / 28) : ROWS;
+    for (let y = HIDDEN - 1; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const v = G.board[y][x];
+        if (v) drawCell(x, y, y >= greyFrom ? 'G' : v);
+      }
+    }
+    // Clearing rows flash, then shrink toward the centre.
+    if (G.phase === 'clear') {
+      const p = 1 - G.phaseT / CLEAR_MS;
+      for (const y of G.clearRows) {
+        const yy = cellY(y);
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(1, p * 2.2) * 0.9})`;
+        const shrink = p > 0.45 ? (p - 0.45) / 0.55 : 0;
+        const w = s * 10 * (1 - shrink);
+        ctx.fillRect(bw + (s * 10 - w) / 2, yy, w, s);
+      }
+    }
+    // Ghost and active piece.
+    const p = G.cur;
+    if (p && G.phase === 'play') {
+      if (settings.ghost) {
+        const gy = ghostY();
+        if (gy !== p.y) {
+          ctx.strokeStyle = COLORS[p.type];
+          ctx.lineWidth = Math.max(1.5, s * 0.08);
+          ctx.globalAlpha = 0.55;
+          for (const [cx, cy] of SHAPES[p.type][p.rot]) {
+            const y = gy + cy; if (y < HIDDEN) continue;
+            rr(ctx, cellX(p.x + cx) + s * 0.12, cellY(y) + s * 0.12, s * 0.76, s * 0.76, s * 0.16); ctx.stroke();
+          }
+          ctx.globalAlpha = 0.12;
+          ctx.fillStyle = COLORS[p.type];
+          for (const [cx, cy] of SHAPES[p.type][p.rot]) { const y = gy + cy; if (y >= HIDDEN) ctx.fillRect(cellX(p.x + cx) + s * 0.1, cellY(y) + s * 0.1, s * 0.8, s * 0.8); }
+          ctx.globalAlpha = 1;
+        }
+      }
+      const fade = grounded() ? 1 - 0.35 * (G.lockT / LOCK_MS) : 1;
+      for (const [x, y] of cellsOf(p)) drawCell(x, y, p.type, fade);
+    }
+    // Effects.
+    for (const f of G.fx) {
+      if (f.kind === 'flash') {
+        ctx.fillStyle = `rgba(255,255,255,${f.life * 0.7})`;
+        for (const [x, y] of f.cells) if (y >= HIDDEN) { rr(ctx, cellX(x) + 1, cellY(y) + 1, s - 2, s - 2, s * 0.2); ctx.fill(); }
+      } else if (f.kind === 'trail') {
+        const cols = new Map();
+        for (const [x, y] of f.cells) cols.set(x, Math.min(cols.get(x) ?? 99, y));
+        for (const [x, y] of cols) {
+          const y1 = cellY(y), y0 = Math.max(cellY(HIDDEN), cellY(y - f.rows));
+          if (y1 <= y0) continue;
+          const grad = ctx.createLinearGradient(0, y0, 0, y1);
+          grad.addColorStop(0, 'rgba(255,255,255,0)');
+          grad.addColorStop(1, `${f.color}${Math.round(f.life * 110).toString(16).padStart(2, '0')}`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(cellX(x) + s * 0.2, y0, s * 0.6, y1 - y0);
+        }
+      } else if (f.kind === 'wipe') {
+        ctx.fillStyle = `rgba(79,243,198,${f.life * 0.35})`;
+        rr(ctx, bw, s + bw, s * 10, s * 20, bw); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawMini(g, type, cx, cy, c, alpha) {
+    const cells = SHAPES[type][0];
+    const xs = cells.map(([x]) => x), ys = cells.map(([, y]) => y);
+    const w = Math.max(...xs) - Math.min(...xs) + 1, h = Math.max(...ys) - Math.min(...ys) + 1;
+    const ox = cx - (w * c) / 2 - Math.min(...xs) * c, oy = cy - (h * c) / 2 - Math.min(...ys) * c;
+    g.globalAlpha = alpha;
+    for (const [x, y] of cells) paintBlock(g, ox + x * c, oy + y * c, c, COLORS[type]);
+    g.globalAlpha = 1;
+  }
+
+  function drawSide() {
+    if (!G || !view.hold) return;
+    const h = view.hold;
+    hctx.clearRect(0, 0, h.W, h.H);
+    hctx.fillStyle = '#0f2a33';
+    rr(hctx, 0, 0, h.W, h.H, h.c * 0.6); hctx.fill();
+    if (G.hold) drawMini(hctx, G.hold, h.W / 2, h.H / 2, h.c, G.holdUsed ? 0.35 : 1);
+    els.holdCv.setAttribute('aria-label', `${t.hold}: ${G.hold || '—'}`);
+    const n = view.next;
+    nctx.clearRect(0, 0, n.W, n.H);
+    nctx.fillStyle = '#0f2a33';
+    rr(nctx, 0, 0, n.W, n.H, n.c * 0.6); nctx.fill();
+    const list = G.queue.slice(0, 5);
+    if (G.phase === 'menu') list.length = 0;
+    let y = n.c * 0.4;
+    list.forEach((type, i) => {
+      const c = i === 0 ? n.c : n.c * 0.72;
+      const slot = i === 0 ? n.c * 2.6 : c * 2.5;
+      if (i === 0) { nctx.fillStyle = 'rgba(255,255,255,.05)'; rr(nctx, n.c * 0.2, y - n.c * 0.2, n.W - n.c * 0.4, slot, n.c * 0.4); nctx.fill(); }
+      drawMini(nctx, type, n.W / 2, y + slot / 2 - (i === 0 ? n.c * 0.2 : 0), c, 1);
+      y += slot + (i === 0 ? n.c * 0.2 : 0);
+    });
+    els.nextCv.setAttribute('aria-label', `${t.next}: ${list.join(', ') || '—'}`);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    if (G) {
+      update(dt);
+      updateHud();
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Wiring ----------
+  for (const btn of document.querySelectorAll('.mode')) btn.addEventListener('click', () => startGame(btn.dataset.mode));
+  $('lvl-down').addEventListener('click', () => { startLevel = Math.max(1, startLevel - 1); save('startLevel', startLevel); showMenuLevel(); });
+  $('lvl-up').addEventListener('click', () => { startLevel = Math.min(15, startLevel + 1); save('startLevel', startLevel); showMenuLevel(); });
+  function showMenuLevel() { $('lvl-out').textContent = startLevel; $('lvl-down').disabled = startLevel <= 1; $('lvl-up').disabled = startLevel >= 15; }
+  $('menu-settings').addEventListener('click', () => openSettings('menu'));
+  $('p-settings').addEventListener('click', () => openSettings('pause'));
+  $('s-done').addEventListener('click', () => { if (settingsReturn === 'pause') showOverlay(els.pause, $('resume')); else showMenu(); });
+  $('s-reset').addEventListener('click', () => { Object.assign(settings, DEFAULTS); syncSettings(); });
+  $('s-das').addEventListener('input', event => { settings.das = Number(event.target.value); syncSettings(); });
+  $('s-arr').addEventListener('input', event => { settings.arr = Number(event.target.value); syncSettings(); });
+  for (const b of document.querySelectorAll('[data-sdf]')) b.addEventListener('click', () => { settings.sdf = Number(b.dataset.sdf); syncSettings(); });
+  for (const [id, key] of [['t-ghost', 'ghost'], ['t-pad', 'pad'], ['t-grid', 'grid']]) $(id).addEventListener('click', () => { settings[key] = !settings[key]; syncSettings(); });
+  $('pause-btn').addEventListener('click', () => { if (G && G.paused) resumeGame(); else pauseGame(); });
+  $('resume').addEventListener('click', resumeGame);
+  $('p-restart').addEventListener('click', () => startGame(G.mode));
+  $('p-modes').addEventListener('click', toMenu);
+  $('p-end').addEventListener('click', () => { G.paused = false; hideAll(); finish('zen'); });
+  $('again').addEventListener('click', () => startGame(G.mode));
+  $('o-modes').addEventListener('click', toMenu);
+
+  function toMenu() {
+    const mode = G ? G.mode : 'marathon';
+    G = makeGame(mode);
+    G.phase = 'menu';
+    decorate();
+    els.chip.textContent = t[mode];
+    els.linesLabel.textContent = t.lines;
+    els.count.hidden = true;
+    updateHud(true);
+    drawSide();
+    showMenu();
+  }
+
+  // A friendly half-built stack behind the start menu.
+  function decorate() {
+    const rows = ['IIII.TTTOO', 'JJJ..TSSOO', 'J.LLL.SSZZ', 'ZZ.LOO.ZZI', 'SZZ.OOT..I'];
+    rows.reverse().forEach((r, i) => { const y = ROWS - 1 - i; [...r].forEach((ch, x) => { G.board[y][x] = ch === '.' ? '' : ch; }); });
+    G.board[ROWS - 1] = [...'LLL.SSJJJI'].map(ch => (ch === '.' ? '' : ch));
+  }
+
+  // Read-only state for automated tests, plus a board loader used to verify T-spin and all-clear scoring.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__fallingBlocks = {
+    state: () => G && {
+      mode: G.mode, phase: G.phase, paused: G.paused, result: G.result, score: G.score, lines: G.lines, level: G.level, time: G.time,
+      pieces: G.pieces, combo: G.combo, b2b: G.b2b, tspins: G.tspins, quads: G.quads, hold: G.hold, holdUsed: G.holdUsed,
+      cur: G.cur && { ...G.cur }, queue: G.queue.slice(0, 5), board: G.board.map(r => r.map(v => v || '.').join('')), overlay: overlays().find(o => !o.hidden)?.id || null,
+    },
+    load: (rows, queue) => {
+      G.board = emptyBoard();
+      rows.slice().reverse().forEach((r, i) => { [...r].forEach((ch, x) => { G.board[ROWS - 1 - i][x] = ch === '.' ? '' : 'G'; }); });
+      G.queue = [...queue]; refillQueue(); G.cur = null; spawn();
+    },
+    patch: values => { Object.assign(G, values); },
+  };
+
+  new ResizeObserver(layout).observe(els.app);
+  WIDE.addEventListener('change', layout);
+  syncSettings();
+  toMenu();
+  layout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

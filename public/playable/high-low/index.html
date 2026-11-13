@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>High Low</title>
+<style>
+:root {
+  --bg: #110a1e;
+  --felt: #4b2b8f;
+  --felt-dark: #1d0e44;
+  --felt-light: #6d4cc4;
+  --rail: #6b3d22;
+  --rail-light: #9a5f37;
+  --text: #f6f2ff;
+  --muted: #c3b4e4;
+  --gold: #f6c95b;
+  --gold-dark: #b98a22;
+  --win: #46d483;
+  --lose: #ff6b6b;
+  --hi: #4fdc95;
+  --lo: #ff8578;
+  --red: #d22a3f;
+  --ink: #1b2130;
+  --plate: #00000038;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: radial-gradient(120% 70% at 50% 0%, #2a1650, var(--bg) 70%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Portrait: one stacked column. Wide: play column on the left, info column (.side) on the right. */
+.app { height: 100%; max-width: min(700px, 100%); margin: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto; grid-template-areas: "top" "hud" "felt" "hist" "track" "msg" "controls"; gap: 6px; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.side { display: contents; }
+.top { grid-area: top; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hud { grid-area: hud; }
+.hist { grid-area: hist; }
+.track { grid-area: track; }
+.felt { grid-area: felt; }
+.msg { grid-area: msg; }
+.controls { grid-area: controls; }
+.ladder { display: none; }
+
+h1 { flex: 1; min-width: 0; font-size: clamp(20px, 6.2vw, 28px); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: var(--gold); text-shadow: 0 2px 0 #0006; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modes { display: flex; padding: 3px; border-radius: 12px; background: #00000040; }
+.modes button { padding: 6px 10px; border-radius: 9px; font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.modes button[aria-pressed="true"] { background: var(--gold); color: #2b1f04; }
+.modes button:disabled:not([aria-pressed="true"]) { opacity: .45; }
+.icon { width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: #00000040; font-size: 16px; font-weight: 900; color: var(--muted); }
+.icon:hover { color: var(--gold); }
+.icon svg { width: 18px; height: 18px; }
+
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: var(--plate); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat:first-child strong { color: var(--gold); }
+.stat.bump strong { animation: bump .35s; }
+@keyframes bump { 40% { scale: 1.18; } }
+
+/* ---------- felt ---------- */
+.felt { --cw: 90px; position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px 52px 12px 12px; border: 7px solid var(--rail); border-radius: 30px; background: radial-gradient(#ffffff08 1px, transparent 1.5px) 0 0 / 5px 5px, radial-gradient(110% 90% at 50% 20%, var(--felt-light), var(--felt) 45%, var(--felt-dark)); box-shadow: inset 0 0 0 2px #00000030, inset 0 0 40px #0007, 0 0 0 2px var(--rail-light), 0 14px 30px #0008; overflow: hidden; }
+.felt.short { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+.flash { position: absolute; inset: 0; border-radius: 22px; pointer-events: none; opacity: 0; }
+.flash.win { animation: flash .75s ease-out; box-shadow: inset 0 0 0 4px var(--win), inset 0 0 70px #46d483aa; }
+.flash.lose { animation: flash .75s ease-out; box-shadow: inset 0 0 0 4px var(--lose), inset 0 0 70px #ff6b6baa; }
+.flash.gold { animation: flash 1s ease-out; box-shadow: inset 0 0 0 4px var(--gold), inset 0 0 80px #f6c95bbb; }
+@keyframes flash { 15% { opacity: 1; } }
+.felt.shake { animation: shake .36s; }
+@keyframes shake { 20% { translate: -6px 0; } 45% { translate: 5px 0; } 70% { translate: -3px 0; } }
+
+.stage { display: flex; align-items: center; justify-content: center; gap: calc(var(--cw) * .16); }
+.pile { position: relative; flex: none; width: calc(var(--cw) * .6); height: calc(var(--cw) * .84); border-radius: calc(var(--cw) * .07); background: repeating-linear-gradient(45deg, #ffffff22 0 2px, transparent 2px 6px), linear-gradient(160deg, #22b8a8, #0c6f69); box-shadow: inset 0 0 0 calc(var(--cw) * .035) #fff, 2px 2px 0 #e9e4da, 3px 3px 0 #0c6f69, 5px 5px 0 #e9e4da, 6px 6px 0 #0c6f69, 0 8px 14px #0007; }
+.pile.empty { background: none; box-shadow: inset 0 0 0 2px #ffffff40; }
+.pile b { position: absolute; left: 50%; top: 50%; translate: -50% -50%; min-width: 28px; padding: 2px 7px; border-radius: 99px; background: #170c33e6; font-size: clamp(11px, calc(var(--cw) * .13), 15px); font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+.slot { position: relative; flex: none; width: var(--cw); height: calc(var(--cw) * 1.4); perspective: calc(var(--cw) * 7); }
+.ph { width: 100%; height: 100%; display: grid; place-items: center; border-radius: calc(var(--cw) * .1); border: 2px dashed #ffffff40; font-size: calc(var(--cw) * .42); font-weight: 900; color: #ffffff38; }
+.slot.cur .ph { font-size: calc(var(--cw) * .16); padding: 8%; text-align: center; color: #ffffff59; }
+
+.card { position: relative; flex: none; width: var(--cw); height: calc(var(--cw) * 1.4); border-radius: calc(var(--cw) * .1); background: linear-gradient(#fff, #f6f2ea); color: var(--ink); box-shadow: 0 3px 8px #0006, 0 0 0 .5px #0003; }
+.card.red { color: var(--red); }
+.ci { position: absolute; left: 7%; top: 4%; display: flex; flex-direction: column; align-items: center; font-weight: 900; line-height: .95; font-size: calc(var(--cw) * .3); letter-spacing: -.08em; }
+.ci i { font-style: normal; font-size: .82em; letter-spacing: 0; }
+.cs { position: absolute; inset: 0; display: grid; place-items: center; padding: 18% 0 0 16%; font-size: calc(var(--cw) * .55); line-height: 1; }
+.cs.face { font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: calc(var(--cw) * .5); }
+.cs.face::after { content: ""; position: absolute; left: 32%; right: 12%; top: 28%; bottom: 10%; border-radius: calc(var(--cw) * .06); border: 1.5px solid currentColor; opacity: .25; }
+.card.down { background: repeating-linear-gradient(45deg, #ffffff22 0 2px, transparent 2px 7px), repeating-linear-gradient(-45deg, #ffffff22 0 2px, transparent 2px 7px), linear-gradient(160deg, #22b8a8, #0c6f69); box-shadow: inset 0 0 0 calc(var(--cw) * .06) #fff, 0 3px 8px #0006; }
+.card.down > * { display: none; }
+.card.ok { box-shadow: 0 0 0 3px var(--win), 0 0 22px #46d48399, 0 3px 8px #0006; }
+.card.bad { box-shadow: 0 0 0 3px var(--lose), 0 0 22px #ff6b6b99, 0 3px 8px #0006; }
+/* Flip card: the face sits on the front, the back is turned away; rotating the wrapper reveals the face. */
+.fc { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .42s cubic-bezier(.3, .7, .3, 1); }
+.fc.back { transform: rotateY(180deg); }
+.fc > .card { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.fc > .card.down { transform: rotateY(180deg); }
+.deal { animation: deal .26s cubic-bezier(.2, .8, .3, 1) backwards; }
+.slide { animation: slide .26s cubic-bezier(.2, .8, .3, 1) backwards; }
+@keyframes deal { from { opacity: 0; translate: calc(var(--cw) * -1.3) 0; rotate: -8deg; scale: .6; } }
+@keyframes slide { from { translate: calc(var(--cw) * 1.16) 0; } }
+
+.res { position: absolute; left: 50%; bottom: calc(var(--cw) * -.1); z-index: 5; translate: -50% 0; padding: 4px 10px; border-radius: 99px; background: #1b2130f0; box-shadow: 0 4px 12px #0008; font-size: clamp(11px, calc(var(--cw) * .13), 17px); font-weight: 900; white-space: nowrap; pointer-events: none; animation: pop .35s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+.res.ok { background: var(--win); color: #062a17; }
+.res.bad { background: var(--lose); color: #fff; }
+@keyframes pop { from { scale: .3; opacity: 0; } }
+
+.oddsbar { flex: none; display: flex; gap: 2px; width: calc(var(--cw) * 2.92); height: 8px; border-radius: 99px; overflow: hidden; background: #0000004d; }
+.oddsbar i { height: 100%; transition: flex-grow .35s; }
+.oddsbar .lo { background: var(--lo); }
+.oddsbar .sa { background: var(--gold); }
+.oddsbar .hi { background: var(--hi); }
+.oddsbar[hidden] { display: none; }
+.rules { flex: none; max-width: calc(var(--cw) * 3.2); font-size: 11px; font-weight: 800; letter-spacing: .05em; line-height: 1.35; text-align: center; text-transform: uppercase; color: #f6c95bc4; }
+.felt.short .rules { display: none; }
+
+.meter { position: absolute; right: 9px; top: 14px; bottom: 14px; width: 36px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.meter b { font-size: 11px; font-weight: 900; color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mtrack { position: relative; flex: 1; width: 12px; border-radius: 99px; background: #0000004d; box-shadow: inset 0 0 0 1px #ffffff1f; }
+.mfill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--f, 0) * 100%); min-height: 12px; border-radius: 99px; background: linear-gradient(to top, var(--gold-dark), var(--gold), #fff1b8); box-shadow: 0 0 10px #f6c95b88; transition: height .5s cubic-bezier(.3, 1.3, .5, 1); }
+.mtick { position: absolute; left: -4px; right: -4px; bottom: calc(var(--p) * 100%); height: 2px; border-radius: 1px; background: #ffffff59; }
+.mtick.best { background: var(--gold); height: 3px; left: -6px; right: -6px; }
+
+.intro { position: absolute; inset: 12px 52px 12px 12px; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; text-align: center; overflow: hidden; }
+.intro[hidden] { display: none; }
+.intro h2 { font-size: clamp(20px, 4.4vw, 30px); font-weight: 900; color: var(--gold); text-shadow: 0 2px 0 #0006; }
+.intro p { max-width: 400px; font-size: 14px; font-weight: 700; line-height: 1.45; color: var(--text); }
+.intro .tags { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+.intro .big { font-size: 15px; font-weight: 900; color: var(--gold); }
+.felt.short .intro { gap: 4px; padding: 4px; }
+.felt.short .intro p { font-size: 12px; line-height: 1.3; }
+.felt.tiny .intro p { display: none; }
+.felt.idle .stage, .felt.idle .oddsbar, .felt.idle .rules { visibility: hidden; }
+
+.toast { position: absolute; left: 50%; top: 14px; z-index: 20; translate: -50% 0; max-width: 80%; padding: 6px 14px; border-radius: 99px; background: #000000c4; font-size: 13px; font-weight: 800; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+
+/* ---------- info boxes ---------- */
+.box { min-width: 0; border-radius: 12px; background: var(--plate); padding: 5px 6px; }
+.box h3 { display: none; margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.box h3 span { float: right; color: var(--gold); letter-spacing: 0; }
+.strip { display: flex; justify-content: flex-end; gap: 4px; height: 36px; overflow: hidden; }
+.strip:empty::before { content: attr(data-empty); align-self: center; margin-right: auto; padding-left: 4px; font-size: 12px; font-weight: 700; color: #c3b4e499; }
+.mini { position: relative; flex: none; width: 26px; height: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; background: linear-gradient(#fff, #f3efe6); color: var(--ink); font-size: 12px; font-weight: 900; line-height: 1; box-shadow: 0 1px 2px #0007; }
+.mini i { font-style: normal; font-size: 11px; }
+.mini.red { color: var(--red); }
+.mini.ok { box-shadow: inset 0 -4px 0 var(--win), 0 1px 2px #0007; }
+.mini.bad { box-shadow: inset 0 -4px 0 var(--lose), 0 1px 2px #0007; }
+.mini.skipped { opacity: .45; }
+.mini.skipped::after { content: ""; position: absolute; left: 3px; right: 3px; top: 50%; height: 2px; background: #555c; rotate: -30deg; }
+.tgrid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+.tcell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 0 1px; border-radius: 6px; background: #ffffff12; line-height: 1.1; }
+.tcell b { font-size: 12px; font-weight: 900; }
+.tcell span { font-size: 11px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tcell.hi { background: #4fdc9530; }
+.tcell.lo { background: #ff857830; }
+.tcell.eq { background: #f6c95b3a; box-shadow: inset 0 0 0 1.5px var(--gold); }
+.tcell.zero { opacity: .32; }
+.track[hidden] { display: none; }
+
+.ladder { flex-direction: column; }
+.ladder ol { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; padding: 0; list-style: none; overflow: hidden; }
+.ladder li { flex: none; display: grid; grid-template-columns: 20px 16px 34px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px; background: #ffffff0d; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ladder li:first-child { box-shadow: inset 0 0 0 1.5px #f6c95b99; }
+.ladder li .n { font-size: 11px; color: var(--muted); }
+.ladder li .g.hi { color: var(--hi); }
+.ladder li .g.lo { color: var(--lo); }
+.ladder li .g.sa { color: var(--gold); }
+.ladder li .c { color: #fff; }
+.ladder li .c.red { color: #ff9aa6; }
+.ladder li .m { color: var(--muted); font-size: 12px; }
+.ladder li b { text-align: right; }
+.ladder li.bad { background: #ff6b6b26; }
+.ladder li.bad b { color: var(--lose); }
+.ladder li.ok b { color: var(--win); }
+.ladder li.base { grid-template-columns: minmax(0, 1fr) auto; color: var(--muted); }
+.ladder li.base b { color: var(--text); }
+.ladder li.empty { display: block; padding: 6px 2px; background: none; box-shadow: none; font-size: 13px; font-weight: 700; color: #c3b4e499; }
+
+/* ---------- controls ---------- */
+.msg { min-height: 19px; font-size: 14px; font-weight: 800; text-align: center; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg.good { color: var(--win); }
+.msg.bad { color: var(--lose); }
+.controls { display: grid; container-type: inline-size; }
+.bar { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 7px; }
+.bar.off { visibility: hidden; }
+.row { display: flex; gap: 7px; }
+.row > button { flex: 1; min-width: 0; }
+.chips { display: flex; justify-content: center; align-items: center; gap: 7px; }
+.chip { position: relative; width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 900; color: #fff; background: radial-gradient(circle, var(--c) 52%, transparent 53%), repeating-conic-gradient(#fff 0 15deg, var(--c) 15deg 45deg); box-shadow: inset 0 0 0 3px var(--c), 0 3px 0 #0007; text-shadow: 0 1px 0 #0008; }
+.chip::before { content: ""; position: absolute; inset: 22%; border-radius: 50%; border: 1.5px dashed #ffffffaa; }
+.chip:disabled { opacity: .35; }
+.chip:not(:disabled):active { translate: 0 2px; box-shadow: inset 0 0 0 3px var(--c), 0 1px 0 #0007; }
+.c100 { --c: #252a36; }
+.c500 { --c: #7a4dd6; }
+.c1000 { --c: #d4900f; }
+.c5000 { --c: #b23a2c; }
+.c10000 { --c: #168a83; }
+.ghost { padding: 0 12px; height: 38px; border-radius: 10px; background: #ffffff14; font-size: 13px; font-weight: 800; color: var(--muted); }
+.ghost:not(:disabled):hover { color: var(--gold); }
+.ghost:disabled { opacity: .4; }
+.btn { height: 46px; padding: 0 8px; border-radius: 12px; font-size: 16px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(#ffd877, var(--gold)); color: #2b1f04; box-shadow: 0 3px 0 var(--gold-dark); }
+.btn.small { height: 38px; font-size: 13px; background: #ffffff1c; color: var(--text); box-shadow: 0 2px 0 #00000059; }
+.btn.small[aria-pressed="true"] { background: #f6c95b33; color: var(--gold); box-shadow: inset 0 0 0 1.5px var(--gold), 0 2px 0 #00000059; }
+.btn.cash { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; background: linear-gradient(#ffd877, var(--gold)); color: #2b1f04; box-shadow: 0 2px 0 var(--gold-dark); }
+.btn.cash span, .btn.cash small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.btn.cash small { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.btn:not(:disabled):active { translate: 0 2px; box-shadow: none; }
+.btn:disabled { opacity: .35; }
+.btn b { margin-left: 4px; padding: 0 5px; border-radius: 99px; background: #00000040; font-size: 12px; }
+.btn.pulse { animation: pulse .9s 2; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--gold), 0 0 18px var(--gold); } }
+.gbtn { height: 52px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 4px; border-radius: 12px; font-weight: 900; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+.gbtn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+.gbtn small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 800; opacity: .82; font-variant-numeric: tabular-nums; }
+.gbtn small:empty { display: none; }
+.ar { width: .72em; height: .72em; margin-right: .3em; fill: currentColor; vertical-align: -.03em; }
+.ladder .ar { margin: 0; width: 11px; height: 11px; }
+@container (max-width: 359px) { .gbtn .pct { display: none; } }
+@container (min-width: 520px) and (max-width: 699px) { .gbtn .pct { display: none; } }
+.gbtn.hi { background: linear-gradient(#7ff0b4, #34c477); color: #05301b; box-shadow: 0 3px 0 #1d8a50; }
+.gbtn.lo { background: linear-gradient(#ffaaa1, #ef6559); color: #3d0905; box-shadow: 0 3px 0 #b2392f; }
+.gbtn.sa { flex: .8; background: linear-gradient(#f7f9fc, #d9dfeb); color: var(--ink); box-shadow: 0 3px 0 #8f9ab0; }
+.gbtn:not(:disabled):active { translate: 0 2px; box-shadow: none; }
+.gbtn:disabled { opacity: .35; }
+.idle { justify-content: flex-end; }
+.idle .note { min-height: 16px; font-size: 12px; font-weight: 800; text-align: center; color: var(--muted); }
+/* Plenty of width: everything on one row. */
+@container (min-width: 520px) {
+  .bar { flex-direction: row; align-items: stretch; }
+  .bar .row { flex: 1; }
+  .gbar .row.main { flex: 2.2; }
+  .gbar .row:not(.main) { flex: 1.35; }
+  .betbar .chips { flex: none; }
+  .betbar .btn { flex: 1; height: 50px; }
+  .gbar .btn.small { height: 52px; }
+  .idle { flex-direction: column; align-items: center; }
+  .idle .btn { width: min(420px, 100%); }
+}
+
+/* ---------- panels ---------- */
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 12px; background: #0b0614c9; }
+.overlay[hidden] { display: none; }
+.panel { width: min(420px, 100%); max-height: calc(100% - 8px); overflow-y: auto; padding: 18px 18px; border-radius: 20px; background: linear-gradient(#2d1a5c, #170c33); box-shadow: 0 0 0 1px #ffffff1a, 0 20px 50px #000a; text-align: center; animation: pop .3s; }
+.panel h2 { font-size: 22px; font-weight: 900; color: var(--gold); }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.panel .score { margin-top: 4px; font-size: 40px; font-weight: 900; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+.panel .score + p { margin-top: 0; }
+.panel .btn { width: 100%; margin-top: 14px; }
+.panel h3 { margin-top: 14px; font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; margin-top: 12px; }
+.grid div { padding: 6px; border-radius: 10px; background: #00000038; }
+.grid small { display: block; font-size: 11px; font-weight: 800; color: var(--muted); }
+.grid strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 12px; }
+.dots i { width: 12px; height: 12px; border-radius: 3px; background: var(--win); }
+.dots i.bad { background: var(--lose); }
+.dots i.skip { background: #ffffff40; }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: #00000038; font-size: 14px; font-weight: 800; text-align: left; }
+.seg { display: flex; flex-shrink: 0; padding: 3px; border-radius: 10px; background: #00000040; }
+.seg button { min-width: 44px; padding: 5px 10px; border-radius: 8px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #2b1f04; }
+.toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: #00000038; font-size: 14px; font-weight: 800; text-align: left; }
+.toggle::after { content: ""; flex-shrink: 0; width: 38px; height: 22px; border-radius: 99px; background: #ffffff2a radial-gradient(circle at 11px 50%, #fff 8px, transparent 8.5px); transition: background .2s; }
+.toggle[aria-pressed="true"]::after { background: var(--win) radial-gradient(circle at 27px 50%, #fff 8px, transparent 8.5px); }
+.note2 { margin-top: 8px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.panel ul { margin-top: 12px; padding-left: 18px; text-align: left; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.panel li + li { margin-top: 6px; }
+.panel .link { margin-top: 12px; font-size: 13px; font-weight: 800; color: var(--muted); text-decoration: underline; }
+
+@media (max-width: 400px) {
+  .top { gap: 6px; }
+  h1 { display: none; }
+  .modes { margin-right: auto; }
+  .modes button { padding: 6px 8px; font-size: 12px; }
+  .icon { width: 32px; height: 32px; }
+  .chips { gap: 5px; }
+  .chip { width: 40px; height: 40px; font-size: 12px; }
+  .ghost { padding: 0 8px; }
+  .felt { border-width: 6px; padding-right: 46px; }
+  .meter { right: 6px; width: 32px; }
+  .intro { right: 46px; }
+}
+@media (max-height: 560px) and (max-aspect-ratio: 5/4) {
+  .stat { padding: 2px 4px 3px; }
+  .stat strong { font-size: 15px; }
+  .gbtn { height: 46px; }
+  .gbtn span { font-size: 15px; }
+  .btn { height: 42px; }
+  .btn.small { height: 34px; }
+  .chip { width: 40px; height: 40px; }
+  .ghost { height: 34px; }
+  .strip { height: 32px; }
+  .mini { width: 23px; height: 32px; font-size: 11px; }
+  .mini i { font-size: 10px; }
+}
+
+/* ---------- wide: play column + info column ---------- */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: 1500px; grid-template-columns: minmax(0, 1fr) clamp(236px, 28vw, 350px); grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "top side" "felt side" "msg side" "controls side"; column-gap: 12px; row-gap: 8px; }
+  .side { grid-area: side; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .ladder { display: flex; flex: 1; min-height: 0; }
+  .box { padding: 8px; }
+  .box h3 { display: block; }
+  .strip { height: 42px; }
+  .mini { width: 30px; height: 42px; font-size: 14px; }
+  .mini i { font-size: 12px; }
+  .side .tgrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .tcell { padding: 3px 0 2px; }
+  .tcell b { font-size: 13px; }
+  .tcell span { font-size: 12px; }
+  .felt { border-radius: 34px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-width: 760px) {
+  h1 { display: none; }
+  .modes { margin-right: auto; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { row-gap: 5px; column-gap: 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .side { gap: 5px; }
+  .box { padding: 5px 6px; }
+  .box h3 { margin-bottom: 3px; font-size: 10px; }
+  .stat { padding: 2px 3px 3px; }
+  .stat small { letter-spacing: 0; }
+  .stat strong { font-size: 15px; }
+  .strip { height: 32px; }
+  .mini { width: 23px; height: 32px; font-size: 11px; }
+  .mini i { font-size: 10px; }
+  .tcell { padding: 1px 0; }
+  .tcell b { font-size: 11px; }
+  .tcell span { font-size: 10px; }
+  .ladder li { padding: 2px 6px; font-size: 12px; }
+  .modes button { padding: 5px 8px; font-size: 12px; }
+  .icon { width: 30px; height: 30px; }
+  .felt { border-width: 5px; border-radius: 24px; }
+  .msg { min-height: 17px; font-size: 13px; }
+  .gbtn, .gbar .btn.small { height: 42px; }
+  .gbtn span { font-size: 14px; }
+  .gbtn small { font-size: 11px; }
+  .btn, .betbar .btn { height: 40px; font-size: 15px; }
+  .btn.small { height: 34px; }
+  .chip { width: 38px; height: 38px; font-size: 12px; }
+  .ghost { height: 34px; }
+  .bar { gap: 5px; }
+  .row { gap: 5px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 380px) {
+  .ladder { display: none; }
+  .hud { flex-wrap: wrap; }
+}
+@media (max-height: 420px) {
+  .panel { padding: 12px 14px; }
+  .panel h2 { font-size: 19px; }
+  .panel .score { font-size: 32px; }
+  .panel .btn { margin-top: 10px; height: 40px; }
+  .grid { margin-top: 8px; }
+  .grid strong { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>High Low</h1>
+    <div class="modes" role="group" data-i18n-label="modes">
+      <button type="button" data-mode="ladder" data-i18n="ladder">Ladder</button>
+      <button type="button" data-mode="streak" data-i18n="streak">Streak</button>
+      <button type="button" data-mode="daily" data-i18n="daily">Daily</button>
+    </div>
+    <button type="button" class="icon" id="statsBtn" data-i18n-label="statsBtn"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg></button>
+    <button type="button" class="icon" id="helpBtn" data-i18n-label="help">?</button>
+  </header>
+
+  <section class="felt" id="felt">
+    <div class="stage">
+      <div class="pile" id="pile" aria-hidden="true"><b id="pileN">52</b></div>
+      <div class="slot cur" id="curSlot" role="img"></div>
+      <div class="slot nxt" id="nxtSlot" role="img"></div>
+    </div>
+    <div class="oddsbar" id="oddsBar" aria-hidden="true"><i class="lo"></i><i class="sa"></i><i class="hi"></i></div>
+    <p class="rules" id="rules"></p>
+    <div class="meter" id="meter" aria-hidden="true"><b id="meterLbl"></b><div class="mtrack" id="mtrack"><div class="mfill" id="mfill"></div></div></div>
+    <div class="intro" id="intro" hidden></div>
+    <div class="flash" id="flash"></div>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+  </section>
+
+  <p class="msg" id="msg"></p>
+
+  <div class="controls" id="controls">
+    <div class="bar betbar" id="betBar">
+      <div class="chips">
+        <button type="button" class="chip c100" data-chip="100" aria-keyshortcuts="1">100</button>
+        <button type="button" class="chip c500" data-chip="500" aria-keyshortcuts="2">500</button>
+        <button type="button" class="chip c1000" data-chip="1000" aria-keyshortcuts="3">1K</button>
+        <button type="button" class="chip c5000" data-chip="5000" aria-keyshortcuts="4">5K</button>
+        <button type="button" class="chip c10000" data-chip="10000" aria-keyshortcuts="5">10K</button>
+        <button type="button" class="ghost" id="clearBtn" data-i18n="clear" aria-keyshortcuts="C">Clear</button>
+      </div>
+      <button type="button" class="btn" id="dealBtn" data-i18n="deal" aria-keyshortcuts="Enter Space">Deal</button>
+    </div>
+    <div class="bar gbar off" id="guessBar">
+      <div class="row main">
+        <button type="button" class="gbtn lo" data-g="lo" aria-keyshortcuts="ArrowDown"><span></span><small></small></button>
+        <button type="button" class="gbtn sa" data-g="sa" aria-keyshortcuts="S"><span></span><small></small></button>
+        <button type="button" class="gbtn hi" data-g="hi" aria-keyshortcuts="ArrowUp"><span></span><small></small></button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn small" id="skipBtn" aria-keyshortcuts="K"></button>
+        <button type="button" class="btn small" id="oddsBtn" aria-pressed="false" data-i18n="odds">Odds</button>
+        <button type="button" class="btn small cash" id="cashBtn" aria-keyshortcuts="C"></button>
+      </div>
+    </div>
+    <div class="bar idle off" id="idleBar">
+      <p class="note" id="idleNote"></p>
+      <button type="button" class="btn" id="startBtn" aria-keyshortcuts="Enter Space"></button>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="hud">
+      <div class="stat" id="s0"><small></small><strong></strong></div>
+      <div class="stat" id="s1"><small></small><strong></strong></div>
+      <div class="stat" id="s2"><small></small><strong></strong></div>
+    </div>
+    <div class="box ladder" id="ladderBox">
+      <h3 id="ladderTitle"></h3>
+      <ol id="ladderList"></ol>
+    </div>
+    <div class="box hist">
+      <h3 data-i18n="historyTitle">Revealed cards</h3>
+      <div class="strip" id="strip" role="list"></div>
+    </div>
+    <div class="box track" id="trackBox">
+      <h3><span id="trackN"></span><b data-i18n="trackerTitle">Cards left</b></h3>
+      <div class="tgrid" id="tgrid"></div>
+    </div>
+  </aside>
+</div>
+
+<div class="overlay" id="statsPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <h2 id="statsTitle" data-i18n="statsTitle">Your stats</h2>
+    <div class="grid" id="statsGrid"></div>
+    <h3 data-i18n="options">Options</h3>
+    <div class="opt"><span data-i18n="ace">Ace</span><div class="seg" role="group" data-i18n-label="ace"><button type="button" data-ace="1" data-i18n="aceHigh">High</button><button type="button" data-ace="0" data-i18n="aceLow">Low</button></div></div>
+    <div class="opt"><span data-i18n="decks">Decks</span><div class="seg" role="group" data-i18n-label="decks"><button type="button" data-decks="1">1</button><button type="button" data-decks="2">2</button></div></div>
+    <button type="button" class="toggle" id="trackOpt" data-i18n="trackerOpt" aria-pressed="true">Card tracker</button>
+    <button type="button" class="toggle" id="oddsOpt" data-i18n="oddsOpt" aria-pressed="true">Show probabilities</button>
+    <p class="note2" data-i18n="applyNote"></p>
+    <button type="button" class="link" id="resetStats" data-i18n="reset">Reset stats</button>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="helpPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle" data-i18n="help">How to play</h2>
+    <ul id="helpList"></ul>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="brokePanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="brokeTitle">
+    <h2 id="brokeTitle" data-i18n="broke">Out of chips</h2>
+    <p id="brokeText"></p>
+    <button type="button" class="btn" id="rebuyBtn"></button>
+  </div>
+</div>
+
+<div class="overlay" id="endPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <h2 id="endTitle"></h2>
+    <p id="endSub"></p>
+    <div class="score" id="endScore"></div>
+    <p id="endUnit"></p>
+    <div class="dots" id="endDots" aria-hidden="true"></div>
+    <div class="grid" id="endGrid"></div>
+    <p id="endNext"></p>
+    <button type="button" class="btn" id="endAgain"></button>
+    <button type="button" class="link" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<p class="sr-only" id="sr" aria-live="polite"></p>
+
+<script>
+(() => {
+  'use strict';
+
+  const I18N = {
+    en: {
+      modes: 'Game mode', ladder: 'Ladder', streak: 'Streak', daily: 'Daily', statsBtn: 'Stats and options', help: 'How to play',
+      bank: 'Chips', stake: 'Stake', pot: 'Pot', run: 'Streak', best: 'Best', left: 'Cards left', score: 'Score',
+      higher: 'Higher', lower: 'Lower', same: 'Same', skip: 'Skip', cashOut: 'Cash out', deal: 'Deal', clear: 'Clear', start: 'Start', seeResult: 'See result', odds: 'Odds',
+      houseRule: x => `Same rank loses unless you pick Same · Pays fair odds × ${x}`, tieRule: 'Same rank loses unless you pick Same',
+      placeStake: 'Pick a stake, then deal', yourCall: 'Higher or lower?', stakeHere: 'Stake chips',
+      ladderIntro: 'Stake chips and call the next card. Every right call multiplies the pot by its odds — cash out before you miss.',
+      streakIntro: 'One deck, no chips: call card after card. A single miss ends the run.',
+      dailyIntro: 'Everyone gets the same shuffled deck today. You have one attempt.',
+      deckInfo: (d, hi) => `${d === 1 ? '1 deck' : `${d} decks`} · Ace ${hi ? 'high' : 'low'}`, skipsInfo: n => `${n} skips`, bestN: n => `Best: ${n}`,
+      stepMsg: (m, pot) => `Correct · ×${m} · pot ${pot}`, lostMsg: n => `you lost ${n}`, cashedMsg: n => `Cashed out ${n}`,
+      deckEnd: n => `End of the deck — cashed out ${n}`, topEnd: n => `Top of the ladder — cashed out ${n}`,
+      skipped: n => `Card skipped · ${n} left`, noSkip: 'No skips left',
+      streakMsg: n => `Correct · ${n} in a row`, tieLoss: 'Same rank — that loses', wrongMsg: 'Wrong call',
+      minBet: n => `Minimum stake is ${n}`, maxBet: n => `Table limit is ${n}`, noChips: 'Not enough chips',
+      broke: 'Out of chips', brokeText: n => `The house spots you a fresh stack of ${n} chips.`, rebuy: n => `Take ${n} chips`,
+      runOver: 'Run over', cleared: 'Deck cleared!', inARow: 'correct in a row', newBest: 'New best!', playAgain: 'Play again', close: 'Close',
+      dailyTitle: 'Daily deck', dailyDone: 'Today’s deck is done', nextIn: (h, m) => `Next deck in ${h} h ${m} min`, todayScore: n => `Today: ${n} correct`,
+      dailyBest: 'Daily best', daysPlayed: 'Days played', dayStreak: 'Day streak',
+      statsTitle: 'Your stats', rounds: 'Rounds', cashOuts: 'Cash-outs', bestCash: 'Best cash-out', bestMult: 'Biggest multiplier', longest: 'Longest ladder', bestStreak: 'Best streak', accuracy: 'Correct calls', refills: 'Refills',
+      options: 'Options', ace: 'Ace', aceHigh: 'High', aceLow: 'Low', decks: 'Decks', trackerOpt: 'Card tracker', oddsOpt: 'Show probabilities',
+      applyNote: 'Ace and deck changes apply from the next round. The daily deck always uses 1 deck with Ace high.', reset: 'Reset stats',
+      callsTitle: 'Your calls', ladderTitle: 'Ladder', historyTitle: 'Revealed cards', trackerTitle: 'Cards left', noCalls: 'No calls yet', emptySlot: 'next card',
+      helpLines: [
+        'A card lies face up. Call whether the next card is Higher or Lower — or exactly the Same rank. Suits don’t matter.',
+        'Ties: if the next card has the same rank, Higher and Lower both lose. Only Same wins.',
+        'Ladder: stake chips and deal. Each right call multiplies the pot by the fair odds of that call (worked out from the cards still in the deck) × 0.97 — the buttons show it before you choose. Cash out any time; a wrong call loses the pot.',
+        'Each round or run gives you 3 skips to swap a card you don’t like.',
+        'Streak: no chips — how many calls in a row can you make through one deck? Daily deck: the same shuffle for everyone today, one attempt.',
+        'In the options: Ace high or low, 1 or 2 decks, the card tracker and probabilities.',
+        'Play chips only — no real money is involved.',
+        'Keys: ↑ higher · ↓ lower · S same · K skip · C cash out · Space/Enter deal · 1–5 chips',
+      ],
+    },
+    vi: {
+      modes: 'Chế độ chơi', ladder: 'Leo thang', streak: 'Chuỗi', daily: 'Hằng ngày', statsBtn: 'Thống kê và tùy chọn', help: 'Cách chơi',
+      bank: 'Chip', stake: 'Cược', pot: 'Thưởng', run: 'Chuỗi', best: 'Kỷ lục', left: 'Lá còn lại', score: 'Điểm',
+      higher: 'Cao hơn', lower: 'Thấp hơn', same: 'Bằng', skip: 'Bỏ qua', cashOut: 'Chốt thưởng', deal: 'Chia bài', clear: 'Xóa', start: 'Bắt đầu', seeResult: 'Xem kết quả', odds: 'Xác suất',
+      houseRule: x => `Cùng hạng là thua, trừ khi chọn Bằng · Trả theo tỉ lệ công bằng × ${x}`, tieRule: 'Cùng hạng là thua, trừ khi chọn Bằng',
+      placeStake: 'Chọn mức cược rồi chia bài', yourCall: 'Cao hơn hay thấp hơn?', stakeHere: 'Đặt chip',
+      ladderIntro: 'Đặt chip rồi đoán lá kế tiếp. Mỗi lần đoán đúng, tiền thưởng được nhân theo tỉ lệ — hãy chốt trước khi đoán trượt.',
+      streakIntro: 'Một bộ bài, không cần chip: đoán liên tiếp từng lá. Sai một lần là kết thúc.',
+      dailyIntro: 'Hôm nay ai cũng nhận cùng một bộ bài đã xáo. Bạn chỉ có một lượt chơi.',
+      deckInfo: (d, hi) => `${d} bộ bài · Át ${hi ? 'cao' : 'thấp'}`, skipsInfo: n => `${n} lượt bỏ qua`, bestN: n => `Kỷ lục: ${n}`,
+      stepMsg: (m, pot) => `Đúng · ×${m} · thưởng ${pot}`, lostMsg: n => `mất ${n}`, cashedMsg: n => `Đã chốt ${n}`,
+      deckEnd: n => `Hết bộ bài — tự chốt ${n}`, topEnd: n => `Lên đỉnh thang — tự chốt ${n}`,
+      skipped: n => `Đã bỏ qua lá · còn ${n} lượt`, noSkip: 'Hết lượt bỏ qua',
+      streakMsg: n => `Đúng · ${n} lá liên tiếp`, tieLoss: 'Cùng hạng — tính là thua', wrongMsg: 'Đoán sai',
+      minBet: n => `Cược tối thiểu là ${n}`, maxBet: n => `Giới hạn bàn là ${n}`, noChips: 'Không đủ chip',
+      broke: 'Hết chip', brokeText: n => `Nhà cái tặng bạn ${n} chip mới.`, rebuy: n => `Nhận ${n} chip`,
+      runOver: 'Kết thúc lượt', cleared: 'Đã đi hết bộ bài!', inARow: 'lần đúng liên tiếp', newBest: 'Kỷ lục mới!', playAgain: 'Chơi lại', close: 'Đóng',
+      dailyTitle: 'Bộ bài hôm nay', dailyDone: 'Bạn đã chơi bộ bài hôm nay', nextIn: (h, m) => `Bộ bài mới sau ${h} giờ ${m} phút`, todayScore: n => `Hôm nay: ${n} lần đúng`,
+      dailyBest: 'Kỷ lục ngày', daysPlayed: 'Số ngày chơi', dayStreak: 'Chuỗi ngày',
+      statsTitle: 'Thống kê của bạn', rounds: 'Số ván', cashOuts: 'Lần chốt', bestCash: 'Chốt lớn nhất', bestMult: 'Hệ số lớn nhất', longest: 'Thang dài nhất', bestStreak: 'Chuỗi dài nhất', accuracy: 'Tỉ lệ đoán đúng', refills: 'Lần nhận chip',
+      options: 'Tùy chọn', ace: 'Át', aceHigh: 'Cao', aceLow: 'Thấp', decks: 'Số bộ bài', trackerOpt: 'Bảng đếm lá', oddsOpt: 'Hiện xác suất',
+      applyNote: 'Thay đổi về Át và số bộ bài áp dụng từ ván sau. Bộ bài hôm nay luôn dùng 1 bộ, Át cao.', reset: 'Xóa thống kê',
+      callsTitle: 'Lượt đoán', ladderTitle: 'Thang thưởng', historyTitle: 'Lá đã lật', trackerTitle: 'Lá còn lại', noCalls: 'Chưa đoán lá nào', emptySlot: 'lá kế tiếp',
+      helpLines: [
+        'Một lá bài đang ngửa. Hãy đoán lá tiếp theo Cao hơn hay Thấp hơn — hoặc Bằng đúng hạng đó. Chất không quan trọng.',
+        'Hòa: nếu lá tiếp theo cùng hạng, cả Cao hơn và Thấp hơn đều thua. Chỉ Bằng mới thắng.',
+        'Leo thang: đặt chip rồi chia bài. Mỗi lần đoán đúng, tiền thưởng được nhân với tỉ lệ công bằng của lựa chọn đó (tính từ các lá còn trong bộ) × 0,97 — hiện sẵn trên nút trước khi chọn. Chốt thưởng bất cứ lúc nào; đoán sai là mất hết.',
+        'Mỗi ván hoặc lượt chơi có 3 lần bỏ qua để đổi lá bạn không ưng.',
+        'Chuỗi: không cần chip — bạn đoán đúng liên tiếp được bao nhiêu lá trong một bộ? Hằng ngày: cùng một bộ bài cho mọi người hôm nay, chỉ một lượt.',
+        'Trong tùy chọn: Át cao hoặc thấp, 1 hoặc 2 bộ bài, bảng đếm lá và xác suất.',
+        'Chỉ chơi bằng chip ảo, không dùng tiền thật.',
+        'Phím: ↑ cao hơn · ↓ thấp hơn · S bằng · K bỏ qua · C chốt thưởng · Space/Enter chia bài · 1–5 chọn chip',
+      ],
+    },
+    zh: {
+      modes: '游戏模式', ladder: '阶梯', streak: '连胜', daily: '每日', statsBtn: '统计与选项', help: '玩法',
+      bank: '筹码', stake: '下注', pot: '奖池', run: '连胜', best: '最佳', left: '剩余牌数', score: '得分',
+      higher: '更大', lower: '更小', same: '相同', skip: '跳过', cashOut: '兑现', deal: '发牌', clear: '清除', start: '开始', seeResult: '查看结果', odds: '概率',
+      houseRule: x => `点数相同即输，除非选「相同」· 按公平赔率 × ${x} 赔付`, tieRule: '点数相同即输，除非选「相同」',
+      placeStake: '选择下注额，然后发牌', yourCall: '更大还是更小？', stakeHere: '下注筹码',
+      ladderIntro: '下注筹码，猜下一张牌。每猜对一次，奖池就按赔率翻倍增长——在猜错之前兑现吧。',
+      streakIntro: '一副牌，不用筹码：一张接一张地猜。猜错一次就结束。',
+      dailyIntro: '今天所有人都拿到同一副洗好的牌。你只有一次机会。',
+      deckInfo: (d, hi) => `${d} 副牌 · A ${hi ? '最大' : '最小'}`, skipsInfo: n => `${n} 次跳过`, bestN: n => `最佳：${n}`,
+      stepMsg: (m, pot) => `猜对 · ×${m} · 奖池 ${pot}`, lostMsg: n => `输掉 ${n}`, cashedMsg: n => `已兑现 ${n}`,
+      deckEnd: n => `牌已发完——自动兑现 ${n}`, topEnd: n => `登上阶梯顶端——自动兑现 ${n}`,
+      skipped: n => `已跳过 · 还剩 ${n} 次`, noSkip: '跳过次数已用完',
+      streakMsg: n => `猜对 · 连续 ${n} 张`, tieLoss: '点数相同——判输', wrongMsg: '猜错了',
+      minBet: n => `最低下注 ${n}`, maxBet: n => `本桌上限 ${n}`, noChips: '筹码不足',
+      broke: '筹码用完了', brokeText: n => `庄家再送你 ${n} 筹码。`, rebuy: n => `领取 ${n} 筹码`,
+      runOver: '本轮结束', cleared: '整副牌全部猜完！', inARow: '连续猜对', newBest: '新纪录！', playAgain: '再玩一次', close: '关闭',
+      dailyTitle: '每日牌局', dailyDone: '今天的牌局已完成', nextIn: (h, m) => `${h} 小时 ${m} 分钟后开放新牌局`, todayScore: n => `今天：猜对 ${n} 次`,
+      dailyBest: '每日最佳', daysPlayed: '参与天数', dayStreak: '连续天数',
+      statsTitle: '你的统计', rounds: '局数', cashOuts: '兑现次数', bestCash: '最大兑现', bestMult: '最高倍数', longest: '最长阶梯', bestStreak: '最长连胜', accuracy: '猜中率', refills: '补充次数',
+      options: '选项', ace: 'A', aceHigh: '最大', aceLow: '最小', decks: '牌副数', trackerOpt: '记牌器', oddsOpt: '显示概率',
+      applyNote: 'A 的大小和牌副数从下一局开始生效。每日牌局固定使用 1 副牌、A 最大。', reset: '重置统计',
+      callsTitle: '猜牌记录', ladderTitle: '阶梯', historyTitle: '已翻开的牌', trackerTitle: '剩余牌', noCalls: '还没有猜牌', emptySlot: '下一张牌',
+      helpLines: [
+        '桌上有一张明牌。猜下一张牌更大还是更小——或点数完全相同。花色不计。',
+        '平局：如果下一张牌点数相同，「更大」和「更小」都算输，只有「相同」获胜。',
+        '阶梯：下注筹码后发牌。每猜对一次，奖池乘以该选项的公平赔率（根据牌堆中剩余的牌计算）× 0.97，选择前按钮上就会显示。随时可以兑现；猜错则输掉奖池。',
+        '每局或每轮有 3 次跳过机会，可以换掉不想猜的牌。',
+        '连胜：不用筹码——一副牌里你能连续猜对多少张？每日牌局：今天所有人同一副牌，只有一次机会。',
+        '选项中可设置：A 最大或最小、1 或 2 副牌、记牌器和概率显示。',
+        '只使用虚拟筹码，不涉及真钱。',
+        '按键：↑ 更大 · ↓ 更小 · S 相同 · K 跳过 · C 兑现 · 空格/Enter 发牌 · 1–5 筹码',
+      ],
+    },
+    fr: {
+      modes: 'Mode de jeu', ladder: 'Échelle', streak: 'Série', daily: 'Du jour', statsBtn: 'Statistiques et options', help: 'Règles du jeu',
+      bank: 'Jetons', stake: 'Mise', pot: 'Cagnotte', run: 'Série', best: 'Record', left: 'Restantes', score: 'Score',
+      higher: 'Plus haut', lower: 'Plus bas', same: 'Égal', skip: 'Passer', cashOut: 'Encaisser', deal: 'Distribuer', clear: 'Effacer', start: 'Commencer', seeResult: 'Voir le résultat', odds: 'Probas',
+      houseRule: x => `Même valeur = perdu, sauf si vous choisissez Égal · Paie la cote juste × ${x}`, tieRule: 'Même valeur = perdu, sauf si vous choisissez Égal',
+      placeStake: 'Choisissez une mise, puis distribuez', yourCall: 'Plus haut ou plus bas ?', stakeHere: 'Misez des jetons',
+      ladderIntro: 'Misez et devinez la carte suivante. Chaque bonne réponse multiplie la cagnotte selon sa cote — encaissez avant de vous tromper.',
+      streakIntro: 'Un seul paquet, sans jetons : devinez carte après carte. Une seule erreur met fin à la série.',
+      dailyIntro: 'Aujourd’hui, tout le monde reçoit le même paquet mélangé. Vous n’avez qu’un essai.',
+      deckInfo: (d, hi) => `${d} jeu${d > 1 ? 'x' : ''} · As ${hi ? 'fort' : 'faible'}`, skipsInfo: n => `${n} passes`, bestN: n => `Record : ${n}`,
+      stepMsg: (m, pot) => `Bien vu · ×${m} · cagnotte ${pot}`, lostMsg: n => `vous perdez ${n}`, cashedMsg: n => `Encaissé : ${n}`,
+      deckEnd: n => `Fin du paquet — ${n} encaissés`, topEnd: n => `Sommet de l’échelle — ${n} encaissés`,
+      skipped: n => `Carte passée · encore ${n}`, noSkip: 'Plus de passes',
+      streakMsg: n => `Bien vu · ${n} d’affilée`, tieLoss: 'Même valeur — c’est perdu', wrongMsg: 'Raté',
+      minBet: n => `Mise minimum : ${n}`, maxBet: n => `Limite de la table : ${n}`, noChips: 'Pas assez de jetons',
+      broke: 'Plus de jetons', brokeText: n => `La maison vous offre ${n} nouveaux jetons.`, rebuy: n => `Prendre ${n} jetons`,
+      runOver: 'Série terminée', cleared: 'Paquet terminé !', inARow: 'bonnes réponses d’affilée', newBest: 'Nouveau record !', playAgain: 'Rejouer', close: 'Fermer',
+      dailyTitle: 'Paquet du jour', dailyDone: 'Le paquet du jour est joué', nextIn: (h, m) => `Prochain paquet dans ${h} h ${m} min`, todayScore: n => `Aujourd’hui : ${n} bonnes réponses`,
+      dailyBest: 'Record du jour', daysPlayed: 'Jours joués', dayStreak: 'Jours d’affilée',
+      statsTitle: 'Vos statistiques', rounds: 'Manches', cashOuts: 'Encaissements', bestCash: 'Plus gros gain', bestMult: 'Plus gros multiplicateur', longest: 'Plus longue échelle', bestStreak: 'Meilleure série', accuracy: 'Bonnes réponses', refills: 'Recharges',
+      options: 'Options', ace: 'As', aceHigh: 'Fort', aceLow: 'Faible', decks: 'Paquets', trackerOpt: 'Suivi des cartes', oddsOpt: 'Afficher les probabilités',
+      applyNote: 'Les réglages de l’As et du nombre de paquets s’appliquent à la manche suivante. Le paquet du jour utilise toujours 1 jeu, As fort.', reset: 'Réinitialiser',
+      callsTitle: 'Vos choix', ladderTitle: 'Échelle', historyTitle: 'Cartes révélées', trackerTitle: 'Cartes restantes', noCalls: 'Aucun pari pour l’instant', emptySlot: 'carte suivante',
+      helpLines: [
+        'Une carte est retournée. Devinez si la suivante sera Plus haute ou Plus basse — ou exactement de même valeur (Égal). Les couleurs ne comptent pas.',
+        'Égalité : si la carte suivante a la même valeur, Plus haut et Plus bas perdent tous les deux. Seul Égal gagne.',
+        'Échelle : misez des jetons et distribuez. Chaque bonne réponse multiplie la cagnotte par la cote juste de ce choix (calculée sur les cartes restantes) × 0,97, affichée sur les boutons avant de choisir. Encaissez quand vous voulez ; une erreur fait perdre la cagnotte.',
+        'Chaque manche ou série donne 3 passes pour écarter une carte qui ne vous plaît pas.',
+        'Série : sans jetons — combien de bonnes réponses d’affilée sur un paquet ? Paquet du jour : le même mélange pour tous aujourd’hui, un seul essai.',
+        'Dans les options : As fort ou faible, 1 ou 2 jeux, suivi des cartes et probabilités.',
+        'Jetons fictifs uniquement, aucun argent réel.',
+        'Touches : ↑ plus haut · ↓ plus bas · S égal · K passer · C encaisser · Espace/Entrée distribuer · 1–5 jetons',
+      ],
+    },
+    th: {
+      modes: 'โหมดเกม', ladder: 'ไต่บันได', streak: 'ต่อเนื่อง', daily: 'รายวัน', statsBtn: 'สถิติและตัวเลือก', help: 'วิธีเล่น',
+      bank: 'ชิป', stake: 'เดิมพัน', pot: 'กองชิป', run: 'ต่อเนื่อง', best: 'ดีที่สุด', left: 'ไพ่ที่เหลือ', score: 'คะแนน',
+      higher: 'สูงกว่า', lower: 'ต่ำกว่า', same: 'เท่ากัน', skip: 'ข้าม', cashOut: 'เก็บชิป', deal: 'แจกไพ่', clear: 'ล้าง', start: 'เริ่ม', seeResult: 'ดูผล', odds: 'โอกาส',
+      houseRule: x => `แต้มเท่ากันถือว่าแพ้ ยกเว้นเลือกเท่ากัน · จ่ายตามอัตราจริง × ${x}`, tieRule: 'แต้มเท่ากันถือว่าแพ้ ยกเว้นเลือกเท่ากัน',
+      placeStake: 'เลือกเดิมพัน แล้วกดแจกไพ่', yourCall: 'สูงกว่าหรือต่ำกว่า?', stakeHere: 'วางชิป',
+      ladderIntro: 'วางชิปแล้วทายไพ่ใบถัดไป ทายถูกแต่ละครั้งกองชิปจะคูณตามอัตราต่อรอง เก็บชิปก่อนจะทายพลาด',
+      streakIntro: 'ไพ่หนึ่งสำรับ ไม่ใช้ชิป ทายต่อกันไปทีละใบ พลาดครั้งเดียวก็จบ',
+      dailyIntro: 'วันนี้ทุกคนได้ไพ่ที่สับแล้วชุดเดียวกัน คุณมีโอกาสเล่นเพียงครั้งเดียว',
+      deckInfo: (d, hi) => `ไพ่ ${d} สำรับ · เอซ${hi ? 'สูง' : 'ต่ำ'}`, skipsInfo: n => `ข้ามได้ ${n} ครั้ง`, bestN: n => `ดีที่สุด: ${n}`,
+      stepMsg: (m, pot) => `ถูกต้อง · ×${m} · กองชิป ${pot}`, lostMsg: n => `เสีย ${n}`, cashedMsg: n => `เก็บชิปแล้ว ${n}`,
+      deckEnd: n => `ไพ่หมดสำรับ — เก็บชิปให้อัตโนมัติ ${n}`, topEnd: n => `ถึงยอดบันได — เก็บชิปให้อัตโนมัติ ${n}`,
+      skipped: n => `ข้ามไพ่แล้ว · เหลือ ${n} ครั้ง`, noSkip: 'ใช้สิทธิ์ข้ามหมดแล้ว',
+      streakMsg: n => `ถูกต้อง · ติดกัน ${n} ใบ`, tieLoss: 'แต้มเท่ากัน — ถือว่าแพ้', wrongMsg: 'ทายผิด',
+      minBet: n => `เดิมพันขั้นต่ำ ${n}`, maxBet: n => `เดิมพันสูงสุดของโต๊ะ ${n}`, noChips: 'ชิปไม่พอ',
+      broke: 'ชิปหมดแล้ว', brokeText: n => `เจ้ามือมอบชิปใหม่ให้คุณ ${n} ชิป`, rebuy: n => `รับ ${n} ชิป`,
+      runOver: 'จบรอบแล้ว', cleared: 'ทายครบทั้งสำรับ!', inARow: 'ครั้งที่ทายถูกติดกัน', newBest: 'สถิติใหม่!', playAgain: 'เล่นอีกครั้ง', close: 'ปิด',
+      dailyTitle: 'ไพ่ประจำวัน', dailyDone: 'เล่นไพ่ประจำวันนี้แล้ว', nextIn: (h, m) => `ไพ่ชุดใหม่ในอีก ${h} ชม. ${m} นาที`, todayScore: n => `วันนี้: ทายถูก ${n} ครั้ง`,
+      dailyBest: 'ดีที่สุดรายวัน', daysPlayed: 'จำนวนวันที่เล่น', dayStreak: 'เล่นติดกัน (วัน)',
+      statsTitle: 'สถิติของคุณ', rounds: 'จำนวนรอบ', cashOuts: 'เก็บชิป', bestCash: 'เก็บได้มากสุด', bestMult: 'ตัวคูณสูงสุด', longest: 'บันไดยาวสุด', bestStreak: 'ต่อเนื่องสูงสุด', accuracy: 'ทายถูก', refills: 'รับชิปเพิ่ม',
+      options: 'ตัวเลือก', ace: 'เอซ', aceHigh: 'สูง', aceLow: 'ต่ำ', decks: 'จำนวนสำรับ', trackerOpt: 'ตัวนับไพ่', oddsOpt: 'แสดงความน่าจะเป็น',
+      applyNote: 'การเปลี่ยนเอซและจำนวนสำรับจะมีผลในรอบถัดไป ไพ่ประจำวันใช้ไพ่ 1 สำรับและเอซสูงเสมอ', reset: 'รีเซ็ตสถิติ',
+      callsTitle: 'การทายของคุณ', ladderTitle: 'บันได', historyTitle: 'ไพ่ที่เปิดแล้ว', trackerTitle: 'ไพ่ที่เหลือ', noCalls: 'ยังไม่ได้ทาย', emptySlot: 'ไพ่ใบถัดไป',
+      helpLines: [
+        'มีไพ่หงายอยู่หนึ่งใบ ทายว่าใบถัดไปจะสูงกว่าหรือต่ำกว่า หรือแต้มเท่ากันพอดี ดอกไม่มีผล',
+        'กรณีเสมอ: ถ้าใบถัดไปแต้มเท่ากัน ทั้งสูงกว่าและต่ำกว่าถือว่าแพ้ มีแค่เท่ากันที่ชนะ',
+        'ไต่บันได: วางชิปแล้วแจกไพ่ ทายถูกแต่ละครั้งกองชิปจะคูณด้วยอัตราจริงของตัวเลือกนั้น (คำนวณจากไพ่ที่ยังเหลือในสำรับ) × 0.97 ซึ่งแสดงบนปุ่มก่อนเลือก เก็บชิปได้ทุกเมื่อ ทายผิดจะเสียกองชิปทั้งหมด',
+        'แต่ละรอบข้ามไพ่ได้ 3 ครั้ง เพื่อเปลี่ยนใบที่ไม่อยากทาย',
+        'ต่อเนื่อง: ไม่ใช้ชิป ดูว่าทายถูกติดกันได้กี่ใบในหนึ่งสำรับ ไพ่ประจำวัน: ทุกคนได้ไพ่ชุดเดียวกันในวันนี้ เล่นได้ครั้งเดียว',
+        'ในตัวเลือก: เอซสูงหรือต่ำ ไพ่ 1 หรือ 2 สำรับ ตัวนับไพ่และความน่าจะเป็น',
+        'เล่นด้วยชิปเสมือนเท่านั้น ไม่มีเงินจริง',
+        'ปุ่ม: ↑ สูงกว่า · ↓ ต่ำกว่า · S เท่ากัน · K ข้าม · C เก็บชิป · Space/Enter แจกไพ่ · 1–5 ชิป',
+      ],
+    },
+    ja: {
+      modes: 'ゲームモード', ladder: 'ラダー', streak: '連続', daily: 'デイリー', statsBtn: '成績とオプション', help: '遊び方',
+      bank: 'チップ', stake: 'ベット', pot: 'ポット', run: '連続', best: 'ベスト', left: '残り枚数', score: 'スコア',
+      higher: 'ハイ', lower: 'ロー', same: '同じ', skip: 'スキップ', cashOut: '受け取る', deal: 'ディール', clear: 'クリア', start: 'スタート', seeResult: '結果を見る', odds: '確率',
+      houseRule: x => `同じ数字は負け（「同じ」を選んだ場合を除く）· 配当は公正オッズ × ${x}`, tieRule: '同じ数字は負け（「同じ」を選んだ場合を除く）',
+      placeStake: 'ベット額を決めてディール', yourCall: 'ハイ？ それともロー？', stakeHere: 'チップを置こう',
+      ladderIntro: 'チップを賭けて次のカードを予想。当たるたびにポットがオッズ分だけ増えていきます。外す前に受け取ろう。',
+      streakIntro: 'デッキ1組、チップなし。1枚ずつ予想を続けて、1回外したら終了です。',
+      dailyIntro: '今日は全員が同じ順番のデッキに挑戦。チャンスは1回だけ。',
+      deckInfo: (d, hi) => `${d}デッキ · Aは${hi ? '最強' : '最弱'}`, skipsInfo: n => `スキップ${n}回`, bestN: n => `ベスト：${n}`,
+      stepMsg: (m, pot) => `正解 · ×${m} · ポット ${pot}`, lostMsg: n => `${n}を失いました`, cashedMsg: n => `${n}を受け取りました`,
+      deckEnd: n => `デッキ終了 — ${n}を自動で受け取り`, topEnd: n => `ラダーの頂上 — ${n}を自動で受け取り`,
+      skipped: n => `スキップしました · 残り${n}回`, noSkip: 'スキップは使い切りました',
+      streakMsg: n => `正解 · ${n}連続`, tieLoss: '同じ数字 — 負けです', wrongMsg: 'はずれ',
+      minBet: n => `最低ベットは${n}です`, maxBet: n => `テーブル上限は${n}です`, noChips: 'チップが足りません',
+      broke: 'チップがなくなりました', brokeText: n => `ハウスから新しいチップ${n}枚をどうぞ。`, rebuy: n => `${n}チップを受け取る`,
+      runOver: 'ゲームオーバー', cleared: 'デッキを完走！', inARow: '連続正解', newBest: '自己ベスト更新！', playAgain: 'もう一度', close: '閉じる',
+      dailyTitle: 'デイリーデッキ', dailyDone: '今日のデッキはプレイ済み', nextIn: (h, m) => `次のデッキまで${h}時間${m}分`, todayScore: n => `今日：${n}回正解`,
+      dailyBest: 'デイリーベスト', daysPlayed: 'プレイ日数', dayStreak: '連続日数',
+      statsTitle: 'あなたの成績', rounds: 'ラウンド数', cashOuts: '受け取り回数', bestCash: '最高受け取り額', bestMult: '最高倍率', longest: '最長ラダー', bestStreak: '最高連続', accuracy: '正解率', refills: 'チップ補充',
+      options: 'オプション', ace: 'A', aceHigh: '最強', aceLow: '最弱', decks: 'デッキ数', trackerOpt: 'カードトラッカー', oddsOpt: '確率を表示',
+      applyNote: 'Aとデッキ数の変更は次のラウンドから反映されます。デイリーデッキは常に1デッキ・A最強です。', reset: '成績をリセット',
+      callsTitle: '予想の履歴', ladderTitle: 'ラダー', historyTitle: '公開済みのカード', trackerTitle: '残りのカード', noCalls: 'まだ予想していません', emptySlot: '次のカード',
+      helpLines: [
+        '表向きのカードが1枚。次のカードがそれより上（ハイ）か下（ロー）か、それとも同じ数字かを予想します。マークは関係ありません。',
+        '同じ数字が出た場合、ハイもローも負け。「同じ」を選んだときだけ勝ちです。',
+        'ラダー：チップを賭けてディール。正解するたびに、その選択の公正オッズ（デッキに残っているカードから計算）× 0.97 でポットが増えます。倍率は選ぶ前にボタンに表示。いつでも受け取れますが、外すとポットは没収です。',
+        '1ラウンド（1ゲーム）につき3回まで、気に入らないカードをスキップできます。',
+        '連続：チップなしで、1デッキで何回連続で当てられるか挑戦。デイリー：今日は全員同じシャッフル、挑戦は1回だけ。',
+        'オプション：Aの強さ、デッキ数（1か2）、カードトラッカーと確率表示。',
+        '使うのは仮想チップだけ。本物のお金は一切かかりません。',
+        'キー：↑ ハイ · ↓ ロー · S 同じ · K スキップ · C 受け取る · Space/Enter ディール · 1–5 チップ',
+      ],
+    },
+    ko: {
+      modes: '게임 모드', ladder: '사다리', streak: '연승', daily: '데일리', statsBtn: '기록 및 옵션', help: '게임 방법',
+      bank: '칩', stake: '베팅', pot: '팟', run: '연승', best: '최고', left: '남은 카드', score: '점수',
+      higher: '높음', lower: '낮음', same: '같음', skip: '건너뛰기', cashOut: '정산', deal: '딜', clear: '지우기', start: '시작', seeResult: '결과 보기', odds: '확률',
+      houseRule: x => `같은 숫자는 패배 (같음 선택 시 제외) · 공정 배당 × ${x} 지급`, tieRule: '같은 숫자는 패배 (같음 선택 시 제외)',
+      placeStake: '베팅 금액을 정하고 딜하세요', yourCall: '높을까요, 낮을까요?', stakeHere: '칩을 거세요',
+      ladderIntro: '칩을 걸고 다음 카드를 맞혀 보세요. 맞힐 때마다 팟이 배당만큼 불어나요. 틀리기 전에 정산하세요.',
+      streakIntro: '덱 하나, 칩 없이 한 장씩 계속 맞혀요. 한 번만 틀려도 끝나요.',
+      dailyIntro: '오늘은 모두가 똑같이 섞인 덱을 받아요. 기회는 한 번뿐이에요.',
+      deckInfo: (d, hi) => `${d}덱 · 에이스 ${hi ? '높음' : '낮음'}`, skipsInfo: n => `건너뛰기 ${n}회`, bestN: n => `최고: ${n}`,
+      stepMsg: (m, pot) => `정답 · ×${m} · 팟 ${pot}`, lostMsg: n => `${n} 잃음`, cashedMsg: n => `${n} 정산 완료`,
+      deckEnd: n => `덱 끝 — ${n} 자동 정산`, topEnd: n => `사다리 꼭대기 — ${n} 자동 정산`,
+      skipped: n => `카드를 건너뛰었어요 · ${n}회 남음`, noSkip: '건너뛰기를 다 썼어요',
+      streakMsg: n => `정답 · ${n}연속`, tieLoss: '같은 숫자 — 패배예요', wrongMsg: '틀렸어요',
+      minBet: n => `최소 베팅은 ${n}이에요`, maxBet: n => `테이블 한도는 ${n}이에요`, noChips: '칩이 부족해요',
+      broke: '칩이 다 떨어졌어요', brokeText: n => `하우스가 새 칩 ${n}개를 드려요.`, rebuy: n => `칩 ${n}개 받기`,
+      runOver: '게임 종료', cleared: '덱 완주!', inARow: '연속 정답', newBest: '최고 기록!', playAgain: '다시 하기', close: '닫기',
+      dailyTitle: '오늘의 덱', dailyDone: '오늘의 덱을 이미 플레이했어요', nextIn: (h, m) => `다음 덱까지 ${h}시간 ${m}분`, todayScore: n => `오늘: ${n}번 정답`,
+      dailyBest: '데일리 최고', daysPlayed: '플레이한 날', dayStreak: '연속 일수',
+      statsTitle: '내 기록', rounds: '라운드', cashOuts: '정산 횟수', bestCash: '최대 정산', bestMult: '최고 배율', longest: '최장 사다리', bestStreak: '최고 연승', accuracy: '정답률', refills: '칩 충전',
+      options: '옵션', ace: '에이스', aceHigh: '높음', aceLow: '낮음', decks: '덱 수', trackerOpt: '카드 트래커', oddsOpt: '확률 표시',
+      applyNote: '에이스와 덱 수 변경은 다음 라운드부터 적용돼요. 오늘의 덱은 항상 1덱, 에이스 높음이에요.', reset: '기록 초기화',
+      callsTitle: '내 선택', ladderTitle: '사다리', historyTitle: '공개된 카드', trackerTitle: '남은 카드', noCalls: '아직 고른 카드가 없어요', emptySlot: '다음 카드',
+      helpLines: [
+        '앞면 카드가 한 장 있어요. 다음 카드가 더 높을지, 낮을지, 아니면 정확히 같은 숫자일지 맞혀 보세요. 무늬는 상관없어요.',
+        '무승부: 다음 카드가 같은 숫자면 높음과 낮음 모두 패배예요. 같음만 이겨요.',
+        '사다리: 칩을 걸고 딜하세요. 맞힐 때마다 팟에 그 선택의 공정 배당(덱에 남은 카드로 계산) × 0.97을 곱해요. 배율은 고르기 전에 버튼에 보여요. 언제든 정산할 수 있고, 틀리면 팟을 잃어요.',
+        '라운드마다 마음에 들지 않는 카드를 3번까지 건너뛸 수 있어요.',
+        '연승: 칩 없이 덱 하나로 몇 번 연속 맞힐 수 있는지 도전해요. 데일리: 오늘은 모두 같은 셔플, 기회는 한 번이에요.',
+        '옵션: 에이스 높음/낮음, 1덱 또는 2덱, 카드 트래커와 확률 표시.',
+        '가상 칩만 사용해요. 실제 돈은 전혀 쓰지 않아요.',
+        '키: ↑ 높음 · ↓ 낮음 · S 같음 · K 건너뛰기 · C 정산 · Space/Enter 딜 · 1–5 칩',
+      ],
+    },
+  };
+
+  const param = new URLSearchParams(location.search).get('lang');
+  const lang = Object.hasOwn(I18N, param) ? param : 'en';
+  const t = I18N[lang];
+  const locale = lang === 'zh' ? 'zh-Hans' : lang;
+  document.documentElement.lang = locale;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t[el.dataset.i18n]; });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => { el.setAttribute('aria-label', t[el.dataset.i18nLabel]); });
+  document.getElementById('helpList').innerHTML = t.helpLines.map(line => `<li>${line}</li>`).join('');
+
+  const nf = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const nf2 = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const nfc = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 2 });
+  const fmt = n => nf.format(n);
+  const fmtBig = n => (n >= 1e7 ? nfc.format(n) : nf.format(n));
+  const fmtX = cents => nf2.format(cents / 100);
+  const fmtPct = p => new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: p > 0 && p < 0.1 ? 1 : 0 }).format(p);
+
+  const store = {
+    get(key, fallback) {
+      try { const raw = localStorage.getItem(`milaan.highLow.${key}`); return raw == null ? fallback : JSON.parse(raw); } catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(`milaan.highLow.${key}`, JSON.stringify(value)); } catch {}
+    },
+  };
+
+  const $ = id => document.getElementById(id);
+  const felt = $('felt');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let T = reduced ? { deal: 0, flip: 0, hold: 420 } : { deal: 240, flip: 440, hold: 560 };
+  const HOUSE = 97; // house factor in percent: payouts are fair odds × 0.97
+  const MIN_BET = 100;
+  const MAX_BET = 50000;
+  const START_BANK = 100000;
+  const CHIPS = [100, 500, 1000, 5000, 10000];
+  const SKIPS = 3;
+  const CAP = 1000; // the pot cashes out automatically at 1000× the stake
+  const SUITS = ['♠', '♥', '♦', '♣'];
+  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const GUESS = { hi: { key: 'higher' }, lo: { key: 'lower' }, sa: { key: 'same' } };
+  const arrowSvg = g => (g === 'sa' ? '<svg class="ar" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2.6h8v1.8H1zm0 3h8v1.8H1z"/></svg>'
+    : `<svg class="ar" viewBox="0 0 10 10" aria-hidden="true"><path d="${g === 'hi' ? 'M5 1.2 9.6 8.8H.4z' : 'M5 8.8 9.6 1.2H.4z'}"/></svg>`);
+
+  const defaultStats = () => ({ rounds: 0, cashOuts: 0, bestCash: 0, bestMult: 0, longest: 0, bestStreak: 0, runs: 0, calls: 0, correct: 0, refills: 0 });
+  const stats = Object.assign(defaultStats(), store.get('stats', {}));
+  const settings = Object.assign({ aceHigh: true, decks: 1, tracker: true, odds: true }, store.get('settings', {}));
+  let dailyLog = store.get('dailyLog', {});
+  if (!dailyLog || typeof dailyLog !== 'object') dailyLog = {};
+  let mode = ['ladder', 'streak', 'daily'].includes(store.get('mode', 'ladder')) ? store.get('mode', 'ladder') : 'ladder';
+  let bank = Number(store.get('chips', START_BANK));
+  if (!(bank >= 0)) bank = START_BANK;
+  let stake = Math.min(Math.max(Number(store.get('stake', 1000)) || 0, 0), MAX_BET);
+  const runs = { ladder: null, streak: null, daily: null };
+  let busy = false;
+  let forced = null;
+
+  // ---------- cards and odds ----------
+  const rankVal = (r, aceHigh) => (r === 'A' ? (aceHigh ? 14 : 1) : r === 'J' ? 11 : r === 'Q' ? 12 : r === 'K' ? 13 : Number(r));
+  const isRed = c => c.s === '♥' || c.s === '♦';
+  const cardName = c => `${c.r}${c.s}`;
+  function makeDeck(decks) {
+    const deck = [];
+    for (let d = 0; d < decks; d++) for (const s of SUITS) for (const r of RANKS) deck.push({ r, s });
+    return deck;
+  }
+  function shuffle(deck, rnd = Math.random) {
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+  }
+  // Seeded shuffle for the daily deck: string hash → 32-bit seed → small PRNG.
+  function hashSeed(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function mulberry32(a) {
+    return () => {
+      a = (a + 0x6D2B79F5) | 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const dailyDeck = date => shuffle(makeDeck(1), mulberry32(hashSeed(`milaan-high-low:${date}`)));
+  const pad2 = n => String(n).padStart(2, '0');
+  const dateKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const today = () => dateKey(new Date());
+
+  // Payout multiplier in hundredths: fair odds (cards left ÷ winning cards) × 0.97, rounded down, never below 1.00.
+  const multCents = (wins, n) => (wins > 0 ? Math.max(100, Math.floor((HOUSE * n) / wins)) : 0);
+  function oddsFor(curVal, rest, aceHigh) {
+    const o = { n: rest.length, lo: 0, sa: 0, hi: 0 };
+    for (const c of rest) {
+      const v = rankVal(c.r, aceHigh);
+      if (v > curVal) o.hi++; else if (v < curVal) o.lo++; else o.sa++;
+    }
+    return o;
+  }
+  const restOf = run => run.deck.slice(run.i);
+  const runOdds = run => oddsFor(rankVal(run.cur.r, run.aceHigh), restOf(run), run.aceHigh);
+
+  function newRun(kind) {
+    const daily = kind === 'daily';
+    const aceHigh = daily ? true : settings.aceHigh;
+    const decks = daily ? 1 : settings.decks;
+    let deck;
+    if (daily) deck = dailyDeck(today());
+    else if (forced) { deck = forced; forced = null; }
+    else deck = shuffle(makeDeck(decks));
+    return { kind, deck, i: 0, cur: null, seen: [], steps: [], skips: SKIPS, active: true, aceHigh, decks, pending: null, curAnim: '', streak: 0, stake: 0, pot: 0, date: daily ? today() : '' };
+  }
+  function dealFirst(run) {
+    run.cur = run.deck[run.i++];
+    run.seen.push({ c: run.cur, res: 'start' });
+    run.curAnim = 'deal';
+  }
+
+  // ---------- daily persistence ----------
+  function saveDaily(call = '') {
+    const d = runs.daily;
+    if (!d) return;
+    store.set('daily', { date: d.date, i: d.i, seen: d.seen, steps: d.steps, skips: d.skips, streak: d.streak, active: d.active, pending: call ? null : d.pending, call });
+  }
+  function loadDaily() {
+    const rec = store.get('daily', null);
+    if (!rec || rec.date !== today()) { runs.daily = null; return; }
+    const run = newRun('daily');
+    Object.assign(run, { i: rec.i, seen: rec.seen || [], steps: rec.steps || [], skips: rec.skips, streak: rec.streak || 0, active: !!rec.active, pending: rec.pending || null });
+    run.cur = run.deck[run.i - 1] || null;
+    if (run.pending) { run.cur = run.deck[run.i - 2] || null; run.pending.anim = false; }
+    run.curAnim = '';
+    runs.daily = run;
+    // A call was made but the page closed before it finished: settle it now.
+    if (rec.call && run.active && run.cur) {
+      const { ok, text } = resolveCall(run, rec.call);
+      finishCall(run, ok, text);
+      run.curAnim = '';
+      saveDaily();
+    }
+  }
+  const dailyDoneToday = () => !!dailyLog[today()] || (runs.daily && runs.daily.date === today() && !runs.daily.active);
+  function dayStreak() {
+    let n = 0;
+    const d = new Date();
+    if (dailyLog[dateKey(d)] == null) d.setDate(d.getDate() - 1);
+    while (dailyLog[dateKey(d)] != null) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  const dailyScores = () => Object.values(dailyLog).map(e => (typeof e === 'object' ? e.s : e)).filter(v => v >= 0);
+  function nextDeckText() {
+    const now = new Date();
+    const mid = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const mins = Math.max(1, Math.ceil((mid - now) / 60000));
+    return t.nextIn(Math.floor(mins / 60), mins % 60);
+  }
+
+  // ---------- rendering ----------
+  function cardEl(c) {
+    const el = document.createElement('div');
+    el.className = `card${isRed(c) ? ' red' : ''}`;
+    const suit = `${c.s}︎`;
+    const face = 'JQK'.includes(c.r);
+    el.innerHTML = `<span class="ci"><b>${c.r}</b><i>${suit}</i></span><span class="cs${face ? ' face' : ''}">${face ? c.r : suit}</span>`;
+    return el;
+  }
+  function flipEl(c, animate) {
+    const wrap = document.createElement('div');
+    wrap.className = 'fc';
+    const back = document.createElement('div');
+    back.className = 'card down';
+    wrap.append(cardEl(c), back);
+    if (animate && !reduced) {
+      wrap.classList.add('back', 'deal');
+      requestAnimationFrame(() => setTimeout(() => wrap.classList.remove('back'), T.deal));
+    }
+    return wrap;
+  }
+  const placeholder = text => { const el = document.createElement('div'); el.className = 'ph'; el.textContent = text; return el; };
+
+  function renderSlots(run) {
+    const curSlot = $('curSlot'), nxtSlot = $('nxtSlot');
+    if (run && run.cur) {
+      let el;
+      if (run.curAnim === 'deal') el = flipEl(run.cur, true);
+      else { el = cardEl(run.cur); if (run.curAnim === 'slide' && !reduced) el.classList.add('slide'); }
+      run.curAnim = '';
+      curSlot.replaceChildren(el);
+      curSlot.setAttribute('aria-label', cardName(run.cur));
+    } else {
+      curSlot.replaceChildren(placeholder(mode === 'ladder' ? t.stakeHere : ''));
+      curSlot.setAttribute('aria-label', t.emptySlot);
+    }
+    if (run && run.pending) {
+      const p = run.pending;
+      const el = flipEl(p.c, p.anim);
+      p.anim = false;
+      const card = el.firstChild;
+      const nodes = [el];
+      if (p.res) {
+        card.classList.add(p.res);
+        const badge = document.createElement('span');
+        badge.className = `res ${p.res}`;
+        badge.textContent = p.badge;
+        nodes.push(badge);
+      }
+      nxtSlot.replaceChildren(...nodes);
+      nxtSlot.setAttribute('aria-label', cardName(p.c));
+    } else {
+      nxtSlot.replaceChildren(placeholder('?'));
+      nxtSlot.setAttribute('aria-label', t.emptySlot);
+    }
+  }
+
+  function setStat(i, label, value) {
+    const el = $(`s${i}`);
+    el.firstChild.textContent = label;
+    el.lastChild.textContent = value;
+  }
+  function bump(i) {
+    const el = $(`s${i}`);
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
+  function renderHud(run) {
+    if (mode === 'ladder') {
+      setStat(0, t.bank, fmtBig(bank));
+      setStat(1, t.stake, fmt(run && run.active ? run.stake : stake));
+      if (run && (run.active || run.steps.length)) setStat(2, t.pot, fmtBig(run.active ? run.pot : run.endPot || 0));
+      else setStat(2, t.pot, '—');
+    } else if (mode === 'streak') {
+      setStat(0, t.run, run ? fmt(run.streak) : '0');
+      setStat(1, t.best, fmt(stats.bestStreak));
+      setStat(2, t.left, fmt(run && run.cur ? run.deck.length - run.i : settings.decks * 52));
+    } else {
+      const scores = dailyScores();
+      setStat(0, t.score, run ? fmt(run.streak) : dailyLog[today()] != null ? fmt(dailyScore(today())) : '0');
+      setStat(1, t.best, fmt(scores.length ? Math.max(...scores) : 0));
+      setStat(2, t.left, fmt(run && run.cur ? run.deck.length - run.i : 52));
+    }
+  }
+  const dailyScore = date => { const e = dailyLog[date]; return typeof e === 'object' && e ? e.s : e; };
+
+  function renderMeter(run) {
+    const track = $('mtrack');
+    let f = 0, label = '', ticks = [];
+    if (mode === 'ladder') {
+      const mult = run && run.stake ? (run.active ? run.pot : run.endPot || 0) / run.stake : 0;
+      f = mult > 1 ? Math.log(mult) / Math.log(CAP) : 0;
+      label = mult ? `×${mult >= 100 ? fmt(Math.floor(mult)) : nf2.format(Math.floor(mult * 100) / 100)}` : '×1';
+      ticks = [2, 10, 100].map(x => ({ p: Math.log(x) / Math.log(CAP) }));
+    } else {
+      const max = run ? run.deck.length - 1 : (mode === 'daily' ? 51 : settings.decks * 52 - 1);
+      const best = mode === 'streak' ? stats.bestStreak : Math.max(0, ...dailyScores());
+      f = run ? run.streak / max : 0;
+      label = run ? fmt(run.streak) : '0';
+      if (best > 0 && best <= max) ticks = [{ p: best / max, best: true }];
+    }
+    $('meterLbl').textContent = label;
+    $('mfill').style.setProperty('--f', Math.min(1, f));
+    track.querySelectorAll('.mtick').forEach(el => el.remove());
+    for (const tk of ticks) {
+      const el = document.createElement('i');
+      el.className = `mtick${tk.best ? ' best' : ''}`;
+      el.style.setProperty('--p', tk.p);
+      track.append(el);
+    }
+  }
+
+  function renderOdds(run) {
+    const bar = $('oddsBar');
+    const show = settings.odds && run && run.active && run.cur;
+    bar.hidden = !show;
+    if (!show) return;
+    const o = runOdds(run);
+    bar.querySelector('.lo').style.flexGrow = o.lo;
+    bar.querySelector('.sa').style.flexGrow = o.sa;
+    bar.querySelector('.hi').style.flexGrow = o.hi;
+  }
+
+  function renderGuessButtons(run) {
+    const o = run && run.cur && run.active ? runOdds(run) : null;
+    document.querySelectorAll('.gbtn').forEach(btn => {
+      const g = btn.dataset.g;
+      const wins = o ? o[g] : 0;
+      btn.firstChild.innerHTML = `${arrowSvg(g)}${t[GUESS[g].key]}`;
+      let sub = '';
+      if (o && wins) {
+        const p = wins / o.n;
+        if (mode === 'ladder') sub = `×${fmtX(multCents(wins, o.n))}${settings.odds ? `<span class="pct"> · ${fmtPct(p)}</span>` : ''}`;
+        else if (settings.odds) sub = fmtPct(p);
+      } else if (o) sub = '—';
+      btn.lastChild.innerHTML = sub;
+      btn.disabled = !o || !wins || busy;
+      const spoken = btn.lastChild.textContent;
+      btn.setAttribute('aria-label', `${t[GUESS[g].key]}${spoken && spoken !== '—' ? ` ${spoken}` : ''}`);
+    });
+    const skip = $('skipBtn');
+    skip.innerHTML = '';
+    skip.append(t.skip);
+    const b = document.createElement('b');
+    b.textContent = run ? run.skips : SKIPS;
+    skip.append(b);
+    skip.disabled = busy || !run || !run.active || run.skips <= 0 || run.deck.length - run.i < 2;
+    const cash = $('cashBtn');
+    cash.hidden = mode !== 'ladder';
+    $('oddsBtn').hidden = mode === 'ladder';
+    $('oddsBtn').setAttribute('aria-pressed', String(settings.odds));
+    if (mode === 'ladder' && run) {
+      cash.innerHTML = '<span></span><small></small>';
+      cash.firstChild.textContent = t.cashOut;
+      cash.lastChild.textContent = fmtBig(run.pot);
+      cash.disabled = busy || !run.active;
+    }
+  }
+
+  function renderControls(run) {
+    const active = run && run.active;
+    let bar = 'idleBar';
+    if (active) bar = 'guessBar';
+    else if (mode === 'ladder') bar = 'betBar';
+    for (const id of ['betBar', 'guessBar', 'idleBar']) {
+      const el = $(id);
+      const on = id === bar;
+      el.classList.toggle('off', !on);
+      el.inert = !on;
+    }
+    if (bar === 'betBar') {
+      document.querySelectorAll('.chip').forEach(btn => { btn.disabled = busy || Number(btn.dataset.chip) > bank - stake || stake + Number(btn.dataset.chip) > MAX_BET; });
+      $('clearBtn').disabled = busy || !stake;
+      $('dealBtn').textContent = stake ? `${t.deal} · ${fmt(stake)}` : t.deal;
+      $('dealBtn').disabled = busy;
+    }
+    if (bar === 'guessBar') renderGuessButtons(run);
+    if (bar === 'idleBar') {
+      const start = $('startBtn');
+      const note = $('idleNote');
+      if (mode === 'daily' && dailyDoneToday()) { start.textContent = t.seeResult; note.textContent = nextDeckText(); }
+      else if (mode === 'daily') { start.textContent = t.start; note.textContent = `${t.dailyTitle} · ${t.deckInfo(1, true)} · ${t.skipsInfo(SKIPS)}`; }
+      else { start.textContent = run ? t.playAgain : t.start; note.textContent = `${t.deckInfo(settings.decks, settings.aceHigh)} · ${t.bestN(fmt(stats.bestStreak))}`; }
+      start.disabled = busy;
+    }
+  }
+
+  function renderIntro(run) {
+    const intro = $('intro');
+    const show = !run || !run.cur;
+    felt.classList.toggle('idle', show);
+    intro.hidden = !show;
+    if (!show) return;
+    let html = '';
+    if (mode === 'ladder') html = `<h2>${t.ladder}</h2><p>${t.ladderIntro}</p><div class="tags">${t.deckInfo(settings.decks, settings.aceHigh)} · ${t.skipsInfo(SKIPS)}</div>`;
+    else if (mode === 'streak') html = `<h2>${t.streak}</h2><p>${t.streakIntro}</p><div class="tags">${t.deckInfo(settings.decks, settings.aceHigh)} · ${t.skipsInfo(SKIPS)}</div><div class="big">${t.bestN(fmt(stats.bestStreak))}</div>`;
+    else if (dailyDoneToday()) html = `<h2>${t.dailyTitle}</h2><div class="tags">${dateLabel()}</div><div class="big">${t.todayScore(fmt(dailyScore(today()) ?? (run ? run.streak : 0)))}</div><p>${t.dailyDone} · ${nextDeckText()}</p>`;
+    else html = `<h2>${t.dailyTitle}</h2><div class="tags">${dateLabel()}</div><p>${t.dailyIntro}</p><div class="tags">${t.deckInfo(1, true)} · ${t.skipsInfo(SKIPS)}</div>`;
+    intro.innerHTML = html;
+  }
+  const dateLabel = () => new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+
+  function miniEl(entry) {
+    const el = document.createElement('div');
+    const c = entry.c;
+    el.className = `mini${isRed(c) ? ' red' : ''}${entry.res === 'ok' || entry.res === 'bad' ? ` ${entry.res}` : ''}${entry.skipped ? ' skipped' : ''}`;
+    el.setAttribute('role', 'listitem');
+    el.setAttribute('aria-label', cardName(c));
+    el.innerHTML = `${c.r}<i>${c.s}︎</i>`;
+    return el;
+  }
+  function renderHistory(run) {
+    const strip = $('strip');
+    strip.dataset.empty = t.noCalls;
+    const seen = run ? run.seen.slice(-40) : [];
+    strip.replaceChildren(...seen.map(miniEl));
+  }
+
+  function renderTracker(run) {
+    const box = $('trackBox');
+    box.hidden = !settings.tracker;
+    if (!settings.tracker) return;
+    const aceHigh = run ? run.aceHigh : mode === 'daily' ? true : settings.aceHigh;
+    const decks = run ? run.decks : mode === 'daily' ? 1 : settings.decks;
+    const counts = {};
+    for (const r of RANKS) counts[r] = run && run.cur ? 0 : 4 * decks;
+    if (run && run.cur) for (const c of restOf(run)) counts[c.r]++;
+    const curVal = run && run.cur && run.active ? rankVal(run.cur.r, run.aceHigh) : 0;
+    const order = [...RANKS].sort((a, b) => rankVal(a, aceHigh) - rankVal(b, aceHigh));
+    $('tgrid').replaceChildren(...order.map(r => {
+      const el = document.createElement('div');
+      const v = rankVal(r, aceHigh);
+      el.className = `tcell${curVal ? (v > curVal ? ' hi' : v < curVal ? ' lo' : ' eq') : ''}${counts[r] ? '' : ' zero'}`;
+      el.innerHTML = `<b>${r}</b><span>${counts[r]}</span>`;
+      el.setAttribute('aria-label', `${r}: ${counts[r]}`);
+      return el;
+    }));
+    $('trackN').textContent = fmt(run && run.cur ? run.deck.length - run.i : decks * 52);
+  }
+
+  function ladderRow(cls, cells) {
+    const li = document.createElement('li');
+    li.className = cls;
+    li.innerHTML = cells;
+    return li;
+  }
+  function renderLadder(run) {
+    const list = $('ladderList');
+    $('ladderTitle').textContent = mode === 'ladder' ? t.ladderTitle : t.callsTitle;
+    if (!run || !run.steps.length) {
+      const rows = [];
+      if (mode === 'ladder' && run) rows.push(ladderRow('base', `<span>${t.stake}</span><b>${fmt(run.stake)}</b>`));
+      const empty = document.createElement('li');
+      empty.className = 'empty';
+      empty.textContent = t.noCalls;
+      list.replaceChildren(...rows, empty);
+      return;
+    }
+    const rows = run.steps.map((s, i) => {
+      const card = `<span class="c${isRed(s.c) ? ' red' : ''}">${cardName(s.c)}︎</span>`;
+      const arrow = `<span class="g ${s.g}">${arrowSvg(s.g)}</span>`;
+      const n = `<span class="n">${i + 1}</span>`;
+      if (mode === 'ladder') return ladderRow(s.ok ? 'ok' : 'bad', `${n}${arrow}${card}<span class="m">×${fmtX(s.m)}</span><b>${s.ok ? fmtBig(s.pot) : '0'}</b>`);
+      return ladderRow(s.ok ? 'ok' : 'bad', `${n}${arrow}${card}<span class="m">${fmtPct(s.p)}</span><b>${s.ok ? '✓' : '✗'}</b>`);
+    }).reverse();
+    if (mode === 'ladder') rows.push(ladderRow('base', `<span>${t.stake}</span><b>${fmt(run.stake)}</b>`));
+    list.replaceChildren(...rows);
+  }
+
+  function renderRules(run) {
+    $('rules').textContent = mode === 'ladder' ? t.houseRule(nf2.format(HOUSE / 100)).replace('× ', '×\u00a0') : t.tieRule;
+    const left = run && run.cur ? run.deck.length - run.i : (mode === 'daily' ? 52 : settings.decks * 52);
+    $('pileN').textContent = left;
+    $('pile').classList.toggle('empty', !left);
+  }
+
+  function render() {
+    const run = runs[mode];
+    document.querySelectorAll('[data-mode]').forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+      b.disabled = busy && b.dataset.mode !== mode;
+    });
+    renderHud(run);
+    renderIntro(run);
+    renderSlots(run);
+    renderOdds(run);
+    renderMeter(run);
+    renderRules(run);
+    renderHistory(run);
+    renderTracker(run);
+    renderLadder(run);
+    renderControls(run);
+  }
+
+  // Card size follows the felt: two full cards + the smaller pile side by side, kept clear of the meter.
+  function layout() {
+    const cs = getComputedStyle(felt);
+    const w = felt.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const h = felt.clientHeight;
+    felt.classList.toggle('short', h < 230);
+    felt.classList.toggle('tiny', h < 150);
+    const extra = h < 230 ? 18 + (settings.odds ? 14 : 0) : 24 + (settings.odds ? 18 : 0) + 42;
+    const cw = Math.max(34, Math.floor(Math.min((h - extra) / 1.4, w / 2.95, 300)));
+    felt.style.setProperty('--cw', `${cw}px`);
+  }
+
+  let toastTimer = 0;
+  function toast(text, ms = 1500) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  }
+  function setMsg(text, tone = '') {
+    const el = $('msg');
+    el.textContent = text;
+    el.className = `msg${tone ? ` ${tone}` : ''}`;
+  }
+  function say(text) {
+    const el = $('sr');
+    el.textContent = '';
+    setTimeout(() => { el.textContent = text; }, 30);
+  }
+  function flash(kind) {
+    const el = $('flash');
+    el.className = 'flash';
+    void el.offsetWidth;
+    el.className = `flash ${kind}`;
+    if (kind === 'lose' && !reduced) {
+      felt.classList.remove('shake');
+      void felt.offsetWidth;
+      felt.classList.add('shake');
+    }
+  }
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  function saveBank() {
+    store.set('chips', bank);
+    store.set('stake', stake);
+  }
+  const saveStats = () => store.set('stats', stats);
+
+  // ---------- ladder ----------
+  function addChip(v) {
+    if (busy || mode !== 'ladder' || (runs.ladder && runs.ladder.active)) return;
+    if (stake + v > MAX_BET) { toast(t.maxBet(fmt(MAX_BET))); return; }
+    if (stake + v > bank) { toast(t.noChips); return; }
+    stake += v;
+    saveBank();
+    render();
+  }
+  function clearStake() {
+    if (busy || mode !== 'ladder' || (runs.ladder && runs.ladder.active)) return;
+    stake = 0;
+    saveBank();
+    render();
+  }
+  function startLadder() {
+    if (busy) return;
+    if (bank < MIN_BET) { openPanel('brokePanel'); return; }
+    if (stake < MIN_BET) {
+      if (!stake) stake = Math.min(1000, Math.floor(bank / MIN_BET) * MIN_BET);
+      if (stake < MIN_BET) { toast(t.minBet(fmt(MIN_BET))); return; }
+    }
+    if (stake > bank) { toast(t.noChips); stake = Math.floor(bank / MIN_BET) * MIN_BET; render(); return; }
+    const run = newRun('ladder');
+    run.stake = stake;
+    run.pot = stake;
+    bank -= stake;
+    saveBank();
+    runs.ladder = run;
+    dealFirst(run);
+    bump(0);
+    setMsg(t.yourCall);
+    say(`${cardName(run.cur)}. ${t.yourCall}`);
+    render();
+  }
+  function endLadder(run, why, reason = '') {
+    run.active = false;
+    stats.rounds++;
+    stats.longest = Math.max(stats.longest, run.steps.filter(s => s.ok).length);
+    if (why === 'lost') {
+      run.endPot = 0;
+      setMsg(`${reason} · ${t.lostMsg(fmtBig(run.pot))}`, 'bad');
+      say(`${reason}. ${t.lostMsg(fmt(run.pot))}`);
+    } else {
+      bank += run.pot;
+      run.endPot = run.pot;
+      stats.cashOuts++;
+      stats.bestCash = Math.max(stats.bestCash, run.pot);
+      stats.bestMult = Math.max(stats.bestMult, Math.floor((run.pot * 100) / run.stake));
+      const text = why === 'deck' ? t.deckEnd(fmtBig(run.pot)) : why === 'top' ? t.topEnd(fmtBig(run.pot)) : t.cashedMsg(fmtBig(run.pot));
+      setMsg(text, 'good');
+      say(text);
+      flash('gold');
+      bump(0);
+    }
+    if (stake > bank) stake = Math.floor(bank / MIN_BET) * MIN_BET;
+    saveBank();
+    saveStats();
+    if (bank < MIN_BET) setTimeout(() => openPanel('brokePanel'), reduced ? 200 : 900);
+  }
+  function cashOut() {
+    const run = runs.ladder;
+    if (busy || mode !== 'ladder' || !run || !run.active) return;
+    endLadder(run, 'cash');
+    render();
+  }
+
+  // ---------- streak / daily ----------
+  function startRun() {
+    if (busy) return;
+    if (mode === 'daily') {
+      if (dailyDoneToday()) { showDailyResult(); return; }
+      const run = newRun('daily');
+      runs.daily = run;
+      dealFirst(run);
+      saveDaily();
+    } else {
+      runs.streak = newRun('streak');
+      dealFirst(runs.streak);
+    }
+    setMsg(t.yourCall);
+    say(`${cardName(runs[mode].cur)}. ${t.yourCall}`);
+    render();
+  }
+  function endRun(run, why) {
+    run.active = false;
+    const n = run.streak;
+    let isBest = false;
+    if (run.kind === 'streak') {
+      stats.runs++;
+      isBest = n > stats.bestStreak;
+      stats.bestStreak = Math.max(stats.bestStreak, n);
+    } else {
+      const prevBest = Math.max(0, ...dailyScores());
+      isBest = n > prevBest;
+      dailyLog[run.date] = { s: n, k: run.seen.slice(1).map(e => (e.res === 'ok' ? 1 : e.res === 'bad' ? 0 : 2)) };
+      store.set('dailyLog', dailyLog);
+      saveDaily();
+    }
+    saveStats();
+    const title = why === 'deck' ? t.cleared : run.kind === 'daily' ? t.dailyTitle : t.runOver;
+    setMsg(`${title} · ${fmt(n)} ${t.inARow}`, why === 'deck' ? 'good' : 'bad');
+    say(`${title}. ${fmt(n)} ${t.inARow}.${isBest ? ` ${t.newBest}` : ''}`);
+    if (why === 'deck') flash('gold');
+    setTimeout(() => (run.kind === 'daily' ? showDailyResult() : showStreakResult(run, why, isBest)), reduced ? 150 : 700);
+  }
+
+  function dotsHtml(codes) {
+    return codes.map(k => `<i class="${k === 1 ? '' : k === 0 ? 'bad' : 'skip'}"></i>`).join('');
+  }
+  function gridHtml(items) {
+    return items.map(([label, value]) => `<div><small>${label}</small><strong>${value}</strong></div>`).join('');
+  }
+  function showStreakResult(run, why, isBest) {
+    $('endTitle').textContent = why === 'deck' ? t.cleared : t.runOver;
+    $('endSub').textContent = t.deckInfo(run.decks, run.aceHigh);
+    $('endScore').textContent = fmt(run.streak);
+    $('endUnit').textContent = isBest ? `${t.inARow} · ${t.newBest}` : t.inARow;
+    $('endDots').innerHTML = dotsHtml(run.seen.slice(1).map(e => (e.res === 'ok' ? 1 : e.res === 'bad' ? 0 : 2)));
+    $('endGrid').innerHTML = gridHtml([[t.bestStreak, fmt(stats.bestStreak)], [t.accuracy, stats.calls ? fmtPct(stats.correct / stats.calls) : '—']]);
+    $('endNext').textContent = '';
+    $('endAgain').textContent = t.playAgain;
+    $('endAgain').dataset.act = 'again';
+    $('endPanel').querySelector('.link').hidden = false;
+    openPanel('endPanel');
+  }
+  function showDailyResult() {
+    const key = today();
+    const e = dailyLog[key];
+    const score = e != null ? dailyScore(key) : runs.daily ? runs.daily.streak : 0;
+    const codes = e && typeof e === 'object' && e.k ? e.k : [];
+    const scores = dailyScores();
+    $('endTitle').textContent = t.dailyTitle;
+    $('endSub').textContent = dateLabel();
+    $('endScore').textContent = fmt(score);
+    $('endUnit').textContent = t.inARow;
+    $('endDots').innerHTML = dotsHtml(codes);
+    $('endGrid').innerHTML = gridHtml([[t.dailyBest, fmt(scores.length ? Math.max(...scores) : 0)], [t.daysPlayed, fmt(scores.length)], [t.dayStreak, fmt(dayStreak())]]);
+    $('endNext').textContent = nextDeckText();
+    $('endAgain').textContent = t.close;
+    $('endAgain').dataset.act = 'close';
+    $('endPanel').querySelector('.link').hidden = true;
+    openPanel('endPanel');
+  }
+
+  // ---------- one call ----------
+  // Applies one call to the run state: reveals the next card, scores it and stores the outcome on run.pending.
+  function resolveCall(run, g) {
+    const o = runOdds(run);
+    const card = run.deck[run.i++];
+    const a = rankVal(run.cur.r, run.aceHigh), b = rankVal(card.r, run.aceHigh);
+    const ok = g === 'hi' ? b > a : g === 'lo' ? b < a : b === a;
+    const p = o[g] / o.n;
+    const m = multCents(o[g], o.n);
+    stats.calls++;
+    if (ok) stats.correct++;
+    run.seen.push({ c: card, res: ok ? 'ok' : 'bad' });
+    let text, badge;
+    if (run.kind === 'ladder') {
+      if (ok) run.pot = Math.floor((run.pot * m) / 100);
+      run.steps.push({ g, c: card, m, ok, pot: run.pot });
+      text = ok ? t.stepMsg(fmtX(m), fmtBig(run.pot)) : a === b ? t.tieLoss : t.wrongMsg;
+      badge = ok ? `×${fmtX(m)}` : '✗';
+    } else {
+      if (ok) run.streak++;
+      run.steps.push({ g, c: card, p, ok });
+      text = ok ? t.streakMsg(fmt(run.streak)) : a === b ? t.tieLoss : t.wrongMsg;
+      badge = ok ? `✓ ${fmt(run.streak)}` : '✗';
+    }
+    run.pending = { c: card, anim: false, res: ok ? 'ok' : 'bad', badge };
+    saveStats();
+    return { ok, text };
+  }
+  function finishCall(run, ok, text) {
+    if (!ok) {
+      if (run.kind === 'ladder') endLadder(run, 'lost', text); else endRun(run, 'lost');
+      return;
+    }
+    run.cur = run.pending.c;
+    run.pending = null;
+    run.curAnim = 'slide';
+    if (run.i >= run.deck.length) {
+      if (run.kind === 'ladder') endLadder(run, 'deck'); else endRun(run, 'deck');
+    } else if (run.kind === 'ladder' && run.pot >= run.stake * CAP) {
+      endLadder(run, 'top');
+    } else if (run.kind !== 'ladder' && [10, 20, 30, 40].includes(run.streak)) {
+      toast(`${fmt(run.streak)} ${t.inARow}!`);
+    }
+    if (run.kind === 'daily') saveDaily();
+    if (run.active) setMsg(text, 'good');
+  }
+
+  async function call(g) {
+    const run = runs[mode];
+    if (busy || !run || !run.active || !run.cur || document.querySelector('.overlay:not([hidden])')) return;
+    if (!runOdds(run)[g]) return;
+    busy = true;
+    // The daily call is committed before the reveal, so reloading mid-flip cannot undo it.
+    if (run.kind === 'daily') saveDaily(g);
+    // The card leaves the tracker and pile count only once it has turned face up.
+    run.pending = { c: run.deck[run.i], anim: true, res: '', badge: '' };
+    render();
+    await wait(T.deal + T.flip);
+
+    const { ok, text } = resolveCall(run, g);
+    setMsg(text, ok ? 'good' : 'bad');
+    say(`${cardName(run.pending.c)}. ${text}`);
+    flash(ok ? 'win' : 'lose');
+    if (ok) bump(run.kind === 'ladder' ? 2 : 0);
+    if (run.kind === 'daily') saveDaily();
+    render();
+    await wait(T.hold);
+
+    busy = false;
+    finishCall(run, ok, text);
+    render();
+  }
+
+  function skip() {
+    const run = runs[mode];
+    if (busy || !run || !run.active || !run.cur) return;
+    if (run.skips <= 0) { toast(t.noSkip); return; }
+    if (run.deck.length - run.i < 2) return;
+    run.skips--;
+    run.seen[run.seen.length - 1].skipped = true;
+    run.cur = run.deck[run.i++];
+    run.seen.push({ c: run.cur, res: 'skip' });
+    run.curAnim = 'deal';
+    if (run.kind === 'daily') saveDaily();
+    setMsg(t.skipped(run.skips));
+    say(`${t.skipped(run.skips)}. ${cardName(run.cur)}`);
+    render();
+  }
+
+  // ---------- panels ----------
+  let lastFocus = null;
+  function openPanel(id) {
+    const el = $(id);
+    if (!el.hidden) return;
+    if (id === 'statsPanel') fillStats();
+    if (id === 'brokePanel') {
+      $('brokeText').textContent = t.brokeText(fmt(START_BANK));
+      $('rebuyBtn').textContent = t.rebuy(fmt(START_BANK));
+    }
+    lastFocus = document.activeElement;
+    el.hidden = false;
+    el.querySelector('.btn').focus({ preventScroll: true });
+  }
+  function closePanel(el) {
+    el.hidden = true;
+    if (lastFocus && document.contains(lastFocus) && !lastFocus.closest('[inert]')) lastFocus.focus({ preventScroll: true });
+  }
+  function fillStats() {
+    const scores = dailyScores();
+    $('statsGrid').innerHTML = gridHtml([
+      [t.rounds, fmt(stats.rounds)], [t.cashOuts, fmt(stats.cashOuts)],
+      [t.bestCash, fmtBig(stats.bestCash)], [t.bestMult, stats.bestMult ? `×${fmtX(stats.bestMult)}` : '—'],
+      [t.longest, fmt(stats.longest)], [t.bestStreak, fmt(stats.bestStreak)],
+      [t.dailyBest, fmt(scores.length ? Math.max(...scores) : 0)], [t.accuracy, stats.calls ? fmtPct(stats.correct / stats.calls) : '—'],
+      [t.refills, fmt(stats.refills)],
+    ]);
+    document.querySelectorAll('[data-ace]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.ace === '1') === settings.aceHigh)));
+    document.querySelectorAll('[data-decks]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.decks) === settings.decks)));
+    $('trackOpt').setAttribute('aria-pressed', String(settings.tracker));
+    $('oddsOpt').setAttribute('aria-pressed', String(settings.odds));
+  }
+  function saveSettings() {
+    store.set('settings', settings);
+    fillStats();
+    render();
+    layout();
+  }
+
+  // ---------- events ----------
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    if (busy || b.dataset.mode === mode) return;
+    mode = b.dataset.mode;
+    store.set('mode', mode);
+    if (mode === 'daily' && runs.daily && runs.daily.date !== today() && !runs.daily.active) runs.daily = null;
+    const run = runs[mode];
+    if (run && run.active) setMsg(t.yourCall);
+    else if (mode === 'ladder') setMsg(t.placeStake);
+    else setMsg('');
+    render();
+    layout();
+  }));
+  document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => addChip(Number(b.dataset.chip))));
+  $('clearBtn').addEventListener('click', clearStake);
+  $('dealBtn').addEventListener('click', startLadder);
+  $('startBtn').addEventListener('click', startRun);
+  document.querySelectorAll('.gbtn').forEach(b => b.addEventListener('click', () => call(b.dataset.g)));
+  $('skipBtn').addEventListener('click', skip);
+  $('cashBtn').addEventListener('click', cashOut);
+  $('oddsBtn').addEventListener('click', () => { settings.odds = !settings.odds; saveSettings(); });
+  $('statsBtn').addEventListener('click', () => openPanel('statsPanel'));
+  $('helpBtn').addEventListener('click', () => openPanel('helpPanel'));
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closePanel(b.closest('.overlay'))));
+  document.querySelectorAll('[data-ace]').forEach(b => b.addEventListener('click', () => { settings.aceHigh = b.dataset.ace === '1'; saveSettings(); }));
+  document.querySelectorAll('[data-decks]').forEach(b => b.addEventListener('click', () => { settings.decks = Number(b.dataset.decks); saveSettings(); }));
+  $('trackOpt').addEventListener('click', () => { settings.tracker = !settings.tracker; saveSettings(); });
+  $('oddsOpt').addEventListener('click', () => { settings.odds = !settings.odds; saveSettings(); });
+  $('resetStats').addEventListener('click', () => {
+    Object.assign(stats, defaultStats());
+    saveStats();
+    fillStats();
+    render();
+  });
+  $('rebuyBtn').addEventListener('click', () => {
+    bank += START_BANK;
+    stats.refills++;
+    stake = Math.min(Math.max(stake, 1000), bank, MAX_BET);
+    saveBank();
+    saveStats();
+    closePanel($('brokePanel'));
+    bump(0);
+    setMsg(t.placeStake);
+    render();
+    $('dealBtn').focus({ preventScroll: true });
+  });
+  $('endAgain').addEventListener('click', () => {
+    closePanel($('endPanel'));
+    if ($('endAgain').dataset.act === 'again') startRun();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.querySelector('.overlay:not([hidden])')) return;
+    const onButton = e.target instanceof HTMLButtonElement;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const run = runs[mode];
+    if (run && run.active) {
+      const g = key === 'ArrowUp' ? 'hi' : key === 'ArrowDown' ? 'lo' : key === 's' ? 'sa' : '';
+      if (g) { e.preventDefault(); call(g); }
+      else if (key === 'k') { e.preventDefault(); skip(); }
+      else if (key === 'c' && mode === 'ladder') { e.preventDefault(); cashOut(); }
+      return;
+    }
+    if (mode === 'ladder' && '12345'.includes(key) && key.length === 1) { e.preventDefault(); addChip(CHIPS[Number(key) - 1]); }
+    else if (mode === 'ladder' && key === 'c') { e.preventDefault(); clearStake(); }
+    else if ((key === 'Enter' || key === ' ') && !onButton) { e.preventDefault(); if (mode === 'ladder') startLadder(); else startRun(); }
+  });
+
+  new ResizeObserver(layout).observe(felt);
+
+  loadDaily();
+  stake = Math.min(stake, Math.floor(bank / MIN_BET) * MIN_BET);
+  setMsg(mode === 'ladder' ? t.placeStake : runs[mode] && runs[mode].active ? t.yourCall : '');
+  render();
+  layout();
+  if (bank < MIN_BET) openPanel('brokePanel');
+
+  // Test hook: lets automated checks stack the deck and read state; harmless for players.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__hl = {
+    get mode() { return mode; }, get bank() { return bank; }, get busy() { return busy; }, get stats() { return stats; },
+    run: () => runs[mode], peek: () => { const r = runs[mode]; return r ? r.deck[r.i] : null; },
+    stack(cards) { forced = cards.map(([r, s]) => ({ r, s })); },
+    fast() { T = { deal: 0, flip: 0, hold: 0 }; },
+    setBank(n) { bank = n; stake = Math.min(stake, n); saveBank(); render(); },
+    odds: (r, rest, aceHigh = true) => { const o = oddsFor(rankVal(r, aceHigh), rest.map(x => ({ r: x })), aceHigh); return { ...o, m: { lo: multCents(o.lo, o.n), sa: multCents(o.sa, o.n), hi: multCents(o.hi, o.n) } }; },
+    dailyDeck: date => dailyDeck(date).map(cardName), today,
+  };
+})();
+</script>
+</body>
+</html>

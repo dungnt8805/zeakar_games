@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spider Solitaire</title>
+<style>
+:root {
+  --felt: #2e2163;
+  --felt-dark: #140d33;
+  --text: #f4f1ff;
+  --muted: #b9addf;
+  --mint: #7cf0c5;
+  --mint-dark: #2fae86;
+  --amber: #ffc857;
+  --violet: #5b3fc4;
+  --violet-dark: #3a2690;
+  --red: #d7263d;
+  --black: #1d1b2e;
+  --paper: #fffdf8;
+  --chip: #0000003b;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--felt);
+  background-image: radial-gradient(#ffffff08 1px, transparent 1.5px), radial-gradient(120% 85% at 50% 0%, #4a36a0, var(--felt) 52%, var(--felt-dark));
+  background-size: 6px 6px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+
+.app {
+  height: 100%; max-width: 760px; margin: auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "hud" "table" "tools";
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+.top { grid-area: top; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { flex: 0 0 auto; width: 38px; height: 38px; }
+.title { flex: 1; min-width: 0; }
+h1 { font-size: clamp(20px, 6.4vw, 28px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+h1 span { color: var(--mint); }
+.sub { margin-top: 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub b { color: var(--mint); white-space: nowrap; }
+.hud { grid-area: hud; display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: var(--chip); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+
+.table { grid-area: table; min-height: 0; min-width: 0; position: relative; isolation: isolate; touch-action: none; border-radius: 10px; }
+.table:focus { outline: none; }
+.table.kb:focus-visible { outline: 2px solid #7cf0c544; outline-offset: 4px; }
+.slot, .card, .cursor { position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); border-radius: var(--r); }
+.slot { display: grid; place-items: center; background: #00000026; box-shadow: inset 0 0 0 1.5px #ffffff22; color: #ffffff33; font-size: calc(var(--cw) * .42); font-weight: 900; }
+.slot.found { background: #0000001a; box-shadow: inset 0 0 0 1.5px #ffffff14; font-size: max(10px, calc(var(--cw) * .34)); }
+.slot.stock { cursor: pointer; font-size: calc(var(--cw) * .5); }
+.slot[hidden] { display: none; }
+.card { background: var(--paper); color: var(--black); box-shadow: 0 1px 2px #00000070, 0 0 0 .5px #00000030; transition: transform .22s cubic-bezier(.25, .8, .35, 1); cursor: grab; will-change: transform; overflow: hidden; }
+.card.red { color: var(--red); }
+.idx { position: absolute; left: 6%; right: 5%; top: 1%; display: flex; align-items: center; justify-content: space-between; font-size: calc(var(--cw) * .38); font-weight: 900; line-height: 1.12; letter-spacing: -.08em; }
+.idx svg { width: calc(var(--cw) * .28); height: calc(var(--cw) * .28); flex-shrink: 0; }
+.pip { position: absolute; left: 20%; bottom: 8%; width: 60%; height: auto; }
+.art { position: absolute; left: 10%; right: 10%; top: 31%; bottom: 6%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: calc(var(--r) * .7); background: #ece8fb; font-family: Georgia, "Times New Roman", serif; font-size: calc(var(--cw) * .44); font-weight: 700; line-height: 1; }
+.red .art { background: #fde8ea; }
+.art svg { width: 40%; height: auto; margin-top: 4%; }
+.card.down { cursor: default; background: radial-gradient(circle at 50% 50%, #ffffff30 0 6%, transparent 7%), repeating-radial-gradient(circle at 50% 50%, transparent 0 calc(var(--cw) * .12), #ffffff26 calc(var(--cw) * .12) calc(var(--cw) * .135)), repeating-conic-gradient(from 0deg at 50% 50%, #ffffff2e 0 1.2deg, transparent 1.2deg 30deg), linear-gradient(155deg, #8a5ce6, #4b2aa8 60%, #2f1a78); box-shadow: inset 0 0 0 calc(var(--cw) * .055) #f4efff, 0 1px 2px #00000070; }
+.card.down > * { display: none; }
+.card.dragging { transition: none; cursor: grabbing; box-shadow: 0 12px 24px #00000066, 0 0 0 .5px #00000030; }
+.card.hint, .slot.hint { box-shadow: 0 0 0 3px var(--mint), 0 0 18px var(--mint); }
+.card.held { box-shadow: 0 0 0 3px var(--amber), 0 6px 16px #0008; }
+.card.shake { animation: shake .3s; }
+.card.flip { animation: flip .26s ease-out; }
+@keyframes shake { 20%, 60% { translate: -4px 0; } 40%, 80% { translate: 4px 0; } }
+@keyframes flip { from { scale: 0 1; } }
+.table.instant .card { transition: none; }
+.cursor { display: none; z-index: 3000; pointer-events: none; box-shadow: 0 0 0 3px var(--mint), 0 0 0 6px #00000080; transition: transform .12s, height .12s; }
+.table.kb:focus .cursor { display: block; }
+.toast { position: absolute; left: 50%; bottom: 10px; z-index: 3100; translate: -50% 0; max-width: 90%; padding: 8px 14px; border-radius: 99px; background: #000000b8; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+.toast.big { color: var(--mint); font-size: 16px; }
+
+.tools { grid-area: tools; display: flex; gap: 6px; }
+.tool { position: relative; flex: 1; min-width: 0; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 5px 4px 6px; border-radius: 12px; background: var(--chip); font-size: 11.5px; font-weight: 800; }
+.tool > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool .icon { font-size: 18px; line-height: 1.15; }
+.tool:disabled { opacity: .4; cursor: default; }
+.tool:active:not(:disabled) { transform: translateY(2px); }
+.tool.deal { background: #7cf0c529; box-shadow: inset 0 0 0 1.5px #7cf0c55c; }
+.count[hidden] { display: none; }
+.count { position: absolute; top: 3px; right: 5px; min-width: 18px; padding: 1px 5px; border-radius: 99px; background: var(--mint); color: #0d2a20; font-size: 11px; font-weight: 900; line-height: 1.35; }
+
+.stats-card { grid-area: stats; display: none; padding: 10px 12px; border-radius: 14px; background: var(--chip); }
+.stats-card h2 { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.stats-card dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin-top: 6px; font-size: 13px; }
+.stats-card dt { color: var(--muted); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-card dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+
+.fx { position: fixed; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+.fx[hidden] { display: none; }
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #0d0826b8; }
+.overlay.light { background: #0d082666; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: calc(100% - 16px); overflow: auto; background: var(--paper); color: #221c3a; border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--violet); }
+.panel p { margin-top: 8px; color: #5a5376; font-size: 15px; line-height: 1.45; }
+.panel .emoji { margin: 0 0 4px; font-size: 44px; line-height: 1.1; }
+.panel .head-logo { width: 54px; height: 54px; margin: 0 auto 4px; display: block; }
+.panel .pick { margin-top: 14px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8a83a6; }
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.choice { min-width: 0; padding: 11px 6px; border-radius: 18px; background: var(--violet); color: #fff; font-size: 17px; font-weight: 900; line-height: 1.15; box-shadow: 0 5px 0 var(--violet-dark); overflow-wrap: anywhere; }
+.choice small { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #ddd3ff; }
+.choice .rec { color: #a9f5d8; font-size: 11px; }
+.choice[aria-current="true"] { box-shadow: 0 5px 0 var(--violet-dark), inset 0 0 0 3px var(--mint); }
+.choice:active, .cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--violet-dark); }
+.switch { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 14px; padding: 10px 12px; border-radius: 16px; background: #efeaff; color: #221c3a; text-align: left; }
+.switch .knob { flex: 0 0 auto; position: relative; width: 42px; height: 24px; border-radius: 99px; background: #bdb4d9; transition: background .2s; }
+.switch .knob::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0004; transition: transform .2s; }
+.switch[aria-checked="true"] .knob { background: var(--mint-dark); }
+.switch[aria-checked="true"] .knob::after { transform: translateX(18px); }
+.switch b { display: block; font-size: 15px; font-weight: 800; }
+.switch small { display: block; font-size: 12px; font-weight: 600; color: #6c6589; }
+.panel .fine { margin-top: 12px; font-size: 12px; color: #8a83a6; }
+.panel .result { font-size: 18px; font-weight: 800; color: #221c3a; }
+.panel .record { font-size: 13px; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--mint); color: #0d2a20; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.actions.resume { margin-top: 12px; }
+.actions[hidden] { display: none; }
+.cta { width: 100%; padding: 14px; border-radius: 18px; background: var(--violet); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--violet-dark); }
+.ghost { width: 100%; padding: 10px; border-radius: 16px; color: #221c3a; font-size: 15px; font-weight: 800; box-shadow: inset 0 0 0 2px #221c3a26; }
+.panel :focus-visible { outline-color: var(--violet); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 400px) {
+  .choices { grid-template-columns: 1fr; gap: 7px; }
+  .choice { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 10px; padding: 9px 14px; text-align: left; }
+  .choice small { margin-top: 0; text-align: right; }
+  .choice .rec { grid-column: 2; }
+  .choice > span { grid-row: span 2; }
+}
+@media (max-width: 360px) {
+  .logo { width: 32px; height: 32px; }
+  .stat strong { font-size: 15px; }
+  .stat small { letter-spacing: 0; }
+  .tool { font-size: 11px; }
+}
+@media (max-height: 560px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 16px; border-radius: 22px; }
+  .panel h2 { font-size: 23px; }
+  .panel p { margin-top: 6px; font-size: 14px; line-height: 1.35; }
+  .panel .emoji { font-size: 34px; }
+  .panel .head-logo { width: 40px; height: 40px; }
+  .panel .pick { margin-top: 10px; }
+  .choice { padding: 9px 6px; font-size: 16px; }
+  .switch { margin-top: 10px; padding: 7px 10px; }
+  .actions { margin-top: 12px; gap: 8px; }
+  .cta { padding: 11px; }
+  .ghost { padding: 8px; }
+}
+
+/* Wide frames: the table takes the full height on the left, HUD, tools and stats move to a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; --side: clamp(190px, 21vw, 290px); grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto auto auto minmax(0, 1fr); grid-template-areas: "table top" "table hud" "table tools" "table stats" "table ."; column-gap: 16px; row-gap: 10px; }
+  .top { align-items: flex-start; }
+  h1 { white-space: normal; font-size: clamp(20px, 2.3vw, 30px); }
+  .sub { white-space: normal; }
+  .hud { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { padding: 6px 8px 7px; }
+  .stat strong { font-size: 20px; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tool { min-height: 58px; font-size: 13px; }
+  .stats-card { display: block; }
+  .panel.menu { width: min(100%, 560px); }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { --side: clamp(160px, 25vw, 220px); row-gap: 6px; column-gap: 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .logo { width: 30px; height: 30px; }
+  h1 { font-size: 18px; }
+  .sub { font-size: 11px; margin-top: 1px; }
+  .hud { gap: 4px; }
+  .stat { padding: 2px 6px 3px; }
+  .stat strong { font-size: 15px; }
+  .tools { gap: 5px; }
+  .tool { min-height: 38px; flex-direction: row; gap: 4px; font-size: 11.5px; padding: 3px 4px; border-radius: 11px; }
+  .tool .icon { font-size: 15px; }
+  .count { top: -4px; right: -2px; font-size: 10px; }
+  .stats-card { padding: 6px 10px; }
+  .stats-card dl { font-size: 11.5px; gap: 1px 8px; margin-top: 3px; }
+  .stats-card h2 { font-size: 10.5px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 420px) {
+  .stats-card dl > :nth-child(n + 9) { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 340px) {
+  .stats-card, .logo { display: none; }
+}
+@media (max-height: 520px) {
+  .panel .intro, .panel .head-logo { display: none; }
+}
+@media (max-height: 420px) {
+  .panel .intro, .panel .fine, .panel .head-logo, .switch small { display: none; }
+  .panel .emoji { font-size: 26px; }
+  .panel h2 { font-size: 21px; }
+  .actions { margin-top: 8px; gap: 6px; }
+  .actions.resume { margin-top: 6px; }
+  .cta { padding: 9px; font-size: 16px; }
+  .ghost { padding: 7px; font-size: 14px; }
+  .choice { padding: 7px 6px; font-size: 15px; }
+  .switch { padding: 5px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="suit-defs">
+  <symbol id="spider" viewBox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 26 14 16 6 20M40 26l10-10 8 4M22 32H8l-4 7M42 32h14l4 7M24 38l-9 9 1 10M40 38l9 9-1 10"/></g><ellipse cx="32" cy="36" rx="10" ry="12" fill="currentColor"/><circle cx="32" cy="22" r="7" fill="currentColor"/><circle cx="29.5" cy="21" r="1.6" fill="#fff"/><circle cx="34.5" cy="21" r="1.6" fill="#fff"/><path d="M32 2v13" stroke="currentColor" stroke-width="1.6"/></symbol>
+</defs></svg>
+<main class="app">
+  <div class="top">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true" style="color:var(--mint)"><use href="#spider"/></svg>
+    <div class="title">
+      <h1>Spider <span>Solitaire</span></h1>
+      <p class="sub" id="sub"></p>
+    </div>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="score">500</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="runs"></small><strong id="runs">0/8</strong></div>
+  </div>
+  <div class="table" id="table" tabindex="0" role="application" data-i18n-label="board">
+    <div class="cursor" id="cursor"></div>
+    <p class="toast" id="toast" aria-hidden="true"></p>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="undo" disabled><span class="icon" aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" class="tool" id="hint"><span class="icon" aria-hidden="true">✦</span><span data-i18n="hint"></span></button>
+    <button type="button" class="tool deal" id="deal"><span class="icon" aria-hidden="true">⇊</span><span data-i18n="deal"></span><b class="count" id="deal-count" aria-hidden="true">5</b></button>
+    <button type="button" class="tool" id="menu"><span class="icon" aria-hidden="true">☰</span><span data-i18n="menu"></span></button>
+  </div>
+  <section class="stats-card" aria-labelledby="stats-title">
+    <h2 id="stats-title"></h2>
+    <dl id="stats-list"></dl>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+<canvas class="fx" id="fx" hidden aria-hidden="true"></canvas>
+
+<div class="overlay" id="start">
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <svg class="head-logo" viewBox="0 0 64 64" aria-hidden="true" style="color:var(--violet)"><use href="#spider"/></svg>
+    <h2 id="start-title">Spider <span>Solitaire</span></h2>
+    <p class="intro" data-i18n="intro"></p>
+    <div class="actions resume" id="resume-box" hidden>
+      <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    </div>
+    <p class="pick" data-i18n="pick"></p>
+    <div class="choices">
+      <button type="button" class="choice" data-start="1"><span data-i18n="suits1"></span><small data-i18n="lvl1"></small><small class="rec" data-rec="1"></small></button>
+      <button type="button" class="choice" data-start="2"><span data-i18n="suits2"></span><small data-i18n="lvl2"></small><small class="rec" data-rec="2"></small></button>
+      <button type="button" class="choice" data-start="4"><span data-i18n="suits4"></span><small data-i18n="lvl4"></small><small class="rec" data-rec="4"></small></button>
+    </div>
+    <button type="button" class="switch" id="winnable" role="switch" aria-checked="true"><span class="knob" aria-hidden="true"></span><span><b data-i18n="winnable"></b><small id="winnable-note"></small></span></button>
+    <p class="fine" data-i18n="controls"></p>
+  </div>
+</div>
+
+<div class="overlay light" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🕸️</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="result" id="win-result"></p>
+    <p id="win-points"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="record" id="win-record"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+      <button type="button" class="ghost" id="change-mode" data-i18n="changeMode"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🕷️</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p data-i18n="stuckText"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="stuck-undo" data-i18n="undo"></button>
+      <button type="button" class="ghost" id="stuck-replay" data-i18n="replay"></button>
+      <button type="button" class="ghost" id="stuck-new" data-i18n="again"></button>
+      <button type="button" class="ghost" id="stuck-keep" data-i18n="keep"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NUMBERS = ['2', '3', '4', '5', '6', '7', '8', '9', '10'];
+  const I18N = {
+    en: {
+      suits1: '1 suit', suits2: '2 suits', suits4: '4 suits', lvl1: 'Beginner', lvl2: 'Intermediate', lvl4: 'Expert',
+      score: 'Score', moves: 'Moves', time: 'Time', runs: 'Runs', undo: 'Undo', hint: 'Hint', deal: 'Deal', menu: 'Menu',
+      board: 'Card table. Left and right arrows choose a column or the stock, up and down choose a card, Enter picks up or drops cards, D deals, H shows a hint, U undoes.',
+      intro: 'Build eight runs from King down to Ace in a single suit — every finished run leaves the table. Drag cards, or tap one to send it to the best spot.',
+      pick: 'Choose a mode', winnable: 'Winnable deals only', winnableOn: 'Every deal has been checked by a solver', winnableOff: 'Fully random deals — some can’t be won',
+      resume: 'Continue game', controls: 'Keyboard: arrows to choose, Enter to pick up and drop, D to deal, H for a hint, U to undo.',
+      record: (w, p) => `Won ${w} of ${p}`, fresh: 'Not played yet',
+      statsTitle: m => `Stats · ${m}`, played: 'Played', wins: 'Won', rate: 'Win rate', bestScore: 'Best score', bestTime: 'Best time', streak: 'Streak', bestStreak: 'Best streak',
+      won: 'You won!', result: (time, m) => `${time} · ${m} moves`, points: s => `Score: ${s}`, winRecord: (w, s, b) => `Wins ${w} · Streak ${s} · Best ${b}`, newBest: 'New best score!',
+      again: 'New deal', replay: 'Replay this deal', changeMode: 'Change mode',
+      stuck: 'No useful moves left', stuckText: 'Undo a few moves, replay this deal or try a new one.', keep: 'Keep looking',
+      dealNo: n => `Deal #${n}`, solvable: 'winnable',
+      stock: 'Stock', column: n => `Column ${n}`, empty: 'empty', dealsLeft: n => n === 1 ? '1 deal left' : `${n} deals left`, noDeals: 'No deals left',
+      ranks: ['Ace', ...NUMBERS, 'Jack', 'Queen', 'King'], suits: ['spades', 'hearts', 'diamonds', 'clubs'], card: (r, s) => `${r} of ${s}`,
+      moved: (c, p) => `${c} to ${p}`, picked: (c, n) => n > 1 ? `Picked up ${c} and ${n - 1} more` : `Picked up ${c}`, illegal: 'That move isn’t allowed', undone: 'Move undone',
+      dealt: 'Dealt a new row', cantDeal: 'Fill every empty column before dealing', runDone: n => `Run complete! ${n} of 8`,
+      noHint: 'No useful moves', hintMove: (c, p) => `Hint: ${c} to ${p}`, hintDeal: 'Hint: deal a new row', hintFill: 'Hint: fill the empty column, then deal',
+      newDeal: m => `New game, ${m}`,
+    },
+    vi: {
+      suits1: '1 chất', suits2: '2 chất', suits4: '4 chất', lvl1: 'Dễ', lvl2: 'Trung bình', lvl4: 'Chuyên gia',
+      score: 'Điểm', moves: 'Nước đi', time: 'Thời gian', runs: 'Bộ xong', undo: 'Hoàn tác', hint: 'Gợi ý', deal: 'Chia bài', menu: 'Menu',
+      board: 'Bàn bài. Phím trái phải để chọn cột hoặc chồng bài úp, phím lên xuống để chọn lá, Enter để nhấc hoặc đặt bài, D để chia bài, H để xem gợi ý, U để hoàn tác.',
+      intro: 'Xếp tám dãy cùng chất từ Già xuống Át — mỗi dãy hoàn chỉnh sẽ tự rời bàn. Kéo thả lá bài, hoặc chạm vào một lá để nó tự tới chỗ phù hợp nhất.',
+      pick: 'Chọn chế độ', winnable: 'Chỉ chia ván giải được', winnableOn: 'Mọi ván đều đã được máy giải thử', winnableOff: 'Chia hoàn toàn ngẫu nhiên — có ván không thể thắng',
+      resume: 'Chơi tiếp', controls: 'Bàn phím: mũi tên để chọn, Enter để nhấc và đặt, D để chia bài, H để gợi ý, U để hoàn tác.',
+      record: (w, p) => `Thắng ${w}/${p} ván`, fresh: 'Chưa chơi ván nào',
+      statsTitle: m => `Thành tích · ${m}`, played: 'Đã chơi', wins: 'Thắng', rate: 'Tỉ lệ thắng', bestScore: 'Điểm cao nhất', bestTime: 'Nhanh nhất', streak: 'Chuỗi thắng', bestStreak: 'Chuỗi dài nhất',
+      won: 'Bạn đã thắng!', result: (time, m) => `${time} · ${m} nước đi`, points: s => `Điểm: ${s}`, winRecord: (w, s, b) => `Thắng ${w} · Chuỗi ${s} · Cao nhất ${b}`, newBest: 'Kỷ lục điểm mới!',
+      again: 'Ván mới', replay: 'Chơi lại ván này', changeMode: 'Đổi chế độ',
+      stuck: 'Hết nước đi hữu ích', stuckText: 'Hãy hoàn tác vài nước, chơi lại ván này hoặc thử ván mới.', keep: 'Tìm tiếp',
+      dealNo: n => `Ván #${n}`, solvable: 'giải được',
+      stock: 'Chồng bài úp', column: n => `Cột ${n}`, empty: 'trống', dealsLeft: n => `còn ${n} lượt chia`, noDeals: 'Đã hết lượt chia',
+      ranks: ['Át', ...NUMBERS, 'Bồi', 'Đầm', 'Già'], suits: ['bích', 'cơ', 'rô', 'nhép'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `${c} tới ${p}`, picked: (c, n) => n > 1 ? `Đã nhấc ${c} cùng ${n - 1} lá` : `Đã nhấc ${c}`, illegal: 'Không thể đi nước này', undone: 'Đã hoàn tác',
+      dealt: 'Đã chia một hàng mới', cantDeal: 'Hãy lấp hết cột trống trước khi chia bài', runDone: n => `Xong một dãy! ${n}/8`,
+      noHint: 'Không có nước đi hữu ích', hintMove: (c, p) => `Gợi ý: ${c} tới ${p}`, hintDeal: 'Gợi ý: chia thêm một hàng', hintFill: 'Gợi ý: lấp cột trống rồi chia bài',
+      newDeal: m => `Ván mới, ${m}`,
+    },
+    zh: {
+      suits1: '单色', suits2: '双色', suits4: '四色', lvl1: '初级', lvl2: '中级', lvl4: '高级',
+      score: '得分', moves: '步数', time: '时间', runs: '完成', undo: '撤销', hint: '提示', deal: '发牌', menu: '菜单',
+      board: '牌桌。左右方向键选择牌列或发牌堆，上下方向键选择纸牌，按 Enter 拿起或放下，按 D 发牌，按 H 提示，按 U 撤销。',
+      intro: '把同一花色的牌从 K 依次排到 A，凑齐八组——每完成一组就会自动收走。拖动纸牌，或点按纸牌让它自动移到最合适的位置。',
+      pick: '选择模式', winnable: '只发有解的牌局', winnableOn: '每一局都经过求解器验证', winnableOff: '完全随机发牌——有些牌局无解',
+      resume: '继续游戏', controls: '键盘：方向键选择，Enter 拿起和放下，D 发牌，H 提示，U 撤销。',
+      record: (w, p) => `${p} 局胜 ${w} 局`, fresh: '还没玩过',
+      statsTitle: m => `战绩 · ${m}`, played: '局数', wins: '胜局', rate: '胜率', bestScore: '最高分', bestTime: '最快', streak: '连胜', bestStreak: '最长连胜',
+      won: '你赢了！', result: (time, m) => `${time} · ${m} 步`, points: s => `得分：${s}`, winRecord: (w, s, b) => `胜局 ${w} · 连胜 ${s} · 最高 ${b}`, newBest: '刷新最高分！',
+      again: '新牌局', replay: '重玩这一局', changeMode: '切换模式',
+      stuck: '没有有用的走法了', stuckText: '撤销几步、重玩这一局，或者换一局新的。', keep: '继续找找',
+      dealNo: n => `牌局 #${n}`, solvable: '有解',
+      stock: '发牌堆', column: n => `第 ${n} 列`, empty: '空', dealsLeft: n => `还能发 ${n} 次`, noDeals: '牌已经发完了',
+      ranks: ['A', ...NUMBERS, 'J', 'Q', 'K'], suits: ['黑桃', '红心', '方块', '梅花'], card: (r, s) => `${s}${r}`,
+      moved: (c, p) => `${c} 移到${p}`, picked: (c, n) => n > 1 ? `拿起${c}及另外 ${n - 1} 张` : `拿起${c}`, illegal: '不能这样移动', undone: '已撤销',
+      dealt: '已发出新的一行', cantDeal: '发牌前要先填满所有空列', runDone: n => `完成一组！${n} / 8`,
+      noHint: '没有有用的走法', hintMove: (c, p) => `提示：把${c}移到${p}`, hintDeal: '提示：发一行新牌', hintFill: '提示：先填满空列再发牌',
+      newDeal: m => `新的一局，${m}`,
+    },
+    fr: {
+      suits1: '1 couleur', suits2: '2 couleurs', suits4: '4 couleurs', lvl1: 'Débutant', lvl2: 'Intermédiaire', lvl4: 'Expert',
+      score: 'Score', moves: 'Coups', time: 'Temps', runs: 'Suites', undo: 'Annuler', hint: 'Indice', deal: 'Distribuer', menu: 'Menu',
+      board: 'Table de jeu. Flèches gauche et droite pour choisir une colonne ou le talon, haut et bas pour choisir une carte, Entrée pour prendre ou poser, D pour distribuer, H pour un indice, U pour annuler.',
+      intro: 'Formez huit suites du Roi à l’As dans une même couleur — chaque suite complète quitte la table. Glissez les cartes, ou touchez-en une pour l’envoyer au meilleur endroit.',
+      pick: 'Choisissez un mode', winnable: 'Donnes gagnables uniquement', winnableOn: 'Chaque donne a été vérifiée par un solveur', winnableOff: 'Donnes totalement aléatoires — certaines sont impossibles',
+      resume: 'Reprendre la partie', controls: 'Clavier : flèches pour choisir, Entrée pour prendre et poser, D pour distribuer, H pour un indice, U pour annuler.',
+      record: (w, p) => `${w} gagnée${w > 1 ? 's' : ''} sur ${p}`, fresh: 'Pas encore joué',
+      statsTitle: m => `Statistiques · ${m}`, played: 'Parties', wins: 'Victoires', rate: 'Réussite', bestScore: 'Meilleur score', bestTime: 'Meilleur temps', streak: 'Série', bestStreak: 'Meilleure série',
+      won: 'Gagné !', result: (time, m) => `${time} · ${m} coups`, points: s => `Score : ${s}`, winRecord: (w, s, b) => `Victoires ${w} · Série ${s} · Record ${b}`, newBest: 'Nouveau record de score !',
+      again: 'Nouvelle donne', replay: 'Rejouer cette donne', changeMode: 'Changer de mode',
+      stuck: 'Plus de coup utile', stuckText: 'Annulez quelques coups, rejouez cette donne ou tentez-en une nouvelle.', keep: 'Chercher encore',
+      dealNo: n => `Donne nº ${n}`, solvable: 'gagnable',
+      stock: 'Talon', column: n => `Colonne ${n}`, empty: 'vide', dealsLeft: n => n > 1 ? `${n} distributions restantes` : '1 distribution restante', noDeals: 'Plus de distribution possible',
+      ranks: ['As', ...NUMBERS, 'Valet', 'Dame', 'Roi'], suits: ['pique', 'cœur', 'carreau', 'trèfle'], card: (r, s) => `${r} de ${s}`,
+      moved: (c, p) => `${c} vers ${p}`, picked: (c, n) => n > 1 ? `Vous prenez ${c} et ${n - 1} ${n > 2 ? 'autres cartes' : 'autre carte'}` : `Vous prenez ${c}`, illegal: 'Ce coup n’est pas permis', undone: 'Coup annulé',
+      dealt: 'Nouvelle rangée distribuée', cantDeal: 'Remplissez toutes les colonnes vides avant de distribuer', runDone: n => `Suite terminée ! ${n} sur 8`,
+      noHint: 'Aucun coup utile', hintMove: (c, p) => `Indice : ${c} vers ${p}`, hintDeal: 'Indice : distribuez une nouvelle rangée', hintFill: 'Indice : remplissez la colonne vide, puis distribuez',
+      newDeal: m => `Nouvelle partie, ${m}`,
+    },
+    th: {
+      suits1: '1 ดอก', suits2: '2 ดอก', suits4: '4 ดอก', lvl1: 'มือใหม่', lvl2: 'ปานกลาง', lvl4: 'เซียน',
+      score: 'คะแนน', moves: 'ครั้ง', time: 'เวลา', runs: 'ชุด', undo: 'ย้อนกลับ', hint: 'คำใบ้', deal: 'แจกไพ่', menu: 'เมนู',
+      board: 'โต๊ะไพ่ ใช้ลูกศรซ้ายขวาเลือกแถวหรือกองจั่ว ลูกศรขึ้นลงเลือกไพ่ กด Enter เพื่อหยิบหรือวาง กด D เพื่อแจกไพ่ กด H เพื่อดูคำใบ้ กด U เพื่อย้อนกลับ',
+      intro: 'เรียงไพ่ดอกเดียวกันจากคิงลงไปถึงเอซให้ครบแปดชุด ชุดที่เรียงครบจะออกจากโต๊ะเอง ลากไพ่ หรือแตะไพ่เพื่อให้ไปยังตำแหน่งที่ดีที่สุด',
+      pick: 'เลือกโหมด', winnable: 'แจกเฉพาะเกมที่ชนะได้', winnableOn: 'ทุกเกมผ่านการตรวจด้วยโปรแกรมแก้เกมแล้ว', winnableOff: 'แจกแบบสุ่มล้วน บางเกมอาจชนะไม่ได้',
+      resume: 'เล่นต่อ', controls: 'คีย์บอร์ด: ลูกศรเพื่อเลือก Enter เพื่อหยิบและวาง D แจกไพ่ H คำใบ้ U ย้อนกลับ',
+      record: (w, p) => `ชนะ ${w} จาก ${p} เกม`, fresh: 'ยังไม่เคยเล่น',
+      statsTitle: m => `สถิติ · ${m}`, played: 'เล่นแล้ว', wins: 'ชนะ', rate: 'อัตราชนะ', bestScore: 'คะแนนสูงสุด', bestTime: 'เวลาดีที่สุด', streak: 'ชนะติดกัน', bestStreak: 'ติดกันสูงสุด',
+      won: 'คุณชนะแล้ว!', result: (time, m) => `${time} · ${m} ครั้ง`, points: s => `คะแนน ${s}`, winRecord: (w, s, b) => `ชนะ ${w} · ติดกัน ${s} · สูงสุด ${b}`, newBest: 'คะแนนสูงสุดใหม่!',
+      again: 'เกมใหม่', replay: 'เล่นเกมนี้อีกครั้ง', changeMode: 'เปลี่ยนโหมด',
+      stuck: 'ไม่มีตาที่เป็นประโยชน์แล้ว', stuckText: 'ลองย้อนกลับสักสองสามตา เล่นเกมนี้ใหม่ หรือเริ่มเกมใหม่', keep: 'หาต่อ',
+      dealNo: n => `เกม #${n}`, solvable: 'ชนะได้',
+      stock: 'กองจั่ว', column: n => `แถว ${n}`, empty: 'ว่าง', dealsLeft: n => `แจกได้อีก ${n} ครั้ง`, noDeals: 'แจกไพ่หมดแล้ว',
+      ranks: ['เอซ', ...NUMBERS, 'แจ็ค', 'ควีน', 'คิง'], suits: ['โพดำ', 'โพแดง', 'ข้าวหลามตัด', 'ดอกจิก'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `ย้าย ${c} ไป${p}`, picked: (c, n) => n > 1 ? `หยิบ ${c} และอีก ${n - 1} ใบ` : `หยิบ ${c}`, illegal: 'ย้ายแบบนี้ไม่ได้', undone: 'ย้อนกลับแล้ว',
+      dealt: 'แจกไพ่แถวใหม่แล้ว', cantDeal: 'ต้องเติมแถวที่ว่างให้ครบก่อนแจกไพ่', runDone: n => `เรียงครบหนึ่งชุด! ${n} จาก 8`,
+      noHint: 'ไม่มีตาที่เป็นประโยชน์', hintMove: (c, p) => `คำใบ้: ย้าย ${c} ไป${p}`, hintDeal: 'คำใบ้: แจกไพ่แถวใหม่', hintFill: 'คำใบ้: เติมแถวที่ว่างก่อน แล้วค่อยแจกไพ่',
+      newDeal: m => `เกมใหม่ ${m}`,
+    },
+    ja: {
+      suits1: '1スート', suits2: '2スート', suits4: '4スート', lvl1: '初級', lvl2: '中級', lvl4: '上級',
+      score: 'スコア', moves: '手数', time: 'タイム', runs: '完成', undo: '戻す', hint: 'ヒント', deal: '配る', menu: 'メニュー',
+      board: 'カードテーブル。左右の矢印キーで列か山札を、上下でカードを選び、Enter で持ち上げる・置く。D で配る、H でヒント、U で一手戻す。',
+      intro: '同じスートでKからAまでの並びを8組作ろう。完成した組は自動で場から外れます。カードはドラッグで動かすか、タップすると最適な場所へ移動します。',
+      pick: 'モードを選択', winnable: 'クリア可能な配りのみ', winnableOn: 'すべての配りをソルバーで確認済み', winnableOff: '完全ランダム。クリアできない配りもあります',
+      resume: '続きから', controls: 'キーボード：矢印で選択、Enter で持ち上げて置く、D で配る、H でヒント、U で戻す。',
+      record: (w, p) => `${p}回中${w}勝`, fresh: 'まだプレイしていません',
+      statsTitle: m => `成績 · ${m}`, played: 'プレイ', wins: '勝利', rate: '勝率', bestScore: '最高スコア', bestTime: '最速', streak: '連勝', bestStreak: '最多連勝',
+      won: 'クリア！', result: (time, m) => `${time} · ${m}手`, points: s => `スコア ${s}`, winRecord: (w, s, b) => `勝利 ${w} · 連勝 ${s} · 最高 ${b}`, newBest: '最高スコア更新！',
+      again: '新しく配る', replay: '同じ配りで再挑戦', changeMode: 'モード変更',
+      stuck: '有効な手がありません', stuckText: '何手か戻すか、同じ配りでやり直すか、新しく配りましょう。', keep: 'もう少し探す',
+      dealNo: n => `配り #${n}`, solvable: 'クリア可能',
+      stock: '山札', column: n => `${n}列目`, empty: '空', dealsLeft: n => `あと${n}回配れます`, noDeals: 'もう配れません',
+      ranks: ['エース', ...NUMBERS, 'ジャック', 'クイーン', 'キング'], suits: ['スペード', 'ハート', 'ダイヤ', 'クラブ'], card: (r, s) => `${s}の${r}`,
+      moved: (c, p) => `${c}を${p}へ`, picked: (c, n) => n > 1 ? `${c}とほか${n - 1}枚を持ち上げました` : `${c}を持ち上げました`, illegal: 'そこには置けません', undone: '一手戻しました',
+      dealt: '新しい列を配りました', cantDeal: '空いている列をすべて埋めてから配りましょう', runDone: n => `1組完成！ ${n}/8`,
+      noHint: '有効な手がありません', hintMove: (c, p) => `ヒント：${c}を${p}へ`, hintDeal: 'ヒント：新しく1列配りましょう', hintFill: 'ヒント：空いた列を埋めてから配りましょう',
+      newDeal: m => `新しいゲーム、${m}`,
+    },
+    ko: {
+      suits1: '1무늬', suits2: '2무늬', suits4: '4무늬', lvl1: '초급', lvl2: '중급', lvl4: '고급',
+      score: '점수', moves: '이동', time: '시간', runs: '완성', undo: '되돌리기', hint: '힌트', deal: '나누기', menu: '메뉴',
+      board: '카드 테이블. 왼쪽·오른쪽 방향키로 열이나 덱을, 위·아래로 카드를 고르고 Enter로 집거나 놓으세요. D는 카드 나누기, H는 힌트, U는 되돌리기입니다.',
+      intro: '같은 무늬로 K부터 A까지 이어진 줄을 8개 완성하세요. 완성된 줄은 자동으로 테이블에서 빠져요. 카드를 드래그하거나, 탭하면 가장 알맞은 곳으로 이동해요.',
+      pick: '모드 선택', winnable: '이길 수 있는 판만', winnableOn: '모든 판을 솔버로 미리 검증했어요', winnableOff: '완전 무작위 — 이길 수 없는 판도 있어요',
+      resume: '이어서 하기', controls: '키보드: 방향키로 고르고 Enter로 집고 놓기, D 나누기, H 힌트, U 되돌리기.',
+      record: (w, p) => `${p}판 중 ${w}승`, fresh: '아직 플레이하지 않았어요',
+      statsTitle: m => `기록 · ${m}`, played: '플레이', wins: '승리', rate: '승률', bestScore: '최고 점수', bestTime: '최단 시간', streak: '연승', bestStreak: '최다 연승',
+      won: '승리했어요!', result: (time, m) => `${time} · ${m}회 이동`, points: s => `점수 ${s}`, winRecord: (w, s, b) => `승리 ${w} · 연승 ${s} · 최고 ${b}`, newBest: '최고 점수 경신!',
+      again: '새 판', replay: '이 판 다시 하기', changeMode: '모드 변경',
+      stuck: '쓸 만한 수가 없어요', stuckText: '몇 수 되돌리거나, 이 판을 다시 하거나, 새 판을 시작해 보세요.', keep: '더 찾아보기',
+      dealNo: n => `${n}번 판`, solvable: '승리 가능',
+      stock: '덱', column: n => `${n}열`, empty: '비어 있음', dealsLeft: n => `${n}번 더 나눌 수 있음`, noDeals: '더 나눌 카드가 없어요',
+      ranks: ['에이스', ...NUMBERS, '잭', '퀸', '킹'], suits: ['스페이드', '하트', '다이아몬드', '클로버'], card: (r, s) => `${s} ${r}`,
+      moved: (c, p) => `${c} → ${p}`, picked: (c, n) => n > 1 ? `${c} 외 ${n - 1}장 집음` : `${c} 집음`, illegal: '그곳에는 놓을 수 없어요', undone: '되돌렸어요',
+      dealt: '새 줄을 나눴어요', cantDeal: '빈 열을 모두 채운 뒤에 나눌 수 있어요', runDone: n => `한 줄 완성! ${n}/8`,
+      noHint: '쓸 만한 수가 없어요', hintMove: (c, p) => `힌트: ${c} → ${p}`, hintDeal: '힌트: 새 줄을 나누세요', hintFill: '힌트: 빈 열을 채운 뒤 나누세요',
+      newDeal: m => `새 게임, ${m}`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Suit outlines on a 100×100 grid, shared by the DOM cards (as <symbol>s) and the win-celebration canvas.
+  const SUIT_PATHS = [
+    ['M50 4C38 22 6 38 6 60C6 74 16 82 28 82C38 82 45 77 48 70C47 82 42 90 32 96H68C58 90 53 82 52 70C55 77 62 82 72 82C84 82 94 74 94 60C94 38 62 22 50 4Z'],
+    ['M50 92C44 84 4 62 4 32C4 16 16 6 29 6C39 6 46 12 50 21C54 12 61 6 71 6C84 6 96 16 96 32C96 62 56 84 50 92Z'],
+    ['M50 3C61 21 74 36 89 50C74 64 61 79 50 97C39 79 26 64 11 50C26 36 39 21 50 3Z'],
+    ['M31 30a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M9 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M53 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M44 40H56V62C56 80 60 88 70 96H30C40 88 44 80 44 62Z'],
+  ];
+  const RANKS = ['A', ...NUMBERS, 'J', 'Q', 'K'];
+  const COLS = 10, STOCK = 10, FOUND = 11, PILES = 19;
+  const MODES = [1, 2, 4];
+  // Deals a full-information solver won (spider-solver.mjs in the build scratchpad); the seed fixes the whole shuffle.
+  const SEEDS = { 1: [8919,16838,24757,32676,40595,48514,56433,64352,72271,80190,88109,96028,103947,111866,119785,127704,135623,143542,151461,159380,167299,175218,183137,191056,198975,206894,214813,222732,230651,238570,246489,254408,262327,270246,278165,286084,294003,301922,309841,317760,325679,333598,341517,349436,357355,365274,373193,381112,389031,396950,404869,412788,420707,428626,436545,444464,452383,460302,468221,476140,484059,491978,499897,507816,515735,523654,531573,539492,547411,555330,563249,571168,579087,587006,594925,602844,610763,618682,626601,634520,642439,650358,658277,666196,674115,682034,689953,697872,705791,713710,721629,729548,737467,745386,753305,761224,769143,777062,784981,792900,800819,808738,824576,832495,840414,848333,856252,864171,880009,887928,895847,903766,911685,919604,927523,935442,943361,951280,959199,967118], 2: [16838,32676,48514,64352,80190,96028,111866,127704,143542,159380,175218,191056,206894,238570,254408,270246,286084,301922,317760,333598,349436,365274,381112,396950,412788,428626,444464,460302,476140,491978,507816,523654,539492,555330,571168,587006,602844,618682,634520,650358,666196,682034,697872,713710,729548,745386,761224,777062,792900,808738,824576,840414,856252,872090,887928,903766,919604,935442,951280,967118,982956,998794,14632,30470,46308,62146,77984,93822,109660,125498,141336,157174,173012,188850,204688,220526,236364,252202,268040,283878,299716,315554,331392,347230,363068,378906,394744,410582,426420,442258,458096,473934,489772,505610,521448,537286,553124,568962,584800,600638,616476,632314,648152,663990,679828,695666,711504,727342,743180,759018,774856,790694,806532,822370,838208,854046,869884,885722,901560,917398], 4: [32676,96028,127704,159380,222732,254408,317760,349436,381112,412788,444464,507816,571168,602844,634520,666196,697872,729548,761224,856252,951280,109660,173012,204688,236364,299716,331392,363068,458096,489772,521448,679828,711504,869884,901560,933236,59940,91616,123292,154968,186644,218320,313348,376700,503404,535080,566756,598432,630108,725136,883516,946868,105248,136924,168600,200276,231952,263628,295304,326980,358656,422008,453684,485360,517036,548712,643740,707092,738768,802120,865472,928824,960500,118880,150556,277260,308936,340612,372288,467316,498992,657372,689048,752400,815752,847428,910780,37484,69160,100836,164188,195864,227540,290892,417596,480948,512624,575976,639328,734356,766032,797708,829384,861060,892736,924412,956088,987764,51116,146144,241172,272848,304524,367876,399552,431228,462904,557932,621284,652960] };
+  const KEY = 'milaan.spiderSolitaire.';
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const isCol = p => p >= 0 && p < COLS;
+
+  const $ = id => document.getElementById(id);
+  const table = $('table');
+  const els = { score: $('score'), moves: $('moves'), time: $('time'), runs: $('runs'), sub: $('sub'), undo: $('undo'), hint: $('hint'), deal: $('deal'), dealCount: $('deal-count'), cursor: $('cursor'), toast: $('toast'), announcer: $('announcer'), start: $('start'), win: $('win'), stuck: $('stuck'), winResult: $('win-result'), winPoints: $('win-points'), winRecord: $('win-record'), newBest: $('new-best'), again: $('again'), fx: $('fx'), winnable: $('winnable'), winnableNote: $('winnable-note'), resumeBox: $('resume-box'), statsTitle: $('stats-title'), statsList: $('stats-list') };
+  const fctx = els.fx.getContext('2d');
+  const FONT = getComputedStyle(document.body).fontFamily;
+
+  $('suit-defs').insertAdjacentHTML('beforeend', SUIT_PATHS.map((paths, s) => `<symbol id="suit${s}" viewBox="0 0 100 100">${paths.map(d => `<path d="${d}" fill="currentColor"/>`).join('')}</symbol>`).join(''));
+  const suitSvg = (s, cls = '') => `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit${s}"/></svg>`;
+
+  const read = (name, fallback) => { try { const v = JSON.parse(localStorage.getItem(KEY + name)); return v ?? fallback; } catch { return fallback; } };
+  const write = (name, value) => { try { localStorage.setItem(KEY + name, JSON.stringify(value)); } catch {} };
+  const drop = name => { try { localStorage.removeItem(KEY + name); } catch {} };
+  const readStats = () => { const all = read('stats', {}); return all && typeof all === 'object' ? all : {}; };
+  const modeStats = (mode, all = readStats()) => ({ played: 0, won: 0, bestScore: 0, bestTime: 0, streak: 0, bestStreak: 0, ...all[mode] });
+  const saveModeStats = (mode, stats) => write('stats', { ...readStats(), [mode]: stats });
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const modeName = n => t[`suits${n}`];
+
+  // ---------- Deal (must stay identical to the solver used to pick the winnable seeds) ----------
+
+  function mulberry32(a) {
+    return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let x = Math.imul(a ^ a >>> 15, 1 | a); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+  }
+  function shuffledDeck(seed) {
+    const rnd = mulberry32(seed);
+    const d = Array.from({ length: 104 }, (_, i) => i);
+    for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+    return d;
+  }
+  const suitOf = (id, n) => n === 1 ? 0 : n === 2 ? Math.floor(id / 13) % 2 : Math.floor(id / 13) % 4;
+
+  const cards = [];
+  const slots = [];
+  let m = null;
+  let piles = Array.from({ length: PILES }, () => []);
+  let suits = MODES.includes(read('mode', 1)) ? read('mode', 1) : 1;
+  let winnablePref = read('winnable', true) !== false;
+  let seed = 0, gameWinnable = false, renderedSuits = 0;
+  let state = 'idle';
+  let moves = 0, elapsed = 0, running = false, started = false, stuckSnoozed = false;
+  let undoStack = [], cycle = null, held = null, hintIndex = 0;
+  let hintTimer = 0, zTimer = 0, toastTimer = 0, panelTimer = 0, saveTimer = 0;
+  const cursor = { p: 0, depth: 0 };
+
+  function buildTable() {
+    for (let p = 0; p < PILES; p++) {
+      const el = document.createElement('div');
+      el.className = `slot${p === STOCK ? ' stock' : p >= FOUND ? ' found' : ''}`;
+      el.setAttribute('aria-hidden', 'true');
+      el.textContent = p === STOCK ? '✓' : p >= FOUND ? 'K' : '';
+      table.append(el);
+      slots.push(el);
+    }
+    for (let id = 0; id < 104; id++) {
+      const el = document.createElement('div');
+      el.className = 'card down';
+      el.setAttribute('aria-hidden', 'true');
+      table.append(el);
+      cards.push({ id, suit: 0, rank: id % 13 + 1, red: false, up: false, el, pile: -1, index: 0, x: 0, y: 0, z: 0 });
+    }
+  }
+
+  // Card faces depend on the suit mode, so they are redrawn when it changes.
+  function paintFaces() {
+    if (renderedSuits === suits) return;
+    renderedSuits = suits;
+    for (const card of cards) {
+      card.suit = suitOf(card.id, suits);
+      card.red = card.suit === 1 || card.suit === 2;
+      card.el.classList.toggle('red', card.red);
+      const center = card.rank > 10 ? `<span class="art">${RANKS[card.rank - 1]}${suitSvg(card.suit)}</span>` : suitSvg(card.suit, 'pip');
+      card.el.innerHTML = `<span class="idx"><b>${RANKS[card.rank - 1]}</b>${suitSvg(card.suit)}</span>${center}`;
+    }
+  }
+
+  const cardName = card => t.card(t.ranks[card.rank - 1], t.suits[card.suit]);
+  const pileName = p => p === STOCK ? t.stock : t.column(p + 1);
+  const top = p => piles[p][piles[p].length - 1];
+  const runsDone = () => piles.slice(FOUND).filter(pile => pile.length).length;
+  const dealsLeft = () => Math.ceil(piles[STOCK].length / 10);
+  const score = () => Math.max(0, 500 - moves + 100 * runsDone());
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function toast(text, big = false) {
+    els.toast.textContent = text;
+    els.toast.classList.toggle('big', big);
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1600);
+  }
+
+  // ---------- Layout ----------
+
+  // Tall portrait tables keep the stock and finished runs in a row on top; wide tables move them to a lane on the right.
+  function measure() {
+    const W = table.clientWidth, H = table.clientHeight;
+    if (!W || !H) return false;
+    const gap = Math.round(Math.max(2, Math.min(10, W * .008)));
+    const laneGap = gap * 3;
+    // Cards are sized so a typical long column (5 down + 13 up) still fits without squeezing the fan.
+    const cwLane = Math.floor(Math.min((W - gap * 9 - laneGap) / 11, H / 4.4 / 1.4, 124));
+    const cwRow = Math.floor(Math.min((W - gap * 9) / 10, H / 5.6 / 1.4, 112));
+    // On landscape tables the side lane wins when it costs little card width, since it frees a whole row for the columns.
+    const wide = W / H > 1.1 && cwLane >= cwRow * .85;
+    let cw, x0, tabY, laneX = 0;
+    if (wide) {
+      cw = cwLane;
+      x0 = Math.round((W - cw * 11 - gap * 9 - laneGap) / 2);
+      laneX = x0 + cw * 10 + gap * 9 + laneGap;
+      tabY = 0;
+    } else {
+      cw = cwRow;
+      x0 = Math.round((W - cw * 10 - gap * 9) / 2);
+      tabY = Math.round(cw * 1.4) + gap * 2;
+    }
+    const ch = Math.round(cw * 1.4);
+    const sOff = wide ? Math.max(2, Math.min(ch * .1, 8)) : Math.max(2, cw * .15);
+    const fOff = wide ? Math.max(2, Math.min(ch * .24, (H - ch * 2 - sOff * 4 - gap * 2) / 7)) : 0;
+    m = { W, H, gap, cw, ch, x0, tabY, wide, laneX, sOff, fOff };
+    table.style.setProperty('--cw', `${cw}px`);
+    table.style.setProperty('--ch', `${ch}px`);
+    table.style.setProperty('--r', `${Math.max(3, Math.round(cw * .1))}px`);
+    slots.forEach((el, p) => {
+      const [x, y] = slotPos(p);
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      el.hidden = p > FOUND && wide;
+    });
+    return true;
+  }
+
+  const colX = c => m.x0 + c * (m.cw + m.gap);
+
+  function slotPos(p) {
+    if (isCol(p)) return [colX(p), m.tabY];
+    if (p === STOCK) return m.wide ? [m.laneX, m.H - m.ch] : [colX(9), 0];
+    const f = p - FOUND;
+    return m.wide ? [m.laneX, Math.round(f * m.fOff)] : [colX(f), 0];
+  }
+
+  // Tall columns squeeze their fan so the last card always stays on the table; face-down cards give way first.
+  function fanFor(pile) {
+    let down = m.ch * .1, up = m.ch * .27, nd = 0, nu = 0;
+    for (let i = 0; i < pile.length - 1; i++) pile[i].up ? nu++ : nd++;
+    const room = Math.max(0, m.H - m.tabY - m.ch);
+    if (nd * down + nu * up > room && nd) down = Math.max(m.ch * .04, Math.min(down, (room - nu * up) / nd));
+    const need = nd * down + nu * up;
+    if (need > room) { const k = room / need; down *= k; up *= k; }
+    return { down, up };
+  }
+
+  function zBase(p) { return p === STOCK ? 0 : p >= FOUND ? 100 + (p - FOUND) * 13 : 300; }
+
+  function layout(lifted = []) {
+    if (!m) return;
+    for (let p = 0; p < PILES; p++) {
+      const pile = piles[p];
+      const [sx, sy] = slotPos(p);
+      if (isCol(p)) {
+        const fan = fanFor(pile);
+        let y = sy;
+        pile.forEach((card, i) => { place(card, p, i, sx, y, lifted); y += card.up ? fan.up : fan.down; });
+      } else if (p === STOCK) {
+        const groups = Math.ceil(pile.length / 10);
+        pile.forEach((card, i) => {
+          const k = groups - 1 - Math.floor(i / 10);
+          place(card, p, i, m.wide ? sx : sx - k * m.sOff, m.wide ? sy - k * m.sOff : sy, lifted);
+        });
+      } else {
+        pile.forEach((card, i) => place(card, p, i, sx, sy, lifted));
+      }
+    }
+    slots[STOCK].textContent = piles[STOCK].length ? '' : '✓';
+    clearTimeout(zTimer);
+    zTimer = setTimeout(() => cards.forEach(card => { if (!card.el.classList.contains('dragging')) card.el.style.zIndex = card.z; }), 340);
+    renderCursor();
+  }
+
+  function place(card, p, i, x, y, lifted) {
+    const flying = lifted.includes(card) || (card.pile >= 0 && card.pile !== p);
+    Object.assign(card, { pile: p, index: i, x, y, z: zBase(p) + i });
+    card.el.style.transform = `translate(${x}px, ${y}px)`;
+    // Cards in flight ride above everything until they land.
+    card.el.style.zIndex = flying ? 1000 + card.z : card.z;
+    card.el.classList.toggle('down', !card.up);
+  }
+
+  function stagger(list, step) {
+    if (reduceMotion.matches) return;
+    list.forEach((card, i) => { card.el.style.transitionDelay = `${i * step}ms`; });
+    setTimeout(() => list.forEach(card => { card.el.style.transitionDelay = ''; }), list.length * step + 300);
+  }
+
+  function flipAnim(card) {
+    card.el.classList.remove('flip');
+    void card.el.offsetWidth;
+    card.el.classList.add('flip');
+  }
+
+  function shake(card) {
+    if (!card) return;
+    card.el.classList.remove('shake');
+    void card.el.offsetWidth;
+    card.el.classList.add('shake');
+  }
+
+  // ---------- Game flow ----------
+
+  // A started game that is left unfinished breaks the winning streak.
+  function abandon() {
+    if (!started || state === 'won') return;
+    const stats = modeStats(suits);
+    stats.streak = 0;
+    saveModeStats(suits, stats);
+    started = false;
+  }
+
+  function pickSeed(mode, winnable) {
+    const list = SEEDS[mode] || [];
+    if (winnable && list.length) {
+      // Avoid repeating the last few verified deals.
+      const recent = read(`recent${mode}`, []);
+      const pool = list.filter(s => !recent.includes(s));
+      const chosen = (pool.length ? pool : list)[Math.floor(Math.random() * (pool.length || list.length))];
+      write(`recent${mode}`, [chosen, ...(Array.isArray(recent) ? recent : [])].slice(0, Math.min(40, list.length - 1)));
+      return chosen;
+    }
+    return 1 + Math.floor(Math.random() * 999999);
+  }
+
+  function newGame(mode = suits, fixedSeed = 0) {
+    abandon();
+    stopFx();
+    clearTimeout(panelTimer);
+    clearHint();
+    releaseHeld();
+    suits = mode;
+    write('mode', mode);
+    seed = fixedSeed || pickSeed(mode, winnablePref);
+    gameWinnable = (SEEDS[mode] || []).includes(seed);
+    paintFaces();
+    const deck = shuffledDeck(seed);
+    piles = Array.from({ length: PILES }, () => []);
+    for (const card of cards) { card.up = false; card.pile = -1; }
+    const order = [];
+    for (let i = 0; i < 54; i++) { const card = cards[deck[i]]; piles[i % COLS].push(card); order.push(card); }
+    for (let c = 0; c < COLS; c++) top(c).up = true;
+    // The stock pops from the end: deal k gives deck[54 + 10k + c] to column c.
+    piles[STOCK] = deck.slice(54).reverse().map(id => cards[id]);
+    moves = 0; elapsed = 0; running = false; started = false; stuckSnoozed = false;
+    undoStack = []; cycle = null; hintIndex = 0;
+    state = 'play';
+    cursor.p = 0; cursor.depth = Infinity;
+    for (const id of ['start', 'win', 'stuck']) els[id].hidden = true;
+    dealAnimation(order);
+    updateHud();
+    saveSoon(0);
+    announce(`${t.newDeal(modeName(suits))}. ${t.dealNo(seed)}`);
+  }
+
+  function dealAnimation(order) {
+    if (reduceMotion.matches || !m) return layout();
+    const [sx, sy] = slotPos(STOCK);
+    for (const card of cards) {
+      card.el.style.transition = 'none';
+      card.el.style.transform = `translate(${sx}px, ${sy}px)`;
+      card.el.classList.add('down');
+    }
+    void table.offsetWidth;
+    for (const card of cards) card.el.style.transition = '';
+    stagger(order, 16);
+    layout();
+  }
+
+  function startClock() {
+    if (!started) {
+      started = true;
+      const stats = modeStats(suits);
+      stats.played += 1;
+      saveModeStats(suits, stats);
+    }
+    running = true;
+  }
+
+  // A movable stack is a face-up run of one suit going down by one.
+  function isRun(p, i) {
+    const pile = piles[p];
+    if (!pile[i] || !pile[i].up) return false;
+    for (let k = i + 1; k < pile.length; k++) if (pile[k].suit !== pile[i].suit || pile[k].rank !== pile[k - 1].rank - 1) return false;
+    return true;
+  }
+
+  function runStart(p) {
+    const pile = piles[p];
+    let i = pile.length - 1;
+    if (i < 0) return -1;
+    while (i > 0 && pile[i - 1].up && pile[i - 1].suit === pile[i].suit && pile[i - 1].rank === pile[i].rank + 1) i--;
+    return i;
+  }
+
+  function canMove(from, count, to) {
+    if (!isCol(from) || !isCol(to) || from === to) return false;
+    const src = piles[from];
+    const i = src.length - count;
+    if (count < 1 || i < 0 || !isRun(from, i)) return false;
+    const dest = top(to);
+    return !dest || dest.rank === src[i].rank + 1;
+  }
+
+  function pushUndo() {
+    undoStack.push({ piles: piles.map(pile => pile.map(card => card.id)), up: cards.map(card => card.up ? 1 : 0).join('') });
+  }
+
+  function flipTop(p) {
+    const card = top(p);
+    if (card && !card.up) { card.up = true; flipAnim(card); }
+  }
+
+  // A finished King-to-Ace run in one suit leaves the column for the next free foundation.
+  function collectRun(p) {
+    const pile = piles[p], n = pile.length;
+    if (n < 13) return false;
+    const king = pile[n - 13];
+    if (!king.up || king.rank !== 13) return false;
+    for (let i = n - 12; i < n; i++) if (!pile[i].up || pile[i].suit !== king.suit || pile[i].rank !== pile[i - 1].rank - 1) return false;
+    const run = pile.splice(n - 13).reverse();
+    const f = FOUND + runsDone();
+    piles[f].push(...run);
+    flipTop(p);
+    stagger(run, 22);
+    const done = runsDone();
+    toast(`+100 · ${t.runDone(done)}`, true);
+    announce(t.runDone(done));
+    return true;
+  }
+
+  function applyMove(from, count, to, lifted = []) {
+    pushUndo();
+    const moved = piles[from].splice(-count);
+    piles[to].push(...moved);
+    flipTop(from);
+    moves += 1;
+    cycle = null;
+    startClock();
+    const collected = collectRun(to);
+    layout([...moved, ...lifted]);
+    return { moved, collected };
+  }
+
+  function tryMove(from, count, to, lifted = []) {
+    if (state !== 'play' || !canMove(from, count, to)) return false;
+    const { moved, collected } = applyMove(from, count, to, lifted);
+    if (!collected) announce(t.moved(cardName(moved[0]), pileName(to)));
+    afterAction();
+    return true;
+  }
+
+  function dealRow() {
+    if (state !== 'play') return;
+    releaseHeld();
+    if (!piles[STOCK].length) { toast(t.noDeals); announce(t.noDeals); return; }
+    if (piles.slice(0, COLS).some(pile => !pile.length)) {
+      toast(t.cantDeal);
+      announce(t.cantDeal);
+      shake(top(STOCK));
+      return;
+    }
+    pushUndo();
+    const dealt = [];
+    for (let c = 0; c < COLS; c++) {
+      const card = piles[STOCK].pop();
+      card.up = true;
+      piles[c].push(card);
+      dealt.push(card);
+    }
+    moves += 1;
+    cycle = null;
+    startClock();
+    stagger(dealt, 45);
+    let collected = false;
+    for (let c = 0; c < COLS; c++) collected = collectRun(c) || collected;
+    layout(dealt);
+    if (!collected) announce(`${t.dealt}. ${t.dealsLeft(dealsLeft())}`);
+    afterAction();
+  }
+
+  // Undo always costs a move, so it can never be used to win back points.
+  function undo() {
+    if ((state !== 'play' && state !== 'stuck') || !undoStack.length) return;
+    const snap = undoStack.pop();
+    piles = snap.piles.map(ids => ids.map(id => cards[id]));
+    cards.forEach((card, i) => { card.up = snap.up[i] === '1'; });
+    moves += 1;
+    stuckSnoozed = false;
+    if (state === 'stuck') { state = 'play'; els.stuck.hidden = true; clearTimeout(panelTimer); }
+    cycle = null;
+    releaseHeld();
+    clearHint();
+    layout();
+    updateHud();
+    saveSoon();
+    announce(t.undone);
+  }
+
+  function afterAction() {
+    clearHint();
+    hintIndex = 0;
+    if (runsDone() === 8) return win();
+    updateHud();
+    saveSoon();
+    if (!piles[STOCK].length && !stuckSnoozed && piles.slice(0, COLS).every(pile => pile.length) && !usefulMoves().length) {
+      state = 'stuck';
+      running = false;
+      updateHud();
+      announce(`${t.stuck}. ${t.stuckText}`);
+      panelTimer = setTimeout(() => { els.stuck.hidden = false; $('stuck-undo').focus({ preventScroll: true }); }, 500);
+    }
+  }
+
+  // ---------- Hints & dead-end detection ----------
+
+  // Whole runs that make real progress, best first. Moving a run that already sits on the next rank to an off-suit card is left out on purpose.
+  function usefulMoves() {
+    const list = [];
+    for (let from = 0; from < COLS; from++) {
+      const i = runStart(from);
+      if (i < 0) continue;
+      const pile = piles[from], lead = pile[i], under = pile[i - 1];
+      const count = pile.length - i;
+      let usedEmpty = false;
+      for (let to = 0; to < COLS; to++) {
+        if (!canMove(from, count, to)) continue;
+        const dest = top(to);
+        let rank = -1;
+        if (!dest) {
+          if (usedEmpty || !under || under.up) continue;
+          usedEmpty = true;
+          rank = 4;
+        } else if (dest.suit === lead.suit) rank = under && !under.up ? 0 : 1;
+        else if (under && !under.up) rank = 2;
+        else if (!under || under.rank !== lead.rank + 1) rank = 3;
+        if (rank < 0) continue;
+        list.push({ from, count, to, rank });
+      }
+    }
+    return list.sort((a, b) => a.rank - b.rank || b.count - a.count);
+  }
+
+  // With an empty column the stock is locked, so the hint points at any stack that can fill it.
+  function fillMove() {
+    const empty = piles.findIndex((pile, p) => isCol(p) && !pile.length);
+    if (empty < 0) return null;
+    for (let from = 0; from < COLS; from++) {
+      const i = runStart(from);
+      if (i > 0) return { from, count: piles[from].length - i, to: empty, fill: true };
+    }
+    return null;
+  }
+
+  function nextHint() {
+    const options = usefulMoves();
+    if (piles[STOCK].length) {
+      const blocked = piles.slice(0, COLS).some(pile => !pile.length);
+      if (!blocked) options.push({ deal: true });
+      else if (!options.length) { const fill = fillMove(); if (fill) options.push(fill); }
+    }
+    return options;
+  }
+
+  function clearHint() {
+    clearTimeout(hintTimer);
+    for (const el of table.querySelectorAll('.hint')) el.classList.remove('hint');
+  }
+
+  function showHint() {
+    if (state !== 'play') return;
+    clearHint();
+    releaseHeld();
+    const options = nextHint();
+    if (!options.length) { toast(t.noHint); announce(t.noHint); return; }
+    const move = options[hintIndex % options.length];
+    hintIndex += 1;
+    if (move.deal) {
+      (top(STOCK)?.el || slots[STOCK]).classList.add('hint');
+      announce(t.hintDeal);
+      toast(t.hintDeal);
+    } else {
+      piles[move.from].slice(-move.count).forEach(card => card.el.classList.add('hint'));
+      (top(move.to)?.el || slots[move.to]).classList.add('hint');
+      const text = move.fill ? t.hintFill : t.hintMove(cardName(piles[move.from][piles[move.from].length - move.count]), pileName(move.to));
+      announce(text);
+      if (move.fill) toast(text);
+    }
+    hintTimer = setTimeout(clearHint, 2200);
+  }
+
+  // ---------- Win ----------
+
+  function win() {
+    state = 'won';
+    running = false;
+    const final = score();
+    const stats = modeStats(suits);
+    stats.won += 1;
+    stats.streak += 1;
+    stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+    const newBest = final > stats.bestScore;
+    stats.bestScore = Math.max(stats.bestScore, final);
+    if (!stats.bestTime || elapsed < stats.bestTime) stats.bestTime = Math.round(elapsed);
+    saveModeStats(suits, stats);
+    drop('save');
+    updateHud();
+    els.winResult.textContent = t.result(formatTime(elapsed), moves);
+    els.winPoints.textContent = t.points(final);
+    els.winRecord.textContent = `${modeName(suits)} · ${t.winRecord(stats.won, stats.streak, stats.bestScore)}`;
+    els.newBest.hidden = !newBest;
+    announce(`${t.won} ${els.winResult.textContent}. ${els.winPoints.textContent}`);
+    celebrate();
+    panelTimer = setTimeout(() => { els.win.hidden = false; els.again.focus({ preventScroll: true }); }, reduceMotion.matches ? 300 : 2600);
+  }
+
+  // Bouncing-card cascade: the finished runs leave the foundations and leave trails on a canvas.
+  const SUIT_SHAPES = SUIT_PATHS.map(list => list.map(d => new Path2D(d)));
+  const fx = { on: false, queue: [], live: [], spawnIn: 0 };
+
+  function paintSuit(ctx, suit, x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 100, size / 100);
+    for (const shape of SUIT_SHAPES[suit]) ctx.fill(shape);
+    ctx.restore();
+  }
+
+  function paintCard(ctx, card, x, y, w, h) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, w * .1); else ctx.rect(x, y, w, h);
+    ctx.fillStyle = '#fffdf8';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(29,27,46,.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = card.red ? '#d7263d' : '#1d1b2e';
+    ctx.font = `900 ${Math.round(w * .36)}px ${FONT}`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(RANKS[card.rank - 1], x + w * .07, y + h * .04);
+    paintSuit(ctx, card.suit, x + w * .66, y + h * .05, w * .26);
+    paintSuit(ctx, card.suit, x + w * .2, y + h * .4, w * .6);
+  }
+
+  function celebrate() {
+    if (reduceMotion.matches || !m) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.fx.width = Math.round(innerWidth * dpr);
+    els.fx.height = Math.round(innerHeight * dpr);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    els.fx.hidden = false;
+    const rect = table.getBoundingClientRect();
+    fx.queue = [];
+    for (let r = 12; r >= 0; r--) for (let f = FOUND; f < PILES; f++) {
+      const card = piles[f][r];
+      if (card) fx.queue.push({ card, x: rect.left + card.x, y: rect.top + card.y, vx: 0, vy: 0 });
+    }
+    fx.live = [];
+    fx.spawnIn = 0;
+    fx.on = true;
+  }
+
+  function stepFx(dt) {
+    fx.spawnIn -= dt;
+    if (fx.spawnIn <= 0 && fx.queue.length) {
+      const b = fx.queue.shift();
+      b.vx = (Math.random() < .5 ? -1 : 1) * (.12 + Math.random() * .22);
+      b.vy = -Math.random() * .45;
+      b.card.el.style.visibility = 'hidden';
+      fx.live.push(b);
+      fx.spawnIn = 110;
+    }
+    const floor = innerHeight - m.ch;
+    for (const b of fx.live) {
+      b.vy += .0017 * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.y > floor) { b.y = floor; b.vy *= -.72; }
+      paintCard(fctx, b.card, b.x, b.y, m.cw, m.ch);
+    }
+    fx.live = fx.live.filter(b => b.x > -m.cw && b.x < innerWidth);
+    if (!fx.queue.length && !fx.live.length) fx.on = false;
+  }
+
+  function stopFx() {
+    fx.on = false;
+    fx.queue = [];
+    fx.live = [];
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.clearRect(0, 0, els.fx.width, els.fx.height);
+    els.fx.hidden = true;
+    cards.forEach(card => { card.el.style.visibility = ''; });
+  }
+
+  // ---------- Save & resume ----------
+
+  function saveSoon(delay = 250) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveGame, delay);
+  }
+
+  function saveGame() {
+    if (state !== 'play' && state !== 'stuck') return;
+    write('save', { v: 1, suits, seed, winnable: gameWinnable, moves, elapsed: Math.round(elapsed), started, piles: piles.map(pile => pile.map(card => card.id)), up: cards.map(card => card.up ? 1 : 0).join(''), undo: undoStack.slice(-150) });
+  }
+
+  function restoreGame() {
+    const s = read('save', null);
+    if (!s || s.v !== 1 || !MODES.includes(s.suits) || !Array.isArray(s.piles) || s.piles.length !== PILES || typeof s.up !== 'string' || s.up.length !== 104) return false;
+    const ids = s.piles.flat();
+    if (ids.length !== 104 || new Set(ids).size !== 104 || ids.some(id => !Number.isInteger(id) || id < 0 || id > 103)) return false;
+    suits = s.suits;
+    seed = +s.seed || 0;
+    gameWinnable = !!s.winnable;
+    paintFaces();
+    piles = s.piles.map(list => list.map(id => cards[id]));
+    cards.forEach((card, i) => { card.up = s.up[i] === '1'; });
+    moves = +s.moves || 0;
+    elapsed = +s.elapsed || 0;
+    started = !!s.started;
+    undoStack = Array.isArray(s.undo) ? s.undo.filter(u => u && Array.isArray(u.piles) && u.piles.length === PILES && typeof u.up === 'string') : [];
+    state = 'play';
+    running = started;
+    return true;
+  }
+
+  // ---------- HUD, menu & loop ----------
+
+  function renderStats() {
+    const st = modeStats(suits);
+    els.statsTitle.textContent = t.statsTitle(modeName(suits));
+    const rows = [[t.played, st.played], [t.wins, st.won], [t.rate, st.played ? `${Math.round(st.won / st.played * 100)}%` : '—'], [t.bestScore, st.bestScore || '—'], [t.bestTime, st.bestTime ? formatTime(st.bestTime) : '—'], [t.streak, st.streak], [t.bestStreak, st.bestStreak]];
+    els.statsList.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  }
+
+  function updateHud() {
+    els.score.textContent = String(score());
+    els.moves.textContent = String(moves);
+    els.time.textContent = formatTime(elapsed);
+    els.runs.textContent = `${runsDone()}/8`;
+    els.sub.innerHTML = seed ? `${modeName(suits)} · ${t.dealNo(seed)}${gameWinnable ? ` · <b>✓ ${t.solvable}</b>` : ''}` : modeName(suits);
+    const left = dealsLeft();
+    els.dealCount.textContent = String(left);
+    els.dealCount.hidden = state === 'idle';
+    els.deal.setAttribute('aria-label', `${t.deal} — ${left ? t.dealsLeft(left) : t.noDeals}`);
+    els.undo.disabled = !undoStack.length || (state !== 'play' && state !== 'stuck');
+    els.hint.disabled = state !== 'play';
+    els.deal.disabled = state !== 'play' || !left;
+    renderStats();
+  }
+
+  function openMenu() {
+    clearTimeout(panelTimer);
+    stopFx();
+    releaseHeld();
+    els.win.hidden = true;
+    els.stuck.hidden = true;
+    const inGame = state === 'play' || state === 'stuck';
+    els.resumeBox.hidden = !inGame;
+    for (const btn of document.querySelectorAll('[data-start]')) {
+      const mode = +btn.dataset.start;
+      const st = modeStats(mode);
+      btn.setAttribute('aria-current', String(mode === suits));
+      btn.querySelector('[data-rec]').textContent = st.played ? t.record(st.won, st.played) : t.fresh;
+    }
+    renderWinnable();
+    els.start.hidden = false;
+    (inGame ? $('resume') : document.querySelector(`[data-start="${suits}"]`)).focus({ preventScroll: true });
+  }
+
+  function closeMenu() {
+    els.start.hidden = true;
+    if (state === 'stuck' && !stuckSnoozed) els.stuck.hidden = false;
+    table.focus({ preventScroll: true });
+  }
+
+  function renderWinnable() {
+    els.winnable.setAttribute('aria-checked', String(winnablePref));
+    els.winnableNote.textContent = winnablePref ? t.winnableOn : t.winnableOff;
+  }
+
+  const overlayOpen = () => !els.start.hidden || !els.win.hidden || !els.stuck.hidden;
+
+  let last = performance.now();
+  function frame(now) {
+    // Clamp dt so a stalled tab never teleports the celebration; the clock only drops long stalls.
+    const dt = Math.min(50, now - last);
+    const clockDt = Math.min(1000, now - last);
+    last = now;
+    if (running && state === 'play' && !document.hidden && !overlayOpen()) {
+      const before = Math.floor(elapsed / 1000);
+      elapsed += clockDt;
+      if (Math.floor(elapsed / 1000) !== before) {
+        els.time.textContent = formatTime(elapsed);
+        if (Math.floor(elapsed / 1000) % 5 === 0) saveSoon();
+      }
+    }
+    if (fx.on) stepFx(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Pointer: drag & tap ----------
+
+  let press = null;
+
+  // Tap sends a stack to its best spot (same suit first); tapping the same card again walks on to the next legal spot.
+  function destinations(from, count) {
+    const lead = piles[from][piles[from].length - count];
+    const same = [], other = [];
+    let empty = -1;
+    for (let k = 1; k < COLS; k++) {
+      const to = (from + k) % COLS;
+      if (!canMove(from, count, to)) continue;
+      const dest = top(to);
+      if (!dest) { if (empty < 0) empty = to; } else (dest.suit === lead.suit ? same : other).push(to);
+    }
+    return [...same, ...other, ...(empty >= 0 ? [empty] : [])];
+  }
+
+  function tapCard(card) {
+    const p = card.pile;
+    if (!isCol(p) || !isRun(p, card.index)) { shake(card); announce(t.illegal); return; }
+    const count = piles[p].length - card.index;
+    const again = cycle && cycle.id === card.id && cycle.at === p;
+    let to = -1;
+    if (again) {
+      const ring = cycle.ring;
+      for (let k = 1; k <= ring.length && to < 0; k++) {
+        const cand = ring[(cycle.pos + k) % ring.length];
+        if (cand !== p && canMove(p, count, cand)) to = cand;
+      }
+    } else to = destinations(p, count)[0] ?? -1;
+    if (to < 0) { shake(card); announce(t.illegal); return; }
+    const ring = again ? cycle.ring : [p, ...destinations(p, count)];
+    tryMove(p, count, to);
+    if (state === 'play') cycle = { id: card.id, ring, pos: ring.indexOf(to), at: to };
+  }
+
+  function dropTarget(stack, from) {
+    const lead = stack[0];
+    let best = -1, bestArea = 0;
+    for (let p = 0; p < COLS; p++) {
+      if (!canMove(from, stack.length, p)) continue;
+      const [x, y] = slotPos(p);
+      const lastCard = top(p);
+      const h = (lastCard ? lastCard.y - y : 0) + m.ch;
+      const w = Math.min(lead.dragX + m.cw, x + m.cw) - Math.max(lead.dragX, x);
+      const v = Math.min(lead.dragY + m.ch, y + h) - Math.max(lead.dragY, y);
+      if (w > 0 && v > 0 && w * v > bestArea) { bestArea = w * v; best = p; }
+    }
+    return best;
+  }
+
+  // Hit-test against where cards are going, not where they are drawn, so rapid taps ignore cards still in flight.
+  function hitTest(event) {
+    const rect = table.getBoundingClientRect();
+    const x = event.clientX - rect.left, y = event.clientY - rect.top;
+    const inside = (cx, cy) => x >= cx && x < cx + m.cw && y >= cy && y < cy + m.ch;
+    let card = null;
+    for (const c of cards) if (c.pile >= 0 && inside(c.x, c.y) && (!card || c.z > card.z)) card = c;
+    if (card) return { card, p: card.pile };
+    for (let p = 0; p <= STOCK; p++) if (inside(...slotPos(p))) return { card: null, p };
+    return { card: null, p: -1 };
+  }
+
+  table.addEventListener('pointerdown', event => {
+    if (state !== 'play' || event.button > 0 || press || !m) return;
+    setKb(false);
+    releaseHeld();
+    table.focus({ preventScroll: true });
+    const { card, p } = hitTest(event);
+    if (p < 0) return;
+    event.preventDefault();
+    if (p === STOCK) { press = { stock: true, id: event.pointerId }; return; }
+    if (!isCol(p) || !card || !card.up) return;
+    const movable = isRun(p, card.index);
+    press = { id: event.pointerId, x: event.clientX, y: event.clientY, card, from: p, stack: movable ? piles[p].slice(card.index) : null, dragging: false };
+    table.setPointerCapture(event.pointerId);
+  });
+
+  table.addEventListener('pointermove', event => {
+    if (!press || press.stock || !press.stack || event.pointerId !== press.id) return;
+    const dx = event.clientX - press.x, dy = event.clientY - press.y;
+    if (!press.dragging) {
+      if (Math.hypot(dx, dy) < 6) return;
+      press.dragging = true;
+      clearHint();
+      press.stack.forEach((card, i) => { card.el.classList.add('dragging'); card.el.style.zIndex = 2000 + i; });
+    }
+    for (const card of press.stack) {
+      card.dragX = card.x + dx;
+      card.dragY = card.y + dy;
+      card.el.style.transform = `translate(${card.dragX}px, ${card.dragY}px)`;
+    }
+  });
+
+  table.addEventListener('pointerup', event => {
+    if (!press || event.pointerId !== press.id) return;
+    const done = press;
+    press = null;
+    if (done.stock) return dealRow();
+    if (!done.dragging) return tapCard(done.card);
+    done.stack.forEach(card => card.el.classList.remove('dragging'));
+    const to = dropTarget(done.stack, done.from);
+    if (to < 0 || !tryMove(done.from, done.stack.length, to, done.stack)) layout(done.stack);
+  });
+
+  table.addEventListener('pointercancel', () => {
+    if (press?.dragging) { press.stack.forEach(card => card.el.classList.remove('dragging')); layout(press.stack); }
+    press = null;
+  });
+
+  // ---------- Keyboard cursor ----------
+
+  function setKb(on) { table.classList.toggle('kb', on); }
+
+  function clampDepth(p, depth) {
+    const pile = piles[p];
+    if (!isCol(p) || !pile.length) return Math.max(0, pile.length - 1);
+    return Math.min(Math.max(depth, runStart(p)), pile.length - 1);
+  }
+
+  function renderCursor() {
+    if (!m) return;
+    const p = cursor.p, pile = piles[p];
+    let [x, y] = slotPos(p), h = m.ch;
+    if (pile.length) {
+      cursor.depth = clampDepth(p, cursor.depth);
+      const lastCard = pile[pile.length - 1], card = isCol(p) ? pile[cursor.depth] : lastCard;
+      x = card.x; y = card.y; h = lastCard.y - card.y + m.ch;
+    }
+    els.cursor.style.transform = `translate(${x}px, ${y}px)`;
+    els.cursor.style.height = `${h}px`;
+  }
+
+  function describe(p) {
+    const pile = piles[p];
+    if (p === STOCK) return `${t.stock}: ${pile.length ? t.dealsLeft(dealsLeft()) : t.noDeals}`;
+    if (!pile.length) return `${pileName(p)}: ${t.empty}`;
+    return `${pileName(p)}: ${cardName(pile[cursor.depth])}`;
+  }
+
+  function moveCursor(key) {
+    let { p, depth } = cursor;
+    if (key === 'ArrowLeft' || key === 'ArrowRight') { p = (p + (key === 'ArrowLeft' ? STOCK : 1)) % (STOCK + 1); depth = Infinity; }
+    else if (isCol(p)) depth = key === 'ArrowUp' ? Math.min(depth, piles[p].length - 1) - 1 : depth + 1;
+    cursor.p = p;
+    cursor.depth = clampDepth(p, depth);
+    renderCursor();
+    announce(describe(p));
+  }
+
+  function markHeld(on) {
+    if (!held) return;
+    piles[held.p].slice(-held.count).forEach(card => card.el.classList.toggle('held', on));
+  }
+
+  function releaseHeld() {
+    markHeld(false);
+    held = null;
+  }
+
+  function activate() {
+    if (state !== 'play') return;
+    const p = cursor.p;
+    if (p === STOCK) { releaseHeld(); return dealRow(); }
+    if (!held) {
+      const pile = piles[p];
+      if (!pile.length) return;
+      const i = clampDepth(p, cursor.depth);
+      if (!isRun(p, i)) { shake(pile[i]); announce(t.illegal); return; }
+      held = { p, count: pile.length - i };
+      markHeld(true);
+      announce(t.picked(cardName(pile[i]), held.count));
+      return;
+    }
+    const { p: from, count } = held;
+    const card = piles[from][piles[from].length - count];
+    releaseHeld();
+    // Pressing Enter twice on the same column works like a tap: the best destination is chosen.
+    if (from === p) return tapCard(card);
+    if (!tryMove(from, count, p)) { shake(card); announce(t.illegal); return; }
+    cursor.depth = Infinity;
+    renderCursor();
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' || overlayOpen() || state === 'idle') return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const key = event.key;
+    if (key.startsWith('Arrow')) {
+      event.preventDefault();
+      setKb(true);
+      if (document.activeElement !== table) table.focus({ preventScroll: true });
+      moveCursor(key);
+    } else if ((key === 'Enter' || key === ' ') && (document.activeElement === table || document.activeElement === document.body)) {
+      event.preventDefault();
+      setKb(true);
+      activate();
+    } else if (key === 'h' || key === 'H') { event.preventDefault(); showHint(); }
+    else if (key === 'u' || key === 'U') { event.preventDefault(); undo(); }
+    else if (key === 'd' || key === 'D') { event.preventDefault(); dealRow(); }
+  });
+
+  // ---------- Buttons ----------
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', showHint);
+  els.deal.addEventListener('click', dealRow);
+  $('menu').addEventListener('click', openMenu);
+  $('resume').addEventListener('click', closeMenu);
+  els.winnable.addEventListener('click', () => { winnablePref = !winnablePref; write('winnable', winnablePref); renderWinnable(); });
+  for (const btn of document.querySelectorAll('[data-start]')) {
+    btn.addEventListener('click', () => { newGame(+btn.dataset.start); table.focus({ preventScroll: true }); });
+  }
+  els.again.addEventListener('click', () => { newGame(suits); table.focus({ preventScroll: true }); });
+  $('change-mode').addEventListener('click', openMenu);
+  $('stuck-undo').addEventListener('click', () => { undo(); table.focus({ preventScroll: true }); });
+  $('stuck-replay').addEventListener('click', () => { newGame(suits, seed); table.focus({ preventScroll: true }); });
+  $('stuck-new').addEventListener('click', () => { newGame(suits); table.focus({ preventScroll: true }); });
+  $('stuck-keep').addEventListener('click', () => { stuckSnoozed = true; state = 'play'; running = true; els.stuck.hidden = true; updateHud(); table.focus({ preventScroll: true }); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+
+  new ResizeObserver(() => {
+    table.classList.add('instant');
+    if (measure()) layout();
+    requestAnimationFrame(() => requestAnimationFrame(() => table.classList.remove('instant')));
+  }).observe(table);
+
+  // Read-only hooks for automated tests (no moves, no stats).
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__spider = {
+    state: () => ({ suits, seed, winnable: gameWinnable, state, moves, score: score(), runs: runsDone(), dealsLeft: dealsLeft(), elapsed, started, undo: undoStack.length, overlay: ['start', 'win', 'stuck'].find(id => !els[id].hidden) || null, card: m && { w: m.cw, h: m.ch, wide: m.wide } }),
+    columns: () => piles.slice(0, COLS).map(pile => pile.map(card => ({ id: card.id, rank: card.rank, suit: card.suit, up: card.up }))),
+    stock: () => piles[STOCK].map(card => card.id),
+    // Centre of the visible strip of card i in pile p (or of the empty slot), in client coordinates.
+    point: (p, i) => {
+      const rect = table.getBoundingClientRect();
+      const pile = piles[p], card = pile[i ?? pile.length - 1];
+      if (!card) { const [x, y] = slotPos(p); return { x: rect.left + x + m.cw / 2, y: rect.top + y + m.ch / 2 }; }
+      const next = pile[card.index + 1];
+      const h = next && isCol(p) ? next.y - card.y : m.ch;
+      return { x: rect.left + card.x + m.cw / 2, y: rect.top + card.y + Math.min(h, m.ch) / 2 };
+    },
+    hints: () => nextHint().map(h => ({ ...h })),
+    seedCount: mode => (SEEDS[mode] || []).length,
+  };
+
+  buildTable();
+  if (restoreGame()) {
+    if (measure()) layout();
+    updateHud();
+    openMenu();
+  } else {
+    paintFaces();
+    // Before the first deal the whole double deck waits face down on the stock.
+    piles[STOCK] = cards.slice();
+    if (measure()) layout();
+    updateHud();
+    openMenu();
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

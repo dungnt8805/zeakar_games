@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snake Arena</title>
+<style>
+:root {
+  --bg: #0a1220;
+  --ink: #eef4ff;
+  --muted: #9db0cf;
+  --accent: #2fe0a8;
+  --accent-dark: #129671;
+  --amber: #ffc247;
+  --amber-dark: #c98a00;
+  --danger: #ff5a7a;
+  --panel: #111d35;
+  --panel-2: #1a2b4b;
+  --line: #2a4069;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+canvas#canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+canvas#canvas:focus-visible { outline: none; }
+
+.hud { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); display: grid; gap: 6px; justify-items: start; pointer-events: none; }
+.hud[hidden], .board[hidden], .boost[hidden] { display: none; }
+.card { display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; border-radius: 14px; background: #0b1527e0; border: 1px solid #ffffff17; box-shadow: 0 4px 14px #0005; pointer-events: auto; }
+.pause { flex: none; width: 34px; height: 34px; border-radius: 10px; background: #ffffff1c; display: grid; place-items: center; }
+.pause svg { width: 14px; height: 14px; fill: #fff; }
+.stat { display: grid; min-width: 0; }
+.stat small { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { font-size: 20px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat.len strong { color: var(--accent); min-width: 44px; }
+.chips { display: flex; gap: 6px; }
+.chip { padding: 3px 10px; border-radius: 99px; background: #0b1527d0; border: 1px solid #ffffff14; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.low { color: var(--danger); }
+
+.board { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 156px; padding: 7px 10px 8px; border-radius: 14px; background: #0b1527d0; border: 1px solid #ffffff14; font-size: 12px; box-shadow: 0 4px 14px #0004; pointer-events: none; }
+.board h2 { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board ol { list-style: none; padding: 0; display: grid; gap: 1px; }
+.board li { display: flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 1.45; color: #d5e0f5; }
+.board li i { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.board li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.board li b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.board li.you { color: var(--amber); font-weight: 800; }
+
+.boost { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 68px; height: 68px; border-radius: 50%; display: grid; place-content: center; justify-items: center; gap: 0; background: radial-gradient(circle at 50% 38%, #ffd77a, var(--amber) 60%, var(--amber-dark)); color: #3a2600; box-shadow: 0 5px 0 #8a5d00, 0 8px 22px #0006; touch-action: none; }
+.boost svg { width: 26px; height: 26px; fill: currentColor; }
+.boost span { font-size: 10px; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boost.on { transform: translateY(3px); box-shadow: 0 2px 0 #8a5d00, 0 0 26px #ffc24799; }
+
+.toast { position: fixed; left: 50%; top: 24%; transform: translateX(-50%); padding: 8px 16px; border-radius: 99px; background: #0b1527e8; border: 1px solid #ffffff1f; color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: 0; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.toast.show { animation: toast 1.8s ease-out both; }
+.toast.good { background: var(--accent); color: #062a1f; }
+.toast.gold { background: var(--amber); color: #3a2600; }
+.toast.bad { background: var(--danger); color: #fff; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 12%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+
+.overlay { position: fixed; inset: 0; display: flex; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); background: #0a122099; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { margin: auto; width: min(100%, 400px); padding: 18px 18px 16px; border-radius: 24px; background: linear-gradient(180deg, #172a4c, var(--panel)); border: 1px solid var(--line); text-align: center; box-shadow: 0 24px 60px #000a; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.logo { display: block; width: 150px; height: 58px; margin: 0 auto 2px; }
+.panel h1 { font-size: clamp(30px, 9vw, 40px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.panel h1 span, .panel h2 span { color: var(--accent); }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.panel p { margin-top: 6px; font-size: 14px; line-height: 1.4; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.panel h3 { display: flex; justify-content: center; gap: 6px; margin: 10px 0 5px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel h3 em { font-style: normal; letter-spacing: 0; text-transform: none; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel h3 em.lock { color: var(--amber); white-space: normal; }
+
+.menu { display: grid; grid-template-areas: "intro" "opts" "go"; width: min(100%, 420px); }
+.menu .intro { grid-area: intro; }
+.menu .opts { grid-area: opts; min-width: 0; }
+.menu .go { grid-area: go; }
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.choice { min-width: 0; padding: 7px 4px 6px; border-radius: 13px; background: var(--panel-2); border: 2px solid transparent; display: grid; gap: 1px; align-content: center; }
+.choice b { font-size: 14px; font-weight: 900; line-height: 1.15; }
+.choice small { font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.2; }
+.choice[aria-checked="true"] { border-color: var(--accent); background: #12403f; }
+.choice[aria-checked="true"] small { color: #bff3e1; }
+.skins { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.skin { position: relative; aspect-ratio: 1; min-height: 34px; border-radius: 12px; background: #0b1529; border: 2px solid transparent; overflow: hidden; }
+.skin canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.skin[aria-checked="true"] { border-color: var(--accent); background: #12303a; }
+.skin.locked canvas { opacity: .32; filter: grayscale(.7); }
+.skin.locked::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 12px; height: 12px; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Crect x='1.5' y='5' width='9' height='6.5' rx='1.5' fill='%23ffc247'/%3E%3Cpath d='M3.5 5V3.6a2.5 2.5 0 0 1 5 0V5' stroke='%23ffc247' stroke-width='1.6' fill='none'/%3E%3C/svg%3E"); }
+.skin.nope { animation: nope .35s; }
+@keyframes nope { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.btn { display: block; width: 100%; margin-top: 12px; padding: 13px 10px; border-radius: 15px; background: var(--accent); color: #062a1f; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.btn.ghost { background: var(--panel-2); color: var(--ink); box-shadow: 0 4px 0 #0c172b; font-size: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.actions .btn { flex: 1 1 130px; }
+.best { margin-top: 8px !important; font-weight: 700; color: #c9d6ee !important; }
+.hint { margin-top: 8px !important; }
+
+.results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.results div { padding: 7px 2px; border-radius: 12px; background: var(--panel-2); min-width: 0; }
+.results small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.results strong { font-size: 19px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin: 10px 3px 0 !important; padding: 5px 14px; border-radius: 99px; background: var(--amber); color: #3a2600 !important; font-weight: 800; font-size: 13px !important; }
+.badge.mint { background: var(--accent); color: #062a1f !important; }
+.badge[hidden] { display: none; }
+.end-art { font-size: 44px; line-height: 1; margin-bottom: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (min-aspect-ratio: 5/4) and (min-width: 540px) {
+  .menu { width: min(100%, 780px); grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-rows: 1fr auto; grid-template-areas: "intro opts" "go opts"; column-gap: 22px; text-align: left; }
+  .menu .intro, .menu .go { text-align: center; }
+  .menu .intro { align-self: center; }
+  .menu .opts h3 { justify-content: flex-start; }
+}
+@media (max-height: 640px) { .logo { height: 44px; width: 120px; } }
+@media (max-height: 620px) { .logo { display: none; } }
+@media (max-height: 620px) and (max-aspect-ratio: 5/4), (max-height: 460px) { .menu .hint { display: none; } }
+@media (max-height: 560px) { .panel { padding: 14px 14px 12px; } .panel h3 { margin: 8px 0 4px; } }
+@media (max-height: 520px) and (max-aspect-ratio: 5/4) { .menu .tag { display: none; } }
+@media (max-height: 460px) {
+  .panel h1 { font-size: 28px; } .panel h2 { font-size: 22px; }
+  .panel p { font-size: 13px; }
+  .btn { padding: 10px; font-size: 17px; margin-top: 8px; }
+  .choice { padding: 5px 3px 4px; } .choice b { font-size: 13px; }
+  .skins { grid-template-columns: repeat(12, 1fr); gap: 4px; }
+  .skin { min-height: 0; border-radius: 9px; }
+  .end-art { display: none; }
+  .results { margin-top: 8px; } .results strong { font-size: 17px; }
+}
+@media (max-height: 360px) {
+  .panel { padding: 10px 12px; border-radius: 18px; }
+  .panel h1 { font-size: 24px; }
+  .panel p { margin-top: 3px; font-size: 12px; line-height: 1.3; }
+  .panel h3 { margin: 5px 0 3px; }
+  .choice small { font-size: 10px; }
+  .menu .best { margin-top: 4px !important; }
+  .card { padding: 3px 10px 3px 3px; } .pause { width: 30px; height: 30px; } .stat strong { font-size: 17px; }
+  .boost { width: 56px; height: 56px; } .boost span { display: none; }
+  .board li:nth-child(n+6) { display: none; }
+}
+@media (max-width: 420px) {
+  .board { width: 128px; font-size: 11px; padding: 6px 8px 7px; }
+  .board li:nth-child(n+7) { display: none; }
+  .card { gap: 8px; padding-right: 10px; }
+  .stat strong { font-size: 18px; }
+  .results strong { font-size: 17px; }
+}
+@media (min-aspect-ratio: 5/4) and (min-width: 540px) and (max-width: 699px) { .skins { grid-template-columns: repeat(6, 1fr); } .skin { min-height: 30px; } }
+@media (max-width: 360px) { .results { gap: 4px; } .results small { letter-spacing: 0; } }
+@media (min-width: 1100px) and (min-height: 700px) {
+  .board { width: 196px; font-size: 14px; padding: 9px 12px 10px; } .board h2 { font-size: 11px; } .board li i { width: 10px; height: 10px; }
+  .stat strong { font-size: 24px; } .stat small { font-size: 11px; } .chip { font-size: 13px; }
+}
+@media (max-width: 340px) { .choice b { font-size: 13px; } .choice small { font-size: 10px; } .panel { padding-left: 12px; padding-right: 12px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .toast.show { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" role="img"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="card">
+    <button type="button" class="pause" id="pause-btn"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" rx="1.2"/><rect x="8.4" y="1" width="3.6" height="12" rx="1.2"/></svg></button>
+    <div class="stat len"><small data-i18n="length"></small><strong id="len">0</strong></div>
+    <div class="stat"><small data-i18n="kills"></small><strong id="kills">0</strong></div>
+  </div>
+  <div class="chips"><span class="chip" id="rank">#1</span><span class="chip" id="clock">0:00</span></div>
+</div>
+<div class="board" id="board" hidden aria-hidden="true"><h2 data-i18n="leaders"></h2><ol id="leaders"></ol></div>
+<button type="button" class="boost" id="boost-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.6h6.3L9 22l10-12.2h-6.4z"/></svg><span data-i18n="boost"></span></button>
+<div class="toast" id="toast" aria-hidden="true"></div>
+
+<div class="overlay" id="menu">
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="intro">
+      <svg class="logo" viewBox="0 0 150 58" aria-hidden="true">
+        <circle cx="16" cy="14" r="4" fill="#ffc247"/><circle cx="132" cy="48" r="3.5" fill="#ff6fb5"/><circle cx="70" cy="9" r="3" fill="#3fa9ff"/><circle cx="96" cy="52" r="2.6" fill="#b6ff3b"/>
+        <path d="M10 44 C 26 18, 48 18, 60 34 S 92 52, 106 30" stroke="#0c5c45" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M10 44 C 26 18, 48 18, 60 34 S 92 52, 106 30" stroke="#2fe0a8" stroke-width="13" fill="none" stroke-linecap="round" stroke-dasharray="7 7"/>
+        <path d="M10 44 C 26 18, 48 18, 60 34 S 92 52, 106 30" stroke="#1fbf8c" stroke-width="13" fill="none" stroke-linecap="round" stroke-dasharray="7 7" stroke-dashoffset="7"/>
+        <circle cx="111" cy="25" r="11" fill="#2fe0a8" stroke="#0c5c45" stroke-width="2.5"/>
+        <circle cx="113" cy="20" r="4" fill="#fff"/><circle cx="117" cy="28" r="4" fill="#fff"/><circle cx="114.6" cy="19.6" r="2" fill="#0a1220"/><circle cx="118.6" cy="27.6" r="2" fill="#0a1220"/>
+      </svg>
+      <h1 id="menu-title">Snake <span>Arena</span></h1>
+      <p class="tag" data-i18n="tagline"></p>
+    </div>
+    <div class="opts">
+      <h3 id="mode-h" data-i18n="mode"></h3>
+      <div class="choices" id="modes" role="radiogroup" aria-labelledby="mode-h"></div>
+      <h3 id="level-h" data-i18n="level"></h3>
+      <div class="choices" id="levels" role="radiogroup" aria-labelledby="level-h"></div>
+      <h3><span id="skin-h" data-i18n="skin"></span><em id="skin-name"></em></h3>
+      <div class="skins" id="skins" role="radiogroup" aria-labelledby="skin-h"></div>
+      <p class="small hint" data-i18n="controls"></p>
+    </div>
+    <div class="go">
+      <button type="button" class="btn" id="play" data-i18n="play"></button>
+      <p class="small best" id="menu-best"></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <div class="actions"><button type="button" class="btn" id="resume" data-i18n="resume"></button><button type="button" class="btn ghost" id="quit" data-i18n="menu"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="end-title">
+    <div class="end-art" id="end-art" aria-hidden="true"></div>
+    <h2 id="end-title"></h2>
+    <p id="end-sub"></p>
+    <div class="results">
+      <div><small data-i18n="length"></small><strong id="r-len"></strong></div>
+      <div><small data-i18n="kills"></small><strong id="r-kills"></strong></div>
+      <div><small data-i18n="rank"></small><strong id="r-rank"></strong></div>
+      <div><small data-i18n="time"></small><strong id="r-time"></strong></div>
+    </div>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="badge mint" id="unlocked" hidden></p>
+    <p class="small" id="end-note"></p>
+    <div class="actions">
+      <button type="button" class="btn" id="again" data-i18n="again"></button>
+      <button type="button" class="btn ghost" id="to-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Steer your snake around a giant arena, gobble glowing orbs and cut rivals off so they burst into food.',
+      controls: 'Point or drag to steer · hold click, ⚡ or Space to boost · ← → keys turn · P pauses',
+      mode: 'Mode', modes: { endless: 'Endless', timed: 'Timed', royale: 'Last Standing' },
+      modeInfo: { endless: 'Grow as long as you can', timed: '3 min · finish #1', royale: 'Shrinking arena · no respawns' },
+      level: 'Rivals', levels: { easy: 'Easy', normal: 'Normal', hard: 'Hard' }, snakes: n => `${n} snakes`,
+      skin: 'Skin',
+      skins: { mint: 'Mint', coral: 'Coral', ocean: 'Ocean', bee: 'Bumblebee', candy: 'Candy', neon: 'Neon', tiger: 'Tiger', frost: 'Frost', lava: 'Lava', rainbow: 'Rainbow', galaxy: 'Galaxy', gold: 'Gold' },
+      req: { len: n => `Reach length ${n}`, kills: n => `Cut off ${n} snakes in total`, games: n => `Play ${n} games`, timed: 'Win a Timed match', royale: 'Win Last Standing' },
+      lockedSkin: (name, req) => `${name} (locked): ${req}`,
+      play: 'Play', length: 'Length', kills: 'Kills', rank: 'Rank', time: 'Time', leaders: 'Leaderboard', you: 'You',
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', menu: 'Menu', again: 'Play again', boost: 'Boost',
+      go: 'Go! Eat orbs and grow!', cut: n => `You cut off ${n}!`, cutBy: n => `Cut off by ${n}`, hitWall: 'You hit the arena wall',
+      timeUp: 'Time’s up!', winner: 'You win!', champion: 'Last snake standing!', gameOver: 'Game over',
+      place: n => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'} place`,
+      lenUp: n => `Length ${n}!`, top: 'You’re #1!', shrink: 'The arena is shrinking!', remaining: n => `${n} snakes left`,
+      newBest: 'New best!', unlocked: n => `New skin: ${n}!`, best: (b, k) => `Best length ${b} · Total kills ${k}`,
+      canvas: 'Snake Arena: a round arena seen from above where snakes eat glowing orbs and try to cut each other off',
+    },
+    vi: {
+      tagline: 'Lái chú rắn quanh đấu trường khổng lồ, ăn những quả cầu phát sáng và chặn đầu đối thủ để chúng vỡ tung thành thức ăn.',
+      controls: 'Trỏ hoặc kéo để lái · giữ chuột, ⚡ hoặc Space để tăng tốc · phím ← → để rẽ · P để tạm dừng',
+      mode: 'Chế độ', modes: { endless: 'Vô tận', timed: 'Tính giờ', royale: 'Sinh tồn' },
+      modeInfo: { endless: 'Dài nhất có thể', timed: '3 phút · về nhất', royale: 'Sân thu hẹp · không hồi sinh' },
+      level: 'Đối thủ', levels: { easy: 'Dễ', normal: 'Vừa', hard: 'Khó' }, snakes: n => `${n} con rắn`,
+      skin: 'Trang phục',
+      skins: { mint: 'Bạc hà', coral: 'San hô', ocean: 'Đại dương', bee: 'Ong vàng', candy: 'Kẹo ngọt', neon: 'Neon', tiger: 'Hổ vằn', frost: 'Băng giá', lava: 'Dung nham', rainbow: 'Cầu vồng', galaxy: 'Thiên hà', gold: 'Hoàng kim' },
+      req: { len: n => `Đạt độ dài ${n}`, kills: n => `Hạ tổng cộng ${n} con rắn`, games: n => `Chơi ${n} ván`, timed: 'Thắng một trận Tính giờ', royale: 'Thắng chế độ Sinh tồn' },
+      lockedSkin: (name, req) => `${name} (đang khóa): ${req}`,
+      play: 'Chơi', length: 'Độ dài', kills: 'Hạ gục', rank: 'Hạng', time: 'Thời gian', leaders: 'Bảng xếp hạng', you: 'Bạn',
+      pause: 'Tạm dừng', paused: 'Đang tạm dừng', resume: 'Tiếp tục', menu: 'Menu', again: 'Chơi lại', boost: 'Tăng tốc',
+      go: 'Bắt đầu! Ăn cầu sáng để lớn lên!', cut: n => `Bạn đã chặn hạ ${n}!`, cutBy: n => `Bị ${n} chặn đầu`, hitWall: 'Bạn đâm vào tường đấu trường',
+      timeUp: 'Hết giờ!', winner: 'Bạn thắng!', champion: 'Con rắn sống sót cuối cùng!', gameOver: 'Kết thúc ván',
+      place: n => `Hạng ${n}`,
+      lenUp: n => `Độ dài ${n}!`, top: 'Bạn đang dẫn đầu!', shrink: 'Đấu trường đang thu hẹp!', remaining: n => `Còn ${n} con rắn`,
+      newBest: 'Kỷ lục mới!', unlocked: n => `Trang phục mới: ${n}!`, best: (b, k) => `Dài nhất ${b} · Tổng hạ gục ${k}`,
+      canvas: 'Snake Arena: đấu trường tròn nhìn từ trên cao, nơi các con rắn ăn cầu sáng và tìm cách chặn đầu nhau',
+    },
+    zh: {
+      tagline: '在巨大的竞技场里操控你的蛇，吃掉发光的能量球，拦住对手的去路，让它们爆成一地食物。',
+      controls: '指向或拖动来转向 · 按住鼠标、⚡ 或空格加速 · ← → 键转向 · P 暂停',
+      mode: '模式', modes: { endless: '无尽', timed: '限时', royale: '生存' },
+      modeInfo: { endless: '尽情长大', timed: '3 分钟 · 争第一', royale: '场地缩小 · 无法复活' },
+      level: '对手', levels: { easy: '简单', normal: '普通', hard: '困难' }, snakes: n => `${n} 条蛇`,
+      skin: '皮肤',
+      skins: { mint: '薄荷', coral: '珊瑚', ocean: '海洋', bee: '蜜蜂', candy: '糖果', neon: '霓虹', tiger: '猛虎', frost: '冰霜', lava: '熔岩', rainbow: '彩虹', galaxy: '银河', gold: '黄金' },
+      req: { len: n => `长度达到 ${n}`, kills: n => `累计拦截 ${n} 条蛇`, games: n => `玩 ${n} 局`, timed: '赢得一局限时赛', royale: '赢得生存模式' },
+      lockedSkin: (name, req) => `${name}（未解锁）：${req}`,
+      play: '开始', length: '长度', kills: '击杀', rank: '排名', time: '时间', leaders: '排行榜', you: '你',
+      pause: '暂停', paused: '已暂停', resume: '继续', menu: '菜单', again: '再玩一次', boost: '加速',
+      go: '开始！吃能量球长大吧！', cut: n => `你拦截了 ${n}！`, cutBy: n => `被 ${n} 拦截了`, hitWall: '你撞上了竞技场边缘',
+      timeUp: '时间到！', winner: '你赢了！', champion: '最后的幸存者！', gameOver: '游戏结束',
+      place: n => `第 ${n} 名`,
+      lenUp: n => `长度 ${n}！`, top: '你排名第一！', shrink: '竞技场正在缩小！', remaining: n => `还剩 ${n} 条蛇`,
+      newBest: '新纪录！', unlocked: n => `新皮肤：${n}！`, best: (b, k) => `最长 ${b} · 累计击杀 ${k}`,
+      canvas: 'Snake Arena：俯视的圆形竞技场，蛇在这里吃发光的能量球并互相拦截',
+    },
+    fr: {
+      tagline: 'Guidez votre serpent dans une arène géante, gobez les orbes lumineux et coupez la route à vos rivaux pour qu’ils éclatent en nourriture.',
+      controls: 'Pointez ou glissez pour diriger · maintenez le clic, ⚡ ou Espace pour accélérer · touches ← → pour tourner · P pour la pause',
+      mode: 'Mode', modes: { endless: 'Sans fin', timed: 'Chrono', royale: 'Survie' },
+      modeInfo: { endless: 'Grandissez sans limite', timed: '3 min · finir 1er', royale: 'Arène qui rétrécit · une seule vie' },
+      level: 'Rivaux', levels: { easy: 'Facile', normal: 'Normal', hard: 'Difficile' }, snakes: n => `${n} serpents`,
+      skin: 'Apparence',
+      skins: { mint: 'Menthe', coral: 'Corail', ocean: 'Océan', bee: 'Abeille', candy: 'Bonbon', neon: 'Néon', tiger: 'Tigre', frost: 'Givre', lava: 'Lave', rainbow: 'Arc-en-ciel', galaxy: 'Galaxie', gold: 'Or' },
+      req: { len: n => `Atteindre une longueur de ${n}`, kills: n => `Éliminer ${n} serpents au total`, games: n => `Jouer ${n} parties`, timed: 'Gagner une partie Chrono', royale: 'Gagner en mode Survie' },
+      lockedSkin: (name, req) => `${name} (verrouillé) : ${req}`,
+      play: 'Jouer', length: 'Longueur', kills: 'Victimes', rank: 'Rang', time: 'Temps', leaders: 'Classement', you: 'Vous',
+      pause: 'Pause', paused: 'En pause', resume: 'Reprendre', menu: 'Menu', again: 'Rejouer', boost: 'Turbo',
+      go: 'C’est parti ! Mangez des orbes pour grandir !', cut: n => `Vous avez coupé la route à ${n} !`, cutBy: n => `Coupé par ${n}`, hitWall: 'Vous avez percuté le bord de l’arène',
+      timeUp: 'Temps écoulé !', winner: 'Vous gagnez !', champion: 'Dernier serpent en vie !', gameOver: 'Partie terminée',
+      place: n => (n === 1 ? '1re place' : `${n}e place`),
+      lenUp: n => `Longueur ${n} !`, top: 'Vous êtes n° 1 !', shrink: 'L’arène rétrécit !', remaining: n => `Plus que ${n} serpents`,
+      newBest: 'Nouveau record !', unlocked: n => `Nouvelle apparence : ${n} !`, best: (b, k) => `Record ${b} · ${k} victimes au total`,
+      canvas: 'Snake Arena : une arène ronde vue de dessus où des serpents mangent des orbes lumineux et se coupent la route',
+    },
+    th: {
+      tagline: 'บังคับงูของคุณในสนามขนาดยักษ์ กินลูกแก้วเรืองแสง และตัดหน้าคู่แข่งให้แตกกระจายเป็นอาหาร',
+      controls: 'ชี้หรือลากเพื่อบังคับ · กดค้างเมาส์, ⚡ หรือ Space เพื่อเร่ง · ปุ่ม ← → เพื่อเลี้ยว · P หยุดชั่วคราว',
+      mode: 'โหมด', modes: { endless: 'ไม่รู้จบ', timed: 'จับเวลา', royale: 'เอาตัวรอด' },
+      modeInfo: { endless: 'ยาวให้ได้มากที่สุด', timed: '3 นาที · ต้องได้ที่ 1', royale: 'สนามหดลง · ไม่มีเกิดใหม่' },
+      level: 'คู่แข่ง', levels: { easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก' }, snakes: n => `งู ${n} ตัว`,
+      skin: 'สกิน',
+      skins: { mint: 'มิ้นต์', coral: 'ปะการัง', ocean: 'มหาสมุทร', bee: 'ผึ้ง', candy: 'ลูกกวาด', neon: 'นีออน', tiger: 'เสือ', frost: 'น้ำแข็ง', lava: 'ลาวา', rainbow: 'สายรุ้ง', galaxy: 'กาแล็กซี', gold: 'ทองคำ' },
+      req: { len: n => `ยาวถึง ${n}`, kills: n => `ตัดหน้างูรวม ${n} ตัว`, games: n => `เล่นครบ ${n} เกม`, timed: 'ชนะโหมดจับเวลา', royale: 'ชนะโหมดเอาตัวรอด' },
+      lockedSkin: (name, req) => `${name} (ล็อกอยู่): ${req}`,
+      play: 'เล่น', length: 'ความยาว', kills: 'กำจัด', rank: 'อันดับ', time: 'เวลา', leaders: 'กระดานผู้นำ', you: 'คุณ',
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', again: 'เล่นอีกครั้ง', boost: 'เร่ง',
+      go: 'เริ่ม! กินลูกแก้วเพื่อโตขึ้น!', cut: n => `คุณตัดหน้า ${n} สำเร็จ!`, cutBy: n => `ถูก ${n} ตัดหน้า`, hitWall: 'คุณชนขอบสนาม',
+      timeUp: 'หมดเวลา!', winner: 'คุณชนะ!', champion: 'งูตัวสุดท้ายที่รอด!', gameOver: 'จบเกม',
+      place: n => `อันดับ ${n}`,
+      lenUp: n => `ความยาว ${n}!`, top: 'คุณขึ้นอันดับ 1!', shrink: 'สนามกำลังหดลง!', remaining: n => `เหลืองู ${n} ตัว`,
+      newBest: 'สถิติใหม่!', unlocked: n => `สกินใหม่: ${n}!`, best: (b, k) => `ยาวสุด ${b} · กำจัดรวม ${k}`,
+      canvas: 'Snake Arena: สนามทรงกลมมองจากด้านบน ที่งูกินลูกแก้วเรืองแสงและพยายามตัดหน้ากัน',
+    },
+    ja: {
+      tagline: '巨大なアリーナでヘビを操って光るオーブを食べよう。ライバルの進路をふさげば、はじけてエサになる！',
+      controls: 'ポイントかドラッグで操作 · クリック長押し・⚡・スペースでブースト · ← → キーで旋回 · P で一時停止',
+      mode: 'モード', modes: { endless: 'エンドレス', timed: 'タイム制', royale: 'サバイバル' },
+      modeInfo: { endless: 'どこまでも長く', timed: '3分 · 1位を目指せ', royale: '縮むアリーナ · 復活なし' },
+      level: 'ライバル', levels: { easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい' }, snakes: n => `${n}匹`,
+      skin: 'スキン',
+      skins: { mint: 'ミント', coral: 'コーラル', ocean: 'オーシャン', bee: 'ハチ', candy: 'キャンディ', neon: 'ネオン', tiger: 'トラ', frost: 'フロスト', lava: 'マグマ', rainbow: 'レインボー', galaxy: 'ギャラクシー', gold: 'ゴールド' },
+      req: { len: n => `長さ${n}に到達`, kills: n => `合計${n}匹を倒す`, games: n => `${n}回プレイ`, timed: 'タイム制で勝利', royale: 'サバイバルで勝利' },
+      lockedSkin: (name, req) => `${name}（ロック中）：${req}`,
+      play: 'プレイ', length: '長さ', kills: 'キル', rank: '順位', time: 'タイム', leaders: 'ランキング', you: 'あなた',
+      pause: '一時停止', paused: '一時停止中', resume: '再開', menu: 'メニュー', again: 'もう一度', boost: 'ブースト',
+      go: 'スタート！オーブを食べて大きくなろう！', cut: n => `${n}の進路をふさいだ！`, cutBy: n => `${n}に進路をふさがれた`, hitWall: 'アリーナの壁にぶつかった',
+      timeUp: 'タイムアップ！', winner: 'あなたの勝ち！', champion: '最後の1匹！', gameOver: 'ゲームオーバー',
+      place: n => `${n}位`,
+      lenUp: n => `長さ${n}！`, top: '1位になった！', shrink: 'アリーナが縮んでいく！', remaining: n => `残り${n}匹`,
+      newBest: '自己ベスト更新！', unlocked: n => `新スキン：${n}！`, best: (b, k) => `最長 ${b} · 合計キル ${k}`,
+      canvas: 'Snake Arena：上から見た円形のアリーナ。ヘビたちが光るオーブを食べ、お互いの進路をふさぎ合う',
+    },
+    ko: {
+      tagline: '거대한 경기장에서 뱀을 조종해 빛나는 구슬을 먹고, 라이벌의 길을 막아 먹이로 터뜨리세요.',
+      controls: '가리키거나 드래그해 조종 · 클릭 유지, ⚡ 또는 스페이스로 부스트 · ← → 키로 회전 · P 일시정지',
+      mode: '모드', modes: { endless: '무한', timed: '타임', royale: '서바이벌' },
+      modeInfo: { endless: '최대한 길게', timed: '3분 · 1위 하기', royale: '좁아지는 경기장 · 부활 없음' },
+      level: '상대', levels: { easy: '쉬움', normal: '보통', hard: '어려움' }, snakes: n => `뱀 ${n}마리`,
+      skin: '스킨',
+      skins: { mint: '민트', coral: '코랄', ocean: '오션', bee: '꿀벌', candy: '캔디', neon: '네온', tiger: '호랑이', frost: '서리', lava: '용암', rainbow: '무지개', galaxy: '은하수', gold: '황금' },
+      req: { len: n => `길이 ${n} 달성`, kills: n => `총 ${n}마리 처치`, games: n => `${n}판 플레이`, timed: '타임 모드에서 승리', royale: '서바이벌에서 승리' },
+      lockedSkin: (name, req) => `${name} (잠김): ${req}`,
+      play: '플레이', length: '길이', kills: '처치', rank: '순위', time: '시간', leaders: '순위표', you: '나',
+      pause: '일시정지', paused: '일시정지됨', resume: '계속하기', menu: '메뉴', again: '다시 하기', boost: '부스트',
+      go: '시작! 구슬을 먹고 자라세요!', cut: n => `${n}의 길을 막았어요!`, cutBy: n => `${n}에게 길이 막혔어요`, hitWall: '경기장 벽에 부딪혔어요',
+      timeUp: '시간 종료!', winner: '승리!', champion: '최후의 뱀!', gameOver: '게임 오버',
+      place: n => `${n}위`,
+      lenUp: n => `길이 ${n}!`, top: '1위 달성!', shrink: '경기장이 좁아지고 있어요!', remaining: n => `뱀 ${n}마리 남음`,
+      newBest: '최고 기록!', unlocked: n => `새 스킨: ${n}!`, best: (b, k) => `최장 ${b} · 총 처치 ${k}`,
+      canvas: 'Snake Arena: 위에서 내려다본 원형 경기장. 뱀들이 빛나는 구슬을 먹고 서로의 길을 막아요',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  const numFmt = new Intl.NumberFormat(lang === 'zh' ? 'zh-Hans' : lang);
+  const fmt = n => numFmt.format(Math.max(0, Math.floor(n)));
+  const clockText = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const TAU = Math.PI * 2;
+  const STEP = 1 / 60;
+  const CELL = 96;
+  const HALF = 4200;
+  const GN = Math.ceil((HALF * 2) / CELL);
+  const START_MASS = 30;
+  const MIN_BOOST = 26;
+  const BASE_SPEED = 170;
+  const BOOST_SPEED = 345;
+  const TIMED_SECONDS = 180;
+  const ROYALE = { grace: 15, shrink: 165, minR: 240 };
+  const ORB_DENSITY = 1 / 8000;
+  const ORB_CAP = 7000;
+  const LEN_MARKS = [100, 250, 500, 1000, 2000, 3000, 5000, 8000];
+  const fan = (step, count, extra) => { const list = [0]; for (let i = 1; i <= count; i++) list.push(i * step, -i * step); for (const e of extra) list.push(e, -e); return list; };
+  const LEVELS = {
+    easy: { bots: 15, think: [0.26, 0.42], look: 0.42, samples: 3, offsets: fan(0.4, 4, [2.4]), err: 0.28, aggro: 0, boost: 0.08, massMax: 380 },
+    normal: { bots: 20, think: [0.12, 0.2], look: 0.72, samples: 4, offsets: fan(0.27, 6, [2.3, 2.9]), err: 0.07, aggro: 0.4, boost: 0.35, massMax: 950 },
+    hard: { bots: 25, think: [0.05, 0.09], look: 1.0, samples: 5, offsets: fan(0.2, 8, [2.2, 2.7, 3.1]), err: 0, aggro: 0.85, boost: 0.7, massMax: 1700 },
+  };
+  const MODES = ['endless', 'timed', 'royale'];
+  const NAMES = ['Noodle', 'Ziggy', 'Mamba', 'Slinky', 'Viper', 'Pretzel', 'Wiggles', 'Kiwi', 'Comet', 'Mochi', 'Taro', 'Boba', 'Sprout', 'Pixel', 'Nova', 'Rocket', 'Dash', 'Twister', 'Fang', 'Echo', 'Zap', 'Biscuit', 'Gizmo', 'Peanut', 'Luna', 'Jelly', 'Ramen', 'Sushi', 'Waffle', 'Tofu', 'Pickle', 'Nacho', 'Bolt', 'Scales', 'Hiss', 'Coil', 'Loopy', 'Ribbon', 'Squiggle', 'Spaghetti'];
+  const ORB_COLORS = ['#2fe0a8', '#ffc247', '#ff6fb5', '#3fa9ff', '#b6ff3b', '#ff7a6b', '#a98bff', '#5ff0ff'];
+  const SKINS = [
+    { id: 'mint', c: ['#2fe0a8', '#1fbf8c'], p: 'solid' },
+    { id: 'coral', c: ['#ff7a6b', '#ff9a83'], p: 'solid' },
+    { id: 'ocean', c: ['#3fa9ff', '#86d4ff'], p: 'stripe' },
+    { id: 'bee', c: ['#ffd23f', '#2b2b33'], p: 'stripe', req: { len: 300 } },
+    { id: 'candy', c: ['#ff6fb5', '#fff3fa', '#7ad7ff'], p: 'bands', req: { kills: 5 } },
+    { id: 'neon', c: ['#b6ff3b', '#00e5ff'], p: 'grad', req: { games: 5 } },
+    { id: 'tiger', c: ['#ff9a1f', '#2e1a10'], p: 'tiger', req: { len: 1000 } },
+    { id: 'frost', c: ['#eef8ff', '#9ad8ff', '#5aa9e6'], p: 'bands', req: { kills: 25 } },
+    { id: 'lava', c: ['#ff3d2e', '#ffb300'], p: 'flow', req: { len: 2500 } },
+    { id: 'rainbow', c: ['#ff5a7a', '#ffc247'], p: 'rainbow', req: { timed: 1 } },
+    { id: 'galaxy', c: ['#6a3dff', '#241466', '#ff7ad9'], p: 'galaxy', req: { royale: 1 } },
+    { id: 'gold', c: ['#ffd75e', '#d9a21b'], p: 'stripe', req: { kills: 100 } },
+  ];
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const wrap = a => { a = (a + Math.PI) % TAU; return (a < 0 ? a + TAU : a) - Math.PI; };
+  const hexRgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const mix = (a, b, f) => { const x = hexRgb(a), y = hexRgb(b); return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * f)).join(',')})`; };
+  for (const skin of SKINS) {
+    skin.edge = mix(skin.c[0], '#000000', 0.55);
+    skin.ramp = Array.from({ length: 16 }, (_, i) => mix(skin.c[0], skin.c[1], i / 15));
+  }
+  const HUES = Array.from({ length: 36 }, (_, i) => `hsl(${i * 10},92%,62%)`);
+  const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
+
+  // Storage: every access guarded, the sandbox may block it.
+  const KEY = name => `milaan.snakeArena.${name}`;
+  const load = (name, fallback) => { try { const v = JSON.parse(localStorage.getItem(KEY(name))); return v && typeof v === 'object' ? Object.assign({}, fallback, v) : { ...fallback }; } catch { return { ...fallback }; } };
+  const save = (name, value) => { try { localStorage.setItem(KEY(name), JSON.stringify(value)); } catch {} };
+  const stats = load('stats', { games: 0, kills: 0, bestLen: 0, timedWins: 0, royaleWins: 0 });
+  const best = load('best', { endless: 0, timed: 0, royale: 0 });
+  const prefs = load('prefs', { mode: 'endless', level: 'normal', skin: 'mint' });
+  if (!MODES.includes(prefs.mode)) prefs.mode = 'endless';
+  if (!LEVELS[prefs.level]) prefs.level = 'normal';
+  const unlocked = skin => {
+    const r = skin.req;
+    if (!r) return true;
+    if (r.len) return stats.bestLen >= r.len;
+    if (r.kills) return stats.kills >= r.kills;
+    if (r.games) return stats.games >= r.games;
+    if (r.timed) return stats.timedWins >= r.timed;
+    return stats.royaleWins >= r.royale;
+  };
+  const reqText = skin => { const r = skin.req; return r.len ? t.req.len(fmt(r.len)) : r.kills ? t.req.kills(r.kills) : r.games ? t.req.games(r.games) : r.timed ? t.req.timed : t.req.royale; };
+  if (!unlocked(skinById(prefs.skin)) || skinById(prefs.skin).id !== prefs.skin) prefs.skin = 'mint';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = {
+    hud: $('hud'), len: $('len'), kills: $('kills'), rank: $('rank'), clock: $('clock'), board: $('board'), leaders: $('leaders'), boost: $('boost-btn'), toast: $('toast'),
+    menu: $('menu'), modes: $('modes'), levels: $('levels'), skins: $('skins'), skinName: $('skin-name'), menuBest: $('menu-best'),
+    paused: $('paused'), end: $('end'), endArt: $('end-art'), endTitle: $('end-title'), endSub: $('end-sub'), rLen: $('r-len'), rKills: $('r-kills'), rRank: $('r-rank'), rTime: $('r-time'),
+    newBest: $('new-best'), unlockedBadge: $('unlocked'), endNote: $('end-note'), announcer: $('announcer'),
+  };
+  canvas.setAttribute('aria-label', t.canvas);
+  $('pause-btn').setAttribute('aria-label', t.pause);
+  const announce = text => { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = text; }, 30); };
+  function toast(text, kind) {
+    els.toast.textContent = text;
+    els.toast.className = 'toast' + (kind ? ` ${kind}` : '');
+    void els.toast.offsetWidth;
+    els.toast.classList.add('show');
+  }
+
+  let view = { w: 1, h: 1, dpr: 1 };
+  function resize() {
+    view = { w: Math.max(1, innerWidth), h: Math.max(1, innerHeight), dpr: Math.min(devicePixelRatio || 1, 2) };
+    canvas.width = Math.round(view.w * view.dpr);
+    canvas.height = Math.round(view.h * view.dpr);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // ---------- World ----------
+  let G = null;
+  const orbHead = new Int32Array(GN * GN);
+  let orbNext = new Int32Array(8192);
+  const segHead = new Int32Array(GN * GN);
+  let segNext = new Int32Array(16384), segIdx = new Int32Array(16384);
+  const segOwner = [];
+  const cellX = x => clamp(((x + HALF) / CELL) | 0, 0, GN - 1);
+
+  function sizeOf(s) {
+    s.r = 9 + Math.sqrt(s.mass) * 0.45;
+    s.n = Math.min(420, 6 + Math.floor(Math.pow(s.mass, 0.78) / 1.6));
+    s.spacing = s.r * 0.55;
+  }
+
+  function makeSnake(o) {
+    const s = {
+      name: o.name, skin: o.skin, isPlayer: !!o.isPlayer, mass: o.mass, maxMass: o.mass, x: o.x, y: o.y, angle: o.angle, target: o.angle,
+      wantBoost: false, boosting: false, alive: true, kills: 0, think: 0, ai: o.ai, px: [], py: [], sx: [], sy: [], n: 0, r: 0, spacing: 0,
+      drop: 0, prey: null, huntUntil: 0, wander: null, wanderUntil: 0,
+    };
+    sizeOf(s);
+    // Lay the starting body out as a loose spiral behind the head so long snakes do not spawn as a straight pole.
+    let x = s.x, y = s.y, a = s.angle + Math.PI, bend = 1 / 70, total = s.n * s.spacing + 40;
+    const pts = [];
+    for (let d = 0; d <= total; d += 4) { pts.push(x, y); x += Math.cos(a) * 4; y += Math.sin(a) * 4; a += 4 * bend; bend *= 0.994; }
+    for (let i = pts.length - 2; i >= 0; i -= 2) { s.px.push(pts[i]); s.py.push(pts[i + 1]); }
+    layout(s);
+    return s;
+  }
+
+  // Body segments sit at fixed spacing along the head's recorded path.
+  function layout(s) {
+    const px = s.px, py = s.py, n = s.n, sp = s.spacing;
+    let ax = s.x, ay = s.y, need = sp, k = 1, i = px.length - 1;
+    s.sx[0] = ax; s.sy[0] = ay;
+    while (k < n && i >= 0) {
+      const bx = px[i], by = py[i];
+      let len = Math.hypot(bx - ax, by - ay);
+      while (len >= need && k < n) {
+        const f = need / len;
+        ax += (bx - ax) * f; ay += (by - ay) * f;
+        s.sx[k] = ax; s.sy[k] = ay; k++;
+        len -= need; need = sp;
+      }
+      if (k >= n) break;
+      need -= len; ax = bx; ay = by; i--;
+    }
+    for (; k < n; k++) { s.sx[k] = ax; s.sy[k] = ay; }
+    s.sx.length = n; s.sy.length = n;
+    if (i > 48) { px.splice(0, i - 24); py.splice(0, i - 24); }
+  }
+
+  function addOrb(x, y, v, c) {
+    if (G.orbs.length >= ORB_CAP) return;
+    G.orbs.push({ x, y, v, r: Math.min(15, 3.2 + Math.sqrt(v) * 1.6), c, ph: Math.random() * TAU, dead: false });
+  }
+  function naturalOrb() {
+    const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * (G.R - 30);
+    const roll = Math.random();
+    addOrb(Math.cos(a) * d, Math.sin(a) * d, roll < 0.7 ? 1 : roll < 0.92 ? 2 : 3, pick(ORB_COLORS));
+  }
+  const orbTarget = () => Math.min(ORB_CAP - 600, Math.round(Math.PI * G.R * G.R * ORB_DENSITY));
+
+  function safeSpot(frac, clearance) {
+    let bestP = null, bestD = -1;
+    for (let tries = 0; tries < 30; tries++) {
+      const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * G.R * frac;
+      const x = Math.cos(a) * d, y = Math.sin(a) * d;
+      let near = Infinity;
+      for (const o of G.snakes) {
+        if (!o.alive) continue;
+        for (let j = 0; j < o.n; j += 3) near = Math.min(near, Math.hypot(o.sx[j] - x, o.sy[j] - y));
+        if (o.isPlayer) near = Math.min(near, Math.hypot(o.x - x, o.y - y) * 0.4);
+      }
+      if (near > clearance) return { x, y };
+      if (!bestP || near > bestD) { bestD = near; bestP = { x, y }; }
+    }
+    return bestP;
+  }
+
+  function personalize(L) {
+    return { ...L, aggro: L.aggro * rand(0.45, 1.35), look: L.look * rand(0.88, 1.12), greed: rand(0.7, 1.3) };
+  }
+
+  function spawnBot() {
+    const used = new Set(G.snakes.filter(s => s.alive).map(s => s.name));
+    const name = pick(NAMES.filter(n => !used.has(n)));
+    const mass = G.mode === 'royale' ? rand(START_MASS, 80) : START_MASS + Math.pow(Math.random(), 2.4) * G.L.massMax;
+    const p = safeSpot(0.82, 280);
+    const s = makeSnake({ name, skin: pick(SKINS), mass, x: p.x, y: p.y, angle: Math.atan2(-p.y, -p.x) + rand(-1.2, 1.2), ai: personalize(G.L) });
+    G.snakes.push(s);
+    return s;
+  }
+
+  function createWorld(mode, level, demo) {
+    const L = LEVELS[level];
+    const R = 1700 + L.bots * 70;
+    G = {
+      mode, level, L, demo, R, R0: R, time: 0, snakes: [], orbs: [], respawns: [], player: null, over: false, win: false, paused: false,
+      kills: 0, maxLen: 0, endAt: 0, endShown: false, deaths: { wall: 0, cut: 0, head: 0, hunted: 0 }, auto: false, mark: 0, rankToastAt: -9,
+      cause: null, killer: null, deathRank: 0, deadAt: null, shrinkWarned: false, leftMark: 99, cam: { x: 0, y: 0, z: 0.8 },
+    };
+    const want = orbTarget();
+    for (let i = 0; i < want; i++) naturalOrb();
+    const count = demo ? 14 : L.bots;
+    for (let i = 0; i < count; i++) spawnBot();
+    buildOrbGrid();
+    buildSegGrid();
+    const focus = G.snakes[0];
+    G.cam.x = focus.x; G.cam.y = focus.y;
+    return G;
+  }
+
+  function buildOrbGrid() {
+    orbHead.fill(-1);
+    const orbs = G.orbs;
+    if (orbNext.length < orbs.length) orbNext = new Int32Array(orbs.length * 2);
+    for (let i = 0; i < orbs.length; i++) {
+      const c = cellX(orbs[i].y) * GN + cellX(orbs[i].x);
+      orbNext[i] = orbHead[c]; orbHead[c] = i;
+    }
+  }
+  function buildSegGrid() {
+    segHead.fill(-1);
+    let e = 0;
+    for (const s of G.snakes) {
+      if (!s.alive) continue;
+      if (e + s.n > segNext.length) { const size = (e + s.n) * 2; const a = new Int32Array(size), b = new Int32Array(size); a.set(segNext); b.set(segIdx); segNext = a; segIdx = b; }
+      for (let j = 0; j < s.n; j++) {
+        const c = cellX(s.sy[j]) * GN + cellX(s.sx[j]);
+        segOwner[e] = s; segIdx[e] = j; segNext[e] = segHead[c]; segHead[c] = e; e++;
+      }
+    }
+  }
+
+  // True when a circle at (x, y) touches another snake's body.
+  function hitAt(x, y, rad, self) {
+    const cx = cellX(x), cy = cellX(y);
+    for (let gy = Math.max(0, cy - 1); gy <= Math.min(GN - 1, cy + 1); gy++) {
+      for (let gx = Math.max(0, cx - 1); gx <= Math.min(GN - 1, cx + 1); gx++) {
+        for (let e = segHead[gy * GN + gx]; e !== -1; e = segNext[e]) {
+          const o = segOwner[e];
+          if (o === self || !o.alive) continue;
+          const j = segIdx[e];
+          // Heads get a bigger, forward-shifted zone: that is where they will be next.
+          const rr = rad + o.r + (j === 0 ? 22 : j < 6 ? 10 : 0);
+          const dx = o.sx[j] + (j === 0 ? Math.cos(o.angle) * 30 : 0) - x, dy = o.sy[j] + (j === 0 ? Math.sin(o.angle) * 30 : 0) - y;
+          if (dx * dx + dy * dy < rr * rr) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function rayClear(s, a, look, samples) {
+    // Probe along the arc the snake would really follow while turning toward heading `a`.
+    const lim = (G.R - s.r - 14) ** 2, rad = s.r + 6, near = s.r + 8;
+    const bend = turnRate(s) / (s.boosting ? BOOST_SPEED : BASE_SPEED);
+    let x = s.x, y = s.y, h = s.angle;
+    for (let k = 0; k <= samples; k++) {
+      let rest = k === 0 ? near : (look - near) / samples;
+      while (rest > 0) {
+        const st = Math.min(12, rest);
+        h += clamp(wrap(a - h), -bend * st, bend * st);
+        x += Math.cos(h) * st; y += Math.sin(h) * st; rest -= st;
+      }
+      if (x * x + y * y > lim || hitAt(x, y, rad, s)) return k / (samples + 1);
+    }
+    return 1;
+  }
+
+  function findPrey(s, range) {
+    let bestO = null, bestD = range;
+    for (const o of G.snakes) {
+      if (o === s || !o.alive) continue;
+      const d = Math.hypot(o.x - s.x, o.y - s.y);
+      if (d < bestD) { bestD = d; bestO = o; }
+    }
+    return bestO;
+  }
+
+  function findFood(s) {
+    const reach = 300, span = Math.ceil(reach / CELL), cx = cellX(s.x), cy = cellX(s.y), lim = (G.R - 50) ** 2;
+    let bestO = null, bestScore = 0;
+    const ca = Math.cos(s.angle), sa = Math.sin(s.angle);
+    for (let gy = Math.max(0, cy - span); gy <= Math.min(GN - 1, cy + span); gy++) {
+      for (let gx = Math.max(0, cx - span); gx <= Math.min(GN - 1, cx + span); gx++) {
+        for (let e = orbHead[gy * GN + gx]; e !== -1; e = orbNext[e]) {
+          const o = G.orbs[e];
+          if (!o || o.dead || o.x * o.x + o.y * o.y > lim) continue;
+          const dx = o.x - s.x, dy = o.y - s.y, d = Math.hypot(dx, dy);
+          if (d > reach) continue;
+          const ahead = (dx * ca + dy * sa) / (d || 1);
+          const score = (o.v / (d + 60)) * (ahead > 0 ? 1 + ahead * 0.6 : 0.7);
+          if (score > bestScore) { bestScore = score; bestO = o; }
+        }
+      }
+    }
+    return bestO;
+  }
+
+  // Bot brain: pick a goal (cut someone off, food, or wander), then steer along the clearest nearby heading.
+  function think(s) {
+    const L = s.ai;
+    s.think = rand(L.think[0], L.think[1]);
+    let gx = 0, gy = 0, goal = false, boost = false;
+    if (L.aggro > 0 && s.mass > 45) {
+      if (s.prey && (!s.prey.alive || G.time > s.huntUntil)) s.prey = null;
+      if (!s.prey && Math.random() < L.aggro * 0.3) { s.prey = findPrey(s, 420); s.huntUntil = G.time + rand(1.6, 3.6); }
+      if (s.prey) {
+        const p = s.prey, d = Math.hypot(p.x - s.x, p.y - s.y);
+        // Never play chicken: drop the hunt when the target is coming straight at us.
+        const facingMe = Math.cos(wrap(Math.atan2(s.y - p.y, s.x - p.x) - p.angle));
+        const ahead = ((s.x - p.x) * Math.cos(p.angle) + (s.y - p.y) * Math.sin(p.angle)) / (d || 1);
+        if (d > 650 || (facingMe > 0.55 && d < 280) || (d < p.r * 4 + 50 && ahead < 0.3)) s.prey = null;
+        else {
+          const lead = Math.min(260, 50 + d * 0.7 + p.r * 2);
+          gx = p.x + Math.cos(p.angle) * lead; gy = p.y + Math.sin(p.angle) * lead; goal = true;
+          const facing = Math.cos(wrap(Math.atan2(gy - s.y, gx - s.x) - s.angle));
+          boost = facing > 0.75 && d < 340 && s.mass > 60 && Math.random() < L.aggro;
+        }
+      }
+    }
+    if (!goal) {
+      const food = findFood(s);
+      if (food) {
+        gx = food.x; gy = food.y; goal = true;
+        boost = food.v >= 5 && s.mass > 70 && Math.hypot(food.x - s.x, food.y - s.y) > 110 && Math.random() < L.boost;
+      }
+    }
+    const dc = Math.hypot(s.x, s.y);
+    if (dc > G.R * 0.86 || !goal) {
+      if (!s.wander || G.time > s.wanderUntil || Math.hypot(s.wander.x - s.x, s.wander.y - s.y) < 80) {
+        const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * G.R * 0.6;
+        s.wander = { x: Math.cos(a) * d, y: Math.sin(a) * d }; s.wanderUntil = G.time + rand(3, 7);
+      }
+      if (dc > G.R * 0.86) { gx = 0; gy = 0; } else { gx = s.wander.x; gy = s.wander.y; }
+    }
+    const ga = Math.atan2(gy - s.y, gx - s.x);
+    const look = s.r * 2.5 + BASE_SPEED * L.look * (s.boosting ? 1.8 : 1);
+    let bestA = s.angle, bestScore = -Infinity, bestClear = 0;
+    for (const off of L.offsets) {
+      const a = s.angle + off;
+      const clear = rayClear(s, a, look, L.samples);
+      const score = clear * 9 + (clear === 1 ? 4 : 0) + Math.cos(wrap(a - ga)) * 2.4 - Math.abs(off) * 0.35;
+      if (score > bestScore) { bestScore = score; bestA = a; bestClear = clear; }
+    }
+    s.target = wrap(bestA + (L.err ? rand(-L.err, L.err) : 0));
+    s.wantBoost = boost && bestClear === 1;
+  }
+
+  const turnRate = s => (4.4 / (1 + (s.r - 11) / 28)) * (s.boosting ? 0.85 : 1);
+  function move(s, dt) {
+    const turn = turnRate(s);
+    const d = wrap(s.target - s.angle);
+    s.angle = wrap(s.angle + clamp(d, -turn * dt, turn * dt));
+    s.boosting = s.wantBoost && s.mass > MIN_BOOST;
+    const v = s.boosting ? BOOST_SPEED : BASE_SPEED;
+    s.x += Math.cos(s.angle) * v * dt;
+    s.y += Math.sin(s.angle) * v * dt;
+    if (s.boosting) {
+      const loss = (5 + s.mass * 0.012) * dt;
+      s.mass -= loss; s.drop += loss * 0.7;
+      if (s.drop >= 2.5) { const k = s.n - 1; addOrb(s.sx[k] + rand(-4, 4), s.sy[k] + rand(-4, 4), s.drop, s.skin.c[0]); s.drop = 0; }
+      sizeOf(s);
+    }
+    const last = s.px.length - 1;
+    if (last < 0 || (s.x - s.px[last]) ** 2 + (s.y - s.py[last]) ** 2 >= 9) { s.px.push(s.x); s.py.push(s.y); }
+    layout(s);
+  }
+
+  // ---------- Player input ----------
+  const input = { mode: 'none', mx: 0, my: 0, mouseDown: false, joy: null, touchBoost: new Set(), btnBoost: false, left: false, right: false, keyBoost: false };
+
+  function toScreen(x, y) {
+    const c = G.cam;
+    return { x: (x - c.x) * c.z + view.w / 2, y: (y - c.y) * c.z + view.h / 2 };
+  }
+
+  function steerPlayer(p) {
+    if (input.left || input.right) { input.mode = 'keys'; p.target = p.angle + (input.right ? 1.2 : 0) - (input.left ? 1.2 : 0); }
+    else if (input.mode === 'keys') p.target = p.angle;
+    else if (input.mode === 'mouse') {
+      const h = toScreen(p.x, p.y), dx = input.mx - h.x, dy = input.my - h.y;
+      if (dx * dx + dy * dy > 25) p.target = Math.atan2(dy, dx);
+    } else if (input.mode === 'joy' && input.joy) {
+      const dx = input.joy.x - input.joy.x0, dy = input.joy.y - input.joy.y0;
+      if (dx * dx + dy * dy > 64) p.target = Math.atan2(dy, dx);
+    }
+    p.wantBoost = input.keyBoost || input.mouseDown || input.touchBoost.size > 0 || input.btnBoost;
+  }
+
+  // ---------- Simulation ----------
+  function die(s, killer, cause) {
+    if (!s.alive) return;
+    s.alive = false;
+    G.deaths[cause]++;
+    const count = Math.max(4, Math.min(140, Math.ceil(s.n / 2)));
+    const total = Math.max(12, s.mass * 0.85), v = total / count;
+    for (let i = 0; i < count; i++) {
+      const j = Math.floor((i * s.n) / count);
+      addOrb(s.sx[j] + rand(-s.r, s.r) * 0.6, s.sy[j] + rand(-s.r, s.r) * 0.6, v, i % 3 === 2 && s.skin.c[1] ? s.skin.c[1] : s.skin.c[0]);
+    }
+    if (killer) {
+      killer.kills++;
+      if (killer.prey === s) G.deaths.hunted++;
+      if (killer.isPlayer && !G.over) { G.kills++; toast(t.cut(s.name), 'good'); announce(t.cut(s.name)); }
+    }
+    if (s.isPlayer && !G.over) {
+      G.cause = cause; G.killer = killer ? killer.name : null; G.deadAt = { x: s.x, y: s.y };
+      G.deathRank = G.mode === 'royale' ? G.snakes.filter(o => o.alive).length + 1 : rankOf(s);
+      finish(false);
+    } else if (!G.demo && G.player && G.player.alive && G.mode === 'royale') {
+      const left = G.snakes.filter(o => o.alive && !o.isPlayer).length;
+      if ([10, 5, 3, 2, 1].includes(left) && left < G.leftMark) { G.leftMark = left; toast(t.remaining(left + 1)); }
+    }
+    if (G.mode !== 'royale' && !s.isPlayer) G.respawns.push(G.time + rand(1.2, 3.5));
+  }
+
+  function step(dt) {
+    const g = G;
+    g.time += dt;
+    if (g.mode === 'royale') {
+      const k = clamp((g.time - ROYALE.grace) / ROYALE.shrink, 0, 1);
+      g.R = g.R0 + (ROYALE.minR - g.R0) * k;
+      if (g.time > ROYALE.grace + ROYALE.shrink + 20) g.R = Math.max(60, ROYALE.minR - (g.time - ROYALE.grace - ROYALE.shrink - 20) * 6);
+      if (!g.shrinkWarned && g.time >= ROYALE.grace && !g.demo) { g.shrinkWarned = true; toast(t.shrink, 'bad'); announce(t.shrink); }
+    }
+    buildOrbGrid();
+    for (const s of g.snakes) {
+      if (!s.alive) continue;
+      if (s.isPlayer && !g.auto) steerPlayer(s);
+      else if ((s.think -= dt) <= 0) think(s);
+    }
+    for (const s of g.snakes) if (s.alive) move(s, dt);
+    buildSegGrid();
+
+    // Quick re-think when something blocks the way right ahead.
+    for (const s of g.snakes) {
+      if (!s.alive || (s.isPlayer && !g.auto) || s.ai.samples < 4 || s.think < 0.02) continue;
+      const d = s.r + (s.boosting ? BOOST_SPEED : BASE_SPEED) * 0.22;
+      const x = s.x + Math.cos(s.angle) * d, y = s.y + Math.sin(s.angle) * d;
+      if (x * x + y * y > (g.R - s.r - 10) ** 2 || hitAt(x, y, s.r + 4, s)) think(s);
+    }
+
+    // Eat and attract orbs.
+    for (const s of g.snakes) {
+      if (!s.alive) continue;
+      const cx = cellX(s.x), cy = cellX(s.y), reach = s.r + 4, mag = s.r * 2 + 34;
+      let ate = false;
+      for (let gy = Math.max(0, cy - 1); gy <= Math.min(GN - 1, cy + 1); gy++) {
+        for (let gx = Math.max(0, cx - 1); gx <= Math.min(GN - 1, cx + 1); gx++) {
+          for (let e = orbHead[gy * GN + gx]; e !== -1; e = orbNext[e]) {
+            const o = g.orbs[e];
+            if (o.dead) continue;
+            const dx = s.x - o.x, dy = s.y - o.y, d2 = dx * dx + dy * dy;
+            if (d2 < (reach + o.r) ** 2) { o.dead = true; s.mass += o.v; ate = true; }
+            else if (d2 < mag * mag) { const d = Math.sqrt(d2), pull = Math.min(d, 300 * dt); o.x += (dx / d) * pull; o.y += (dy / d) * pull; }
+          }
+        }
+      }
+      if (ate) { sizeOf(s); layout(s); if (s.mass > s.maxMass) s.maxMass = s.mass; }
+    }
+
+    // Collisions: a head touching another snake's body dies; head-on, the shorter snake loses.
+    const deaths = [];
+    for (const a of g.snakes) {
+      if (!a.alive) continue;
+      if (a.x * a.x + a.y * a.y > (g.R - a.r * 0.4) ** 2) { deaths.push([a, null, 'wall']); continue; }
+      const cx = cellX(a.x), cy = cellX(a.y);
+      let hit = null, cause = 'cut';
+      for (let gy = Math.max(0, cy - 1); gy <= Math.min(GN - 1, cy + 1) && !hit; gy++) {
+        for (let gx = Math.max(0, cx - 1); gx <= Math.min(GN - 1, cx + 1) && !hit; gx++) {
+          for (let e = segHead[gy * GN + gx]; e !== -1; e = segNext[e]) {
+            const o = segOwner[e];
+            if (o === a || !o.alive) continue;
+            const j = segIdx[e], dx = o.sx[j] - a.x, dy = o.sy[j] - a.y, d2 = dx * dx + dy * dy;
+            if (j === 0) {
+              const lim = (a.r + o.r) * 0.75;
+              if (d2 < lim * lim && a.mass <= o.mass) { hit = o; cause = 'head'; break; }
+            } else {
+              const lim = a.r * 0.55 + o.r * 0.95;
+              if (d2 < lim * lim) { hit = o; break; }
+            }
+          }
+        }
+      }
+      if (hit) deaths.push([a, hit, cause]);
+    }
+    for (const [s, killer, cause] of deaths) die(s, killer, cause);
+    if (g.snakes.some(s => !s.alive)) g.snakes = g.snakes.filter(s => s.alive || s.isPlayer);
+
+    // Compact orbs, trim the shrinking arena, and keep the food supply up.
+    const lim = (g.R - 6) ** 2, orbs = g.orbs;
+    let w = 0;
+    for (let i = 0; i < orbs.length; i++) { const o = orbs[i]; if (!o.dead && (g.mode !== 'royale' || o.x * o.x + o.y * o.y < lim)) orbs[w++] = o; }
+    orbs.length = w;
+    const want = orbTarget();
+    for (let i = 0; i < 24 && orbs.length < want; i++) naturalOrb();
+    g.respawns.sort((a, b) => a - b);
+    while (g.respawns.length && g.respawns[0] <= g.time) { g.respawns.shift(); spawnBot(); }
+
+    const p = g.player;
+    if (p && p.alive && !g.over) {
+      g.maxLen = Math.max(g.maxLen, p.mass);
+      if (g.mark < LEN_MARKS.length && p.mass >= LEN_MARKS[g.mark]) { const n = LEN_MARKS[g.mark++]; toast(t.lenUp(fmt(n)), 'gold'); announce(t.lenUp(fmt(n))); }
+      const rank = rankOf(p);
+      if (rank === 1 && g.snakes.length > 3 && g.time - g.rankToastAt > 20) { g.rankToastAt = g.time; toast(t.top, 'gold'); announce(t.top); }
+      if (g.mode === 'timed' && g.time >= TIMED_SECONDS) { g.deathRank = rank; g.timeUp = true; finish(rank === 1); }
+      if (g.mode === 'royale' && !g.snakes.some(s => s.alive && !s.isPlayer)) { g.deathRank = 1; finish(true); }
+    }
+    if (g.over && !g.endShown && g.time >= g.endAt) { g.endShown = true; showEnd(); }
+  }
+
+  const rankOf = s => 1 + G.snakes.reduce((n, o) => n + (o.alive && o !== s && o.mass > s.mass ? 1 : 0), 0);
+
+  // ---------- Drawing ----------
+  const orbSprites = new Map();
+  function orbSprite(color) {
+    let c = orbSprites.get(color);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = c.height = 48;
+    const g = c.getContext('2d'), grad = g.createRadialGradient(24, 24, 0, 24, 24, 24);
+    grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.16, color); grad.addColorStop(0.36, color);
+    grad.addColorStop(0.42, color + '66'); grad.addColorStop(1, color + '00');
+    g.fillStyle = grad; g.fillRect(0, 0, 48, 48);
+    orbSprites.set(color, c);
+    return c;
+  }
+  const hexPattern = (() => {
+    const a = 28, w = a * 3, h = 48, tile = document.createElement('canvas');
+    tile.width = w; tile.height = h;
+    const g = tile.getContext('2d');
+    g.fillStyle = '#0c1628'; g.fillRect(0, 0, w, h);
+    g.scale(1, h / (Math.sqrt(3) * a));
+    const hh = Math.sqrt(3) * a;
+    for (const [cx, cy] of [[0, 0], [w, 0], [0, hh], [w, hh], [a * 1.5, hh / 2], [a * 1.5, -hh / 2], [a * 1.5, hh * 1.5]]) {
+      g.beginPath();
+      for (let k = 0; k < 6; k++) { const an = (k * Math.PI) / 3; g.lineTo(cx + Math.cos(an) * (a - 2.2), cy + Math.sin(an) * (a - 2.2)); }
+      g.closePath(); g.fillStyle = '#13213b'; g.fill();
+      g.strokeStyle = '#18294a'; g.lineWidth = 1.2; g.stroke();
+    }
+    return ctx.createPattern(tile, 'repeat');
+  })();
+
+  function chunkColor(skin, k, chunks, time) {
+    const c = skin.c;
+    switch (skin.p) {
+      case 'solid': return k % 2 ? c[1] : c[0];
+      case 'stripe': return (k >> 1) % 2 ? c[1] : c[0];
+      case 'bands': return c[(k >> 1) % c.length];
+      case 'tiger': return k % 3 === 2 ? c[1] : c[0];
+      case 'grad': return skin.ramp[Math.min(15, Math.floor((k / Math.max(1, chunks - 1)) * 15))];
+      case 'flow': { const u = (((k * 0.5 - time * 4) % 16) + 16) % 16; return skin.ramp[Math.round(Math.abs(u - 8) * (15 / 8))]; }
+      case 'rainbow': return HUES[Math.floor((((k * 3 - time * 30) % 36) + 36) % 36)];
+      case 'galaxy': return k % 7 === 3 ? c[2] : k % 2 ? c[1] : c[0];
+      default: return c[0];
+    }
+  }
+
+  // Draws a snake in the current transform; `z` is the screen zoom for hairline widths.
+  function drawSnake(g, s, time, z) {
+    const n = s.n, r = s.r, sx = s.sx, sy = s.sy, skin = s.skin;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const path = (from, to) => { g.beginPath(); g.moveTo(sx[from], sy[from]); for (let j = from + 1; j <= to; j++) g.lineTo(sx[j], sy[j]); };
+    path(0, n - 1);
+    if (s.boosting) { g.globalAlpha = 0.28; g.strokeStyle = skin.c[0]; g.lineWidth = r * 2 + 16; g.stroke(); g.globalAlpha = 1; }
+    g.strokeStyle = skin.edge; g.lineWidth = r * 2 + Math.max(2.5 / z, r * 0.22); g.stroke();
+    const C = 3, chunks = Math.ceil((n - 1) / C);
+    for (let k = chunks - 1; k >= 0; k--) {
+      const from = k * C, to = Math.min(n - 1, from + C);
+      path(from, to);
+      g.strokeStyle = chunkColor(skin, k, chunks, time); g.lineWidth = r * 2; g.stroke();
+    }
+    path(0, n - 1);
+    g.strokeStyle = '#ffffff24'; g.lineWidth = r * 0.7; g.stroke();
+    // Head and eyes.
+    const a = s.angle, ca = Math.cos(a), sa = Math.sin(a), hx = sx[0], hy = sy[0];
+    g.fillStyle = chunkColor(skin, 0, chunks, time);
+    g.beginPath(); g.arc(hx + ca * r * 0.15, hy + sa * r * 0.15, r * 1.04, 0, TAU); g.fill();
+    const look = s.target, la = Math.cos(look), lb = Math.sin(look);
+    for (const side of [-1, 1]) {
+      const ex = hx + ca * r * 0.4 - sa * r * 0.48 * side, ey = hy + sa * r * 0.4 + ca * r * 0.48 * side;
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(ex, ey, r * 0.38, 0, TAU); g.fill();
+      g.fillStyle = '#0a1220'; g.beginPath(); g.arc(ex + la * r * 0.15, ey + lb * r * 0.15, r * 0.2, 0, TAU); g.fill();
+    }
+  }
+
+  function draw(dt) {
+    const g = G, w = view.w, h = view.h, dpr = view.dpr, cam = g.cam;
+    const p = g.player;
+    let focus = p && p.alive ? p : null;
+    if (!focus && g.deadAt) focus = g.deadAt;
+    if (!focus) { let big = null; for (const s of g.snakes) if (s.alive && (!big || s.mass > big.mass)) big = s; focus = big || { x: 0, y: 0, r: 12 }; }
+    const base = Math.max(0.6, Math.sqrt(w * h) / 820);
+    const fr = focus.r || (p ? p.r : 14);
+    const tz = base / (1 + (fr - 11) / 45);
+    const k = 1 - Math.exp(-dt * 3);
+    cam.z += (tz - cam.z) * k;
+    const fk = p && p.alive ? 1 - Math.exp(-dt * 14) : 1 - Math.exp(-dt * 3);
+    cam.x += (focus.x - cam.x) * fk; cam.y += (focus.y - cam.y) * fk;
+    const z = cam.z, time = reduced ? 0 : g.time;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#070c16'; ctx.fillRect(0, 0, w, h);
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (w / 2 - cam.x * z), dpr * (h / 2 - cam.y * z));
+    const left = cam.x - w / 2 / z, right = cam.x + w / 2 / z, top = cam.y - h / 2 / z, bottom = cam.y + h / 2 / z;
+
+    ctx.beginPath(); ctx.arc(0, 0, g.R, 0, TAU);
+    ctx.fillStyle = hexPattern; ctx.fill();
+    if (g.mode === 'royale' && g.R < g.R0) {
+      ctx.beginPath(); ctx.arc(0, 0, g.R0, 0, TAU); ctx.arc(0, 0, g.R, 0, TAU, true);
+      ctx.fillStyle = '#ff2d5514'; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, g.R + 8, 0, TAU);
+    ctx.strokeStyle = '#ff4d6d33'; ctx.lineWidth = 34; ctx.stroke();
+    ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 7; ctx.stroke();
+
+    const pad = 30;
+    for (const o of g.orbs) {
+      if (o.x < left - pad || o.x > right + pad || o.y < top - pad || o.y > bottom + pad) continue;
+      const pulse = reduced ? 1 : 1 + 0.12 * Math.sin(time * 3 + o.ph);
+      const d = (o.r / 0.18) * pulse;
+      ctx.drawImage(orbSprite(o.c), o.x - d / 2, o.y - d / 2, d, d);
+    }
+
+    const visible = s => {
+      const m = s.r * 2 + 20;
+      for (let j = 0; j < s.n; j += 4) if (s.sx[j] > left - m && s.sx[j] < right + m && s.sy[j] > top - m && s.sy[j] < bottom + m) return true;
+      const j = s.n - 1;
+      return s.sx[j] > left - m && s.sx[j] < right + m && s.sy[j] > top - m && s.sy[j] < bottom + m;
+    };
+    const shown = [];
+    for (const s of g.snakes) if (s.alive && !s.isPlayer && visible(s)) { drawSnake(ctx, s, time, z); shown.push(s); }
+    if (p && p.alive) drawSnake(ctx, p, time, z);
+
+    // Names in screen space.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = '700 11px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    let leader = null;
+    for (const s of g.snakes) if (s.alive && (!leader || s.mass > leader.mass)) leader = s;
+    for (const s of shown) {
+      const q = toScreen(s.x, s.y);
+      if (q.x < -40 || q.x > w + 40 || q.y < -20 || q.y > h + 40) continue;
+      ctx.fillStyle = s === leader ? '#ffc247' : '#ffffffb3';
+      ctx.fillText(s === leader ? `👑 ${s.name}` : s.name, q.x, q.y - s.r * z - 8);
+    }
+
+    drawMinimap(g, w, h);
+    if (input.mode === 'joy' && input.joy && p && p.alive && !g.paused) {
+      const j = input.joy, dx = j.x - j.x0, dy = j.y - j.y0, d = Math.hypot(dx, dy), m = Math.min(1, 44 / (d || 1));
+      ctx.fillStyle = '#ffffff14'; ctx.strokeStyle = '#ffffff40'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(j.x0, j.y0, 46, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffff55'; ctx.beginPath(); ctx.arc(j.x0 + dx * m, j.y0 + dy * m, 20, 0, TAU); ctx.fill();
+    }
+  }
+
+  function drawMinimap(g, w, h) {
+    const size = clamp(Math.min(w, h) * 0.22, 64, 132), r = size / 2;
+    const cx = w - r - 10, cy = h - r - 10, s = r / (g.R0 + 20);
+    ctx.fillStyle = '#0a1426c8';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ff4d6d99'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, g.R * s, 0, TAU); ctx.stroke();
+    for (const o of g.snakes) {
+      if (!o.alive || o.isPlayer) continue;
+      ctx.fillStyle = o.skin.c[0] + 'aa';
+      const rr = clamp(1.2 + o.r * 0.06, 1.4, 3);
+      ctx.beginPath(); ctx.arc(cx + o.x * s, cy + o.y * s, rr, 0, TAU); ctx.fill();
+    }
+    const p = g.player;
+    if (p && p.alive) {
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx + p.x * s, cy + p.y * s, 3.4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx + p.x * s, cy + p.y * s, 6, 0, TAU); ctx.stroke();
+    }
+  }
+
+  // ---------- HUD ----------
+  let hudAt = 0;
+  function updateHud(now) {
+    if (now - hudAt < 160 || !G || G.demo) return;
+    hudAt = now;
+    const g = G, p = g.player;
+    const alive = g.snakes.filter(s => s.alive).sort((a, b) => b.mass - a.mass);
+    if (p && p.alive) {
+      els.len.textContent = fmt(p.mass);
+      els.rank.textContent = `${t.rank} #${alive.indexOf(p) + 1}/${alive.length}`;
+    }
+    els.kills.textContent = String(g.kills);
+    if (g.mode === 'timed') {
+      const left = Math.max(0, TIMED_SECONDS - g.time);
+      els.clock.textContent = clockText(Math.ceil(left));
+      els.clock.classList.toggle('low', left <= 20);
+    } else els.clock.textContent = clockText(g.time);
+    const rows = alive.slice(0, 8).map((s, i) => row(s, i + 1));
+    if (p && p.alive && alive.indexOf(p) >= 8) rows[7] = row(p, alive.indexOf(p) + 1);
+    els.leaders.innerHTML = rows.join('');
+  }
+  const row = (s, pos) => `<li class="${s.isPlayer ? 'you' : ''}"><i style="background:${s.skin.c[0]}"></i><span>${pos}. ${s.name}</span><b>${fmt(s.mass)}</b></li>`;
+
+  // ---------- Screens ----------
+  function choiceButton(label, info, checked) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'choice'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(checked));
+    b.innerHTML = `<b></b><small></small>`;
+    b.firstChild.textContent = label; b.lastChild.textContent = info;
+    return b;
+  }
+
+  function renderMenu() {
+    els.modes.innerHTML = '';
+    for (const m of MODES) {
+      const b = choiceButton(t.modes[m], t.modeInfo[m], prefs.mode === m);
+      b.addEventListener('click', () => { prefs.mode = m; save('prefs', prefs); renderMenu(); els.modes.querySelector('[aria-checked="true"]').focus(); });
+      els.modes.append(b);
+    }
+    els.levels.innerHTML = '';
+    for (const l of Object.keys(LEVELS)) {
+      const b = choiceButton(t.levels[l], t.snakes(LEVELS[l].bots), prefs.level === l);
+      b.addEventListener('click', () => { prefs.level = l; save('prefs', prefs); renderMenu(); els.levels.querySelector('[aria-checked="true"]').focus(); });
+      els.levels.append(b);
+    }
+    renderSkins();
+    els.menuBest.textContent = t.best(fmt(best[prefs.mode]), fmt(stats.kills));
+  }
+
+  function renderSkins(note) {
+    els.skins.innerHTML = '';
+    for (const skin of SKINS) {
+      const open = unlocked(skin), name = t.skins[skin.id];
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'skin' + (open ? '' : ' locked');
+      b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(prefs.skin === skin.id));
+      b.setAttribute('aria-label', open ? name : t.lockedSkin(name, reqText(skin)));
+      const c = document.createElement('canvas');
+      c.width = c.height = 84;
+      b.append(c);
+      drawPreview(c, skin);
+      b.addEventListener('click', () => {
+        if (!open) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); setSkinNote(t.lockedSkin(name, reqText(skin)), true); announce(t.lockedSkin(name, reqText(skin))); return; }
+        prefs.skin = skin.id; save('prefs', prefs); renderSkins(); els.skins.querySelector('[aria-checked="true"]').focus();
+      });
+      els.skins.append(b);
+    }
+    if (!note) setSkinNote(t.skins[prefs.skin], false);
+  }
+  function setSkinNote(text, locked) { els.skinName.textContent = text; els.skinName.classList.toggle('lock', locked); }
+
+  function drawPreview(c, skin) {
+    const g = c.getContext('2d'), n = 16, s = { n, r: 6.4, sx: [], sy: [], skin, angle: -0.5, target: -0.5, boosting: false };
+    for (let k = 0; k < n; k++) { const u = k / (n - 1); s.sx.push(32 - u * 22); s.sy.push(23 + Math.sin(u * TAU * 0.85 + 0.6) * 9); }
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, 42, 42);
+    drawSnake(g, s, 0, 2);
+  }
+
+  function showMenu() {
+    els.end.hidden = true; els.paused.hidden = true; els.hud.hidden = true; els.board.hidden = true; els.boost.hidden = true;
+    createWorld('endless', 'normal', true);
+    renderMenu();
+    els.menu.hidden = false;
+    $('play').focus({ preventScroll: true });
+  }
+
+  let coarse = matchMedia('(pointer: coarse)').matches;
+  function startGame(mode = prefs.mode, level = prefs.level) {
+    createWorld(mode, level, false);
+    const spot = safeSpot(0.45, 420) || { x: 0, y: 0 };
+    const p = makeSnake({ name: t.you, skin: skinById(prefs.skin), mass: START_MASS, x: spot.x, y: spot.y, angle: Math.atan2(-spot.y, -spot.x) || 0, isPlayer: true, ai: personalize(LEVELS.hard) });
+    p.ai.aggro = 0.3;
+    G.player = p; G.snakes.push(p);
+    G.cam.x = p.x; G.cam.y = p.y;
+    buildSegGrid();
+    input.joy = null; input.touchBoost.clear(); input.mouseDown = false; input.btnBoost = false; input.left = input.right = input.keyBoost = false;
+    if (input.mode === 'keys') input.mode = 'none';
+    els.menu.hidden = true; els.end.hidden = true; els.paused.hidden = true;
+    els.hud.hidden = false; els.board.hidden = false; els.boost.hidden = !coarse;
+    hudAt = 0;
+    toast(t.go, 'good'); announce(t.go);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function finish(win) {
+    const g = G;
+    if (g.over || g.demo) return;
+    g.over = true; g.win = win; g.endAt = g.time + (win ? 0.4 : 1.1);
+    const p = g.player;
+    const before = SKINS.filter(unlocked).map(s => s.id);
+    const length = Math.floor(g.mode === 'timed' && p.alive ? p.mass : g.maxLen);
+    g.finalLen = length;
+    stats.games++;
+    stats.kills += g.kills;
+    stats.bestLen = Math.max(stats.bestLen, Math.floor(g.maxLen));
+    if (win && g.mode === 'timed') stats.timedWins++;
+    if (win && g.mode === 'royale') stats.royaleWins++;
+    g.newBest = length > best[g.mode];
+    if (g.newBest) best[g.mode] = length;
+    save('stats', stats); save('best', best);
+    g.unlocked = SKINS.filter(s => unlocked(s) && !before.includes(s.id)).map(s => t.skins[s.id]);
+    if (win) { announce(`${g.mode === 'royale' ? t.champion : t.winner} ${t.length}: ${fmt(length)}`); }
+  }
+
+  function showEnd() {
+    const g = G;
+    let title, sub, art;
+    if (g.win) { title = g.mode === 'royale' ? t.champion : t.winner; sub = t.place(1); art = '🏆'; }
+    else if (g.timeUp) { title = t.timeUp; sub = t.place(g.deathRank); art = '⏱️'; }
+    else {
+      title = g.cause === 'wall' || !g.killer ? t.hitWall : t.cutBy(g.killer);
+      sub = g.mode === 'endless' ? t.gameOver : t.place(g.deathRank);
+      art = '💥';
+    }
+    els.endArt.textContent = art;
+    els.endTitle.textContent = title;
+    els.endSub.textContent = sub;
+    els.rLen.textContent = fmt(g.finalLen);
+    els.rKills.textContent = String(g.kills);
+    els.rRank.textContent = `#${g.deathRank || rankOf(g.player)}`;
+    els.rTime.textContent = clockText(Math.min(g.time, g.mode === 'timed' ? TIMED_SECONDS : g.time));
+    els.newBest.hidden = !g.newBest;
+    els.unlockedBadge.hidden = !g.unlocked.length;
+    els.unlockedBadge.textContent = g.unlocked.length ? t.unlocked(g.unlocked.join(', ')) : '';
+    els.endNote.textContent = t.best(fmt(best[g.mode]), fmt(stats.kills));
+    els.hud.hidden = true; els.boost.hidden = true;
+    els.end.hidden = false;
+    if (!g.win) announce(`${title}. ${sub}. ${t.length}: ${fmt(g.finalLen)}`);
+    $('again').focus({ preventScroll: true });
+  }
+
+  function pause() {
+    if (!G || G.demo || G.over || G.paused) return;
+    G.paused = true;
+    input.mouseDown = false; input.touchBoost.clear(); input.joy = null; input.btnBoost = false; input.left = input.right = input.keyBoost = false;
+    els.paused.hidden = false;
+    $('resume').focus({ preventScroll: true });
+  }
+  function resume() {
+    if (!G || !G.paused) return;
+    G.paused = false;
+    els.paused.hidden = true;
+    canvas.focus({ preventScroll: true });
+  }
+  const playing = () => G && !G.demo && !G.over && !G.paused && G.player && G.player.alive;
+
+  // ---------- Input wiring ----------
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') {
+      input.mode = 'mouse'; input.mx = e.clientX; input.my = e.clientY;
+      if (e.button === 0 && playing()) input.mouseDown = true;
+      return;
+    }
+    if (!coarse) { coarse = true; if (playing()) els.boost.hidden = false; }
+    if (!input.joy) { input.joy = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }; input.mode = 'joy'; }
+    else input.touchBoost.add(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') { input.mx = e.clientX; input.my = e.clientY; if (input.mode !== 'keys' || !(input.left || input.right)) input.mode = 'mouse'; return; }
+    const j = input.joy;
+    if (j && j.id === e.pointerId) {
+      j.x = e.clientX; j.y = e.clientY;
+      // Floating stick: drag the base along when the finger goes past the rim.
+      const dx = j.x - j.x0, dy = j.y - j.y0, d = Math.hypot(dx, dy);
+      if (d > 70) { j.x0 = j.x - (dx / d) * 70; j.y0 = j.y - (dy / d) * 70; }
+    }
+  });
+  const release = e => {
+    if (e.pointerType === 'mouse') { input.mouseDown = false; return; }
+    if (input.joy && input.joy.id === e.pointerId) input.joy = null;
+    input.touchBoost.delete(e.pointerId);
+  };
+  addEventListener('pointerup', release);
+  addEventListener('pointercancel', release);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  const boostOn = e => { e.preventDefault(); input.btnBoost = true; els.boost.classList.add('on'); try { els.boost.setPointerCapture(e.pointerId); } catch {} };
+  const boostOff = () => { input.btnBoost = false; els.boost.classList.remove('on'); };
+  els.boost.addEventListener('pointerdown', boostOn);
+  els.boost.addEventListener('pointerup', boostOff);
+  els.boost.addEventListener('pointercancel', boostOff);
+  els.boost.addEventListener('lostpointercapture', boostOff);
+  els.boost.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.btnBoost = true; els.boost.classList.add('on'); } });
+  els.boost.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') boostOff(); });
+
+  const KEYS = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'boost', w: 'boost', W: 'boost', ' ': 'boost', Shift: 'boost' };
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'p' || e.key === 'P') && G && !G.demo && !G.over) { G.paused ? resume() : pause(); e.preventDefault(); return; }
+    const k = KEYS[e.key];
+    if (!k || !playing()) return;
+    if (e.target !== canvas && e.target !== document.body && e.key === ' ') return;
+    e.preventDefault();
+    if (k === 'boost') input.keyBoost = true; else { input[k] = true; input.mode = 'keys'; }
+  });
+  document.addEventListener('keyup', e => {
+    const k = KEYS[e.key];
+    if (k === 'boost') input.keyBoost = false; else if (k) input[k] = false;
+  });
+  addEventListener('blur', () => { input.left = input.right = input.keyBoost = false; input.mouseDown = false; pause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  $('play').addEventListener('click', () => startGame());
+  $('again').addEventListener('click', () => startGame(G ? G.mode : prefs.mode, G ? G.level : prefs.level));
+  $('to-menu').addEventListener('click', showMenu);
+  $('quit').addEventListener('click', showMenu);
+  $('resume').addEventListener('click', resume);
+  $('pause-btn').addEventListener('click', pause);
+
+  // ---------- Loop ----------
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (G && !G.paused) {
+      acc += dt;
+      while (acc >= STEP) { step(STEP); acc -= STEP; }
+    }
+    if (G) { draw(G.paused ? 0 : dt); updateHud(now); }
+    requestAnimationFrame(frame);
+  }
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+
+  if (navigator.webdriver) window.__snakeArena = {
+    state: () => G && {
+      mode: G.mode, level: G.level, demo: G.demo, time: +G.time.toFixed(2), over: G.over, win: G.win, paused: G.paused, endShown: G.endShown, R: Math.round(G.R),
+      alive: G.snakes.filter(s => s.alive).length, bots: G.snakes.filter(s => s.alive && !s.isPlayer).length, orbs: G.orbs.length, deaths: { ...G.deaths },
+      player: G.player && { alive: G.player.alive, mass: Math.round(G.player.mass), n: G.player.n, x: Math.round(G.player.x), y: Math.round(G.player.y), angle: +G.player.angle.toFixed(3), boosting: G.player.boosting, rank: G.player.alive ? rankOf(G.player) : G.deathRank },
+      kills: G.kills, cause: G.cause, killer: G.killer, unlocked: G.unlocked || [],
+    },
+    sim: sec => { for (let i = 0, n = Math.round(sec / STEP); i < n && G; i++) step(STEP); },
+    autopilot: on => { if (G) G.auto = !!on; },
+    grow: m => { if (G && G.player) { G.player.mass += m; G.player.maxMass = Math.max(G.player.maxMass, G.player.mass); sizeOf(G.player); layout(G.player); } },
+    stats: () => ({ ...stats, best: { ...best } }),
+  };
+
+  showMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahjong Solitaire</title>
+<style>
+:root {
+  --bg: #121a36;
+  --bg-2: #22336a;
+  --text: #eef2ff;
+  --muted: #a8b6dd;
+  --jade: #23a983;
+  --jade-dark: #137257;
+  --gold: #f5c859;
+  --gold-dark: #c99630;
+  --red: #d8463a;
+  --paper: #fff8ea;
+  --ink: #1f2645;
+  --ink-muted: #66708f;
+  --chip: #0b112640;
+  --side: clamp(168px, 19vw, 262px);
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(45deg, #ffffff06 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(-45deg, #ffffff06 0 1px, transparent 1px 22px),
+    radial-gradient(120% 90% at 50% 30%, var(--bg-2), var(--bg) 70%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button, a { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+.app {
+  height: 100%; max-width: 780px; margin: auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "hud" "stage" "tools";
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+.top { grid-area: top; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.title { flex: 1; min-width: 0; }
+h1 { font-size: clamp(20px, 6.2vw, 28px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+h1 span { color: var(--gold); }
+.sub { margin-top: 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; background: var(--chip); box-shadow: inset 0 0 0 1px #ffffff1a; }
+.icon-btn svg, .tool svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn:active, .tool:active:not(:disabled) { transform: translateY(2px); }
+
+.hud { grid-area: hud; display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 6px 5px; border-radius: 12px; background: var(--chip); box-shadow: inset 0 0 0 1px #ffffff12; text-align: center; }
+.stat small { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat.warn strong { color: #ff9b8f; }
+.bar { grid-area: bar; display: none; height: 6px; border-radius: 99px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--jade), var(--gold)); transition: width .3s; }
+
+.stage { grid-area: stage; position: relative; min-height: 0; min-width: 0; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; border-radius: 12px; }
+.stage canvas:focus { outline: none; }
+.stage canvas:focus-visible { outline: 2px solid #f5c85966; outline-offset: -2px; }
+.toast { position: absolute; left: 50%; bottom: 8px; translate: -50% 0; max-width: 92%; padding: 7px 14px; border-radius: 99px; background: #070b1ccc; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+
+.tools { grid-area: tools; display: flex; gap: 6px; }
+.tool { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; padding: 5px 4px; border-radius: 14px; background: var(--chip); box-shadow: inset 0 0 0 1px #ffffff14; font-size: 12px; font-weight: 800; }
+.tool > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool:disabled { opacity: .4; cursor: default; }
+.tool.primary { background: var(--jade); box-shadow: 0 3px 0 var(--jade-dark); }
+
+/* Overlays */
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #080d22b8; }
+.overlay.light { background: #080d2266; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; overscroll-behavior: contain; background: var(--paper); color: var(--ink); border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 22px 54px #0009; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--jade-dark); }
+.panel .text { margin-top: 8px; color: var(--ink-muted); font-size: 14.5px; line-height: 1.45; }
+.panel .emoji { font-size: 42px; line-height: 1.15; }
+.panel :focus-visible { outline-color: var(--jade-dark); }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.cta { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 13px 10px; border-radius: 18px; background: var(--jade); color: #fff; font-size: 18px; font-weight: 900; line-height: 1.15; box-shadow: 0 5px 0 var(--jade-dark); }
+.cta small, .daily small { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; opacity: .85; }
+.cta:active, .daily:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--jade-dark); }
+.ghost { width: 100%; padding: 11px; border-radius: 16px; color: var(--ink); font-size: 15px; font-weight: 800; box-shadow: inset 0 0 0 2px #1f264526; }
+.ghost:disabled { opacity: .4; cursor: default; }
+.ghost[hidden], .cta[hidden] { display: none; }
+
+.panel.menu { width: min(100%, 760px); padding: 18px; text-align: left; }
+.phead { display: flex; align-items: center; gap: 12px; }
+.logo { flex: 0 0 auto; width: 46px; height: 58px; }
+.phead .text { margin-top: 3px; }
+.rules { font-size: 13.5px; }
+.go { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.daily { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 13px 10px; border-radius: 18px; background: var(--gold); color: #3b2a05; font-size: 17px; font-weight: 900; line-height: 1.15; box-shadow: 0 5px 0 var(--gold-dark); text-align: center; }
+.daily.done { background: #f3ecdb; color: var(--ink); box-shadow: 0 5px 0 #ddd1b3; }
+.menu h3 { margin-top: 16px; font-size: 12px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-muted); }
+.layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; margin-top: 8px; }
+.lay { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 8px 9px 7px; border-radius: 14px; background: #f3ecdb; text-align: left; box-shadow: 0 3px 0 #e2d7bb; }
+.lay svg { display: block; width: 100%; height: 50px; margin-bottom: 4px; }
+.lay b { font-size: 14px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lay small { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lay .best { color: #8a6a12; }
+.lay .best em { font-style: normal; color: var(--gold-dark); letter-spacing: 1px; }
+.lay[aria-current="true"] { box-shadow: inset 0 0 0 2.5px var(--jade), 0 3px 0 #e2d7bb; }
+.lay:active { transform: translateY(2px); box-shadow: 0 1px 0 #e2d7bb; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 9px 12px; border-radius: 14px; background: #f3ecdb; font-size: 14px; font-weight: 800; text-align: left; }
+.toggle i { position: relative; flex: 0 0 auto; width: 42px; height: 24px; border-radius: 99px; background: #c9c0aa; transition: background .2s; }
+.toggle i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 2px #0004; }
+.toggle[aria-pressed="true"] i { background: var(--jade); }
+.toggle[aria-pressed="true"] i::after { transform: translateX(18px); }
+.keys { margin-top: 10px; font-size: 12px; color: var(--ink-muted); }
+
+.stars { margin-top: 6px; font-size: 30px; letter-spacing: 5px; color: #e4d9bf; min-height: 1.25em; }
+.stars b { color: var(--gold); text-shadow: 0 2px 0 var(--gold-dark); display: inline-block; animation: star .4s calc(var(--i) * 150ms + .2s) both cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes star { from { transform: scale(0) rotate(-40deg); } }
+.big-time { margin-top: 2px; font-size: 32px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 8px; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #3b2a05; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.fine { margin-top: 10px; font-size: 12px; color: var(--ink-muted); line-height: 1.4; }
+.store-link { display: inline-block; margin-top: 14px; font-size: 14px; font-weight: 700; color: var(--jade-dark); text-underline-offset: 4px; line-height: 1.4; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 380px) {
+  .app { gap: 6px; padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  h1 { font-size: 20px; }
+  .stat { padding: 3px 3px 4px; }
+  .stat small { font-size: 10px; letter-spacing: 0; }
+  .stat strong { font-size: 16px; }
+  .tool { min-height: 46px; font-size: 11px; }
+  .tool svg { width: 20px; height: 20px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .panel.menu { padding: 14px 12px; }
+  .go { gap: 8px; }
+  .cta, .daily { padding: 11px 6px; font-size: 16px; }
+  .layouts { grid-template-columns: 1fr 1fr; gap: 6px; }
+}
+@media (max-height: 600px) and (max-aspect-ratio: 5/4) and (min-width: 400px) {
+  .tool { min-height: 44px; flex-direction: row; gap: 5px; }
+}
+@media (max-height: 560px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 16px; border-radius: 22px; }
+  .panel h2 { font-size: 23px; }
+  .panel .text { margin-top: 5px; font-size: 13.5px; line-height: 1.35; }
+  .panel .emoji { font-size: 32px; }
+  .stars { font-size: 24px; margin-top: 2px; }
+  .big-time { font-size: 26px; }
+  .actions { margin-top: 10px; gap: 8px; }
+  .cta, .daily { padding: 10px 8px; }
+  .ghost { padding: 8px; }
+  .store-link { margin-top: 8px; }
+  .lay svg { height: 40px; }
+}
+
+/* Wide frames: the board takes the full height on the left, HUD and tools move to a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto auto auto minmax(0, 1fr); grid-template-areas: "stage top" "stage hud" "stage bar" "stage tools" "stage ."; column-gap: 16px; row-gap: 10px; }
+  h1 { white-space: normal; font-size: clamp(20px, 2.3vw, 30px); }
+  .sub { font-size: 13px; }
+  .top { align-items: flex-start; }
+  .hud { flex-direction: column; gap: 6px; }
+  .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 7px 12px; text-align: left; }
+  .stat small { font-size: 11px; }
+  .stat strong { font-size: 20px; }
+  .bar { display: block; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tool { min-height: 62px; font-size: 13px; }
+  .tool svg { width: 24px; height: 24px; }
+  .panel.menu { width: min(100%, 860px); }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { --side: clamp(160px, 26vw, 220px); row-gap: 6px; column-gap: 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 19px; }
+  .sub { font-size: 11.5px; margin-top: 1px; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 12px; }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .hud { gap: 4px; }
+  .stat { padding: 3px 9px; }
+  .stat small { font-size: 10px; letter-spacing: .02em; }
+  .stat strong { font-size: 16px; }
+  .bar { height: 5px; }
+  .tools { gap: 5px; }
+  .tool { min-height: 36px; flex-direction: row; gap: 4px; font-size: 11.5px; padding: 3px 4px; border-radius: 11px; }
+  .tool svg { width: 18px; height: 18px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) and (max-width: 700px) {
+  .tool svg { display: none; }
+  .tool { font-size: 11.5px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 360px) {
+  .sub { display: none; }
+  .tool > span { font-size: 10.5px; }
+}
+@media (max-height: 420px) {
+  .panel.menu { padding: 10px 14px; }
+  .phead .logo { width: 34px; height: 44px; }
+  .rules { display: none; }
+  .go { margin-top: 8px; }
+  .cta, .daily { padding: 8px 6px; font-size: 16px; }
+  .menu h3 { margin-top: 10px; }
+  .toggle { margin-top: 10px; padding: 6px 10px; }
+  .keys { display: none; }
+  .panel .emoji { font-size: 26px; }
+  .panel h2 { font-size: 21px; }
+  .fine { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <div class="title">
+      <h1>Mahjong <span>Solitaire</span></h1>
+      <p class="sub" id="layout-name"></p>
+    </div>
+    <button type="button" class="icon-btn" id="menu" data-i18n-label="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></button>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="left"></small><strong id="left">0</strong></div>
+    <div class="stat" id="pairs-stat"><small data-i18n="pairs"></small><strong id="pairs">0</strong></div>
+  </div>
+  <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+  <div class="stage" id="stage">
+    <canvas id="board" tabindex="0" role="application" data-i18n-label="board"></canvas>
+    <p class="toast" id="toast" aria-hidden="true"></p>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="undo" aria-keyshortcuts="U"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span data-i18n="undo"></span></button>
+    <button type="button" class="tool" id="hint" aria-keyshortcuts="H"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2h5c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3Z"/></svg><span data-i18n="hint"></span></button>
+    <button type="button" class="tool" id="shuffle" aria-keyshortcuts="S"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg><span data-i18n="shuffle"></span></button>
+    <button type="button" class="tool" id="reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span data-i18n="restart"></span></button>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <div class="phead">
+      <svg class="logo" viewBox="0 0 46 58" aria-hidden="true"><rect x="1" y="7" width="38" height="50" rx="7" fill="#137257"/><rect x="4" y="4" width="38" height="50" rx="7" fill="#e6dcc3"/><rect x="7" y="1" width="38" height="50" rx="7" fill="#fffaf0" stroke="#d8ccae"/><text x="26" y="36" text-anchor="middle" font-size="28" font-weight="700" fill="#cf2f2f" font-family="'Songti SC','STSong','SimSun','Noto Serif CJK SC','Hiragino Mincho ProN','Yu Mincho',serif">中</text></svg>
+      <div>
+        <h2 id="start-title">Mahjong <span>Solitaire</span></h2>
+        <p class="text" data-i18n="tagline"></p>
+      </div>
+    </div>
+    <p class="text rules" data-i18n="rules"></p>
+    <div class="go">
+      <button type="button" class="cta" id="play"><span id="play-label"></span><small id="play-sub"></small></button>
+      <button type="button" class="daily" id="daily"><span data-i18n="daily"></span><small id="daily-sub"></small></button>
+    </div>
+    <h3 data-i18n="layouts"></h3>
+    <div class="layouts" id="layouts"></div>
+    <button type="button" class="toggle" id="dim" aria-pressed="true"><span data-i18n="dim"></span><i aria-hidden="true"></i></button>
+    <p class="keys" data-i18n="keys"></p>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🎉</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="stars" id="win-stars" role="img"></p>
+    <p class="big-time" id="win-time"></p>
+    <p class="text" id="win-detail"></p>
+    <p class="badge" id="win-record" data-i18n="record" hidden></p>
+    <p class="fine" id="win-rule"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="next" data-i18n="next"></button>
+      <button type="button" class="ghost" id="again"></button>
+      <button type="button" class="ghost" id="to-menu" data-i18n="toMenu"></button>
+    </div>
+    <a class="store-link" href="https://play.google.com/store/apps/details?id=dev.lamian.games.tilematchpuzzle" target="_blank" rel="noopener noreferrer"><span data-i18n="full"></span> ↗</a>
+  </div>
+</div>
+
+<div class="overlay light" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🀄</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p class="text" data-i18n="stuckText"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="stuck-shuffle" data-i18n="shuffle"></button>
+      <button type="button" class="ghost" id="stuck-undo" data-i18n="undo"></button>
+      <button type="button" class="ghost" id="stuck-reset" data-i18n="restart"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const I18N = {
+    en: {
+      tagline: 'Match pairs of free tiles until the whole stack is cleared.',
+      rules: 'A tile is free when nothing lies on top of it and its left or right side is open. Any two flowers match each other, and so do any two seasons.',
+      keys: 'Keys: arrows + Enter to pick tiles · H hint · U undo · S shuffle',
+      time: 'Time', left: 'Tiles', pairs: 'Free pairs', undo: 'Undo', hint: 'Hint', shuffle: 'Shuffle', restart: 'Restart', menu: 'Layouts',
+      play: 'Play', resume: 'Continue', daily: 'Daily puzzle', dailyNew: 'A new layout every day', dailyDone: s => `Solved today · ${s}`,
+      layouts: 'Choose a layout', tilesN: n => `${n} tiles`, best: s => `Best ${s}`, noBest: 'Not played yet', dim: 'Dim blocked tiles',
+      won: 'Board cleared!', record: 'New best time!', result: (h, s) => `${h} hint${h === 1 ? '' : 's'} · ${s} shuffle${s === 1 ? '' : 's'}`,
+      starRule: tm => `★★★ = under ${tm}, no shuffles and at most 3 hints`,
+      next: 'Next layout', again: 'New deal', replay: 'Play again', toMenu: 'All layouts',
+      stuck: 'No more moves', stuckText: 'There are no free pairs left. Shuffle the remaining tiles or undo a few moves.',
+      full: 'Get Mochi Tiles on Google Play',
+      dealt: (name, n) => `${name}: ${n} tiles. Match the free pairs.`, matched: n => `Pair removed. ${n} tiles left.`, blocked: 'That tile is blocked.',
+      selected: name => `${name} selected.`, hintMsg: (a, b) => `Hint: ${a} and ${b}.`, shuffled: 'Tiles shuffled.', undone: 'Move undone.', restarted: 'Deal restarted.',
+      starsLabel: n => `${n} of 3 stars`, board: 'Mahjong board. Arrow keys move between free tiles, Enter or Space selects.', dailyName: name => `Daily · ${name}`,
+      dots: n => `${n} of Dots`, bamboo: n => `${n} of Bamboo`, chars: n => `${n} of Characters`,
+      winds: ['East wind', 'South wind', 'West wind', 'North wind'], dragons: ['Red dragon', 'Green dragon', 'White dragon'],
+      flowers: ['Plum flower', 'Orchid flower', 'Chrysanthemum flower', 'Bamboo flower'], seasons: ['Spring', 'Summer', 'Autumn', 'Winter'],
+      layoutNames: ['Garden', 'Dragon', 'Flower', 'Diamond', 'Crab', 'Arena', 'Bridge', 'Butterfly', 'Cross', 'Fortress', 'Pyramid', 'Twin Towers', 'Stairs', 'Turtle'],
+    },
+    vi: {
+      tagline: 'Ghép từng cặp quân đang mở cho đến khi dọn sạch cả chồng mạt chược.',
+      rules: 'Một quân được mở khi không có quân nào đè lên và còn trống bên trái hoặc bên phải. Hai quân Hoa bất kỳ ghép được với nhau, hai quân Mùa cũng vậy.',
+      keys: 'Phím: mũi tên + Enter để chọn quân · H gợi ý · U hoàn tác · S xáo trộn',
+      time: 'Thời gian', left: 'Còn lại', pairs: 'Cặp mở', undo: 'Hoàn tác', hint: 'Gợi ý', shuffle: 'Xáo trộn', restart: 'Chơi lại', menu: 'Bố cục',
+      play: 'Chơi', resume: 'Tiếp tục', daily: 'Thử thách hằng ngày', dailyNew: 'Mỗi ngày một bố cục mới', dailyDone: s => `Đã giải hôm nay · ${s}`,
+      layouts: 'Chọn bố cục', tilesN: n => `${n} quân`, best: s => `Kỷ lục ${s}`, noBest: 'Chưa chơi', dim: 'Làm mờ quân bị chặn',
+      won: 'Dọn sạch bàn!', record: 'Kỷ lục thời gian mới!', result: (h, s) => `${h} gợi ý · ${s} lần xáo trộn`,
+      starRule: tm => `★★★ = dưới ${tm}, không xáo trộn và tối đa 3 gợi ý`,
+      next: 'Bố cục tiếp theo', again: 'Ván mới', replay: 'Chơi lại', toMenu: 'Tất cả bố cục',
+      stuck: 'Hết nước đi', stuckText: 'Không còn cặp nào đang mở. Hãy xáo trộn các quân còn lại hoặc hoàn tác vài bước.',
+      full: 'Tải Mochi Tiles trên Google Play',
+      dealt: (name, n) => `${name}: ${n} quân. Hãy ghép các cặp đang mở.`, matched: n => `Đã ghép một cặp. Còn ${n} quân.`, blocked: 'Quân này đang bị chặn.',
+      selected: name => `Đã chọn ${name}.`, hintMsg: (a, b) => `Gợi ý: ${a} và ${b}.`, shuffled: 'Đã xáo trộn các quân.', undone: 'Đã hoàn tác.', restarted: 'Đã chơi lại ván này.',
+      starsLabel: n => `${n}/3 sao`, board: 'Bàn mạt chược. Dùng phím mũi tên để di chuyển giữa các quân đang mở, Enter hoặc Space để chọn.', dailyName: name => `Hằng ngày · ${name}`,
+      dots: n => `Đồng ${n}`, bamboo: n => `Điều ${n}`, chars: n => `Vạn ${n}`,
+      winds: ['Gió Đông', 'Gió Nam', 'Gió Tây', 'Gió Bắc'], dragons: ['Trung (đỏ)', 'Phát (xanh)', 'Bạch (trắng)'],
+      flowers: ['Hoa mai', 'Hoa lan', 'Hoa cúc', 'Hoa trúc'], seasons: ['Mùa xuân', 'Mùa hạ', 'Mùa thu', 'Mùa đông'],
+      layoutNames: ['Khu vườn', 'Rồng', 'Bông hoa', 'Kim cương', 'Con cua', 'Đấu trường', 'Cây cầu', 'Bươm bướm', 'Chữ thập', 'Pháo đài', 'Kim tự tháp', 'Tháp đôi', 'Bậc thang', 'Con rùa'],
+    },
+    zh: {
+      tagline: '两两消除可以拿取的相同牌，直到清空整座牌堆。',
+      rules: '一张牌上方没有压牌，并且左侧或右侧有一边空出时，才可以拿取。任意两张花牌可以配对，任意两张季节牌也可以配对。',
+      keys: '按键：方向键 + Enter 选牌 · H 提示 · U 撤销 · S 洗牌',
+      time: '时间', left: '剩余', pairs: '可配对', undo: '撤销', hint: '提示', shuffle: '洗牌', restart: '重新开始', menu: '牌阵',
+      play: '开始', resume: '继续', daily: '每日挑战', dailyNew: '每天一个新牌阵', dailyDone: s => `今日已完成 · ${s}`,
+      layouts: '选择牌阵', tilesN: n => `${n} 张牌`, best: s => `最佳 ${s}`, noBest: '尚未挑战', dim: '调暗不可拿取的牌',
+      won: '全部消除！', record: '刷新最佳用时！', result: (h, s) => `提示 ${h} 次 · 洗牌 ${s} 次`,
+      starRule: tm => `★★★：${tm} 内完成，不洗牌，提示不超过 3 次`,
+      next: '下一个牌阵', again: '重新发牌', replay: '再玩一次', toMenu: '全部牌阵',
+      stuck: '无牌可消', stuckText: '已经没有可以配对的牌了。把剩下的牌洗一洗，或者撤销几步。',
+      full: '在 Google Play 获取 Mochi Tiles',
+      dealt: (name, n) => `${name}：共 ${n} 张牌。请配对可以拿取的牌。`, matched: n => `消除一对，还剩 ${n} 张。`, blocked: '这张牌被挡住了。',
+      selected: name => `已选择${name}。`, hintMsg: (a, b) => `提示：${a} 和 ${b}。`, shuffled: '已洗牌。', undone: '已撤销。', restarted: '已重新开始本局。',
+      starsLabel: n => `${n} 星（满分 3 星）`, board: '麻将牌桌。用方向键在可拿取的牌之间移动，按 Enter 或空格键选择。', dailyName: name => `每日 · ${name}`,
+      dots: n => `${CN[n]}筒`, bamboo: n => `${CN[n]}条`, chars: n => `${CN[n]}万`,
+      winds: ['东风', '南风', '西风', '北风'], dragons: ['红中', '发财', '白板'],
+      flowers: ['梅', '兰', '菊', '竹'], seasons: ['春', '夏', '秋', '冬'],
+      layoutNames: ['花园', '长龙', '花朵', '钻石', '螃蟹', '竞技场', '长桥', '蝴蝶', '十字', '城堡', '金字塔', '双塔', '阶梯', '乌龟'],
+    },
+    fr: {
+      tagline: 'Associez les paires de tuiles libres jusqu’à vider toute la pile.',
+      rules: 'Une tuile est libre si rien n’est posé dessus et si son côté gauche ou droit est dégagé. Deux fleurs quelconques forment une paire, tout comme deux saisons.',
+      keys: 'Clavier : flèches + Entrée pour choisir · H indice · U annuler · S mélanger',
+      time: 'Temps', left: 'Tuiles', pairs: 'Paires libres', undo: 'Annuler', hint: 'Indice', shuffle: 'Mélanger', restart: 'Recommencer', menu: 'Dispositions',
+      play: 'Jouer', resume: 'Continuer', daily: 'Défi du jour', dailyNew: 'Une nouvelle disposition chaque jour', dailyDone: s => `Résolu aujourd’hui · ${s}`,
+      layouts: 'Choisissez une disposition', tilesN: n => `${n} tuiles`, best: s => `Record ${s}`, noBest: 'Pas encore joué', dim: 'Assombrir les tuiles bloquées',
+      won: 'Plateau vidé !', record: 'Nouveau meilleur temps !', result: (h, s) => `${h} indice${h > 1 ? 's' : ''} · ${s} mélange${s > 1 ? 's' : ''}`,
+      starRule: tm => `★★★ = moins de ${tm}, sans mélange et 3 indices au plus`,
+      next: 'Disposition suivante', again: 'Nouvelle donne', replay: 'Rejouer', toMenu: 'Toutes les dispositions',
+      stuck: 'Plus aucun coup', stuckText: 'Il ne reste aucune paire libre. Mélangez les tuiles restantes ou annulez quelques coups.',
+      full: 'Obtenir Mochi Tiles sur Google Play',
+      dealt: (name, n) => `${name} : ${n} tuiles. Associez les paires libres.`, matched: n => `Paire retirée. Encore ${n} tuiles.`, blocked: 'Cette tuile est bloquée.',
+      selected: name => `Sélection : ${name}.`, hintMsg: (a, b) => `Indice : ${a} et ${b}.`, shuffled: 'Tuiles mélangées.', undone: 'Coup annulé.', restarted: 'Donne recommencée.',
+      starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, board: 'Plateau de mahjong. Les flèches passent d’une tuile libre à l’autre, Entrée ou Espace sélectionne.', dailyName: name => `Du jour · ${name}`,
+      dots: n => `${n} de Cercles`, bamboo: n => `${n} de Bambous`, chars: n => `${n} de Caractères`,
+      winds: ['Vent d’est', 'Vent du sud', 'Vent d’ouest', 'Vent du nord'], dragons: ['Dragon rouge', 'Dragon vert', 'Dragon blanc'],
+      flowers: ['Fleur de prunier', 'Orchidée', 'Chrysanthème', 'Fleur de bambou'], seasons: ['Printemps', 'Été', 'Automne', 'Hiver'],
+      layoutNames: ['Jardin', 'Dragon', 'Fleur', 'Diamant', 'Crabe', 'Arène', 'Pont', 'Papillon', 'Croix', 'Forteresse', 'Pyramide', 'Tours jumelles', 'Escalier', 'Tortue'],
+    },
+    th: {
+      tagline: 'จับคู่ไพ่ที่ว่างทีละคู่ จนเคลียร์กองไพ่นกกระจอกได้หมด',
+      rules: 'ไพ่จะว่างเมื่อไม่มีไพ่ใบอื่นทับอยู่ และด้านซ้ายหรือขวาเปิดโล่ง ไพ่ดอกไม้สองใบใดก็จับคู่กันได้ ไพ่ฤดูกาลก็เช่นกัน',
+      keys: 'ปุ่ม: ลูกศร + Enter เพื่อเลือกไพ่ · H คำใบ้ · U ย้อนกลับ · S สับไพ่',
+      time: 'เวลา', left: 'เหลือ', pairs: 'คู่ที่จับได้', undo: 'ย้อนกลับ', hint: 'คำใบ้', shuffle: 'สับไพ่', restart: 'เริ่มใหม่', menu: 'รูปแบบ',
+      play: 'เล่น', resume: 'เล่นต่อ', daily: 'โจทย์ประจำวัน', dailyNew: 'รูปแบบใหม่ทุกวัน', dailyDone: s => `วันนี้ผ่านแล้ว · ${s}`,
+      layouts: 'เลือกรูปแบบ', tilesN: n => `${n} ใบ`, best: s => `ดีที่สุด ${s}`, noBest: 'ยังไม่เคยเล่น', dim: 'หรี่ไพ่ที่ถูกบัง',
+      won: 'เคลียร์กระดานแล้ว!', record: 'ทำเวลาดีที่สุดใหม่!', result: (h, s) => `คำใบ้ ${h} ครั้ง · สับไพ่ ${s} ครั้ง`,
+      starRule: tm => `★★★ = ภายใน ${tm} ไม่สับไพ่ และใช้คำใบ้ไม่เกิน 3 ครั้ง`,
+      next: 'รูปแบบถัดไป', again: 'แจกไพ่ใหม่', replay: 'เล่นอีกครั้ง', toMenu: 'รูปแบบทั้งหมด',
+      stuck: 'ไม่มีคู่ให้เลือกแล้ว', stuckText: 'ไม่มีไพ่คู่ที่ว่างเหลืออยู่ ลองสับไพ่ที่เหลือหรือย้อนกลับสักสองสามตา',
+      full: 'ดาวน์โหลด Mochi Tiles บน Google Play',
+      dealt: (name, n) => `${name}: ${n} ใบ จับคู่ไพ่ที่ว่าง`, matched: n => `จับคู่แล้ว เหลือ ${n} ใบ`, blocked: 'ไพ่ใบนี้ถูกบังอยู่',
+      selected: name => `เลือก ${name}`, hintMsg: (a, b) => `คำใบ้: ${a} กับ ${b}`, shuffled: 'สับไพ่แล้ว', undone: 'ย้อนกลับแล้ว', restarted: 'เริ่มกระดานนี้ใหม่แล้ว',
+      starsLabel: n => `${n} จาก 3 ดาว`, board: 'กระดานไพ่นกกระจอก ใช้ปุ่มลูกศรเลื่อนไปยังไพ่ที่ว่าง กด Enter หรือ Space เพื่อเลือก', dailyName: name => `ประจำวัน · ${name}`,
+      dots: n => `วงกลม ${n}`, bamboo: n => `ไม้ไผ่ ${n}`, chars: n => `ตัวอักษร ${n}`,
+      winds: ['ลมตะวันออก', 'ลมใต้', 'ลมตะวันตก', 'ลมเหนือ'], dragons: ['มังกรแดง', 'มังกรเขียว', 'มังกรขาว'],
+      flowers: ['ดอกเหมย', 'ดอกกล้วยไม้', 'ดอกเบญจมาศ', 'ดอกไผ่'], seasons: ['ฤดูใบไม้ผลิ', 'ฤดูร้อน', 'ฤดูใบไม้ร่วง', 'ฤดูหนาว'],
+      layoutNames: ['สวน', 'มังกร', 'ดอกไม้', 'เพชร', 'ปู', 'สนามประลอง', 'สะพาน', 'ผีเสื้อ', 'กากบาท', 'ป้อมปราการ', 'พีระมิด', 'หอคอยคู่', 'บันได', 'เต่า'],
+    },
+    ja: {
+      tagline: '取れる牌を2枚ずつそろえて、山をすべて崩そう。',
+      rules: '上に牌が重なっておらず、左右どちらかが空いている牌だけ取れます。花牌どうし、季節牌どうしはどれでもペアになります。',
+      keys: 'キー操作：矢印 + Enter で牌を選択 · H ヒント · U 戻す · S シャッフル',
+      time: '時間', left: '残り', pairs: '取れる組', undo: '戻す', hint: 'ヒント', shuffle: 'シャッフル', restart: 'やり直し', menu: '配置',
+      play: 'プレイ', resume: '続ける', daily: '今日のパズル', dailyNew: '毎日新しい配置', dailyDone: s => `今日はクリア済み · ${s}`,
+      layouts: '配置を選ぶ', tilesN: n => `${n}枚`, best: s => `ベスト ${s}`, noBest: '未プレイ', dim: '取れない牌を暗くする',
+      won: 'すべてクリア！', record: 'ベストタイム更新！', result: (h, s) => `ヒント${h}回 · シャッフル${s}回`,
+      starRule: tm => `★★★：${tm}以内、シャッフルなし、ヒント3回まで`,
+      next: '次の配置', again: '新しく配る', replay: 'もう一度', toMenu: '配置一覧',
+      stuck: '取れる牌がありません', stuckText: '取れるペアが残っていません。残りの牌をシャッフルするか、何手か戻しましょう。',
+      full: 'Google Play で Mochi Tiles を入手',
+      dealt: (name, n) => `${name}：${n}枚。取れる牌をペアにしよう。`, matched: n => `ペアを取りました。残り${n}枚。`, blocked: 'この牌はまだ取れません。',
+      selected: name => `${name}を選択。`, hintMsg: (a, b) => `ヒント：${a}と${b}。`, shuffled: 'シャッフルしました。', undone: '1手戻しました。', restarted: '最初からやり直します。',
+      starsLabel: n => `星${n}つ（3つ中）`, board: '麻雀牌の盤面。矢印キーで取れる牌を移動し、Enter かスペースで選択します。', dailyName: name => `今日 · ${name}`,
+      dots: n => `${CN[n]}筒`, bamboo: n => `${CN[n]}索`, chars: n => `${CN[n]}萬`,
+      winds: ['東', '南', '西', '北'], dragons: ['中', '發', '白'],
+      flowers: ['梅', '蘭', '菊', '竹'], seasons: ['春', '夏', '秋', '冬'],
+      layoutNames: ['庭園', 'ドラゴン', '花', 'ダイヤ', 'カニ', 'アリーナ', '橋', 'チョウ', '十字', '要塞', 'ピラミッド', 'ツインタワー', '階段', 'カメ'],
+    },
+    ko: {
+      tagline: '열린 패를 두 장씩 짝지어 패 더미를 모두 없애세요.',
+      rules: '위에 다른 패가 없고 왼쪽이나 오른쪽이 비어 있는 패만 고를 수 있어요. 꽃패끼리, 계절패끼리는 어떤 것이든 짝이 됩니다.',
+      keys: '키: 화살표 + Enter로 패 선택 · H 힌트 · U 되돌리기 · S 섞기',
+      time: '시간', left: '남은 패', pairs: '가능한 짝', undo: '되돌리기', hint: '힌트', shuffle: '섞기', restart: '다시 시작', menu: '배치',
+      play: '시작', resume: '계속하기', daily: '오늘의 퍼즐', dailyNew: '매일 새로운 배치', dailyDone: s => `오늘 완료 · ${s}`,
+      layouts: '배치 선택', tilesN: n => `패 ${n}장`, best: s => `최고 ${s}`, noBest: '기록 없음', dim: '막힌 패 어둡게 표시',
+      won: '판을 모두 비웠어요!', record: '최고 기록 경신!', result: (h, s) => `힌트 ${h}회 · 섞기 ${s}회`,
+      starRule: tm => `★★★ = ${tm} 이내, 섞기 없이, 힌트 3회 이하`,
+      next: '다음 배치', again: '새 판', replay: '다시 하기', toMenu: '전체 배치',
+      stuck: '더 이상 짝이 없어요', stuckText: '짝지을 수 있는 열린 패가 없어요. 남은 패를 섞거나 몇 수 되돌려 보세요.',
+      full: 'Google Play에서 Mochi Tiles 받기',
+      dealt: (name, n) => `${name}: 패 ${n}장. 열린 패를 짝지어 보세요.`, matched: n => `한 쌍을 없앴어요. ${n}장 남음.`, blocked: '이 패는 막혀 있어요.',
+      selected: name => `${name} 선택됨.`, hintMsg: (a, b) => `힌트: ${a} · ${b}`, shuffled: '패를 섞었어요.', undone: '한 수 되돌렸어요.', restarted: '이 판을 처음부터 다시 시작해요.',
+      starsLabel: n => `별 3개 중 ${n}개`, board: '마작 판. 화살표 키로 열린 패 사이를 이동하고 Enter나 Space로 선택하세요.', dailyName: name => `오늘 · ${name}`,
+      dots: n => `${n}통`, bamboo: n => `${n}삭`, chars: n => `${n}만`,
+      winds: ['동풍', '남풍', '서풍', '북풍'], dragons: ['중', '발', '백'],
+      flowers: ['매화', '난초', '국화', '대나무'], seasons: ['봄', '여름', '가을', '겨울'],
+      layoutNames: ['정원', '용', '꽃', '다이아몬드', '게', '경기장', '다리', '나비', '십자가', '요새', '피라미드', '쌍둥이 탑', '계단', '거북'],
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    app: $('app'), stage: $('stage'), canvas: $('board'), toast: $('toast'), announcer: $('announcer'), layoutName: $('layout-name'),
+    time: $('time'), left: $('left'), pairs: $('pairs'), pairsStat: $('pairs-stat'), bar: $('bar'),
+    undo: $('undo'), hint: $('hint'), shuffle: $('shuffle'), restart: $('reset'), menu: $('menu'),
+    start: $('start'), play: $('play'), playLabel: $('play-label'), playSub: $('play-sub'), daily: $('daily'), dailySub: $('daily-sub'), layouts: $('layouts'), dim: $('dim'),
+    win: $('win'), winStars: $('win-stars'), winTime: $('win-time'), winDetail: $('win-detail'), winRecord: $('win-record'), winRule: $('win-rule'), next: $('next'), again: $('again'), toMenu: $('to-menu'),
+    stuck: $('stuck'), stuckShuffle: $('stuck-shuffle'), stuckUndo: $('stuck-undo'), stuckRestart: $('stuck-reset'),
+  };
+  const ctx = els.canvas.getContext('2d');
+  const STORE = { stats: 'milaan.mahjong.stats', daily: 'milaan.mahjong.daily', save: 'milaan.mahjong.save', dim: 'milaan.mahjong.dim', last: 'milaan.mahjong.last' };
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+  const remove = key => { try { localStorage.removeItem(key); } catch {} };
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6d2b79f5) >>> 0; let x = Math.imul(a ^ (a >>> 15), a | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+  const hashStr = s => { let h = 2166136261; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const shuffleArr = (list, rng) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const fmt = ms => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`; };
+  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+  // ---- Layouts (tile units; .5 steps allowed). A tile covers 1×1 at layer z. ----
+  const R = (x, y, w, h, z) => { const out = []; for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push([x + i, y + j, z]); return out; };
+  const P = (x, y, z) => [[x, y, z]];
+  const LAYOUTS = [
+    { id: 'garden', cells: () => [...R(0, 0, 6, 4, 0), ...R(1, 0.5, 4, 3, 1)] },
+    { id: 'dragon', cells: () => [...P(-1, 0.5, 0), ...R(0, 0, 4, 2, 0), ...R(3, 2, 3, 2, 0), ...R(5, 4, 4, 2, 0), ...R(8, 2, 3, 2, 0), ...R(10, 0, 4, 2, 0),
+      ...R(0.5, 0.5, 3, 1, 1), ...R(3.5, 2.5, 2, 1, 1), ...R(5.5, 4.5, 3, 1, 1), ...R(8.5, 2.5, 2, 1, 1), ...R(10.5, 0.5, 3, 1, 1),
+      ...R(1, 0.5, 2, 1, 2), ...R(6, 4.5, 2, 1, 2), ...R(11, 0.5, 2, 1, 2)] },
+    { id: 'flower', cells: () => [...R(4, 2, 4, 4, 0), ...R(5, 0, 2, 2, 0), ...R(5, 6, 2, 2, 0), ...R(1, 3, 3, 2, 0), ...R(8, 3, 3, 2, 0),
+      ...R(2, 0.5, 2, 2, 0), ...R(8, 0.5, 2, 2, 0), ...R(2, 5.5, 2, 2, 0), ...R(8, 5.5, 2, 2, 0),
+      ...R(4.5, 2.5, 3, 3, 1), ...R(1.5, 3.5, 2, 1, 1), ...R(8.5, 3.5, 2, 1, 1), ...P(5.5, 0.5, 1), ...P(5.5, 6.5, 1), ...R(5, 3, 2, 2, 2), ...P(5.5, 3.5, 3)] },
+    { id: 'diamond', cells: () => [
+      ...[4, 6, 8, 10, 8, 6, 4].flatMap((w, j) => R((10 - w) / 2, j, w, 1, 0)),
+      ...[2, 4, 6, 4, 2].flatMap((w, j) => R((10 - w) / 2, j + 1, w, 1, 1)),
+      ...[2, 4, 2].flatMap((w, j) => R((10 - w) / 2, j + 2, w, 1, 2)), ...R(4, 3, 2, 1, 3)] },
+    { id: 'crab', cells: () => [...R(3, 2, 6, 4, 0), ...R(0, 0, 3, 2, 0), ...R(9, 0, 3, 2, 0), ...R(0, 3, 2, 1, 0), ...R(0, 4.5, 2, 1, 0), ...R(10, 3, 2, 1, 0), ...R(10, 4.5, 2, 1, 0), ...P(4, 1, 0), ...P(7, 1, 0),
+      ...R(3.5, 2.5, 5, 3, 1), ...R(0.5, 0.5, 2, 1, 1), ...R(9.5, 0.5, 2, 1, 1), ...R(4.5, 3, 3, 2, 2), ...R(5, 3.5, 2, 1, 3), ...P(5.5, 3.5, 4)] },
+    { id: 'arena', cells: () => [...R(2, 0, 8, 1, 0), ...R(2, 6, 8, 1, 0), ...R(1, 1, 2, 1, 0), ...R(9, 1, 2, 1, 0), ...R(1, 5, 2, 1, 0), ...R(9, 5, 2, 1, 0), ...R(0, 2, 2, 3, 0), ...R(10, 2, 2, 3, 0), ...R(4, 2, 4, 3, 0),
+      ...R(3, 0, 6, 1, 1), ...R(3, 6, 6, 1, 1), ...R(0, 2, 1, 3, 1), ...R(11, 2, 1, 3, 1), ...R(4.5, 2.5, 3, 2, 1), ...R(4, 0, 4, 1, 2), ...R(4, 6, 4, 1, 2), ...R(5, 3, 2, 1, 2)] },
+    { id: 'bridge', cells: () => [...R(0, 0, 3, 6, 0), ...R(10, 0, 3, 6, 0), ...R(3, 2, 7, 2, 0), ...R(0.5, 0.5, 2, 5, 1), ...R(10.5, 0.5, 2, 5, 1), ...R(3, 2.5, 7, 1, 1),
+      ...R(1, 1.5, 1, 3, 2), ...R(11, 1.5, 1, 3, 2), ...R(4, 2.5, 5, 1, 2)] },
+    { id: 'butterfly', cells: () => [...R(0, 0, 5, 3, 0), ...R(0.5, 3, 4, 3, 0), ...R(7, 0, 5, 3, 0), ...R(7.5, 3, 4, 3, 0), ...R(5, 0.5, 2, 6, 0),
+      ...R(1, 0.5, 3, 2, 1), ...R(1.5, 3.5, 2, 2, 1), ...R(8, 0.5, 3, 2, 1), ...R(8.5, 3.5, 2, 2, 1), ...R(5.5, 1, 1, 5, 1),
+      ...R(1.5, 1, 2, 1, 2), ...R(8.5, 1, 2, 1, 2), ...R(5.5, 1.5, 1, 4, 2), ...P(5.5, 3, 3)] },
+    { id: 'cross', cells: () => [...R(4, 0, 4, 8, 0), ...R(0, 2, 4, 4, 0), ...R(8, 2, 4, 4, 0), ...R(1, 3, 10, 2, 1), ...R(5, 1, 2, 2, 1), ...R(5, 5, 2, 2, 1),
+      ...R(3, 3, 6, 2, 2), ...R(5, 2, 2, 1, 2), ...R(5, 5, 2, 1, 2), ...R(5, 3, 2, 2, 3)] },
+    { id: 'fortress', cells: () => [...R(0, 0, 12, 2, 0), ...R(0, 5, 12, 2, 0), ...R(0, 2, 2, 3, 0), ...R(10, 2, 2, 3, 0), ...R(4, 2.5, 4, 2, 0),
+      ...R(0, 0, 2, 2, 1), ...R(10, 0, 2, 2, 1), ...R(0, 5, 2, 2, 1), ...R(10, 5, 2, 2, 1), ...R(3, 0, 6, 1, 1), ...R(3, 6, 6, 1, 1), ...R(4, 2.5, 4, 2, 1),
+      ...P(0.5, 0.5, 2), ...P(10.5, 0.5, 2), ...P(0.5, 5.5, 2), ...P(10.5, 5.5, 2), ...R(5, 3, 2, 1, 2), ...P(0.5, 0.5, 3), ...P(10.5, 0.5, 3), ...P(0.5, 5.5, 3), ...P(10.5, 5.5, 3)] },
+    { id: 'pyramid', cells: () => [...R(0, 0, 10, 6, 0), ...R(1, 1, 8, 4, 1), ...R(2, 1.5, 6, 3, 2), ...R(3, 2, 4, 2, 3), ...R(4, 2.5, 2, 1, 4)] },
+    { id: 'towers', cells: () => [...R(0, 0, 4, 6, 0), ...R(8, 0, 4, 6, 0), ...R(4, 2, 4, 2, 0), ...R(0.5, 0.5, 3, 5, 1), ...R(8.5, 0.5, 3, 5, 1), ...R(4, 2.5, 4, 1, 1),
+      ...R(1, 1, 2, 4, 2), ...R(9, 1, 2, 4, 2), ...R(1, 1.5, 2, 3, 3), ...R(9, 1.5, 2, 3, 3), ...R(1.5, 2, 1, 2, 4), ...R(9.5, 2, 1, 2, 4)] },
+    { id: 'stairs', cells: () => [...R(0, 0, 10, 5, 0), ...R(2, 0, 8, 5, 1), ...R(4, 0, 6, 5, 2), ...R(6, 0, 4, 5, 3)] },
+    { id: 'turtle', cells: () => [...R(1, 0, 12, 1, 0), ...R(3, 1, 8, 1, 0), ...R(2, 2, 10, 1, 0), ...R(1, 3, 12, 2, 0), ...R(2, 5, 10, 1, 0), ...R(3, 6, 8, 1, 0), ...R(1, 7, 12, 1, 0),
+      ...P(0, 3.5, 0), ...P(13, 3.5, 0), ...P(14, 3.5, 0), ...R(4, 1, 6, 6, 1), ...R(5, 2, 4, 4, 2), ...R(6, 3, 2, 2, 3), ...P(6.5, 3.5, 4)] },
+  ];
+  const prepared = new Map();
+
+  // Positions in half-tile units; neighbour lists make the "free tile" test cheap.
+  function prepare(index) {
+    if (prepared.has(index)) return prepared.get(index);
+    const def = LAYOUTS[index];
+    const raw = def.cells().map(([x, y, z]) => ({ x: Math.round(x * 2), y: Math.round(y * 2), z }));
+    const minX = Math.min(...raw.map(p => p.x)), minY = Math.min(...raw.map(p => p.y));
+    const pos = raw.map(p => ({ x: p.x - minX, y: p.y - minY, z: p.z }));
+    const n = pos.length, idx = [...pos.keys()];
+    const overlaps = (a, b) => Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2;
+    const L = {
+      index, id: def.id, pos, n,
+      left: pos.map(p => idx.filter(j => pos[j].z === p.z && pos[j].x === p.x - 2 && Math.abs(pos[j].y - p.y) < 2)),
+      right: pos.map(p => idx.filter(j => pos[j].z === p.z && pos[j].x === p.x + 2 && Math.abs(pos[j].y - p.y) < 2)),
+      above: pos.map(p => idx.filter(j => pos[j].z > p.z && overlaps(pos[j], p))),
+      below: pos.map(p => pos.filter(q => q.z < p.z && overlaps(q, p)).length),
+      spanX: Math.max(...pos.map(p => p.x)) + 2, spanY: Math.max(...pos.map(p => p.y)) + 2, maxZ: Math.max(...pos.map(p => p.z)),
+    };
+    // Back-to-front: lower layers first, then from top-right towards the viewer at the bottom-left.
+    L.order = idx.slice().sort((a, b) => pos[a].z - pos[b].z || (pos[a].y - pos[a].x) - (pos[b].y - pos[b].x) || pos[a].y - pos[b].y);
+    L.rank = new Int32Array(n); L.order.forEach((i, r) => { L.rank[i] = r; });
+    prepared.set(index, L);
+    return L;
+  }
+
+  // ---- Tiles: 0–8 dots, 9–17 bamboo, 18–26 characters, 27–30 winds, 31–33 dragons, 34–37 flowers, 38–41 seasons ----
+  const groupOf = k => (k < 34 ? k : k < 38 ? 34 : 38);
+  function tileName(k) {
+    if (k < 9) return t.dots(k + 1);
+    if (k < 18) return t.bamboo(k - 8);
+    if (k < 27) return t.chars(k - 17);
+    if (k < 31) return t.winds[k - 27];
+    if (k < 34) return t.dragons[k - 31];
+    if (k < 38) return t.flowers[k - 34];
+    return t.seasons[k - 38];
+  }
+
+  // Whole sets of four first, so smaller layouts still feel like real mahjong.
+  function pairPool(count, rng) {
+    const groups = [];
+    for (let k = 0; k < 34; k++) groups.push([[k, k], [k, k]]);
+    const fl = shuffleArr([34, 35, 36, 37], rng), se = shuffleArr([38, 39, 40, 41], rng);
+    groups.push([[fl[0], fl[1]], [fl[2], fl[3]]], [[se[0], se[1]], [se[2], se[3]]]);
+    shuffleArr(groups, rng);
+    const pairs = [];
+    for (const g of groups) for (const p of g) if (pairs.length < count) pairs.push(p);
+    return pairs;
+  }
+
+  // Reverse placement: repeatedly take two tiles that are free at the same moment. Playing those pairs in
+  // that order always clears the board, so every deal (and every successful shuffle) is solvable.
+  function removalPlan(L, alive, rng) {
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const live = alive.slice(); let count = live.reduce((a, b) => a + b, 0); const plan = [];
+      const isFree = i => !L.above[i].some(j => live[j]) && (!L.left[i].some(j => live[j]) || !L.right[i].some(j => live[j]));
+      const pick = list => {
+        const w = list.map(i => (L.below[i] + 1) ** 2); let r = rng() * w.reduce((a, b) => a + b, 0);
+        for (let k = 0; k < list.length; k++) { r -= w[k]; if (r <= 0) return list[k]; }
+        return list[list.length - 1];
+      };
+      while (count) {
+        const free = []; for (let i = 0; i < L.n; i++) if (live[i] && isFree(i)) free.push(i);
+        if (free.length < 2) break;
+        const a = pick(free), b = pick(free.filter(i => i !== a));
+        live[a] = live[b] = 0; count -= 2; plan.push([a, b]);
+      }
+      if (!count) return plan;
+    }
+    return null;
+  }
+
+  function deal(L, rng) {
+    const plan = removalPlan(L, new Uint8Array(L.n).fill(1), rng);
+    const pairs = pairPool(L.n / 2, rng), faces = new Array(L.n).fill(0);
+    plan.forEach(([a, b], i) => { const [f1, f2] = pairs[i]; const flip = rng() < 0.5; faces[a] = flip ? f2 : f1; faces[b] = flip ? f1 : f2; });
+    return { faces, plan };
+  }
+
+  // ---- Game state ----
+  let G = null;
+  let dimBlocked = read(STORE.dim, true) !== false;
+  let keyboardMode = false;
+  const par = n => n * 4000;
+
+  function makeGame(index, faces, daily) {
+    const L = prepare(index);
+    return { L, daily, init: faces.slice(), faces: faces.slice(), alive: new Uint8Array(L.n).fill(1), free: new Uint8Array(L.n), left: L.n, pairCount: 0, hist: [], sel: -1, hint: null, hintAt: 0, cursor: -1, elapsed: 0, started: false, over: false, hints: 0, shuffles: 0, dealAt: performance.now(), plan: null, fx: [], shake: null };
+  }
+
+  function dailyIndex(key) {
+    const pool = LAYOUTS.map((_, i) => i).filter(i => prepare(i).n >= 72);
+    return pool[hashStr('layout-' + key) % pool.length];
+  }
+
+  function newGame(index, daily = null) {
+    const L = prepare(index);
+    const rng = mulberry32(daily ? hashStr('mahjong-' + daily) : (Math.random() * 4294967296) >>> 0);
+    const { faces, plan } = deal(L, rng);
+    G = makeGame(index, faces, daily);
+    G.plan = plan; G.plan0 = plan;
+    write(STORE.last, L.id);
+    afterDeal();
+    els.announcer.textContent = t.dealt(layoutTitle(), L.n);
+  }
+
+  function restartGame() {
+    if (!G) return;
+    const { L, init, daily, plan0 } = G;
+    G = makeGame(L.index, init, daily);
+    G.plan = G.plan0 = plan0;
+    afterDeal();
+    els.announcer.textContent = t.restarted;
+  }
+
+  function afterDeal() {
+    hideOverlays();
+    refreshState();
+    layoutView();
+    saveGame();
+    requestDraw();
+  }
+
+  const layoutTitle = () => (G.daily ? t.dailyName(t.layoutNames[G.L.index]) : t.layoutNames[G.L.index]);
+
+  function isFree(i) {
+    const { L, alive } = G;
+    return !L.above[i].some(j => alive[j]) && (!L.left[i].some(j => alive[j]) || !L.right[i].some(j => alive[j]));
+  }
+
+  function freeByGroup() {
+    const groups = new Map();
+    for (let i = 0; i < G.L.n; i++) if (G.alive[i] && G.free[i]) { const g = groupOf(G.faces[i]); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); }
+    return groups;
+  }
+
+  function refreshState() {
+    for (let i = 0; i < G.L.n; i++) G.free[i] = G.alive[i] && isFree(i) ? 1 : 0;
+    let pairs = 0;
+    for (const list of freeByGroup().values()) pairs += list.length * (list.length - 1) / 2;
+    G.pairCount = pairs;
+    if (G.cursor >= 0 && !(G.alive[G.cursor] && G.free[G.cursor])) G.cursor = nearestFree(G.cursor);
+    updateHud();
+  }
+
+  function updateHud() {
+    els.left.textContent = String(G.left);
+    els.pairs.textContent = String(G.pairCount);
+    els.pairsStat.classList.toggle('warn', G.left > 0 && G.pairCount <= 1);
+    els.bar.style.width = `${(1 - G.left / G.L.n) * 100}%`;
+    els.layoutName.textContent = `${layoutTitle()} · ${t.tilesN(G.L.n)}`;
+    els.undo.disabled = !G.hist.length || G.over;
+    els.hint.disabled = els.shuffle.disabled = G.over || !G.left;
+    renderTime();
+  }
+
+  function renderTime() { els.time.textContent = fmt(G ? G.elapsed : 0); }
+
+  // ---- Moves ----
+  function onTile(i) {
+    if (!G || G.over || overlayOpen()) return;
+    G.started = true;
+    if (!G.free[i]) {
+      G.shake = { i, at: performance.now() };
+      toast(t.blocked);
+      els.announcer.textContent = t.blocked;
+      requestDraw();
+      return;
+    }
+    if (G.sel === i) { G.sel = -1; requestDraw(); return; }
+    if (G.sel >= 0 && groupOf(G.faces[G.sel]) === groupOf(G.faces[i])) { removePair(G.sel, i); return; }
+    G.sel = i;
+    els.announcer.textContent = t.selected(tileName(G.faces[i]));
+    requestDraw();
+  }
+
+  function removePair(a, b) {
+    const now = performance.now();
+    for (const i of [a, b]) { G.alive[i] = 0; G.fx.push({ type: 'vanish', i, face: G.faces[i], at: now }); burst(i, now); }
+    G.left -= 2;
+    G.hist.push([a, b]);
+    G.sel = -1; G.hint = null;
+    if (G.plan) G.plan = G.plan[0] && ((G.plan[0][0] === a && G.plan[0][1] === b) || (G.plan[0][0] === b && G.plan[0][1] === a)) ? G.plan.slice(1) : null;
+    refreshState();
+    saveGame();
+    requestDraw();
+    if (!G.left) return win();
+    els.announcer.textContent = t.matched(G.left);
+    if (!G.pairCount) setTimeout(() => { if (G && !G.over && !G.pairCount && !overlayOpen()) showStuck(); }, reducedMotion.matches ? 0 : 420);
+  }
+
+  function undo() {
+    if (!G || G.over || !G.hist.length) return;
+    const step = G.hist.pop();
+    if (Array.isArray(step)) { for (const i of step) G.alive[i] = 1; G.left += 2; }
+    else G.faces = step.faces;
+    G.plan = null; G.sel = -1; G.hint = null; G.fx = [];
+    els.stuck.hidden = true;
+    refreshState();
+    saveGame();
+    requestDraw();
+    els.announcer.textContent = t.undone;
+    toast(t.undone);
+  }
+
+  function shuffleTiles() {
+    if (!G || G.over || G.left < 2) return;
+    G.started = true;
+    const live = []; for (let i = 0; i < G.L.n; i++) if (G.alive[i]) live.push(i);
+    const rng = Math.random;
+    const byGroup = new Map();
+    for (const i of live) { const f = G.faces[i], g = groupOf(f); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(f); }
+    const pairs = [];
+    for (const list of byGroup.values()) { shuffleArr(list, rng); for (let k = 0; k + 1 < list.length; k += 2) pairs.push([list[k], list[k + 1]]); }
+    shuffleArr(pairs, rng);
+    G.hist.push({ faces: G.faces.slice() });
+    const plan = removalPlan(G.L, G.alive, rng);
+    const faces = G.faces.slice();
+    if (plan) plan.forEach(([a, b], k) => { faces[a] = pairs[k][0]; faces[b] = pairs[k][1]; });
+    else { const pool = shuffleArr(live.map(i => G.faces[i]), rng); live.forEach((i, k) => { faces[i] = pool[k]; }); }
+    G.faces = faces; G.plan = plan; G.shuffles += 1; G.sel = -1; G.hint = null;
+    G.fx.push({ type: 'shuffle', at: performance.now() });
+    els.stuck.hidden = true;
+    refreshState();
+    saveGame();
+    requestDraw();
+    els.announcer.textContent = t.shuffled;
+    toast(t.shuffled);
+    if (!G.pairCount) setTimeout(() => { if (G && !G.over && !G.pairCount && !overlayOpen()) showStuck(); }, 500);
+  }
+
+  // Hint: a pair that keeps the board solvable when a short search can prove it, otherwise the best-looking pair.
+  function candidateMoves(alive, free, faces, L) {
+    const groups = new Map(), remain = new Map();
+    for (let i = 0; i < L.n; i++) {
+      if (!alive[i]) continue;
+      const g = groupOf(faces[i]);
+      remain.set(g, (remain.get(g) || 0) + 1);
+      if (free[i]) { if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); }
+    }
+    const moves = [];
+    for (const [g, list] of groups) {
+      if (list.length < 2) continue;
+      const all = list.length === remain.get(g);
+      if (all && list.length % 2 === 0) { moves.push({ a: list[0], b: list[1], score: 1000 }); continue; }
+      for (let x = 0; x < list.length; x++) for (let y = x + 1; y < list.length; y++) {
+        const a = list[x], b = list[y];
+        const unblock = L.below[a] + L.below[b] + (L.left[a].length + L.right[a].length + L.left[b].length + L.right[b].length) * 0.5;
+        moves.push({ a, b, score: unblock * 10 + L.pos[a].z + L.pos[b].z });
+      }
+    }
+    return moves.sort((m, n) => n.score - m.score);
+  }
+
+  function searchHint(budget) {
+    const L = G.L, alive = G.alive.slice(), faces = G.faces;
+    const free = new Uint8Array(L.n);
+    const freeOf = i => !L.above[i].some(j => alive[j]) && (!L.left[i].some(j => alive[j]) || !L.right[i].some(j => alive[j]));
+    const dead = new Set();
+    let nodes = 0;
+    const solve = count => {
+      if (!count) return true;
+      if (++nodes > budget) throw new Error('budget');
+      const key = alive.join('');
+      if (dead.has(key)) return false;
+      for (let i = 0; i < L.n; i++) free[i] = alive[i] && freeOf(i) ? 1 : 0;
+      for (const m of candidateMoves(alive, free, faces, L)) {
+        alive[m.a] = alive[m.b] = 0;
+        const ok = solve(count - 2);
+        alive[m.a] = alive[m.b] = 1;
+        if (ok) return true;
+      }
+      dead.add(key);
+      return false;
+    };
+    try {
+      for (let i = 0; i < L.n; i++) free[i] = alive[i] && freeOf(i) ? 1 : 0;
+      for (const m of candidateMoves(alive, free.slice(), faces, L)) {
+        alive[m.a] = alive[m.b] = 0;
+        const ok = solve(G.left - 2);
+        alive[m.a] = alive[m.b] = 1;
+        if (ok) return m;
+      }
+    } catch { /* search budget exhausted */ }
+    return null;
+  }
+
+  function showHint() {
+    if (!G || G.over || !G.left) return;
+    if (!G.pairCount) { showStuck(); return; }
+    let move = null;
+    if (G.plan && G.plan.length) { const [a, b] = G.plan[0]; move = { a, b }; }
+    if (!move) move = searchHint(G.left > 90 ? 1500 : 4000);
+    if (!move) move = candidateMoves(G.alive, G.free, G.faces, G.L)[0];
+    G.started = true;
+    G.hints += 1;
+    G.hint = [move.a, move.b]; G.hintAt = performance.now(); G.sel = -1;
+    saveGame();
+    els.announcer.textContent = t.hintMsg(tileName(G.faces[move.a]), tileName(G.faces[move.b]));
+    requestDraw();
+  }
+
+  function stars() {
+    let s = 3;
+    if (G.elapsed > par(G.L.n)) s -= 1;
+    if (G.shuffles > 0) s -= 1;
+    if (G.hints > 3) s -= 1;
+    return Math.max(1, s);
+  }
+
+  function win() {
+    G.over = true;
+    const s = stars(), time = G.elapsed;
+    let record = false;
+    if (G.daily) {
+      const days = read(STORE.daily, {});
+      const prev = days[G.daily];
+      record = !prev || time < prev.best;
+      days[G.daily] = { best: record ? time : prev.best, stars: Math.max(s, prev ? prev.stars : 0) };
+      const keys = Object.keys(days).sort();
+      while (keys.length > 60) delete days[keys.shift()];
+      write(STORE.daily, days);
+    }
+    const stats = read(STORE.stats, {});
+    const st = stats[G.L.id] || { wins: 0, best: 0, stars: 0 };
+    if (!G.daily) record = !st.wins || time < st.best;
+    st.best = st.wins ? Math.min(st.best, time) : time; st.wins += 1; st.stars = Math.max(st.stars, s);
+    stats[G.L.id] = st;
+    write(STORE.stats, stats);
+    remove(STORE.save);
+    updateHud();
+    confetti();
+    els.winStars.innerHTML = [0, 1, 2].map(i => (i < s ? `<b style="--i:${i}">★</b>` : '☆')).join('');
+    els.winStars.setAttribute('aria-label', t.starsLabel(s));
+    els.winTime.textContent = fmt(time);
+    els.winDetail.textContent = t.result(G.hints, G.shuffles);
+    els.winRecord.hidden = !record;
+    els.winRule.textContent = t.starRule(fmt(par(G.L.n)));
+    els.again.textContent = G.daily ? t.replay : t.again;
+    els.announcer.textContent = `${t.won} ${fmt(time)}. ${t.starsLabel(s)}.`;
+    setTimeout(() => { if (G && G.over && !overlayOpen()) { els.win.hidden = false; els.next.focus({ preventScroll: true }); } }, reducedMotion.matches ? 200 : 900);
+  }
+
+  function showStuck() {
+    els.stuckUndo.disabled = !G.hist.length;
+    els.stuck.hidden = false;
+    els.announcer.textContent = `${t.stuck}. ${t.stuckText}`;
+    els.stuckShuffle.focus({ preventScroll: true });
+  }
+
+  // ---- Persistence of the game in progress ----
+  let saveTimer = 0;
+  function saveGame() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 300);
+  }
+  function saveNow() {
+    clearTimeout(saveTimer);
+    if (!G || G.over) return;
+    write(STORE.save, { v: 1, id: G.L.id, daily: G.daily, init: G.init, faces: G.faces, alive: Array.from(G.alive).join(''), hist: G.hist, elapsed: Math.round(G.elapsed), hints: G.hints, shuffles: G.shuffles, started: G.started });
+  }
+  function restoreGame() {
+    const s = read(STORE.save, null);
+    if (!s || s.v !== 1) return false;
+    const index = LAYOUTS.findIndex(l => l.id === s.id);
+    if (index < 0) return false;
+    const L = prepare(index);
+    if (!Array.isArray(s.faces) || s.faces.length !== L.n || !Array.isArray(s.init) || s.init.length !== L.n || typeof s.alive !== 'string' || s.alive.length !== L.n) return false;
+    G = makeGame(index, s.init, s.daily || null);
+    G.faces = s.faces.slice();
+    for (let i = 0; i < L.n; i++) G.alive[i] = s.alive[i] === '1' ? 1 : 0;
+    G.left = G.alive.reduce((a, b) => a + b, 0);
+    G.hist = Array.isArray(s.hist) ? s.hist : [];
+    G.elapsed = +s.elapsed || 0; G.hints = +s.hints || 0; G.shuffles = +s.shuffles || 0; G.started = !!s.started;
+    if (!G.left || G.left % 2) return false;
+    refreshState();
+    return true;
+  }
+
+  // ---- Rendering ----
+  const ASPECT = 1.32, DEPTH = 0.13;
+  const CJK = '"Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "Source Han Serif SC", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", serif';
+  const SANS = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const C = { blue: '#1f45a0', green: '#18864a', red: '#cf2f2f', ink: '#1d2b5c' };
+  const V = { dpr: 1, cw: 0, ch: 0, W: 0, H: 0, t: 0, fw: 0, fh: 0, r: 0, ox: 0, oy: 0, key: '', faces: [], body: null };
+
+  function rr(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+  }
+  const circle = (c, x, y, r, fill) => { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); };
+
+  function layoutView() {
+    const rect = els.stage.getBoundingClientRect();
+    V.dpr = Math.min(3, window.devicePixelRatio || 1);
+    V.cw = Math.max(1, Math.round(rect.width * V.dpr)); V.ch = Math.max(1, Math.round(rect.height * V.dpr));
+    if (els.canvas.width !== V.cw) els.canvas.width = V.cw;
+    if (els.canvas.height !== V.ch) els.canvas.height = V.ch;
+    if (!G) return;
+    const L = G.L, cols = L.spanX / 2, rows = L.spanY / 2, depth = DEPTH * (L.maxZ + 1);
+    const pad = 6 * V.dpr;
+    const W = Math.floor(Math.max(8, Math.min((V.cw - pad * 2) / (cols + depth), (V.ch - pad * 2) / (rows * ASPECT + depth), 112 * V.dpr)));
+    V.W = W; V.H = Math.round(W * ASPECT); V.t = Math.max(2, Math.round(W * DEPTH));
+    const gap = Math.max(1, Math.round(W * 0.035));
+    V.fw = W - gap; V.fh = V.H - gap; V.r = Math.max(2, Math.round(W * 0.13));
+    const bw = cols * W + V.t * (L.maxZ + 1), bh = rows * V.H + V.t * (L.maxZ + 1);
+    V.ox = Math.round((V.cw - bw) / 2); V.oy = Math.round((V.ch - bh) / 2) + V.t * L.maxZ;
+    const key = `${V.fw}x${V.fh}x${V.t}`;
+    if (key !== V.key) { V.key = key; buildSprites(); }
+  }
+
+  function facePos(i) {
+    const p = G.L.pos[i];
+    return [V.ox + p.x * V.W / 2 + V.t * (p.z + 1), V.oy + p.y * V.H / 2 - V.t * p.z];
+  }
+
+  function buildSprites() {
+    const { fw, fh, t, r } = V;
+    const pad = Math.ceil(t * 1.6) + 2;
+    const body = document.createElement('canvas');
+    body.width = fw + t + pad * 2; body.height = fh + t + pad * 2;
+    const b = body.getContext('2d');
+    b.save();
+    b.shadowColor = 'rgba(4, 8, 28, .5)'; b.shadowBlur = t * 1.3; b.shadowOffsetX = -t * 0.45; b.shadowOffsetY = t * 0.55;
+    b.fillStyle = '#0e5a44'; rr(b, pad, pad + t, fw, fh, r); b.fill();
+    b.restore();
+    for (let i = t; i >= 1; i--) {
+      const k = i / t;
+      b.fillStyle = k > 0.5 ? (k > 0.8 ? '#0f6248' : '#178a66') : (k > 0.3 ? '#d9cdae' : '#e8dec4');
+      rr(b, pad + t - i, pad + i, fw, fh, r); b.fill();
+    }
+    V.body = { c: body, pad };
+    V.faces = [];
+    for (let k = 0; k < 42; k++) V.faces.push(makeFace(k, fw, fh, r));
+  }
+
+  function makeFace(k, fw, fh, r) {
+    const c = document.createElement('canvas');
+    c.width = fw; c.height = fh;
+    const x = c.getContext('2d');
+    const grad = x.createLinearGradient(0, 0, fw * 0.4, fh);
+    const tint = k >= 38 ? ['#f6fbff', '#dfe9f4'] : k >= 34 ? ['#fff8f2', '#f5e0d5'] : ['#fffdf6', '#efe5cb'];
+    grad.addColorStop(0, tint[0]); grad.addColorStop(1, tint[1]);
+    rr(x, 0, 0, fw, fh, r); x.fillStyle = grad; x.fill();
+    x.lineWidth = Math.max(1, fw * 0.02); x.strokeStyle = 'rgba(120, 96, 50, .28)';
+    rr(x, x.lineWidth / 2, x.lineWidth / 2, fw - x.lineWidth, fh - x.lineWidth, r); x.stroke();
+    const s = Math.min(fw / 60, fh / 80) * 0.95;
+    x.save();
+    x.translate(fw / 2, fh / 2); x.scale(s, s); x.translate(-30, -40);
+    drawArt(x, k);
+    x.restore();
+    return c;
+  }
+
+  // ---- Tile artwork, drawn in a 60×80 box ----
+  function dot(x, cx, cy, r, col) {
+    circle(x, cx, cy, r, col);
+    circle(x, cx, cy, r * 0.7, '#fffaf0');
+    circle(x, cx, cy, r * 0.44, col);
+    circle(x, cx - r * 0.16, cy - r * 0.16, r * 0.14, 'rgba(255,255,255,.7)');
+  }
+  const DOTS = [
+    null,
+    [[30, 22, 11, 'g'], [30, 58, 11, 'b']],
+    [[15, 17, 9.5, 'b'], [30, 40, 9.5, 'r'], [45, 63, 9.5, 'g']],
+    [[17, 22, 10, 'b'], [43, 22, 10, 'g'], [17, 58, 10, 'g'], [43, 58, 10, 'b']],
+    [[16, 18, 9, 'b'], [44, 18, 9, 'g'], [30, 40, 9, 'r'], [16, 62, 9, 'g'], [44, 62, 9, 'b']],
+    [[18, 16, 8.6, 'g'], [42, 16, 8.6, 'g'], [18, 40, 8.6, 'r'], [42, 40, 8.6, 'r'], [18, 64, 8.6, 'r'], [42, 64, 8.6, 'r']],
+    [[13, 11, 6.8, 'g'], [30, 20, 6.8, 'g'], [47, 29, 6.8, 'g'], [19, 49, 7.8, 'r'], [41, 49, 7.8, 'r'], [19, 68, 7.8, 'r'], [41, 68, 7.8, 'r']],
+    [[18, 12, 7.6, 'b'], [42, 12, 7.6, 'b'], [18, 31, 7.6, 'b'], [42, 31, 7.6, 'b'], [18, 50, 7.6, 'b'], [42, 50, 7.6, 'b'], [18, 69, 7.6, 'b'], [42, 69, 7.6, 'b']],
+    [[13, 15, 7.6, 'b'], [30, 15, 7.6, 'b'], [47, 15, 7.6, 'b'], [13, 40, 7.6, 'r'], [30, 40, 7.6, 'r'], [47, 40, 7.6, 'r'], [13, 65, 7.6, 'g'], [30, 65, 7.6, 'g'], [47, 65, 7.6, 'g']],
+  ];
+  const COL = { b: C.blue, g: C.green, r: C.red };
+
+  function drawDots(x, n) {
+    if (n === 1) {
+      circle(x, 30, 40, 22, C.green); circle(x, 30, 40, 18.5, '#fffaf0');
+      for (let a = 0; a < 12; a++) { const ang = a / 12 * Math.PI * 2; circle(x, 30 + Math.cos(ang) * 14, 40 + Math.sin(ang) * 14, 2.6, a % 2 ? C.blue : C.red); }
+      circle(x, 30, 40, 9, C.red); circle(x, 30, 40, 5.5, '#fffaf0'); circle(x, 30, 40, 3, C.blue);
+      return;
+    }
+    for (const [cx, cy, r, c] of DOTS[n - 1]) dot(x, cx, cy, r, COL[c]);
+  }
+
+  function stick(x, cx, cy, len, col) {
+    const w = 7.5, top = cy - len / 2;
+    x.fillStyle = col; rr(x, cx - w / 2, top, w, len, 3.2); x.fill();
+    x.fillStyle = 'rgba(0,0,0,.22)';
+    x.fillRect(cx - w / 2, top + 3, w, 1.6); x.fillRect(cx - w / 2, top + len - 4.6, w, 1.6); x.fillRect(cx - w / 2, cy - 0.8, w, 1.6);
+    x.fillStyle = 'rgba(255,255,255,.45)';
+    x.fillRect(cx - 1.6, top + 5, 1.6, len / 2 - 6.5); x.fillRect(cx - 1.6, cy + 1.8, 1.6, len / 2 - 7);
+  }
+  const STICKS = [
+    null,
+    [[30, 22, 28, 'g'], [30, 58, 28, 'b']],
+    [[30, 22, 28, 'b'], [18, 58, 28, 'g'], [42, 58, 28, 'g']],
+    [[18, 22, 28, 'b'], [42, 22, 28, 'g'], [18, 58, 28, 'g'], [42, 58, 28, 'b']],
+    [[15, 22, 28, 'g'], [45, 22, 28, 'b'], [30, 40, 28, 'r'], [15, 58, 28, 'b'], [45, 58, 28, 'g']],
+    [[14, 22, 28, 'g'], [30, 22, 28, 'g'], [46, 22, 28, 'g'], [14, 58, 28, 'b'], [30, 58, 28, 'b'], [46, 58, 28, 'b']],
+    [[30, 13, 20, 'r'], [14, 40, 22, 'g'], [30, 40, 22, 'g'], [46, 40, 22, 'g'], [14, 66, 22, 'b'], [30, 66, 22, 'b'], [46, 66, 22, 'b']],
+    [[12, 22, 28, 'g'], [24, 22, 28, 'b'], [36, 22, 28, 'b'], [48, 22, 28, 'g'], [12, 58, 28, 'g'], [24, 58, 28, 'b'], [36, 58, 28, 'b'], [48, 58, 28, 'g']],
+    [[14, 14, 22, 'g'], [30, 14, 22, 'r'], [46, 14, 22, 'b'], [14, 40, 22, 'g'], [30, 40, 22, 'r'], [46, 40, 22, 'b'], [14, 66, 22, 'g'], [30, 66, 22, 'r'], [46, 66, 22, 'b']],
+  ];
+
+  function bird(x) {
+    x.lineCap = 'round';
+    x.lineWidth = 2.6;
+    [[C.green, 48, 72], [C.blue, 53, 64], [C.red, 42, 76], [C.green, 56, 55]].forEach(([col, ex, ey]) => {
+      x.strokeStyle = col; x.beginPath(); x.moveTo(36, 50); x.quadraticCurveTo(44, 56, ex, ey); x.stroke();
+      circle(x, ex, ey, 2.4, col);
+    });
+    x.fillStyle = C.green; x.beginPath(); x.ellipse(31, 46, 11, 15, -0.35, 0, Math.PI * 2); x.fill();
+    x.fillStyle = C.blue; x.beginPath(); x.ellipse(34, 47, 6, 10, -0.5, 0, Math.PI * 2); x.fill();
+    circle(x, 24, 26, 7.5, C.red);
+    x.fillStyle = '#e89a1c'; x.beginPath(); x.moveTo(17.5, 24.5); x.lineTo(10, 28); x.lineTo(18, 29.5); x.closePath(); x.fill();
+    circle(x, 22.5, 24.5, 2, '#fffaf0'); circle(x, 22.2, 24.6, 1, C.ink);
+    x.strokeStyle = C.red; x.lineWidth = 1.6;
+    [[22, 18, 19, 12], [25, 18, 25, 11], [28, 19, 31, 13]].forEach(([a, b, c, d]) => { x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); circle(x, c, d, 1.5, C.red); });
+    x.strokeStyle = '#a0662a'; x.lineWidth = 1.8;
+    x.beginPath(); x.moveTo(27, 59); x.lineTo(24, 69); x.moveTo(32, 60); x.lineTo(31, 70); x.moveTo(20, 70); x.lineTo(35, 70); x.stroke();
+  }
+
+  function glyph(x, ch, cx, cy, size, col, font = CJK) {
+    x.fillStyle = col; x.font = `700 ${size}px ${font}`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(ch, cx, cy);
+  }
+  const corner = (x, label, col) => glyph(x, label, 9, 10, 11, col, SANS);
+
+  function petal(x, cx, cy, rx, ry, ang, col) { x.fillStyle = col; x.beginPath(); x.ellipse(cx, cy, rx, ry, ang, 0, Math.PI * 2); x.fill(); }
+
+  function drawFlower(x, n) {
+    if (n === 0) {
+      x.strokeStyle = '#7a4a24'; x.lineWidth = 3; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(12, 68); x.quadraticCurveTo(22, 52, 30, 38); x.moveTo(20, 56); x.lineTo(40, 58); x.stroke();
+      for (let a = 0; a < 5; a++) { const ang = a / 5 * Math.PI * 2 - Math.PI / 2; circle(x, 31 + Math.cos(ang) * 8, 33 + Math.sin(ang) * 8, 6.5, '#e45b7d'); }
+      circle(x, 31, 33, 4, '#f7d04a');
+      for (let a = 0; a < 5; a++) { const ang = a / 5 * Math.PI * 2; circle(x, 42 + Math.cos(ang) * 3.4, 57 + Math.sin(ang) * 3.4, 2.8, '#ef8aa3'); }
+    } else if (n === 1) {
+      x.strokeStyle = C.green; x.lineWidth = 2.4; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(18, 72); x.quadraticCurveTo(14, 46, 26, 30); x.moveTo(30, 72); x.quadraticCurveTo(44, 52, 50, 36); x.moveTo(24, 72); x.quadraticCurveTo(24, 56, 30, 44); x.stroke();
+      [[-0.9], [0], [0.9]].forEach(([a]) => petal(x, 31 + Math.sin(a) * 8, 30 - Math.cos(a) * 8, 4.5, 10, a, '#8d4fc4'));
+      petal(x, 31, 33, 4, 6, 0, '#c99ae8'); circle(x, 31, 34, 2, '#f7d04a');
+    } else if (n === 2) {
+      for (let a = 0; a < 16; a++) { const ang = a / 16 * Math.PI * 2; petal(x, 30 + Math.cos(ang) * 10, 34 + Math.sin(ang) * 10, 2.6, 8, ang + Math.PI / 2, a % 2 ? '#f0a020' : '#f6c440'); }
+      circle(x, 30, 34, 6, '#c2601b'); circle(x, 30, 34, 3, '#e98a2a');
+      x.strokeStyle = C.green; x.lineWidth = 2.4; x.beginPath(); x.moveTo(30, 48); x.lineTo(30, 70); x.stroke();
+      petal(x, 23, 61, 3.4, 7, -0.9, C.green); petal(x, 37, 64, 3.4, 7, 0.9, C.green);
+    } else {
+      stick(x, 24, 40, 56, '#3d9a4f');
+      petal(x, 37, 26, 3.6, 11, 1.0, '#1f7a3c'); petal(x, 38, 40, 3.4, 10.5, 1.25, '#2f8f48'); petal(x, 13, 50, 3.4, 10, -1.15, '#1f7a3c'); petal(x, 37, 54, 3.2, 9.5, 0.95, '#2f8f48');
+    }
+    corner(x, String(n + 1), C.red);
+    glyph(x, '梅蘭菊竹'[n], 47, 70, 13, C.red);
+  }
+
+  function drawSeason(x, n) {
+    if (n === 0) {
+      x.strokeStyle = C.green; x.lineWidth = 2.6; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(30, 70); x.quadraticCurveTo(28, 52, 30, 40); x.stroke();
+      petal(x, 21, 52, 4, 9, -1.0, '#3aa35a'); petal(x, 39, 50, 4, 9, 1.0, '#3aa35a');
+      for (let a = 0; a < 5; a++) { const ang = a / 5 * Math.PI * 2 - Math.PI / 2; circle(x, 30 + Math.cos(ang) * 7, 30 + Math.sin(ang) * 7, 5.6, '#f29bb6'); }
+      circle(x, 30, 30, 3.4, '#f7d04a');
+    } else if (n === 1) {
+      x.fillStyle = '#f0a020';
+      for (let a = 0; a < 12; a++) {
+        const ang = a / 12 * Math.PI * 2;
+        x.beginPath(); x.moveTo(30 + Math.cos(ang - 0.14) * 13, 38 + Math.sin(ang - 0.14) * 13); x.lineTo(30 + Math.cos(ang) * 21, 38 + Math.sin(ang) * 21); x.lineTo(30 + Math.cos(ang + 0.14) * 13, 38 + Math.sin(ang + 0.14) * 13); x.fill();
+      }
+      circle(x, 30, 38, 12, '#f26b1d'); circle(x, 30, 38, 8.5, '#f8b63a');
+    } else if (n === 2) {
+      x.fillStyle = '#d9542a'; x.beginPath();
+      const pts = [[30, 14], [34, 26], [45, 21], [41, 33], [52, 36], [42, 42], [46, 52], [33, 47], [30, 58], [27, 47], [14, 52], [18, 42], [8, 36], [19, 33], [15, 21], [26, 26]];
+      pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py))); x.closePath(); x.fill();
+      x.strokeStyle = '#8a2d12'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(30, 66); x.lineTo(30, 24); x.moveTo(30, 40); x.lineTo(42, 30); x.moveTo(30, 40); x.lineTo(18, 30); x.stroke();
+    } else {
+      x.strokeStyle = '#2a6fc0'; x.lineWidth = 2.6; x.lineCap = 'round';
+      for (let a = 0; a < 6; a++) {
+        const ang = a / 6 * Math.PI * 2, cx = Math.cos(ang), cy = Math.sin(ang);
+        x.beginPath(); x.moveTo(30, 38); x.lineTo(30 + cx * 19, 38 + cy * 19);
+        for (const d of [9, 14]) {
+          const bx = 30 + cx * d, by = 38 + cy * d, l = d === 9 ? 6 : 4.5;
+          x.moveTo(bx, by); x.lineTo(bx + Math.cos(ang + 0.8) * l, by + Math.sin(ang + 0.8) * l);
+          x.moveTo(bx, by); x.lineTo(bx + Math.cos(ang - 0.8) * l, by + Math.sin(ang - 0.8) * l);
+        }
+        x.stroke();
+      }
+      circle(x, 30, 38, 3, '#2a6fc0');
+    }
+    corner(x, String(n + 1), C.blue);
+    glyph(x, '春夏秋冬'[n], 47, 70, 13, C.blue);
+  }
+
+  function drawArt(x, k) {
+    if (k < 9) return drawDots(x, k + 1);
+    if (k < 18) {
+      const n = k - 8;
+      if (n === 1) return bird(x);
+      for (const [cx, cy, len, c] of STICKS[n - 1]) stick(x, cx, cy, len, COL[c]);
+      return;
+    }
+    if (k < 27) {
+      const n = k - 17;
+      glyph(x, CN[n], 30, 25, 30, C.ink);
+      glyph(x, '萬', 30, 58, 30, C.red);
+      corner(x, String(n), C.ink);
+      return;
+    }
+    if (k < 31) {
+      glyph(x, '東南西北'[k - 27], 30, 42, 44, C.ink);
+      corner(x, 'ESWN'[k - 27], C.red);
+      return;
+    }
+    if (k === 31) return glyph(x, '中', 30, 41, 48, C.red);
+    if (k === 32) return glyph(x, '發', 30, 41, 46, C.green);
+    if (k === 33) {
+      x.strokeStyle = C.blue; x.lineWidth = 3.2; rr(x, 13, 14, 34, 52, 4); x.stroke();
+      x.lineWidth = 1.6; rr(x, 18.5, 19.5, 23, 41, 2.5); x.stroke();
+      return;
+    }
+    if (k < 38) return drawFlower(x, k - 34);
+    return drawSeason(x, k - 38);
+  }
+
+  // ---- Frame loop (only runs while something animates) ----
+  let rafId = 0, lastFrame = 0;
+  const particles = [];
+  function requestDraw() { if (!rafId) rafId = requestAnimationFrame(frame); }
+  function frame(now) {
+    rafId = 0;
+    const dt = Math.min(50, lastFrame ? now - lastFrame : 16);
+    lastFrame = now;
+    for (const p of particles) { p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.rot += p.spin * dt; }
+    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+    draw(now);
+    if (busyAnimating(now)) requestDraw(); else lastFrame = 0;
+  }
+  const dealMs = () => (reducedMotion.matches ? 0 : Math.min(5, 700 / G.L.n) * G.L.n + 280);
+  function busyAnimating(now) {
+    if (!G) return false;
+    G.fx = G.fx.filter(f => now - f.at < 360);
+    if (G.shake && now - G.shake.at > 320) G.shake = null;
+    return particles.length > 0 || G.fx.length > 0 || !!G.shake || (G.hint && !reducedMotion.matches) || now - G.dealAt < dealMs();
+  }
+
+  function burst(i, now) {
+    if (reducedMotion.matches) return;
+    const [fx, fy] = facePos(i);
+    const cx = fx + V.fw / 2, cy = fy + V.fh / 2;
+    for (let k = 0; k < 9; k++) {
+      const a = Math.random() * Math.PI * 2, sp = (0.08 + Math.random() * 0.16) * V.dpr;
+      particles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.05 * V.dpr, g: 0.0004 * V.dpr, life: 420 + Math.random() * 200, max: 620, size: (2 + Math.random() * 2.5) * V.dpr, color: k % 3 ? '#f5c859' : '#7ff0c8', rot: 0, spin: 0, at: now });
+    }
+  }
+  function confetti() {
+    if (reducedMotion.matches) return;
+    const colors = ['#f5c859', '#23a983', '#d8463a', '#5b8cff', '#f29bb6'];
+    for (let k = 0; k < 110; k++) {
+      particles.push({ x: Math.random() * V.cw, y: -Math.random() * V.ch * 0.4, vx: (Math.random() - 0.5) * 0.12 * V.dpr, vy: (0.1 + Math.random() * 0.15) * V.dpr, g: 0.00012 * V.dpr, life: 1800 + Math.random() * 900, max: 2700, size: (4 + Math.random() * 4) * V.dpr, color: colors[k % colors.length], rot: Math.random() * 6, spin: (Math.random() - 0.5) * 0.02, rect: true });
+    }
+    requestDraw();
+  }
+
+  function drawTile(i, fx, fy, face) {
+    ctx.drawImage(V.body.c, fx - V.t - V.body.pad, fy - V.body.pad);
+    ctx.drawImage(V.faces[face], fx, fy);
+  }
+
+  function draw(now = performance.now()) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, V.cw, V.ch);
+    if (!G || !V.body) return;
+    const { L } = G;
+    const spread = reducedMotion.matches ? 0 : Math.min(5, 700 / L.n);
+    const sinceDeal = now - G.dealAt;
+    const pulse = reducedMotion.matches ? 1 : 0.55 + 0.45 * Math.sin((now - G.hintAt) / 170);
+    const showCursor = keyboardMode && document.activeElement === els.canvas;
+    for (const i of L.order) {
+      if (!G.alive[i]) continue;
+      let [fx, fy] = facePos(i);
+      let alpha = 1;
+      if (spread) {
+        const d = sinceDeal - L.rank[i] * spread;
+        if (d < 0) continue;
+        if (d < 260) { const p = d / 260; alpha = p; fy -= (1 - p) * (1 - p) * V.H * 0.5; }
+      }
+      if (G.shake && G.shake.i === i) fx += Math.sin((now - G.shake.at) / 22) * V.W * 0.07 * Math.max(0, 1 - (now - G.shake.at) / 320);
+      ctx.globalAlpha = alpha;
+      drawTile(i, fx, fy, G.faces[i]);
+      const blocked = !G.free[i];
+      if (blocked && dimBlocked) { rr(ctx, fx, fy, V.fw, V.fh, V.r); ctx.fillStyle = 'rgba(16, 24, 56, .3)'; ctx.fill(); }
+      if (G.hint && G.hint.includes(i)) {
+        rr(ctx, fx, fy, V.fw, V.fh, V.r);
+        ctx.fillStyle = `rgba(35, 169, 131, ${0.22 * pulse})`; ctx.fill();
+        ctx.lineWidth = Math.max(2, V.W * 0.07); ctx.strokeStyle = `rgba(28, 200, 150, ${0.5 + 0.5 * pulse})`; ctx.stroke();
+      }
+      if (G.sel === i) {
+        rr(ctx, fx, fy, V.fw, V.fh, V.r);
+        ctx.fillStyle = 'rgba(255, 196, 64, .36)'; ctx.fill();
+        ctx.lineWidth = Math.max(2, V.W * 0.08); ctx.strokeStyle = '#f2a516'; ctx.stroke();
+      }
+      if (showCursor && G.cursor === i) {
+        const lw = Math.max(2, V.W * 0.07);
+        rr(ctx, fx - lw / 2, fy - lw / 2, V.fw + lw, V.fh + lw, V.r + lw / 2);
+        ctx.lineWidth = lw; ctx.strokeStyle = '#4f8dff'; ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (const f of G.fx) {
+      const p = Math.min(1, (now - f.at) / 340);
+      if (f.type === 'vanish') {
+        const [fx, fy] = facePos(f.i);
+        const sc = 1 + p * 0.25, cx = fx + V.fw / 2, cy = fy + V.fh / 2 - p * V.H * 0.35;
+        ctx.save(); ctx.globalAlpha = 1 - p; ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.translate(-V.fw / 2, -V.fh / 2);
+        drawTile(f.i, 0, 0, f.face);
+        rr(ctx, 0, 0, V.fw, V.fh, V.r); ctx.fillStyle = 'rgba(255, 220, 120, .45)'; ctx.fill();
+        ctx.restore();
+      } else if (f.type === 'shuffle') {
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.25 * (1 - p)})`; ctx.fillRect(0, 0, V.cw, V.ch);
+      }
+    }
+    for (const q of particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life / 300));
+      ctx.fillStyle = q.color;
+      if (q.rect) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillRect(-q.size / 2, -q.size / 4, q.size, q.size / 2); ctx.restore(); }
+      else { ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Topmost tile under a point (device pixels), including its visible side.
+  function hitTest(px, py) {
+    if (!G) return -1;
+    const order = G.L.order;
+    for (let k = order.length - 1; k >= 0; k--) {
+      const i = order[k];
+      if (!G.alive[i]) continue;
+      const [fx, fy] = facePos(i);
+      if (px >= fx - V.t && px <= fx + V.fw && py >= fy && py <= fy + V.fh + V.t) return i;
+    }
+    return -1;
+  }
+
+  // ---- Keyboard cursor ----
+  function nearestFree(from) {
+    const list = []; for (let i = 0; i < G.L.n; i++) if (G.alive[i] && G.free[i]) list.push(i);
+    if (!list.length) return -1;
+    const ref = from >= 0 ? G.L.pos[from] : { x: G.L.spanX / 2, y: G.L.spanY / 2 };
+    return list.reduce((best, i) => { const p = G.L.pos[i], q = G.L.pos[best]; return (p.x - ref.x) ** 2 + (p.y - ref.y) ** 2 < (q.x - ref.x) ** 2 + (q.y - ref.y) ** 2 ? i : best; }, list[0]);
+  }
+  function moveCursor(dx, dy) {
+    if (G.cursor < 0 || !G.free[G.cursor]) { G.cursor = nearestFree(G.cursor); announceCursor(); return; }
+    const cur = G.L.pos[G.cursor];
+    let best = -1, bestScore = Infinity;
+    for (let i = 0; i < G.L.n; i++) {
+      if (!G.alive[i] || !G.free[i] || i === G.cursor) continue;
+      const p = G.L.pos[i], ddx = p.x - cur.x + (p.z - cur.z) * 0.3, ddy = p.y - cur.y - (p.z - cur.z) * 0.3;
+      const along = ddx * dx + ddy * dy;
+      if (along <= 0.2) continue;
+      const score = along + Math.abs(ddx * dy + ddy * dx) * 2.2;
+      if (score < bestScore) { bestScore = score; best = i; }
+    }
+    if (best >= 0) { G.cursor = best; announceCursor(); }
+  }
+  function announceCursor() {
+    if (G.cursor >= 0) els.announcer.textContent = tileName(G.faces[G.cursor]);
+    requestDraw();
+  }
+
+  // ---- UI ----
+  let toastTimer = 0;
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1400);
+  }
+  const overlays = () => [els.start, els.win, els.stuck];
+  const overlayOpen = () => overlays().some(o => !o.hidden);
+  function hideOverlays() { for (const o of overlays()) o.hidden = true; }
+
+  function previewSvg(L) {
+    const h = L.maxZ * 0.5;
+    const rects = L.order.map(i => {
+      const p = L.pos[i];
+      const fill = ['#e2d6b6', '#efe5ca', '#f8f1df', '#fffaf0', '#ffffff'][Math.min(4, p.z)];
+      return `<rect x="${(p.x * 1.5 + p.z * 0.5).toFixed(1)}" y="${(p.y * 2 - p.z * 0.5 + h).toFixed(1)}" width="2.8" height="3.8" rx=".5" fill="${fill}" stroke="#137257" stroke-width=".3"/>`;
+    }).join('');
+    return `<svg viewBox="-.2 -.2 ${(L.spanX * 1.5 + (L.maxZ + 1) * 0.5).toFixed(1)} ${(L.spanY * 2 + (L.maxZ + 1) * 0.5).toFixed(1)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${rects}</svg>`;
+  }
+
+  function buildMenu() {
+    els.layouts.innerHTML = '';
+    LAYOUTS.forEach((def, index) => {
+      const L = prepare(index);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'lay'; b.dataset.index = String(index);
+      b.innerHTML = `${previewSvg(L)}<b></b><small class="count"></small><small class="best"></small>`;
+      b.querySelector('b').textContent = t.layoutNames[index];
+      b.querySelector('.count').textContent = t.tilesN(L.n);
+      b.addEventListener('click', () => { newGame(index); focusBoard(); });
+      els.layouts.append(b);
+    });
+  }
+
+  function renderMenu() {
+    const stats = read(STORE.stats, {});
+    for (const b of els.layouts.children) {
+      const index = +b.dataset.index, st = stats[LAYOUTS[index].id];
+      const best = b.querySelector('.best');
+      if (st && st.wins) best.innerHTML = `<em>${'★'.repeat(st.stars)}${'☆'.repeat(3 - st.stars)}</em> ${t.best(fmt(st.best))}`;
+      else best.textContent = t.noBest;
+      b.setAttribute('aria-label', `${t.layoutNames[index]}, ${t.tilesN(prepare(index).n)}, ${st && st.wins ? `${t.starsLabel(st.stars)}, ${t.best(fmt(st.best))}` : t.noBest}`);
+      b.setAttribute('aria-current', String(!!G && !G.daily && G.L.index === index));
+    }
+    const key = todayKey(), day = read(STORE.daily, {})[key];
+    const dName = t.layoutNames[dailyIndex(key)];
+    els.daily.classList.toggle('done', !!day);
+    els.dailySub.textContent = day ? t.dailyDone(fmt(day.best)) : `${dName} · ${t.dailyNew}`;
+    const resumable = G && !G.over && (G.hist.length || G.elapsed > 0);
+    els.playLabel.textContent = resumable ? t.resume : t.play;
+    els.playSub.textContent = G ? `${layoutTitle()} · ${t.tilesN(G.L.n)}` : '';
+    els.dim.setAttribute('aria-pressed', String(dimBlocked));
+  }
+
+  function showMenu() {
+    renderMenu();
+    els.win.hidden = els.stuck.hidden = true;
+    els.start.hidden = false;
+    saveNow();
+    els.play.focus({ preventScroll: true });
+  }
+
+  function focusBoard() { els.canvas.focus({ preventScroll: true }); }
+
+  function nextLayout() {
+    const index = (G.L.index + 1) % LAYOUTS.length;
+    newGame(index);
+    focusBoard();
+  }
+
+  // ---- Timer ----
+  let lastTick = performance.now();
+  function tick() {
+    const now = performance.now();
+    const dt = Math.min(1000, now - lastTick);
+    lastTick = now;
+    if (G && G.started && !G.over && !document.hidden && !overlayOpen()) {
+      G.elapsed += dt;
+      renderTime();
+      if (Math.floor(G.elapsed / 5000) !== Math.floor((G.elapsed - dt) / 5000)) saveGame();
+    }
+  }
+  setInterval(tick, 250);
+  document.addEventListener('visibilitychange', () => { lastTick = performance.now(); if (document.hidden) saveNow(); });
+  window.addEventListener('pagehide', saveNow);
+
+  // ---- Input ----
+  els.canvas.addEventListener('pointerdown', event => {
+    keyboardMode = false;
+    if (!G || overlayOpen()) return;
+    const rect = els.canvas.getBoundingClientRect();
+    const i = hitTest((event.clientX - rect.left) * V.dpr, (event.clientY - rect.top) * V.dpr);
+    if (i >= 0) onTile(i);
+    else if (G.sel >= 0) { G.sel = -1; requestDraw(); }
+  });
+  document.addEventListener('pointerdown', () => { keyboardMode = false; }, true);
+  els.canvas.addEventListener('focus', () => { if (G && keyboardMode && G.cursor < 0) G.cursor = nearestFree(-1); requestDraw(); });
+  els.canvas.addEventListener('blur', () => requestDraw());
+
+  const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const HOTKEYS = { h: showHint, u: undo, z: undo, s: shuffleTiles };
+  document.addEventListener('keydown', event => {
+    keyboardMode = true;
+    if (!G || overlayOpen() || event.altKey) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+    if (event.ctrlKey || event.metaKey) return;
+    if (ARROWS[event.key]) {
+      event.preventDefault();
+      if (document.activeElement !== els.canvas) focusBoard();
+      moveCursor(...ARROWS[event.key]);
+      return;
+    }
+    if ((event.key === 'Enter' || event.key === ' ') && document.activeElement === els.canvas) {
+      event.preventDefault();
+      if (G.cursor < 0) G.cursor = nearestFree(-1);
+      if (G.cursor >= 0) onTile(G.cursor);
+      return;
+    }
+    const action = HOTKEYS[event.key.toLowerCase()];
+    if (action) { event.preventDefault(); action(); }
+  });
+
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', showHint);
+  els.shuffle.addEventListener('click', shuffleTiles);
+  els.restart.addEventListener('click', restartGame);
+  els.menu.addEventListener('click', showMenu);
+  els.play.addEventListener('click', () => {
+    if (!G || G.over) { newGame(G ? G.L.index : LAYOUTS.length - 1); }
+    hideOverlays();
+    requestDraw();
+    if (G && !G.pairCount && G.left) showStuck();
+    else focusBoard();
+  });
+  els.daily.addEventListener('click', () => { const key = todayKey(); newGame(dailyIndex(key), key); focusBoard(); });
+  els.dim.addEventListener('click', () => { dimBlocked = !dimBlocked; write(STORE.dim, dimBlocked); els.dim.setAttribute('aria-pressed', String(dimBlocked)); requestDraw(); });
+  els.next.addEventListener('click', nextLayout);
+  els.again.addEventListener('click', () => { if (G.daily) restartGame(); else newGame(G.L.index); focusBoard(); });
+  els.toMenu.addEventListener('click', showMenu);
+  els.stuckShuffle.addEventListener('click', () => { els.stuck.hidden = true; shuffleTiles(); focusBoard(); });
+  els.stuckUndo.addEventListener('click', () => { els.stuck.hidden = true; undo(); focusBoard(); });
+  els.stuckRestart.addEventListener('click', () => { els.stuck.hidden = true; restartGame(); focusBoard(); });
+
+  new ResizeObserver(() => { layoutView(); requestDraw(); }).observe(els.stage);
+
+  // Read-only hooks for automated tests.
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__mahjong = {
+    state: () => G && { layout: G.L.id, daily: G.daily, left: G.left, total: G.L.n, pairs: G.pairCount, elapsed: G.elapsed, hints: G.hints, shuffles: G.shuffles, over: G.over, sel: G.sel, started: G.started, history: G.hist.length, overlay: overlays().find(o => !o.hidden)?.id || null, tile: V.W / V.dpr },
+    layouts: () => LAYOUTS.map((d, i) => { const L = prepare(i); return { id: d.id, n: L.n, spanX: L.spanX / 2, spanY: L.spanY / 2, maxZ: L.maxZ }; }),
+    plan: () => (G && G.plan ? G.plan.map(p => p.slice()) : null),
+    freePairs: () => { if (!G) return []; const out = []; for (const list of freeByGroup().values()) for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) out.push([list[a], list[b]]); return out; },
+    point: i => { const [fx, fy] = facePos(i); const r = els.canvas.getBoundingClientRect(); return { x: r.left + (fx + V.fw / 2) / V.dpr, y: r.top + (fy + V.fh / 2) / V.dpr }; },
+    pos: () => G && G.L.pos.map(p => ({ ...p })),
+    hit: (x, y) => { const r = els.canvas.getBoundingClientRect(); return hitTest((x - r.left) * V.dpr, (y - r.top) * V.dpr); },
+    faces: () => G && G.faces.slice(),
+    alive: () => G && Array.from(G.alive),
+    free: () => G && Array.from(G.free),
+    verify: (index, seeds = 20) => {
+      const L = prepare(index); let ok = 0;
+      for (let s = 1; s <= seeds; s++) {
+        const { faces, plan } = deal(L, mulberry32(s * 7919));
+        const alive = new Uint8Array(L.n).fill(1);
+        const free = i => !L.above[i].some(j => alive[j]) && (!L.left[i].some(j => alive[j]) || !L.right[i].some(j => alive[j]));
+        let good = !!plan && plan.length * 2 === L.n;
+        for (const [a, b] of plan || []) { if (!free(a) || !free(b) || groupOf(faces[a]) !== groupOf(faces[b])) { good = false; break; } alive[a] = alive[b] = 0; }
+        const counts = new Map(); faces.forEach(f => counts.set(groupOf(f), (counts.get(groupOf(f)) || 0) + 1));
+        if ([...counts.values()].some(c => c % 2)) good = false;
+        if (good) ok += 1;
+      }
+      return ok;
+    },
+  };
+
+  buildMenu();
+  if (!restoreGame()) {
+    const last = LAYOUTS.findIndex(l => l.id === read(STORE.last, 'turtle'));
+    newGame(last >= 0 ? last : LAYOUTS.length - 1);
+  } else {
+    G.dealAt = performance.now();
+    layoutView();
+  }
+  showMenu();
+  requestDraw();
+})();
+</script>
+</body>
+</html>

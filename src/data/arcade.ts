@@ -20,7 +20,7 @@ const FIRST_PARTY_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-
 // Games drawn on a fixed tall canvas or board; on a sideways phone they would use about a fifth of the screen.
 const PORTRAIT_ONLY = new Set([
 	'air-hockey', 'ball-maze', 'bottle-flip', 'brick-breaker', 'bubble-shooter', 'candy-rope', 'chicken-cross', 'color-gate',
-	'fruit-merge', 'gold-digger', 'helix-drop', 'hoop-shot', 'jumpy-climb', 'knife-throw', 'mini-golf', 'mini-pinball',
+	'fruit-merge', 'helix-drop', 'hoop-shot', 'jumpy-climb', 'knife-throw', 'mini-golf', 'mini-pinball',
 	'number-drop', 'paddle-duel', 'penalty-kick', 'sky-hopper', 'snake', 'stack-up', 'star-defender', 'tower-stack',
 ]);
 const game = (id: string, title: string, category: ArcadeCategory, gameId?: string): ArcadeGame => ({ id, title, category, gameId, languages: 'all', sandbox: FIRST_PARTY_SANDBOX, portraitOnly: PORTRAIT_ONLY.has(id) });
@@ -31,7 +31,10 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	// Puzzle
 	game('sudoku', 'Sudoku', 'puzzle', 'sudoku-challenge'),
 	game('block-puzzle', 'Block Puzzle', 'puzzle', 'blokito-puzzle'),
+	game('falling-blocks', 'Falling Blocks', 'puzzle'),
+	game('hexa-sort', 'Hexa Sort', 'puzzle'),
 	game('tile-match', 'Tile Match', 'puzzle', 'mochi-tiles'),
+	game('mahjong', 'Mahjong Solitaire', 'puzzle'),
 	game('2048', '2048', 'puzzle'),
 	game('water-sort', 'Water Sort', 'puzzle'),
 	game('fruit-merge', 'Fruit Merge', 'puzzle'),
@@ -41,14 +44,17 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('bus-sort', 'Bus Sort', 'puzzle'),
 	game('screw-puzzle', 'Screw Puzzle', 'puzzle'),
 	game('parking-escape', 'Parking Escape', 'puzzle'),
+	game('box-push', 'Box Push', 'puzzle'),
 	game('number-drop', 'Number Drop', 'puzzle'),
 	game('nonogram', 'Nonogram', 'puzzle'),
 	game('color-connect', 'Color Connect', 'puzzle'),
 	game('pipe-connect', 'Pipe Connect', 'puzzle'),
 	game('sliding-puzzle', 'Sliding Puzzle', 'puzzle'),
+	game('jigsaw', 'Jigsaw Puzzle', 'puzzle'),
 	game('candy-rope', 'Candy Rope', 'puzzle'),
 	// Word
 	game('word-guess', 'Word Guess', 'word'),
+	game('word-search', 'Word Search', 'word'),
 	game('crossword', 'Mini Crossword', 'word'),
 	game('hangman', 'Hangman', 'word'),
 	game('typing-speed', 'Typing Speed', 'word'),
@@ -58,10 +64,18 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('reaction-test', 'Reaction Test', 'brain'),
 	// Board & card
 	game('solitaire', 'Solitaire', 'board'),
+	game('spider-solitaire', 'Spider Solitaire', 'board'),
 	game('blackjack', 'Blackjack', 'board'),
 	game('poker', 'Poker', 'board'),
 	game('draw-poker', 'Draw Poker', 'board'),
+	game('high-low', 'High Low', 'board'),
+	game('tien-len', 'Tiến Lên', 'board'),
+	game('ludo', 'Ludo', 'board'),
+	game('sea-battle', 'Sea Battle', 'board'),
 	game('tic-tac-toe', 'Tic-Tac-Toe', 'board'),
+	game('chess', 'Chess', 'board'),
+	game('xiangqi', 'Xiangqi', 'board'),
+	game('reversi', 'Reversi', 'board'),
 	game('checkers', 'Checkers', 'board'),
 	game('four-in-a-row', 'Four in a Row', 'board'),
 	// Skill
@@ -75,7 +89,12 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	// Arcade
 	game('crowd-rush', 'Crowd Rush', 'arcade'),
 	game('hungry-hole', 'Hungry Hole', 'arcade'),
+	game('snake-arena', 'Snake Arena', 'arcade'),
+	game('maze-muncher', 'Maze Muncher', 'arcade'),
+	game('marble-chain', 'Marble Chain', 'arcade'),
+	game('fishing', 'Fishing Frenzy', 'arcade'),
 	game('territory-war', 'Territory War', 'arcade'),
+	game('tower-defense', 'Tower Defense', 'arcade'),
 	game('fruit-slice', 'Fruit Slice', 'arcade'),
 	game('bubble-shooter', 'Bubble Shooter', 'arcade'),
 	game('snake', 'Snake', 'arcade'),
@@ -90,6 +109,10 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('blob-arena', 'Blob Arena', 'arcade'),
 	{ id: 'aster-strike', title: 'Aster Strike', category: 'arcade', gameId: 'aster-strike', languages: ['en', 'vi'], sandbox: 'allow-scripts allow-popups allow-popups-to-escape-sandbox', portraitOnly: false },
 	// Sports
+	game('turbo-racing', 'Turbo Racing', 'sports'),
+	game('bowling', 'Bowling', 'sports'),
+	game('archery', 'Archery', 'sports'),
+	game('darts', 'Darts', 'sports'),
 	game('billiards', 'Billiards', 'sports'),
 	game('hoop-shot', 'Hoop Shot', 'sports'),
 	game('penalty-kick', 'Penalty Kick', 'sports'),
