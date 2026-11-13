@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FreeCell</title>
+<style>
+:root {
+  --felt: #6e3519;
+  --felt-hi: #a65a2a;
+  --felt-dark: #2b1206;
+  --text: #fff5ea;
+  --muted: #eac6a6;
+  --aqua: #78e8d6;
+  --aqua-dark: #23917f;
+  --honey: #ffcc5c;
+  --rust: #c4521d;
+  --rust-dark: #86300b;
+  --red: #d7263d;
+  --black: #1d1b2e;
+  --paper: #fffdf8;
+  --chip: #0000003a;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--felt);
+  background-image: radial-gradient(#ffffff09 1px, transparent 1.5px), radial-gradient(120% 85% at 50% 0%, var(--felt-hi), var(--felt) 52%, var(--felt-dark));
+  background-size: 6px 6px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button, input { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--aqua); outline-offset: 3px; }
+
+.app {
+  height: 100%; max-width: 680px; margin: auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "hud" "table" "tools";
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+.top { grid-area: top; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { flex: 0 0 auto; width: 38px; height: 38px; }
+.title { flex: 1; min-width: 0; }
+h1 { font-size: clamp(20px, 6.4vw, 28px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+h1 span { color: var(--honey); }
+.sub { margin-top: 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub b { color: var(--aqua); white-space: nowrap; }
+.hud { grid-area: hud; display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: var(--chip); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+
+.table { grid-area: table; min-height: 0; min-width: 0; position: relative; isolation: isolate; touch-action: none; border-radius: 10px; }
+.table:focus { outline: none; }
+.table.kb:focus-visible { outline: 2px solid #78e8d644; outline-offset: 4px; }
+.slot, .card, .cursor { position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); border-radius: var(--r); }
+.slot { display: grid; place-items: center; background: #00000029; box-shadow: inset 0 0 0 1.5px #ffffff24; color: #ffffff30; }
+.slot.cell { background: #0000003d; box-shadow: inset 0 0 0 1.5px #ffcc5c40; }
+.slot.cell::after { content: ""; width: 34%; aspect-ratio: 1; border-radius: 22%; border: 2px dashed #ffcc5c40; }
+.slot.home svg { width: 52%; height: auto; }
+.slot.col { background: #00000018; box-shadow: inset 0 0 0 1.5px #ffffff18; }
+.card { background: var(--paper); color: var(--black); box-shadow: 0 1px 2px #00000070, 0 0 0 .5px #00000030; transition: transform .22s cubic-bezier(.25, .8, .35, 1); cursor: grab; will-change: transform; overflow: hidden; }
+.card.red { color: var(--red); }
+.idx { position: absolute; left: 6%; right: 5%; top: 1%; display: flex; align-items: center; justify-content: space-between; font-size: calc(var(--cw) * .38); font-weight: 900; line-height: 1.12; letter-spacing: -.08em; }
+.idx svg { width: calc(var(--cw) * .28); height: calc(var(--cw) * .28); flex-shrink: 0; }
+.pip { position: absolute; left: 20%; bottom: 8%; width: 60%; height: auto; }
+.art { position: absolute; left: 10%; right: 10%; top: 31%; bottom: 6%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: calc(var(--r) * .7); background: #f6ebdc; font-family: Georgia, "Times New Roman", serif; font-size: calc(var(--cw) * .44); font-weight: 700; line-height: 1; }
+.red .art { background: #fde8ea; }
+.art svg { width: 40%; height: auto; margin-top: 4%; }
+.card.dragging { transition: none; cursor: grabbing; box-shadow: 0 12px 24px #00000066, 0 0 0 .5px #00000030; }
+.card.hint, .slot.hint { box-shadow: 0 0 0 3px var(--aqua), 0 0 18px var(--aqua); }
+.card.held { box-shadow: 0 0 0 3px var(--honey), 0 6px 16px #0008; }
+.card.shake { animation: shake .3s; }
+@keyframes shake { 20%, 60% { translate: -4px 0; } 40%, 80% { translate: 4px 0; } }
+.table.instant .card { transition: none; }
+.cursor { display: none; z-index: 3000; pointer-events: none; box-shadow: 0 0 0 3px var(--aqua), 0 0 0 6px #00000080; transition: transform .12s, height .12s; }
+.table.kb:focus .cursor { display: block; }
+.toast { position: absolute; left: 50%; bottom: 10px; z-index: 3100; translate: -50% 0; max-width: 90%; padding: 8px 14px; border-radius: 99px; background: #000000b8; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+.toast.big { color: var(--honey); font-size: 16px; }
+
+.tools { grid-area: tools; display: flex; gap: 6px; }
+.tool { position: relative; flex: 1; min-width: 0; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 5px 4px 6px; border-radius: 12px; background: var(--chip); font-size: 11.5px; font-weight: 800; }
+.tool > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool .icon { font-size: 18px; line-height: 1.15; }
+.tool:disabled { opacity: .4; cursor: default; }
+.tool:active:not(:disabled) { transform: translateY(2px); }
+.tool.hint-btn { background: #78e8d626; box-shadow: inset 0 0 0 1.5px #78e8d655; }
+.tool.busy .icon { animation: spin .8s linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+
+.stats-card { grid-area: stats; display: none; padding: 10px 12px; border-radius: 14px; background: var(--chip); }
+.stats-card h2 { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.stats-card dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin-top: 6px; font-size: 13px; }
+.stats-card dt { color: var(--muted); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-card dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+
+.fx { position: fixed; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+.fx[hidden] { display: none; }
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #1a0a03b8; }
+.overlay.light { background: #1a0a0366; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: calc(100% - 16px); overflow: auto; background: #fffaf3; color: #2a1a10; border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 27px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--rust); }
+.panel p { margin-top: 8px; color: #6b5646; font-size: 15px; line-height: 1.45; }
+.panel .emoji { margin: 0 0 4px; font-size: 44px; line-height: 1.1; }
+.panel .head-logo { width: 54px; height: 54px; margin: 0 auto 4px; display: block; }
+.panel .pick { margin-top: 14px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #9a8573; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.choice { min-width: 0; padding: 11px 6px; border-radius: 18px; background: var(--rust); color: #fff; font-size: 17px; font-weight: 900; line-height: 1.15; box-shadow: 0 5px 0 var(--rust-dark); overflow-wrap: anywhere; }
+.choice .ic { display: block; font-size: 22px; line-height: 1.2; }
+.choice small { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #ffe2cf; }
+.choice.done small { color: #b9fff2; }
+.choice:active, .cta:active, .go:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--rust-dark); }
+.dealno { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 6px 6px 12px; border-radius: 16px; background: #f6eadf; }
+.dealno label { flex: 1; min-width: 0; text-align: left; font-size: 14px; font-weight: 800; }
+.dealno input { width: 96px; min-width: 0; padding: 8px 10px; border: 2px solid #2a1a1026; border-radius: 12px; background: #fff; font-size: 16px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; user-select: text; -webkit-user-select: text; }
+.dealno input:focus-visible { outline: 3px solid var(--rust); outline-offset: 1px; }
+.go { flex: 0 0 auto; padding: 9px 14px; border-radius: 12px; background: var(--rust); color: #fff; font-size: 15px; font-weight: 900; box-shadow: 0 3px 0 var(--rust-dark); }
+.panel .formnote { margin-top: 5px; font-size: 12px; line-height: 1.3; color: #8a7462; }
+.panel .formnote.err { color: #c0262d; font-weight: 700; }
+.switches { display: grid; gap: 8px; margin-top: 12px; }
+.switch { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 16px; background: #f6eadf; color: #2a1a10; text-align: left; }
+.switch .knob { flex: 0 0 auto; position: relative; width: 42px; height: 24px; border-radius: 99px; background: #cdb8a6; transition: background .2s; }
+.switch .knob::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0004; transition: transform .2s; }
+.switch[aria-checked="true"] .knob { background: var(--aqua-dark); }
+.switch[aria-checked="true"] .knob::after { transform: translateX(18px); }
+.switch b { display: block; font-size: 15px; font-weight: 800; }
+.switch small { display: block; font-size: 12px; font-weight: 600; color: #7a6656; }
+.panel .fine { margin-top: 12px; font-size: 12px; color: #9a8573; }
+.panel .result { font-size: 18px; font-weight: 800; color: #2a1a10; }
+.panel .record { font-size: 13px; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--honey); color: #3b2306; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.actions.resume { margin-top: 12px; }
+.actions[hidden] { display: none; }
+.cta { width: 100%; padding: 14px; border-radius: 18px; background: var(--rust); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 var(--rust-dark); }
+.ghost { width: 100%; padding: 10px; border-radius: 16px; color: #2a1a10; font-size: 15px; font-weight: 800; box-shadow: inset 0 0 0 2px #2a1a1026; }
+.panel :focus-visible { outline-color: var(--rust); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 360px) {
+  .logo { width: 32px; height: 32px; }
+  .stat strong { font-size: 15px; }
+  .stat small { letter-spacing: 0; }
+  .tool { font-size: 11px; }
+  .panel { padding: 18px 14px; }
+  .dealno input { width: 80px; }
+}
+@media (max-height: 560px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 16px; border-radius: 22px; }
+  .panel h2 { font-size: 23px; }
+  .panel p { margin-top: 6px; font-size: 14px; line-height: 1.35; }
+  .panel .emoji { font-size: 34px; }
+  .panel .head-logo { width: 40px; height: 40px; }
+  .panel .pick { margin-top: 10px; }
+  .choice { padding: 8px 6px; font-size: 16px; }
+  .choice .ic { font-size: 18px; }
+  .dealno { margin-top: 9px; }
+  .switches { margin-top: 9px; gap: 6px; }
+  .switch { padding: 6px 10px; }
+  .actions { margin-top: 12px; gap: 8px; }
+  .cta { padding: 11px; }
+  .ghost { padding: 8px; }
+}
+
+/* Wide frames: the table takes the full height on the left, HUD, tools and stats move to a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; --side: clamp(190px, 21vw, 290px); grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto auto auto minmax(0, 1fr); grid-template-areas: "table top" "table hud" "table tools" "table stats" "table ."; column-gap: 16px; row-gap: 10px; }
+  .top { align-items: flex-start; }
+  h1 { white-space: normal; font-size: clamp(20px, 2.3vw, 30px); }
+  .sub { white-space: normal; }
+  .hud { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { padding: 6px 8px 7px; }
+  .stat strong { font-size: 20px; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tool { min-height: 58px; font-size: 13px; }
+  .stats-card { display: block; }
+  .panel.menu { width: min(100%, 600px); }
+  .panel.menu .switches { grid-template-columns: 1fr 1fr; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { --side: clamp(160px, 25vw, 220px); row-gap: 6px; column-gap: 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .logo { width: 30px; height: 30px; }
+  h1 { font-size: 18px; }
+  .sub { font-size: 11px; margin-top: 1px; }
+  .hud { gap: 4px; }
+  .stat { padding: 2px 6px 3px; }
+  .stat strong { font-size: 15px; }
+  .tools { gap: 5px; }
+  .tool { min-height: 38px; flex-direction: row; gap: 4px; font-size: 11.5px; padding: 3px 4px; border-radius: 11px; }
+  .tool .icon { font-size: 15px; }
+  .stats-card { padding: 6px 10px; }
+  .stats-card dl { font-size: 11.5px; gap: 1px 8px; margin-top: 3px; }
+  .stats-card h2 { font-size: 10.5px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 420px) {
+  .stats-card dl > :nth-child(n + 9) { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 340px) {
+  .stats-card, .logo { display: none; }
+}
+@media (max-height: 520px) {
+  .panel .intro, .panel .head-logo { display: none; }
+}
+@media (max-height: 420px) {
+  .panel .intro, .panel .fine, .panel .head-logo, .switch small, .panel .formnote:not(.err) { display: none; }
+  .panel .emoji { font-size: 26px; }
+  .panel h2 { font-size: 21px; }
+  .actions { margin-top: 8px; gap: 6px; }
+  .actions.resume { margin-top: 6px; }
+  .cta { padding: 9px; font-size: 16px; }
+  .ghost { padding: 7px; font-size: 14px; }
+  .choice { padding: 6px; font-size: 15px; }
+  .choice .ic { display: inline; font-size: 15px; margin-right: 4px; }
+  .dealno { padding: 4px 4px 4px 10px; }
+  .dealno input { padding: 5px 8px; }
+  .go { padding: 6px 12px; }
+  .switch { padding: 5px 10px; }
+  .switch b { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="suit-defs">
+  <symbol id="fc-logo" viewBox="0 0 64 64"><rect x="4" y="6" width="12" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><rect x="18.5" y="6" width="12" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><rect x="33" y="6" width="12" height="16" rx="3" fill="currentColor"/><rect x="47.5" y="6" width="12" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><rect x="14" y="27" width="36" height="33" rx="6" fill="currentColor"/><path d="M32 33c-5 7-12 10-12 16 0 4 3 6 6 6 2.5 0 4.5-1.3 5.3-3.2-.3 3.2-1.6 5-4 6.7h9.4c-2.4-1.7-3.7-3.5-4-6.7.8 1.9 2.8 3.2 5.3 3.2 3 0 6-2 6-6 0-6-7-9-12-16Z" fill="#fffaf3"/></symbol>
+</defs></svg>
+<main class="app">
+  <div class="top">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true" style="color:var(--honey)"><use href="#fc-logo"/></svg>
+    <div class="title">
+      <h1>Free<span>Cell</span></h1>
+      <p class="sub" id="sub"></p>
+    </div>
+  </div>
+  <div class="hud">
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+    <div class="stat"><small data-i18n="home"></small><strong id="home">0/52</strong></div>
+    <div class="stat"><small data-i18n="max"></small><strong id="max">5</strong></div>
+  </div>
+  <div class="table" id="table" tabindex="0" role="application" data-i18n-label="board">
+    <div class="cursor" id="cursor"></div>
+    <p class="toast" id="toast" aria-hidden="true"></p>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="undo" disabled><span class="icon" aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button type="button" class="tool hint-btn" id="hint"><span class="icon" aria-hidden="true">✦</span><span data-i18n="hint"></span></button>
+    <button type="button" class="tool" id="replay-deal"><span class="icon" aria-hidden="true">⟲</span><span data-i18n="restart"></span></button>
+    <button type="button" class="tool" id="menu"><span class="icon" aria-hidden="true">☰</span><span data-i18n="menu"></span></button>
+  </div>
+  <section class="stats-card" aria-labelledby="stats-title">
+    <h2 id="stats-title" data-i18n="statsTitle"></h2>
+    <dl id="stats-list"></dl>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+<canvas class="fx" id="fx" hidden aria-hidden="true"></canvas>
+
+<div class="overlay" id="start">
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <svg class="head-logo" viewBox="0 0 64 64" aria-hidden="true" style="color:var(--rust)"><use href="#fc-logo"/></svg>
+    <h2 id="start-title">Free<span>Cell</span></h2>
+    <p class="intro" data-i18n="intro"></p>
+    <div class="actions resume" id="resume-box" hidden>
+      <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    </div>
+    <p class="pick" data-i18n="pick"></p>
+    <div class="choices">
+      <button type="button" class="choice" id="play-random"><span class="ic" aria-hidden="true">🎲</span><span data-i18n="random"></span><small id="random-note"></small></button>
+      <button type="button" class="choice" id="play-daily"><span class="ic" aria-hidden="true">📅</span><span data-i18n="daily"></span><small id="daily-note"></small></button>
+    </div>
+    <form class="dealno" id="deal-form" novalidate>
+      <label for="deal-input" data-i18n="dealNumber"></label>
+      <input id="deal-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="7" autocomplete="off" enterkeyhint="go" aria-describedby="deal-note">
+      <button type="submit" class="go" data-i18n="play"></button>
+    </form>
+    <p class="formnote" id="deal-note" aria-live="polite"></p>
+    <div class="switches">
+      <button type="button" class="switch" id="winnable" role="switch" aria-checked="true"><span class="knob" aria-hidden="true"></span><span><b data-i18n="winnable"></b><small id="winnable-note"></small></span></button>
+      <button type="button" class="switch" id="auto" role="switch" aria-checked="true"><span class="knob" aria-hidden="true"></span><span><b data-i18n="auto"></b><small id="auto-note"></small></span></button>
+    </div>
+    <p class="record" id="menu-record"></p>
+    <p class="fine" data-i18n="controls"></p>
+  </div>
+</div>
+
+<div class="overlay light" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🏆</p>
+    <h2 id="win-title" data-i18n="won"></h2>
+    <p class="result" id="win-result"></p>
+    <p id="win-deal"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="record" id="win-record"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+      <button type="button" class="ghost" id="replay" data-i18n="replay"></button>
+      <button type="button" class="ghost" id="win-menu" data-i18n="toMenu"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="stuck" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stuck-title">
+    <p class="emoji" aria-hidden="true">🧊</p>
+    <h2 id="stuck-title" data-i18n="stuck"></h2>
+    <p data-i18n="stuckText"></p>
+    <div class="actions">
+      <button type="button" class="cta" id="stuck-undo" data-i18n="undo"></button>
+      <button type="button" class="ghost" id="stuck-replay" data-i18n="restartDeal"></button>
+      <button type="button" class="ghost" id="stuck-new" data-i18n="again"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NUMBERS = ['2', '3', '4', '5', '6', '7', '8', '9', '10'];
+  const I18N = {
+    en: {
+      moves: 'Moves', time: 'Time', home: 'Home', max: 'Max move', undo: 'Undo', hint: 'Hint', restart: 'Restart', menu: 'Menu',
+      board: 'Card table. Left and right arrows choose a free cell, foundation or column, up and down choose a card or switch between the top row and the columns, Enter picks up or drops cards, 1 to 8 jump to a column, H shows a hint, U undoes.',
+      intro: 'Move all 52 cards to the four foundations, Ace to King by suit. Park cards in the four free cells and build the columns down in alternating colors.',
+      pick: 'New game', random: 'Random deal', randomOn: 'Always winnable', randomOff: 'Any deal', daily: 'Daily deal', dailyDone: '✓ Solved today',
+      dealNumber: 'Deal number', play: 'Play', dealRange: 'Deals 1–32000 have all been checked by our solver.', badDeal: 'Enter a number from 1 to 1,000,000.',
+      winnable: 'Winnable deals only', winnableOn: 'Random deals come from solver-checked deals 1–32000', winnableOff: 'Any deal from 1 to 1,000,000 — a few may be impossible',
+      auto: 'Auto-move to foundations', autoOn: 'Cards no longer needed go home by themselves', autoOff: 'You move every card home yourself',
+      resume: 'Continue game', controls: 'Keyboard: arrows to choose, Enter to pick up and drop, 1–8 for columns, H for a hint, U to undo.',
+      record: (w, p) => `Won ${w} of ${p}`, fresh: 'Not played yet',
+      statsTitle: 'Stats', played: 'Played', wins: 'Won', rate: 'Win rate', streak: 'Streak', bestStreak: 'Best streak', bestTime: 'Best time', fewest: 'Fewest moves', dailyStreak: 'Daily streak',
+      won: 'Solved!', result: (time, m) => `${time} · ${m} moves`, winRecord: (w, s, b) => `Wins ${w} · Streak ${s} · Best ${b}`, newBest: 'New record!',
+      again: 'New deal', replay: 'Replay this deal', toMenu: 'Menu',
+      stuck: 'No moves left', stuckText: 'The free cells are full and no card can move. Undo a few moves or restart the deal.', restartDeal: 'Restart this deal',
+      dealNo: n => `Deal #${n}`, solvable: 'winnable', unverified: 'unchecked', dailyTag: 'Daily',
+      cell: n => `free cell ${n}`, homeOf: s => `the ${s} foundation`, column: n => `column ${n}`, empty: 'empty',
+      ranks: ['Ace', ...NUMBERS, 'Jack', 'Queen', 'King'], suits: ['spades', 'hearts', 'diamonds', 'clubs'], card: (r, s) => `${r} of ${s}`,
+      moved: (c, p) => `${c} to ${p}`, movedRun: (c, n, p) => `${c} and ${n - 1} more to ${p}`, picked: (c, n) => n > 1 ? `Picked up ${c} and ${n - 1} more` : `Picked up ${c}`,
+      illegal: 'That move isn’t allowed', tooMany: n => n === 1 ? 'Only 1 card can move right now' : `Only ${n} cards can move at once right now`, undone: 'Move undone', restarted: 'Deal restarted',
+      sentHome: n => n === 1 ? '1 card went home' : `${n} cards went home`, finishing: 'All in order — sending the rest home',
+      noHint: 'No moves left', hintMove: (c, p) => `Hint: ${c} to ${p}`, lost: 'This position can’t be won any more — try Undo', newDeal: n => `New game, deal #${n}`,
+    },
+    vi: {
+      moves: 'Nước đi', time: 'Thời gian', home: 'Đã xếp', max: 'Tối đa', undo: 'Hoàn tác', hint: 'Gợi ý', restart: 'Chơi lại', menu: 'Menu',
+      board: 'Bàn bài. Phím trái phải để chọn ô trống, ô đích hoặc cột, lên xuống để chọn lá bài hoặc chuyển giữa hàng trên và các cột, Enter để nhấc hoặc đặt bài, phím 1 đến 8 để tới cột, H để xem gợi ý, U để hoàn tác.',
+      intro: 'Đưa đủ 52 lá lên bốn ô đích, từ Át đến Già theo từng chất. Gửi tạm bài vào bốn ô trống và xếp các cột giảm dần, xen kẽ đỏ đen.',
+      pick: 'Ván mới', random: 'Ván ngẫu nhiên', randomOn: 'Luôn giải được', randomOff: 'Bất kỳ ván nào', daily: 'Ván hằng ngày', dailyDone: '✓ Đã giải hôm nay',
+      dealNumber: 'Số ván', play: 'Chơi', dealRange: 'Các ván 1–32000 đều đã được máy giải thử.', badDeal: 'Hãy nhập số từ 1 đến 1.000.000.',
+      winnable: 'Chỉ chia ván giải được', winnableOn: 'Ván ngẫu nhiên lấy từ các ván 1–32000 đã được máy giải', winnableOff: 'Bất kỳ ván nào từ 1 đến 1.000.000 — vài ván có thể bế tắc',
+      auto: 'Tự đưa bài lên ô đích', autoOn: 'Lá không còn cần dùng sẽ tự bay lên ô đích', autoOff: 'Bạn tự đưa từng lá lên ô đích',
+      resume: 'Chơi tiếp', controls: 'Bàn phím: mũi tên để chọn, Enter để nhấc và đặt, 1–8 để tới cột, H gợi ý, U hoàn tác.',
+      record: (w, p) => `Thắng ${w}/${p} ván`, fresh: 'Chưa chơi ván nào',
+      statsTitle: 'Thành tích', played: 'Đã chơi', wins: 'Thắng', rate: 'Tỉ lệ thắng', streak: 'Chuỗi thắng', bestStreak: 'Chuỗi dài nhất', bestTime: 'Nhanh nhất', fewest: 'Ít nước nhất', dailyStreak: 'Chuỗi hằng ngày',
+      won: 'Giải xong!', result: (time, m) => `${time} · ${m} nước đi`, winRecord: (w, s, b) => `Thắng ${w} · Chuỗi ${s} · Dài nhất ${b}`, newBest: 'Kỷ lục mới!',
+      again: 'Ván mới', replay: 'Chơi lại ván này', toMenu: 'Menu',
+      stuck: 'Hết nước đi', stuckText: 'Các ô trống đã đầy và không lá nào di chuyển được. Hãy hoàn tác vài nước hoặc chơi lại ván này.', restartDeal: 'Chơi lại từ đầu',
+      dealNo: n => `Ván #${n}`, solvable: 'giải được', unverified: 'chưa kiểm tra', dailyTag: 'Hằng ngày',
+      cell: n => `ô trống ${n}`, homeOf: s => `ô đích ${s}`, column: n => `cột ${n}`, empty: 'trống',
+      ranks: ['Át', ...NUMBERS, 'Bồi', 'Đầm', 'Già'], suits: ['bích', 'cơ', 'rô', 'nhép'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `${c} tới ${p}`, movedRun: (c, n, p) => `${c} cùng ${n - 1} lá tới ${p}`, picked: (c, n) => n > 1 ? `Đã nhấc ${c} cùng ${n - 1} lá` : `Đã nhấc ${c}`,
+      illegal: 'Không thể đi nước này', tooMany: n => `Lúc này chỉ di chuyển được ${n} lá một lần`, undone: 'Đã hoàn tác', restarted: 'Đã chơi lại ván từ đầu',
+      sentHome: n => `${n} lá đã lên ô đích`, finishing: 'Bài đã xếp gọn — tự đưa nốt lên ô đích',
+      noHint: 'Không còn nước đi', hintMove: (c, p) => `Gợi ý: ${c} tới ${p}`, lost: 'Thế bài này không còn giải được — hãy hoàn tác', newDeal: n => `Ván mới, ván #${n}`,
+    },
+    zh: {
+      moves: '步数', time: '时间', home: '已收', max: '最多可移', undo: '撤销', hint: '提示', restart: '重来', menu: '菜单',
+      board: '牌桌。左右方向键选择空当、收牌区或牌列，上下方向键选择纸牌或在上排与牌列之间切换，按 Enter 拿起或放下，按 1 到 8 跳到对应牌列，按 H 提示，按 U 撤销。',
+      intro: '把 52 张牌全部按花色从 A 到 K 收到四个收牌区。可以把牌暂放在四个空当里，牌列按红黑交替依次递减排列。',
+      pick: '新游戏', random: '随机牌局', randomOn: '保证有解', randomOff: '任意牌局', daily: '每日牌局', dailyDone: '✓ 今日已完成',
+      dealNumber: '牌局编号', play: '开始', dealRange: '第 1–32000 局都已经过求解器验证。', badDeal: '请输入 1 到 1,000,000 之间的数字。',
+      winnable: '只发有解的牌局', winnableOn: '随机牌局取自经求解器验证的第 1–32000 局', winnableOff: '1 到 1,000,000 之间任意一局——少数可能无解',
+      auto: '自动收牌', autoOn: '不再需要的牌会自动收走', autoOff: '每张牌都由你亲手收',
+      resume: '继续游戏', controls: '键盘：方向键选择，Enter 拿起和放下，1–8 跳到牌列，H 提示，U 撤销。',
+      record: (w, p) => `${p} 局胜 ${w} 局`, fresh: '还没玩过',
+      statsTitle: '战绩', played: '局数', wins: '胜局', rate: '胜率', streak: '连胜', bestStreak: '最长连胜', bestTime: '最快', fewest: '最少步数', dailyStreak: '每日连续',
+      won: '完成了！', result: (time, m) => `${time} · ${m} 步`, winRecord: (w, s, b) => `胜局 ${w} · 连胜 ${s} · 最长 ${b}`, newBest: '新纪录！',
+      again: '新牌局', replay: '重玩这一局', toMenu: '菜单',
+      stuck: '无路可走了', stuckText: '空当已满，也没有牌能移动。撤销几步，或者从头再来这一局。', restartDeal: '从头再来',
+      dealNo: n => `第 ${n} 局`, solvable: '有解', unverified: '未验证', dailyTag: '每日',
+      cell: n => `空当 ${n}`, homeOf: s => `${s}收牌区`, column: n => `第 ${n} 列`, empty: '空',
+      ranks: ['A', ...NUMBERS, 'J', 'Q', 'K'], suits: ['黑桃', '红心', '方块', '梅花'], card: (r, s) => `${s}${r}`,
+      moved: (c, p) => `${c} 移到${p}`, movedRun: (c, n, p) => `${c}及另外 ${n - 1} 张移到${p}`, picked: (c, n) => n > 1 ? `拿起${c}及另外 ${n - 1} 张` : `拿起${c}`,
+      illegal: '不能这样移动', tooMany: n => `现在一次最多只能移动 ${n} 张`, undone: '已撤销', restarted: '已从头开始',
+      sentHome: n => `${n} 张牌已收走`, finishing: '牌已理顺——自动收完剩下的牌',
+      noHint: '无路可走了', hintMove: (c, p) => `提示：把${c}移到${p}`, lost: '这个局面已经无解了——试试撤销', newDeal: n => `新游戏，第 ${n} 局`,
+    },
+    fr: {
+      moves: 'Coups', time: 'Temps', home: 'Rangées', max: 'Max', undo: 'Annuler', hint: 'Indice', restart: 'Rejouer', menu: 'Menu',
+      board: 'Table de jeu. Flèches gauche et droite pour choisir une case libre, une fondation ou une colonne, haut et bas pour choisir une carte ou passer de la rangée du haut aux colonnes, Entrée pour prendre ou poser, 1 à 8 pour aller à une colonne, H pour un indice, U pour annuler.',
+      intro: 'Montez les 52 cartes sur les quatre fondations, de l’As au Roi par couleur. Garez des cartes dans les quatre cases libres et descendez les colonnes en alternant rouge et noir.',
+      pick: 'Nouvelle partie', random: 'Donne au hasard', randomOn: 'Toujours gagnable', randomOff: 'N’importe quelle donne', daily: 'Donne du jour', dailyDone: '✓ Résolue aujourd’hui',
+      dealNumber: 'Numéro de donne', play: 'Jouer', dealRange: 'Les donnes 1 à 32000 ont toutes été vérifiées par notre solveur.', badDeal: 'Saisissez un nombre de 1 à 1 000 000.',
+      winnable: 'Donnes gagnables uniquement', winnableOn: 'Les donnes au hasard viennent des donnes 1 à 32000 vérifiées', winnableOff: 'N’importe quelle donne de 1 à 1 000 000 — quelques-unes sont peut-être impossibles',
+      auto: 'Rangement automatique', autoOn: 'Les cartes devenues inutiles montent toutes seules', autoOff: 'Vous montez chaque carte vous-même',
+      resume: 'Reprendre la partie', controls: 'Clavier : flèches pour choisir, Entrée pour prendre et poser, 1 à 8 pour les colonnes, H pour un indice, U pour annuler.',
+      record: (w, p) => `${w} gagnée${w > 1 ? 's' : ''} sur ${p}`, fresh: 'Pas encore joué',
+      statsTitle: 'Statistiques', played: 'Parties', wins: 'Victoires', rate: 'Réussite', streak: 'Série', bestStreak: 'Meilleure série', bestTime: 'Meilleur temps', fewest: 'Moins de coups', dailyStreak: 'Série du jour',
+      won: 'Résolu !', result: (time, m) => `${time} · ${m} coups`, winRecord: (w, s, b) => `Victoires ${w} · Série ${s} · Record ${b}`, newBest: 'Nouveau record !',
+      again: 'Nouvelle donne', replay: 'Rejouer cette donne', toMenu: 'Menu',
+      stuck: 'Plus aucun coup', stuckText: 'Les cases libres sont pleines et aucune carte ne peut bouger. Annulez quelques coups ou recommencez la donne.', restartDeal: 'Recommencer la donne',
+      dealNo: n => `Donne nº ${n}`, solvable: 'gagnable', unverified: 'non vérifiée', dailyTag: 'Du jour',
+      cell: n => `la case libre ${n}`, homeOf: s => `la fondation ${s}`, column: n => `la colonne ${n}`, empty: 'vide',
+      ranks: ['As', ...NUMBERS, 'Valet', 'Dame', 'Roi'], suits: ['pique', 'cœur', 'carreau', 'trèfle'], card: (r, s) => `${r} de ${s}`,
+      moved: (c, p) => `${c} vers ${p}`, movedRun: (c, n, p) => `${c} et ${n - 1} ${n > 2 ? 'autres cartes' : 'autre carte'} vers ${p}`, picked: (c, n) => n > 1 ? `Vous prenez ${c} et ${n - 1} ${n > 2 ? 'autres cartes' : 'autre carte'}` : `Vous prenez ${c}`,
+      illegal: 'Ce coup n’est pas permis', tooMany: n => n === 1 ? 'Une seule carte peut bouger pour l’instant' : `Pour l’instant, ${n} cartes au plus peuvent bouger ensemble`, undone: 'Coup annulé', restarted: 'Donne recommencée',
+      sentHome: n => n === 1 ? '1 carte rangée' : `${n} cartes rangées`, finishing: 'Tout est en ordre — rangement du reste',
+      noHint: 'Plus aucun coup', hintMove: (c, p) => `Indice : ${c} vers ${p}`, lost: 'Cette position n’est plus gagnable — essayez Annuler', newDeal: n => `Nouvelle partie, donne nº ${n}`,
+    },
+    th: {
+      moves: 'ครั้ง', time: 'เวลา', home: 'เก็บแล้ว', max: 'ย้ายได้', undo: 'ย้อนกลับ', hint: 'คำใบ้', restart: 'เริ่มใหม่', menu: 'เมนู',
+      board: 'โต๊ะไพ่ ใช้ลูกศรซ้ายขวาเลือกช่องว่าง กองเก็บ หรือแถว ลูกศรขึ้นลงเลือกไพ่หรือสลับระหว่างแถวบนกับแถวไพ่ กด Enter เพื่อหยิบหรือวาง กด 1 ถึง 8 เพื่อไปยังแถว กด H เพื่อดูคำใบ้ กด U เพื่อย้อนกลับ',
+      intro: 'ย้ายไพ่ทั้ง 52 ใบขึ้นกองเก็บทั้งสี่ เรียงจากเอซถึงคิงตามดอก ใช้ช่องว่างสี่ช่องพักไพ่ และเรียงแถวไพ่ลดหลั่นสลับสีแดงดำ',
+      pick: 'เกมใหม่', random: 'สุ่มเกม', randomOn: 'ชนะได้แน่นอน', randomOff: 'เกมใดก็ได้', daily: 'เกมประจำวัน', dailyDone: '✓ วันนี้ผ่านแล้ว',
+      dealNumber: 'หมายเลขเกม', play: 'เล่น', dealRange: 'เกมที่ 1–32000 ผ่านการตรวจด้วยโปรแกรมแก้เกมทั้งหมดแล้ว', badDeal: 'กรอกตัวเลขตั้งแต่ 1 ถึง 1,000,000',
+      winnable: 'เฉพาะเกมที่ชนะได้', winnableOn: 'สุ่มจากเกมที่ 1–32000 ที่ตรวจแล้วว่าชนะได้', winnableOff: 'เกมใดก็ได้ตั้งแต่ 1 ถึง 1,000,000 บางเกมอาจชนะไม่ได้',
+      auto: 'เก็บไพ่อัตโนมัติ', autoOn: 'ไพ่ที่ไม่ต้องใช้แล้วจะขึ้นกองเก็บเอง', autoOff: 'คุณย้ายไพ่ขึ้นกองเก็บเองทุกใบ',
+      resume: 'เล่นต่อ', controls: 'คีย์บอร์ด: ลูกศรเพื่อเลือก Enter เพื่อหยิบและวาง 1–8 ไปยังแถว H คำใบ้ U ย้อนกลับ',
+      record: (w, p) => `ชนะ ${w} จาก ${p} เกม`, fresh: 'ยังไม่เคยเล่น',
+      statsTitle: 'สถิติ', played: 'เล่นแล้ว', wins: 'ชนะ', rate: 'อัตราชนะ', streak: 'ชนะติดกัน', bestStreak: 'ติดกันสูงสุด', bestTime: 'เวลาดีที่สุด', fewest: 'ครั้งน้อยสุด', dailyStreak: 'รายวันติดกัน',
+      won: 'สำเร็จ!', result: (time, m) => `${time} · ${m} ครั้ง`, winRecord: (w, s, b) => `ชนะ ${w} · ติดกัน ${s} · สูงสุด ${b}`, newBest: 'สถิติใหม่!',
+      again: 'เกมใหม่', replay: 'เล่นเกมนี้อีกครั้ง', toMenu: 'เมนู',
+      stuck: 'ไม่มีทางเดินแล้ว', stuckText: 'ช่องว่างเต็มหมดและไม่มีไพ่ใบไหนขยับได้ ลองย้อนกลับสักสองสามตา หรือเริ่มเกมนี้ใหม่',
+      restartDeal: 'เริ่มเกมนี้ใหม่',
+      dealNo: n => `เกม #${n}`, solvable: 'ชนะได้', unverified: 'ยังไม่ตรวจ', dailyTag: 'ประจำวัน',
+      cell: n => `ช่องว่าง ${n}`, homeOf: s => `กองเก็บ${s}`, column: n => `แถว ${n}`, empty: 'ว่าง',
+      ranks: ['เอซ', ...NUMBERS, 'แจ็ค', 'ควีน', 'คิง'], suits: ['โพดำ', 'โพแดง', 'ข้าวหลามตัด', 'ดอกจิก'], card: (r, s) => `${r} ${s}`,
+      moved: (c, p) => `ย้าย ${c} ไป${p}`, movedRun: (c, n, p) => `ย้าย ${c} และอีก ${n - 1} ใบไป${p}`, picked: (c, n) => n > 1 ? `หยิบ ${c} และอีก ${n - 1} ใบ` : `หยิบ ${c}`,
+      illegal: 'ย้ายแบบนี้ไม่ได้', tooMany: n => `ตอนนี้ย้ายได้ครั้งละไม่เกิน ${n} ใบ`, undone: 'ย้อนกลับแล้ว', restarted: 'เริ่มเกมนี้ใหม่แล้ว',
+      sentHome: n => `เก็บไพ่ขึ้นกอง ${n} ใบ`, finishing: 'เรียงครบแล้ว กำลังเก็บไพ่ที่เหลือ',
+      noHint: 'ไม่มีทางเดินแล้ว', hintMove: (c, p) => `คำใบ้: ย้าย ${c} ไป${p}`, lost: 'ตานี้ชนะไม่ได้แล้ว ลองย้อนกลับดู', newDeal: n => `เกมใหม่ เกม #${n}`,
+    },
+    ja: {
+      moves: '手数', time: 'タイム', home: '回収', max: '移動上限', undo: '戻す', hint: 'ヒント', restart: 'やり直し', menu: 'メニュー',
+      board: 'カードテーブル。左右の矢印キーでフリーセル・組札・列を、上下でカードを選ぶか上段と列を行き来し、Enter で持ち上げる・置く。1〜8 で列へ移動、H でヒント、U で一手戻す。',
+      intro: '52枚すべてをスートごとにAからKまで4つの組札へ集めよう。4つのフリーセルにカードを一時置きし、列は赤黒交互に数字を下げて重ねます。',
+      pick: '新しいゲーム', random: 'ランダム', randomOn: '必ずクリア可能', randomOff: 'すべての配り', daily: 'デイリー', dailyDone: '✓ 今日はクリア済み',
+      dealNumber: '配り番号', play: 'プレイ', dealRange: '1〜32000番の配りはすべてソルバーで確認済みです。', badDeal: '1〜1,000,000の数字を入力してください。',
+      winnable: 'クリア可能な配りのみ', winnableOn: 'ソルバー確認済みの1〜32000番から選びます', winnableOff: '1〜1,000,000番のどれか。まれにクリア不能な配りもあります',
+      auto: '自動で組札へ', autoOn: 'もう使わないカードは自動で組札へ', autoOff: 'すべて自分で組札へ移動',
+      resume: '続きから', controls: 'キーボード：矢印で選択、Enter で持ち上げて置く、1〜8 で列、H でヒント、U で戻す。',
+      record: (w, p) => `${p}回中${w}勝`, fresh: 'まだプレイしていません',
+      statsTitle: '成績', played: 'プレイ', wins: '勝利', rate: '勝率', streak: '連勝', bestStreak: '最多連勝', bestTime: '最速', fewest: '最少手数', dailyStreak: 'デイリー連続',
+      won: 'クリア！', result: (time, m) => `${time} · ${m}手`, winRecord: (w, s, b) => `勝利 ${w} · 連勝 ${s} · 最多 ${b}`, newBest: '記録更新！',
+      again: '新しく配る', replay: '同じ配りで再挑戦', toMenu: 'メニュー',
+      stuck: '動かせる手がありません', stuckText: 'フリーセルが埋まり、動かせるカードがありません。何手か戻すか、最初からやり直しましょう。', restartDeal: '最初からやり直す',
+      dealNo: n => `配り #${n}`, solvable: 'クリア可能', unverified: '未確認', dailyTag: 'デイリー',
+      cell: n => `フリーセル${n}`, homeOf: s => `${s}の組札`, column: n => `${n}列目`, empty: '空',
+      ranks: ['エース', ...NUMBERS, 'ジャック', 'クイーン', 'キング'], suits: ['スペード', 'ハート', 'ダイヤ', 'クラブ'], card: (r, s) => `${s}の${r}`,
+      moved: (c, p) => `${c}を${p}へ`, movedRun: (c, n, p) => `${c}とほか${n - 1}枚を${p}へ`, picked: (c, n) => n > 1 ? `${c}とほか${n - 1}枚を持ち上げました` : `${c}を持ち上げました`,
+      illegal: 'そこには置けません', tooMany: n => `今は一度に${n}枚までしか動かせません`, undone: '一手戻しました', restarted: '最初からやり直しました',
+      sentHome: n => `${n}枚を組札へ`, finishing: '並びがそろいました。残りを組札へ',
+      noHint: '動かせる手がありません', hintMove: (c, p) => `ヒント：${c}を${p}へ`, lost: 'この局面からはもうクリアできません。戻してみましょう', newDeal: n => `新しいゲーム、配り #${n}`,
+    },
+    ko: {
+      moves: '이동', time: '시간', home: '정리', max: '최대 이동', undo: '되돌리기', hint: '힌트', restart: '다시 시작', menu: '메뉴',
+      board: '카드 테이블. 왼쪽·오른쪽 방향키로 프리셀, 파운데이션, 열을 고르고, 위·아래로 카드를 고르거나 윗줄과 열 사이를 오가세요. Enter로 집거나 놓고, 1~8은 해당 열로 이동, H는 힌트, U는 되돌리기입니다.',
+      intro: '52장을 모두 무늬별로 A부터 K까지 네 개의 파운데이션에 모으세요. 네 칸의 프리셀에 카드를 잠시 두고, 열은 빨강과 검정을 번갈아 내림차순으로 쌓아요.',
+      pick: '새 게임', random: '무작위 판', randomOn: '항상 승리 가능', randomOff: '모든 판', daily: '오늘의 판', dailyDone: '✓ 오늘 완료',
+      dealNumber: '판 번호', play: '시작', dealRange: '1~32000번 판은 모두 솔버로 검증했어요.', badDeal: '1부터 1,000,000 사이의 숫자를 입력하세요.',
+      winnable: '이길 수 있는 판만', winnableOn: '솔버로 검증한 1~32000번 판에서 골라요', winnableOff: '1~1,000,000번 중 아무 판 — 드물게 풀 수 없는 판도 있어요',
+      auto: '자동으로 올리기', autoOn: '더 필요 없는 카드는 알아서 파운데이션으로', autoOff: '모든 카드를 직접 올려요',
+      resume: '이어서 하기', controls: '키보드: 방향키로 고르고 Enter로 집고 놓기, 1~8 열 이동, H 힌트, U 되돌리기.',
+      record: (w, p) => `${p}판 중 ${w}승`, fresh: '아직 플레이하지 않았어요',
+      statsTitle: '기록', played: '플레이', wins: '승리', rate: '승률', streak: '연승', bestStreak: '최다 연승', bestTime: '최단 시간', fewest: '최소 이동', dailyStreak: '오늘의 판 연속',
+      won: '완성!', result: (time, m) => `${time} · ${m}회 이동`, winRecord: (w, s, b) => `승리 ${w} · 연승 ${s} · 최다 ${b}`, newBest: '새 기록!',
+      again: '새 판', replay: '이 판 다시 하기', toMenu: '메뉴',
+      stuck: '둘 수 있는 수가 없어요', stuckText: '프리셀이 가득 찼고 움직일 카드가 없어요. 몇 수 되돌리거나 이 판을 처음부터 다시 해 보세요.', restartDeal: '처음부터 다시',
+      dealNo: n => `${n}번 판`, solvable: '승리 가능', unverified: '미검증', dailyTag: '오늘의 판',
+      cell: n => `프리셀 ${n}`, homeOf: s => `${s} 파운데이션`, column: n => `${n}열`, empty: '비어 있음',
+      ranks: ['에이스', ...NUMBERS, '잭', '퀸', '킹'], suits: ['스페이드', '하트', '다이아몬드', '클로버'], card: (r, s) => `${s} ${r}`,
+      moved: (c, p) => `${c} → ${p}`, movedRun: (c, n, p) => `${c} 외 ${n - 1}장 → ${p}`, picked: (c, n) => n > 1 ? `${c} 외 ${n - 1}장 집음` : `${c} 집음`,
+      illegal: '그곳에는 놓을 수 없어요', tooMany: n => `지금은 한 번에 ${n}장까지만 옮길 수 있어요`, undone: '되돌렸어요', restarted: '처음부터 다시 시작했어요',
+      sentHome: n => `${n}장을 파운데이션으로`, finishing: '정렬 완료 — 남은 카드를 모두 올려요',
+      noHint: '둘 수 있는 수가 없어요', hintMove: (c, p) => `힌트: ${c} → ${p}`, lost: '이 상태로는 더 이상 이길 수 없어요 — 되돌려 보세요', newDeal: n => `새 게임, ${n}번 판`,
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // ---- core start (deal generator + solver; fc-verify.mjs in the build scratchpad runs this exact block) ----
+  const FC = (() => {
+    const A = 65;
+    const rankOf = id => id % 13 + 1;
+    const suitOf = id => (id / 13) | 0;
+    const redOf = id => { const s = (id / 13) | 0; return s === 1 || s === 2; };
+
+    function mulberry32(a) {
+      return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let x = Math.imul(a ^ a >>> 15, 1 | a); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+    }
+
+    // Deal n: our own shuffle, dealt left to right into 8 columns (4 of 7 cards, 4 of 6).
+    function deal(n) {
+      const rnd = mulberry32(Math.imul(n, 0x9E3779B1) ^ 0x2C1B3C6D);
+      const d = Array.from({ length: 52 }, (_, i) => i);
+      for (let i = 51; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+      const cols = Array.from({ length: 8 }, () => []);
+      d.forEach((id, i) => cols[i % 8].push(id));
+      return cols;
+    }
+
+    // A card may go home automatically once nothing can still need it as a landing spot.
+    function safeHome(id, f) {
+      const r = rankOf(id), s = suitOf(id);
+      if (f[s] !== r - 1) return false;
+      if (r <= 2) return true;
+      const opp = redOf(id) ? [0, 3] : [1, 2];
+      return f[opp[0]] >= r - 1 && f[opp[1]] >= r - 1;
+    }
+
+    const capacity = (free, empty) => (free + 1) * (1 << empty);
+
+    // Solver state: columns and cells as strings of card chars ('.' = empty cell), f = foundation heights.
+    function pack(cols, cells, f) {
+      return { c: cols.map(col => col.map(id => String.fromCharCode(A + id)).join('')), z: cells.map(id => id < 0 ? '.' : String.fromCharCode(A + id)).join(''), f: f.slice() };
+    }
+
+    // Applies safe home moves until none is left, recording them as moves.
+    function autoplay(st, out) {
+      let again = true;
+      while (again) {
+        again = false;
+        for (let i = 0; i < 8; i++) {
+          const col = st.c[i];
+          if (!col) continue;
+          const id = col.charCodeAt(col.length - 1) - A;
+          if (safeHome(id, st.f)) { st.c[i] = col.slice(0, -1); st.f[suitOf(id)]++; out.push({ from: i, to: 12 + suitOf(id), n: 1 }); again = true; }
+        }
+        for (let k = 0; k < 4; k++) {
+          const ch = st.z.charCodeAt(k);
+          if (ch === 46) continue;
+          const id = ch - A;
+          if (safeHome(id, st.f)) { st.z = st.z.slice(0, k) + '.' + st.z.slice(k + 1); st.f[suitOf(id)]++; out.push({ from: 8 + k, to: 12 + suitOf(id), n: 1 }); again = true; }
+        }
+      }
+    }
+
+    function keyOf(st) {
+      return String.fromCharCode(A + st.f[0], A + st.f[1], A + st.f[2], A + st.f[3]) + st.z.replace(/\./g, '').split('').sort().join('') + '|' + st.c.slice().sort().join('|');
+    }
+
+    // Length of the alternating, descending run on top of a column.
+    function runLen(col) {
+      let n = col.length ? 1 : 0;
+      for (let i = col.length - 1; i > 0; i--) {
+        const a = col.charCodeAt(i) - A, b = col.charCodeAt(i - 1) - A;
+        if (rankOf(b) !== rankOf(a) + 1 || redOf(a) === redOf(b)) break;
+        n++;
+      }
+      return n;
+    }
+
+    function heuristic(st) {
+      const home = st.f[0] + st.f[1] + st.f[2] + st.f[3];
+      let h = (52 - home) * 4, free = 0, empty = 0;
+      for (let k = 0; k < 4; k++) if (st.z.charCodeAt(k) !== 46) h += 2; else free++;
+      for (let i = 0; i < 8; i++) {
+        const col = st.c[i];
+        if (!col) { empty++; continue; }
+        // Cards sitting above a lower card of their column must move before that card can go home.
+        let low = 99;
+        for (let j = 0; j < col.length; j++) {
+          const r = rankOf(col.charCodeAt(j) - A);
+          if (r > low) h += 3; else low = r;
+        }
+        // Depth of the next card each foundation is waiting for.
+        for (let j = 0; j < col.length; j++) {
+          const id = col.charCodeAt(j) - A;
+          if (rankOf(id) === st.f[suitOf(id)] + 1) h += (col.length - 1 - j);
+        }
+      }
+      return h - empty * 3 - free;
+    }
+
+    function children(st) {
+      const out = [];
+      let free = 0, firstCell = -1, firstEmpty = -1, empty = 0;
+      for (let k = 0; k < 4; k++) if (st.z.charCodeAt(k) === 46) { free++; if (firstCell < 0) firstCell = k; }
+      for (let i = 0; i < 8; i++) if (!st.c[i]) { empty++; if (firstEmpty < 0) firstEmpty = i; }
+      const cap = capacity(free, empty), capEmpty = capacity(free, empty - 1);
+      const push = (mv, fn) => {
+        const nx = { c: st.c.slice(), z: st.z, f: st.f.slice() };
+        fn(nx);
+        const moves = [mv];
+        autoplay(nx, moves);
+        out.push({ st: nx, moves });
+      };
+      // Home moves the autoplay held back.
+      for (let i = 0; i < 8; i++) {
+        const col = st.c[i];
+        if (!col) continue;
+        const id = col.charCodeAt(col.length - 1) - A;
+        if (st.f[suitOf(id)] === rankOf(id) - 1) push({ from: i, to: 12 + suitOf(id), n: 1 }, nx => { nx.c[i] = col.slice(0, -1); nx.f[suitOf(id)]++; });
+      }
+      for (let k = 0; k < 4; k++) {
+        const ch = st.z.charCodeAt(k);
+        if (ch === 46) continue;
+        const id = ch - A;
+        if (st.f[suitOf(id)] === rankOf(id) - 1) push({ from: 8 + k, to: 12 + suitOf(id), n: 1 }, nx => { nx.z = nx.z.slice(0, k) + '.' + nx.z.slice(k + 1); nx.f[suitOf(id)]++; });
+      }
+      // Column to column (only the run length that fits; every length onto the first empty column).
+      for (let i = 0; i < 8; i++) {
+        const src = st.c[i];
+        if (!src) continue;
+        const L = runLen(src);
+        const topId = src.charCodeAt(src.length - 1) - A;
+        for (let j = 0; j < 8; j++) {
+          if (j === i) continue;
+          const dst = st.c[j];
+          if (dst) {
+            const d = dst.charCodeAt(dst.length - 1) - A;
+            const n = rankOf(d) - rankOf(topId);
+            if (n < 1 || n > L || n > cap) continue;
+            const lead = src.charCodeAt(src.length - n) - A;
+            if (redOf(lead) === redOf(d)) continue;
+            push({ from: i, to: j, n }, nx => { nx.c[j] = dst + src.slice(-n); nx.c[i] = src.slice(0, -n); });
+          } else if (j === firstEmpty) {
+            for (let n = Math.min(L, capEmpty); n >= 1; n--) {
+              if (n === src.length) continue;
+              push({ from: i, to: j, n }, nx => { nx.c[j] = src.slice(-n); nx.c[i] = src.slice(0, -n); });
+            }
+          }
+        }
+      }
+      // Cell to column.
+      for (let k = 0; k < 4; k++) {
+        const ch = st.z.charCodeAt(k);
+        if (ch === 46) continue;
+        const id = ch - A;
+        for (let j = 0; j < 8; j++) {
+          const dst = st.c[j];
+          if (dst) {
+            const d = dst.charCodeAt(dst.length - 1) - A;
+            if (rankOf(d) !== rankOf(id) + 1 || redOf(d) === redOf(id)) continue;
+          } else if (j !== firstEmpty) continue;
+          push({ from: 8 + k, to: j, n: 1 }, nx => { nx.c[j] = dst + String.fromCharCode(ch); nx.z = nx.z.slice(0, k) + '.' + nx.z.slice(k + 1); });
+        }
+      }
+      // Column to cell.
+      if (firstCell >= 0) {
+        for (let i = 0; i < 8; i++) {
+          const src = st.c[i];
+          if (!src) continue;
+          push({ from: i, to: 8 + firstCell, n: 1 }, nx => { nx.c[i] = src.slice(0, -1); nx.z = nx.z.slice(0, firstCell) + src[src.length - 1] + nx.z.slice(firstCell + 1); });
+        }
+      }
+      return out;
+    }
+
+    // Best-first search that can run in slices: step(budget) returns 'solved', 'none' (proved unwinnable) or 'busy'.
+    function solver(cols, cells, f) {
+      const root = pack(cols, cells, f);
+      const rootMoves = [];
+      autoplay(root, rootMoves);
+      const heap = [], seen = new Set();
+      let nodes = 0, result = 'busy', path = null;
+      const push = node => {
+        heap.push(node);
+        let i = heap.length - 1;
+        while (i > 0) { const p = (i - 1) >> 1; if (heap[p].pri <= node.pri) break; heap[i] = heap[p]; i = p; }
+        heap[i] = node;
+      };
+      const pop = () => {
+        const topNode = heap[0], last = heap.pop();
+        if (heap.length) {
+          let i = 0;
+          for (;;) {
+            const l = i * 2 + 1, r = l + 1;
+            let m = i, mp = last.pri;
+            if (l < heap.length && heap[l].pri < mp) { m = l; mp = heap[l].pri; }
+            if (r < heap.length && heap[r].pri < mp) m = r;
+            if (m === i) break;
+            heap[i] = heap[m]; i = m;
+          }
+          heap[i] = last;
+        }
+        return topNode;
+      };
+      const done = st => st.f[0] + st.f[1] + st.f[2] + st.f[3] === 52;
+      const trace = node => {
+        const list = [];
+        for (let n = node; n.parent; n = n.parent) list.unshift(...n.moves);
+        return [...rootMoves, ...list];
+      };
+      seen.add(keyOf(root));
+      const start = { st: root, parent: null, moves: null, g: 0, pri: 0 };
+      if (done(root)) { result = 'solved'; path = rootMoves; } else push(start);
+      function step(budget) {
+        while (result === 'busy' && budget-- > 0) {
+          if (!heap.length) { result = 'none'; break; }
+          const node = pop();
+          nodes++;
+          for (const ch of children(node.st)) {
+            const k = keyOf(ch.st);
+            if (seen.has(k)) continue;
+            seen.add(k);
+            const child = { st: ch.st, parent: node, moves: ch.moves, g: node.g + 1, pri: 0 };
+            if (done(ch.st)) { result = 'solved'; path = trace(child); break; }
+            child.pri = heuristic(ch.st) + child.g * 0.5;
+            push(child);
+          }
+        }
+        return result;
+      }
+      return { step, get path() { return path; }, get nodes() { return nodes; } };
+    }
+
+    return { deal, safeHome, capacity, solver, rankOf, suitOf, redOf };
+  })();
+  // ---- core end ----
+
+  // Suit outlines on a 100×100 grid, shared by the DOM cards (as <symbol>s) and the win-celebration canvas.
+  const SUIT_PATHS = [
+    ['M50 4C38 22 6 38 6 60C6 74 16 82 28 82C38 82 45 77 48 70C47 82 42 90 32 96H68C58 90 53 82 52 70C55 77 62 82 72 82C84 82 94 74 94 60C94 38 62 22 50 4Z'],
+    ['M50 92C44 84 4 62 4 32C4 16 16 6 29 6C39 6 46 12 50 21C54 12 61 6 71 6C84 6 96 16 96 32C96 62 56 84 50 92Z'],
+    ['M50 3C61 21 74 36 89 50C74 64 61 79 50 97C39 79 26 64 11 50C26 36 39 21 50 3Z'],
+    ['M31 30a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M9 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M53 60a19 19 0 1 0 38 0a19 19 0 1 0-38 0Z', 'M44 40H56V62C56 80 60 88 70 96H30C40 88 44 80 44 62Z'],
+  ];
+  const RANKS = ['A', ...NUMBERS, 'J', 'Q', 'K'];
+  const COLS = 8, CELL = 8, HOME = 12, PILES = 16;
+  const CHECKED = 32000, MAX_DEAL = 1000000;
+  // Deals 1–32000 our solver could not finish; every other deal in that range was solved and replayed by a rules checker.
+  const UNSOLVED = [3127,3208,5490,6205,7758,9429,11231,11888,12374,12721,13406,15011,15284,15322,17407,18049,18059,20886,21172,22354,22454,23717,26411,27104,28377,28578,29066,29391,29723,30709,31350,31835];
+  const KEY = 'milaan.freecell.';
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const isCol = p => p >= 0 && p < COLS;
+  const isCell = p => p >= CELL && p < HOME;
+  const isHome = p => p >= HOME && p < PILES;
+  const isWinnable = n => n >= 1 && n <= CHECKED && !UNSOLVED.includes(n);
+
+  const $ = id => document.getElementById(id);
+  const table = $('table');
+  const els = { moves: $('moves'), time: $('time'), home: $('home'), max: $('max'), sub: $('sub'), undo: $('undo'), hint: $('hint'), restart: $('replay-deal'), cursor: $('cursor'), toast: $('toast'), announcer: $('announcer'), start: $('start'), win: $('win'), stuck: $('stuck'), winResult: $('win-result'), winDeal: $('win-deal'), winRecord: $('win-record'), newBest: $('new-best'), again: $('again'), fx: $('fx'), winnable: $('winnable'), winnableNote: $('winnable-note'), auto: $('auto'), autoNote: $('auto-note'), resumeBox: $('resume-box'), statsList: $('stats-list'), randomNote: $('random-note'), daily: $('play-daily'), dailyNote: $('daily-note'), dealInput: $('deal-input'), dealNote: $('deal-note'), menuRecord: $('menu-record') };
+  const fctx = els.fx.getContext('2d');
+  const FONT = getComputedStyle(document.body).fontFamily;
+
+  $('suit-defs').insertAdjacentHTML('beforeend', SUIT_PATHS.map((paths, s) => `<symbol id="suit${s}" viewBox="0 0 100 100">${paths.map(d => `<path d="${d}" fill="currentColor"/>`).join('')}</symbol>`).join(''));
+  const suitSvg = (s, cls = '') => `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit${s}"/></svg>`;
+
+  const read = (name, fallback) => { try { const v = JSON.parse(localStorage.getItem(KEY + name)); return v ?? fallback; } catch { return fallback; } };
+  const write = (name, value) => { try { localStorage.setItem(KEY + name, JSON.stringify(value)); } catch {} };
+  const drop = name => { try { localStorage.removeItem(KEY + name); } catch {} };
+  const readStats = () => ({ played: 0, won: 0, streak: 0, bestStreak: 0, bestTime: 0, fewest: 0, dailyLast: '', dailyStreak: 0, ...(read('stats', {}) || {}) });
+  const formatTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const fmtNum = n => n.toLocaleString(lang === 'zh' ? 'zh-CN' : lang);
+
+  // ---------- Deals ----------
+
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const prevDay = key => { const [y, mo, d] = key.split('-').map(Number); return dayKey(new Date(y, mo - 1, d - 1)); };
+
+  // The daily deal is the same for everyone on a given date and always comes from the checked range.
+  function dailyDeal(key = dayKey()) {
+    let h = 2166136261;
+    for (const ch of `freecell:${key}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    let n = (h >>> 0) % CHECKED + 1;
+    while (!isWinnable(n)) n = n % CHECKED + 1;
+    return n;
+  }
+
+  function randomDeal(winnable) {
+    const recent = read('recent', []);
+    for (let tries = 0; tries < 50; tries++) {
+      const n = winnable ? 1 + Math.floor(Math.random() * CHECKED) : 1 + Math.floor(Math.random() * MAX_DEAL);
+      if (winnable && !isWinnable(n)) continue;
+      if (Array.isArray(recent) && recent.includes(n)) continue;
+      write('recent', [n, ...(Array.isArray(recent) ? recent : [])].slice(0, 30));
+      return n;
+    }
+    return 1;
+  }
+
+  const cards = [];
+  const slots = [];
+  let m = null;
+  let piles = Array.from({ length: PILES }, () => []);
+  let dealNo = 0, kind = 'random', dailyKey = '';
+  let winnablePref = read('winnable', true) !== false;
+  let autoPref = read('auto', true) !== false;
+  let state = 'idle';
+  let moves = 0, elapsed = 0, running = false, started = false;
+  let undoStack = [], cycle = null, held = null, hintJob = null;
+  let hintTimer = 0, zTimer = 0, toastTimer = 0, panelTimer = 0, saveTimer = 0;
+  const cursor = { p: 0, depth: 0 };
+
+  function buildTable() {
+    for (let p = 0; p < PILES; p++) {
+      const el = document.createElement('div');
+      el.className = `slot ${isCol(p) ? 'col' : isCell(p) ? 'cell' : 'home'}`;
+      el.setAttribute('aria-hidden', 'true');
+      if (isHome(p)) el.innerHTML = suitSvg(p - HOME);
+      table.append(el);
+      slots.push(el);
+    }
+    for (let id = 0; id < 52; id++) {
+      const el = document.createElement('div');
+      const suit = FC.suitOf(id), rank = FC.rankOf(id), red = FC.redOf(id);
+      el.className = `card${red ? ' red' : ''}`;
+      el.setAttribute('aria-hidden', 'true');
+      const center = rank > 10 ? `<span class="art">${RANKS[rank - 1]}${suitSvg(suit)}</span>` : suitSvg(suit, 'pip');
+      el.innerHTML = `<span class="idx"><b>${RANKS[rank - 1]}</b>${suitSvg(suit)}</span>${center}`;
+      table.append(el);
+      cards.push({ id, suit, rank, red, el, pile: -1, index: 0, x: 0, y: 0, z: 0 });
+    }
+  }
+
+  const cardName = card => t.card(t.ranks[card.rank - 1], t.suits[card.suit]);
+  const pileName = p => isCol(p) ? t.column(p + 1) : isCell(p) ? t.cell(p - CELL + 1) : t.homeOf(t.suits[p - HOME]);
+  const top = p => piles[p][piles[p].length - 1];
+  const homeCount = () => piles.slice(HOME).reduce((n, pile) => n + pile.length, 0);
+  const freeCells = () => piles.slice(CELL, HOME).filter(pile => !pile.length).length;
+  const emptyCols = () => piles.slice(0, COLS).filter(pile => !pile.length).length;
+  const capacity = toEmpty => FC.capacity(freeCells(), Math.max(0, emptyCols() - (toEmpty ? 1 : 0)));
+
+  function announce(text) { els.announcer.textContent = text; }
+
+  function toast(text, big = false) {
+    els.toast.textContent = text;
+    els.toast.classList.toggle('big', big);
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1700);
+  }
+
+  // ---------- Layout ----------
+
+  // Portrait tables keep the free cells and foundations in a row above the columns; wide, short tables move them to lanes on both sides.
+  function measure() {
+    const W = table.clientWidth, H = table.clientHeight;
+    if (!W || !H) return false;
+    const gap = Math.round(Math.max(3, Math.min(12, W * .009)));
+    const laneGap = gap * 3;
+    // Room for a column of about ten cards before the fan has to squeeze.
+    const FIT = 3.4;
+    const cwRow = Math.floor(Math.min((W - gap * 7) / 8, (H - gap * 3) / ((1 + FIT) * 1.4), 124));
+    const cwLane = Math.floor(Math.min((W - gap * 7 - laneGap * 2) / 10, H / (FIT * 1.4), 124));
+    const lane = W / H > 1.15 && cwLane > cwRow * 1.06;
+    const cw = lane ? cwLane : cwRow;
+    const ch = Math.round(cw * 1.4);
+    let x0, tabY, laneStep = 0;
+    if (lane) {
+      x0 = Math.round((W - cw * 10 - gap * 7 - laneGap * 2) / 2) + cw + laneGap;
+      tabY = 0;
+      laneStep = Math.min(ch + gap, (H - ch) / 3);
+    } else {
+      x0 = Math.round((W - cw * 8 - gap * 7) / 2);
+      tabY = ch + Math.round(gap * 2.5);
+    }
+    m = { W, H, gap, cw, ch, x0, tabY, lane, laneGap, laneStep };
+    table.style.setProperty('--cw', `${cw}px`);
+    table.style.setProperty('--ch', `${ch}px`);
+    table.style.setProperty('--r', `${Math.max(3, Math.round(cw * .1))}px`);
+    slots.forEach((el, p) => {
+      const [x, y] = slotPos(p);
+      el.style.transform = `translate(${x}px, ${y}px)`;
+    });
+    return true;
+  }
+
+  const colX = c => m.x0 + c * (m.cw + m.gap);
+
+  function slotPos(p) {
+    if (isCol(p)) return [colX(p), m.tabY];
+    const k = isCell(p) ? p - CELL : p - HOME;
+    if (!m.lane) return [colX(isCell(p) ? k : 4 + k), 0];
+    const x = isCell(p) ? m.x0 - m.laneGap - m.cw : colX(7) + m.cw + m.laneGap;
+    return [x, Math.round(k * m.laneStep)];
+  }
+
+  // Long columns squeeze their fan so the last card always stays on the table.
+  function fanFor(pile) {
+    let up = m.ch * .27;
+    const room = Math.max(0, m.H - m.tabY - m.ch);
+    if ((pile.length - 1) * up > room) up = room / (pile.length - 1);
+    return up;
+  }
+
+  function zBase(p) { return isCol(p) ? 300 : isCell(p) ? 100 + (p - CELL) : 120 + (p - HOME) * 14; }
+
+  function layout(lifted = []) {
+    if (!m) return;
+    for (let p = 0; p < PILES; p++) {
+      const pile = piles[p];
+      const [sx, sy] = slotPos(p);
+      if (isCol(p)) {
+        const fan = fanFor(pile);
+        pile.forEach((card, i) => place(card, p, i, sx, sy + i * fan, lifted));
+      } else pile.forEach((card, i) => place(card, p, i, sx, sy, lifted));
+    }
+    clearTimeout(zTimer);
+    zTimer = setTimeout(() => cards.forEach(card => { if (!card.el.classList.contains('dragging')) card.el.style.zIndex = card.z; }), 340);
+    renderCursor();
+  }
+
+  function place(card, p, i, x, y, lifted) {
+    const flying = lifted.includes(card) || (card.pile >= 0 && card.pile !== p);
+    Object.assign(card, { pile: p, index: i, x, y, z: zBase(p) + i });
+    card.el.style.transform = `translate(${x}px, ${y}px)`;
+    // Cards in flight ride above everything until they land.
+    card.el.style.zIndex = flying ? 1000 + card.z : card.z;
+  }
+
+  function delayCards(list, start, step) {
+    if (reduceMotion.matches || !list.length) return;
+    list.forEach((card, i) => { card.el.style.transitionDelay = `${start + i * step}ms`; });
+    setTimeout(() => list.forEach(card => { card.el.style.transitionDelay = ''; }), start + list.length * step + 300);
+  }
+
+  function shake(card) {
+    if (!card) return;
+    card.el.classList.remove('shake');
+    void card.el.offsetWidth;
+    card.el.classList.add('shake');
+  }
+
+  // ---------- Rules ----------
+
+  // A movable stack is a run going down by one in alternating colors.
+  function isRun(p, i) {
+    const pile = piles[p];
+    if (!pile[i] || isHome(p)) return false;
+    for (let k = i + 1; k < pile.length; k++) if (pile[k].red === pile[k - 1].red || pile[k].rank !== pile[k - 1].rank - 1) return false;
+    return true;
+  }
+
+  function runStart(p) {
+    const pile = piles[p];
+    let i = pile.length - 1;
+    if (i < 0) return -1;
+    while (i > 0 && isRun(p, i - 1)) i--;
+    return i;
+  }
+
+  function fits(card, to, count) {
+    const dest = top(to);
+    if (isHome(to)) return count === 1 && card.suit === to - HOME && piles[to].length === card.rank - 1;
+    if (isCell(to)) return count === 1 && !dest;
+    return !dest || (dest.rank === card.rank + 1 && dest.red !== card.red);
+  }
+
+  // Returns '' for a legal move, 'many' when only the free space is short, or 'no'.
+  function moveError(from, count, to) {
+    if (from === to || isHome(from) || to < 0) return 'no';
+    const src = piles[from], i = src.length - count;
+    if (count < 1 || i < 0 || !isRun(from, i) || !fits(src[i], to, count)) return 'no';
+    if (isCol(to) && count > capacity(!piles[to].length)) return 'many';
+    return '';
+  }
+  const canMove = (from, count, to) => moveError(from, count, to) === '';
+
+  function anyMove() {
+    for (let from = 0; from < HOME; from++) {
+      if (!piles[from].length) continue;
+      for (let to = 0; to < PILES; to++) if (canMove(from, 1, to)) return true;
+    }
+    return false;
+  }
+
+  // ---------- Game flow ----------
+
+  // A started game that is left unfinished breaks the winning streak.
+  function abandon() {
+    if (!started || state === 'won') return;
+    const stats = readStats();
+    stats.streak = 0;
+    write('stats', stats);
+    started = false;
+  }
+
+  function dealPiles(n) {
+    const cols = FC.deal(n);
+    piles = Array.from({ length: PILES }, (_, p) => isCol(p) ? cols[p].map(id => cards[id]) : []);
+  }
+
+  function newGame(n, how = 'random') {
+    abandon();
+    stopFx();
+    clearTimeout(panelTimer);
+    cancelHint();
+    releaseHeld();
+    dealNo = n;
+    kind = how;
+    dailyKey = how === 'daily' ? dayKey() : '';
+    for (const card of cards) card.pile = -1;
+    dealPiles(n);
+    moves = 0; elapsed = 0; running = false; started = false;
+    undoStack = []; cycle = null;
+    state = 'play';
+    cursor.p = 0; cursor.depth = Infinity;
+    for (const id of ['start', 'win', 'stuck']) els[id].hidden = true;
+    dealAnimation();
+    updateHud();
+    saveSoon(0);
+    announce(t.newDeal(n));
+  }
+
+  function dealAnimation() {
+    if (reduceMotion.matches || !m) return layout();
+    const x = m.W / 2 - m.cw / 2, y = m.H;
+    for (const card of cards) {
+      card.el.style.transition = 'none';
+      card.el.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    void table.offsetWidth;
+    for (const card of cards) card.el.style.transition = '';
+    const order = [];
+    for (let i = 0; i < 7; i++) for (let c = 0; c < COLS; c++) if (piles[c][i]) order.push(piles[c][i]);
+    delayCards(order, 0, 12);
+    layout();
+  }
+
+  function startClock() {
+    if (!started) {
+      started = true;
+      const stats = readStats();
+      stats.played += 1;
+      write('stats', stats);
+    }
+    running = true;
+  }
+
+  function snapshot() { return { piles: piles.map(pile => pile.map(card => card.id)), moves }; }
+  function restore(snap) { piles = snap.piles.map(ids => ids.map(id => cards[id])); moves = snap.moves; }
+
+  // Every column running down in order means the rest can go home without any thought.
+  function allInOrder() {
+    for (let c = 0; c < COLS; c++) {
+      const pile = piles[c];
+      for (let i = 1; i < pile.length; i++) if (pile[i].rank >= pile[i - 1].rank) return false;
+    }
+    return true;
+  }
+
+  // Sends cards home after a move: safe ones always, everything once the table is sorted.
+  function autoHome() {
+    if (!autoPref) return { list: [], finish: false };
+    const list = [];
+    let finish = false, again = true;
+    const f = piles.slice(HOME).map(pile => pile.length);
+    while (again) {
+      again = false;
+      if (!finish && homeCount() < 52 && allInOrder()) finish = true;
+      for (let p = 0; p < HOME; p++) {
+        const card = top(p);
+        if (!card || f[card.suit] !== card.rank - 1 || !(finish || FC.safeHome(card.id, f))) continue;
+        piles[p].pop();
+        piles[HOME + card.suit].push(card);
+        f[card.suit]++;
+        list.push(card);
+        again = true;
+      }
+    }
+    return { list, finish };
+  }
+
+  function applyMove(from, count, to, lifted = []) {
+    undoStack.push(snapshot());
+    const moved = piles[from].splice(-count);
+    piles[to].push(...moved);
+    moves += 1;
+    cycle = null;
+    startClock();
+    const auto = autoHome();
+    layout([...moved, ...lifted, ...auto.list]);
+    delayCards(auto.list, 160, auto.finish ? 45 : 90);
+    return { moved, auto };
+  }
+
+  function tryMove(from, count, to, lifted = []) {
+    if (state !== 'play') return false;
+    const err = moveError(from, count, to);
+    if (err) {
+      if (err === 'many') { const n = capacity(isCol(to) && !piles[to].length); toast(t.tooMany(n)); announce(t.tooMany(n)); }
+      return false;
+    }
+    const { moved, auto } = applyMove(from, count, to, lifted);
+    const text = count > 1 ? t.movedRun(cardName(moved[0]), count, pileName(to)) : t.moved(cardName(moved[0]), pileName(to));
+    announce(auto.list.length ? `${text}. ${t.sentHome(auto.list.length)}` : text);
+    if (auto.finish) toast(t.finishing, true);
+    afterAction();
+    return true;
+  }
+
+  function undo() {
+    if ((state !== 'play' && state !== 'stuck') || !undoStack.length) return;
+    restore(undoStack.pop());
+    if (state === 'stuck') { state = 'play'; els.stuck.hidden = true; clearTimeout(panelTimer); }
+    cycle = null;
+    cancelHint();
+    releaseHeld();
+    layout();
+    updateHud();
+    saveSoon();
+    announce(t.undone);
+  }
+
+  // Restarting is itself undoable, and the clock keeps running.
+  function restartDeal() {
+    if (state !== 'play' && state !== 'stuck') return;
+    if (!moves && !undoStack.length) return;
+    undoStack.push(snapshot());
+    dealPiles(dealNo);
+    moves = 0;
+    if (state === 'stuck') { state = 'play'; els.stuck.hidden = true; clearTimeout(panelTimer); }
+    cycle = null;
+    cancelHint();
+    releaseHeld();
+    layout(cards);
+    updateHud();
+    saveSoon();
+    toast(t.restarted);
+    announce(t.restarted);
+  }
+
+  function afterAction() {
+    cancelHint();
+    if (homeCount() === 52) return win();
+    updateHud();
+    saveSoon();
+    if (!anyMove()) {
+      state = 'stuck';
+      running = false;
+      updateHud();
+      announce(`${t.stuck}. ${t.stuckText}`);
+      panelTimer = setTimeout(() => { els.stuck.hidden = false; $('stuck-undo').focus({ preventScroll: true }); }, 600);
+    }
+  }
+
+  // ---------- Hints ----------
+
+  function clearHint() {
+    clearTimeout(hintTimer);
+    for (const el of table.querySelectorAll('.hint')) el.classList.remove('hint');
+  }
+
+  function cancelHint() {
+    hintJob = null;
+    els.hint.classList.remove('busy');
+    els.hint.removeAttribute('aria-busy');
+    clearHint();
+  }
+
+  // Fallback when the solver runs out of time: home first, then building on columns, then parking in a cell.
+  function simpleMove() {
+    const order = [];
+    for (let from = 0; from < HOME; from++) {
+      const pile = piles[from];
+      if (!pile.length) continue;
+      const start = isCol(from) ? runStart(from) : 0;
+      for (let i = pile.length - 1; i >= start; i--) {
+        const count = pile.length - i;
+        for (let to = 0; to < PILES; to++) {
+          if (!canMove(from, count, to)) continue;
+          const score = isHome(to) ? 0 : isCol(to) && piles[to].length ? (isCell(from) ? 1 : i === 0 ? 4 : 2) : isCol(to) ? 5 : 6;
+          if (isCol(from) && isCol(to) && !piles[to].length && i === 0) continue;
+          order.push({ from, to, n: count, score });
+        }
+      }
+    }
+    order.sort((a, b) => a.score - b.score || b.n - a.n);
+    return order[0] || null;
+  }
+
+  function solverInput() {
+    return [piles.slice(0, COLS).map(pile => pile.map(card => card.id)), piles.slice(CELL, HOME).map(pile => pile.length ? pile[0].id : -1), piles.slice(HOME).map(pile => pile.length)];
+  }
+
+  function showMove(mv) {
+    const from = piles[mv.from], lead = from[from.length - mv.n];
+    from.slice(-mv.n).forEach(card => card.el.classList.add('hint'));
+    (top(mv.to)?.el || slots[mv.to]).classList.add('hint');
+    const text = t.hintMove(cardName(lead), pileName(mv.to));
+    announce(text);
+    return text;
+  }
+
+  // The solver runs in small slices so the page never freezes; its first move is the hint.
+  function showHint() {
+    if (state !== 'play' || hintJob) return;
+    clearHint();
+    releaseHeld();
+    const job = { solver: FC.solver(...solverInput()), budget: 60000 };
+    hintJob = job;
+    els.hint.classList.add('busy');
+    els.hint.setAttribute('aria-busy', 'true');
+    const tick = () => {
+      if (hintJob !== job) return;
+      const res = job.solver.step(1500);
+      job.budget -= 1500;
+      if (res === 'busy' && job.budget > 0) { setTimeout(tick, 0); return; }
+      cancelHint();
+      const mv = res === 'solved' ? job.solver.path[0] : simpleMove();
+      if (!mv) { toast(t.noHint); announce(t.noHint); return; }
+      const text = showMove(mv);
+      if (res === 'none') { toast(t.lost); announce(t.lost); } else toast(text);
+      hintTimer = setTimeout(clearHint, 2600);
+    };
+    tick();
+  }
+
+  // ---------- Win ----------
+
+  function win() {
+    state = 'won';
+    running = false;
+    const stats = readStats();
+    stats.won += 1;
+    stats.streak += 1;
+    stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+    const time = Math.round(elapsed);
+    const newBest = (stats.bestTime > 0 && time < stats.bestTime) || (stats.fewest > 0 && moves < stats.fewest);
+    if (!stats.bestTime || time < stats.bestTime) stats.bestTime = time;
+    if (!stats.fewest || moves < stats.fewest) stats.fewest = moves;
+    if (kind === 'daily' && dailyKey && stats.dailyLast !== dailyKey) {
+      stats.dailyStreak = stats.dailyLast === prevDay(dailyKey) ? stats.dailyStreak + 1 : 1;
+      stats.dailyLast = dailyKey;
+    }
+    write('stats', stats);
+    drop('save');
+    updateHud();
+    els.winResult.textContent = t.result(formatTime(elapsed), moves);
+    els.winDeal.textContent = dealLabel();
+    els.winRecord.textContent = t.winRecord(stats.won, stats.streak, stats.bestStreak);
+    els.newBest.hidden = !newBest;
+    announce(`${t.won} ${els.winResult.textContent}`);
+    celebrate();
+    panelTimer = setTimeout(() => { els.win.hidden = false; els.again.focus({ preventScroll: true }); }, reduceMotion.matches ? 300 : 2800);
+  }
+
+  // Bouncing-card cascade: the cards leave the foundations and leave trails on a canvas.
+  const SUIT_SHAPES = SUIT_PATHS.map(list => list.map(d => new Path2D(d)));
+  const fx = { on: false, queue: [], live: [], spawnIn: 0 };
+
+  function paintSuit(ctx, suit, x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 100, size / 100);
+    for (const shape of SUIT_SHAPES[suit]) ctx.fill(shape);
+    ctx.restore();
+  }
+
+  function paintCard(ctx, card, x, y, w, h) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, w * .1); else ctx.rect(x, y, w, h);
+    ctx.fillStyle = '#fffdf8';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(29,27,46,.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = card.red ? '#d7263d' : '#1d1b2e';
+    ctx.font = `900 ${Math.round(w * .36)}px ${FONT}`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(RANKS[card.rank - 1], x + w * .07, y + h * .04);
+    paintSuit(ctx, card.suit, x + w * .66, y + h * .05, w * .26);
+    paintSuit(ctx, card.suit, x + w * .2, y + h * .4, w * .6);
+  }
+
+  function celebrate() {
+    if (reduceMotion.matches || !m) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    els.fx.width = Math.round(innerWidth * dpr);
+    els.fx.height = Math.round(innerHeight * dpr);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    els.fx.hidden = false;
+    const rect = table.getBoundingClientRect();
+    fx.queue = [];
+    for (let r = 12; r >= 0; r--) for (let f = HOME; f < PILES; f++) {
+      const card = piles[f][r];
+      if (card) fx.queue.push({ card, x: rect.left + card.x, y: rect.top + card.y, vx: 0, vy: 0 });
+    }
+    fx.live = [];
+    fx.spawnIn = 400;
+    fx.on = true;
+  }
+
+  function stepFx(dt) {
+    fx.spawnIn -= dt;
+    if (fx.spawnIn <= 0 && fx.queue.length) {
+      const b = fx.queue.shift();
+      b.vx = (Math.random() < .5 ? -1 : 1) * (.12 + Math.random() * .22);
+      b.vy = -Math.random() * .45;
+      b.card.el.style.visibility = 'hidden';
+      fx.live.push(b);
+      fx.spawnIn = 110;
+    }
+    const floor = innerHeight - m.ch;
+    for (const b of fx.live) {
+      b.vy += .0017 * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.y > floor) { b.y = floor; b.vy *= -.72; }
+      paintCard(fctx, b.card, b.x, b.y, m.cw, m.ch);
+    }
+    fx.live = fx.live.filter(b => b.x > -m.cw && b.x < innerWidth);
+    if (!fx.queue.length && !fx.live.length) fx.on = false;
+  }
+
+  function stopFx() {
+    fx.on = false;
+    fx.queue = [];
+    fx.live = [];
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.clearRect(0, 0, els.fx.width, els.fx.height);
+    els.fx.hidden = true;
+    cards.forEach(card => { card.el.style.visibility = ''; });
+  }
+
+  // ---------- Save & resume ----------
+
+  function saveSoon(delay = 250) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveGame, delay);
+  }
+
+  function saveGame() {
+    if (state !== 'play' && state !== 'stuck') return;
+    write('save', { v: 1, deal: dealNo, kind, dailyKey, moves, elapsed: Math.round(elapsed), started, piles: piles.map(pile => pile.map(card => card.id)), undo: undoStack.slice(-300) });
+  }
+
+  const validPiles = list => Array.isArray(list) && list.length === PILES && list.every(Array.isArray) && (ids => ids.length === 52 && new Set(ids).size === 52 && ids.every(id => Number.isInteger(id) && id >= 0 && id < 52))(list.flat());
+
+  function restoreGame() {
+    const s = read('save', null);
+    if (!s || s.v !== 1 || !Number.isInteger(s.deal) || s.deal < 1 || s.deal > MAX_DEAL || !validPiles(s.piles)) return false;
+    dealNo = s.deal;
+    kind = ['random', 'daily', 'pick'].includes(s.kind) ? s.kind : 'random';
+    dailyKey = typeof s.dailyKey === 'string' ? s.dailyKey : '';
+    piles = s.piles.map(list => list.map(id => cards[id]));
+    moves = +s.moves || 0;
+    elapsed = +s.elapsed || 0;
+    started = !!s.started;
+    undoStack = Array.isArray(s.undo) ? s.undo.filter(u => u && validPiles(u.piles)).map(u => ({ piles: u.piles, moves: +u.moves || 0 })) : [];
+    state = 'play';
+    running = started;
+    return true;
+  }
+
+  // ---------- HUD, menu & loop ----------
+
+  function dealLabel() {
+    const tag = kind === 'daily' ? `${t.dailyTag} · ` : '';
+    return `${tag}${t.dealNo(dealNo)}`;
+  }
+
+  function renderStats() {
+    const st = readStats();
+    const rows = [[t.played, st.played], [t.wins, st.won], [t.rate, st.played ? `${Math.round(st.won / st.played * 100)}%` : '—'], [t.streak, st.streak], [t.bestStreak, st.bestStreak], [t.bestTime, st.bestTime ? formatTime(st.bestTime) : '—'], [t.fewest, st.fewest || '—'], [t.dailyStreak, st.dailyStreak]];
+    els.statsList.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  }
+
+  function updateHud() {
+    els.moves.textContent = String(moves);
+    els.time.textContent = formatTime(elapsed);
+    els.home.textContent = `${homeCount()}/52`;
+    els.max.textContent = String(Math.min(13, capacity(false)));
+    els.sub.innerHTML = dealNo ? `${dealLabel()}${isWinnable(dealNo) ? ` · <b>✓ ${t.solvable}</b>` : ` · ${t.unverified}`}` : '';
+    const live = state === 'play' || state === 'stuck';
+    els.undo.disabled = !undoStack.length || !live;
+    els.hint.disabled = state !== 'play';
+    els.restart.disabled = !live || (!moves && !undoStack.length);
+    renderStats();
+  }
+
+  function openMenu() {
+    clearTimeout(panelTimer);
+    stopFx();
+    releaseHeld();
+    cancelHint();
+    els.win.hidden = true;
+    els.stuck.hidden = true;
+    const inGame = state === 'play' || state === 'stuck';
+    els.resumeBox.hidden = !inGame;
+    renderMenu();
+    els.start.hidden = false;
+    (inGame ? $('resume') : $('play-random')).focus({ preventScroll: true });
+  }
+
+  function renderMenu() {
+    const st = readStats();
+    const today = dayKey();
+    const done = st.dailyLast === today;
+    els.daily.classList.toggle('done', done);
+    els.dailyNote.textContent = done ? t.dailyDone : t.dealNo(dailyDeal(today));
+    els.randomNote.textContent = winnablePref ? t.randomOn : t.randomOff;
+    els.menuRecord.textContent = st.played ? `${t.record(st.won, st.played)} · ${t.streak} ${st.streak}` : t.fresh;
+    els.dealNote.textContent = t.dealRange;
+    els.dealNote.classList.remove('err');
+    if (!els.dealInput.value && dealNo) els.dealInput.value = String(dealNo);
+    els.winnable.setAttribute('aria-checked', String(winnablePref));
+    els.winnableNote.textContent = winnablePref ? t.winnableOn : t.winnableOff;
+    els.auto.setAttribute('aria-checked', String(autoPref));
+    els.autoNote.textContent = autoPref ? t.autoOn : t.autoOff;
+  }
+
+  function closeMenu() {
+    els.start.hidden = true;
+    if (state === 'stuck') els.stuck.hidden = false;
+    table.focus({ preventScroll: true });
+  }
+
+  const overlayOpen = () => !els.start.hidden || !els.win.hidden || !els.stuck.hidden;
+
+  let last = performance.now();
+  function frame(now) {
+    // Clamp dt so a stalled tab never teleports the celebration; the clock only drops long stalls.
+    const dt = Math.min(50, now - last);
+    const clockDt = Math.min(1000, now - last);
+    last = now;
+    if (running && state === 'play' && !document.hidden && !overlayOpen()) {
+      const before = Math.floor(elapsed / 1000);
+      elapsed += clockDt;
+      if (Math.floor(elapsed / 1000) !== before) {
+        els.time.textContent = formatTime(elapsed);
+        if (Math.floor(elapsed / 1000) % 5 === 0) saveSoon();
+      }
+    }
+    if (fx.on) stepFx(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Pointer: drag & tap ----------
+
+  let press = null;
+
+  // Where a tap sends cards, best first: home, onto a column, an empty column, then a free cell.
+  function destinations(from, count) {
+    const lead = piles[from][piles[from].length - count];
+    const list = [];
+    if (count === 1 && canMove(from, 1, HOME + lead.suit)) list.push(HOME + lead.suit);
+    const built = [], empty = [];
+    for (let k = 1; k < COLS + 1; k++) {
+      const to = (Math.max(0, isCol(from) ? from : 0) + k) % COLS;
+      if (!canMove(from, count, to)) continue;
+      (piles[to].length ? built : empty).push(to);
+    }
+    list.push(...built, ...empty.slice(0, 1));
+    if (count === 1 && isCol(from)) { const cell = piles.findIndex((pile, p) => isCell(p) && !pile.length); if (cell >= 0) list.push(cell); }
+    return list;
+  }
+
+  function tapCard(card) {
+    const p = card.pile;
+    if (isHome(p) || !isRun(p, card.index)) { shake(card); announce(t.illegal); return; }
+    const count = piles[p].length - card.index;
+    const again = cycle && cycle.id === card.id && cycle.at === p;
+    let to = -1;
+    if (again) {
+      const ring = cycle.ring;
+      for (let k = 1; k <= ring.length && to < 0; k++) {
+        const cand = ring[(cycle.pos + k) % ring.length];
+        if (cand !== p && canMove(p, count, cand)) to = cand;
+      }
+    } else to = destinations(p, count)[0] ?? -1;
+    if (to < 0) {
+      shake(card);
+      // Explain when only the free space is short.
+      const short = [...Array(COLS).keys()].some(c => moveError(p, count, c) === 'many');
+      if (short) { const n = capacity(false); toast(t.tooMany(n)); announce(t.tooMany(n)); } else announce(t.illegal);
+      return;
+    }
+    const ring = again ? cycle.ring : [p, ...destinations(p, count)];
+    tryMove(p, count, to);
+    if (state === 'play' && !isHome(to)) cycle = { id: card.id, ring, pos: ring.indexOf(to), at: to };
+  }
+
+  function dropTarget(stack, from) {
+    const lead = stack[0];
+    let best = -1, bestArea = 0, short = false;
+    for (let p = 0; p < PILES; p++) {
+      const err = moveError(from, stack.length, p);
+      const [x, y] = slotPos(p);
+      const lastCard = top(p);
+      const h = (isCol(p) && lastCard ? lastCard.y - y : 0) + m.ch;
+      const w = Math.min(lead.dragX + m.cw, x + m.cw) - Math.max(lead.dragX, x);
+      const v = Math.min(lead.dragY + m.ch, y + h) - Math.max(lead.dragY, y);
+      if (w <= 0 || v <= 0) continue;
+      if (err === 'many' && w * v > m.cw * m.ch * .25) short = true;
+      if (!err && w * v > bestArea) { bestArea = w * v; best = p; }
+    }
+    return { best, short };
+  }
+
+  // Hit-test against where cards are going, not where they are drawn, so rapid taps ignore cards still in flight.
+  function hitTest(event) {
+    const rect = table.getBoundingClientRect();
+    const x = event.clientX - rect.left, y = event.clientY - rect.top;
+    const inside = (cx, cy) => x >= cx && x < cx + m.cw && y >= cy && y < cy + m.ch;
+    let card = null;
+    for (const c of cards) if (c.pile >= 0 && inside(c.x, c.y) && (!card || c.z > card.z)) card = c;
+    if (card) return { card, p: card.pile };
+    for (let p = 0; p < PILES; p++) if (inside(...slotPos(p))) return { card: null, p };
+    return { card: null, p: -1 };
+  }
+
+  table.addEventListener('pointerdown', event => {
+    if (state !== 'play' || event.button > 0 || press || !m) return;
+    setKb(false);
+    releaseHeld();
+    table.focus({ preventScroll: true });
+    const { card, p } = hitTest(event);
+    if (p < 0 || !card) return;
+    event.preventDefault();
+    if (isHome(p)) { shake(card); return; }
+    const movable = isRun(p, card.index);
+    press = { id: event.pointerId, x: event.clientX, y: event.clientY, card, from: p, stack: movable ? piles[p].slice(card.index) : null, dragging: false };
+    table.setPointerCapture(event.pointerId);
+  });
+
+  table.addEventListener('pointermove', event => {
+    if (!press || !press.stack || event.pointerId !== press.id) return;
+    const dx = event.clientX - press.x, dy = event.clientY - press.y;
+    if (!press.dragging) {
+      if (Math.hypot(dx, dy) < 6) return;
+      press.dragging = true;
+      clearHint();
+      press.stack.forEach((card, i) => { card.el.classList.add('dragging'); card.el.style.zIndex = 2000 + i; });
+    }
+    for (const card of press.stack) {
+      card.dragX = card.x + dx;
+      card.dragY = card.y + dy;
+      card.el.style.transform = `translate(${card.dragX}px, ${card.dragY}px)`;
+    }
+  });
+
+  table.addEventListener('pointerup', event => {
+    if (!press || event.pointerId !== press.id) return;
+    const done = press;
+    press = null;
+    if (!done.dragging) return tapCard(done.card);
+    done.stack.forEach(card => card.el.classList.remove('dragging'));
+    const { best, short } = dropTarget(done.stack, done.from);
+    if (best >= 0 && tryMove(done.from, done.stack.length, best, done.stack)) return;
+    if (short) { const n = capacity(false); toast(t.tooMany(n)); announce(t.tooMany(n)); }
+    layout(done.stack);
+  });
+
+  table.addEventListener('pointercancel', () => {
+    if (press?.dragging) { press.stack.forEach(card => card.el.classList.remove('dragging')); layout(press.stack); }
+    press = null;
+  });
+
+  // ---------- Keyboard cursor ----------
+
+  // The top row (free cells, then foundations) sits above columns 1–8.
+  const TOP_ROW = [8, 9, 10, 11, 12, 13, 14, 15];
+
+  function setKb(on) { table.classList.toggle('kb', on); }
+
+  function clampDepth(p, depth) {
+    const pile = piles[p];
+    if (!isCol(p) || !pile.length) return Math.max(0, pile.length - 1);
+    return Math.min(Math.max(depth, runStart(p)), pile.length - 1);
+  }
+
+  function renderCursor() {
+    if (!m) return;
+    const p = cursor.p, pile = piles[p];
+    let [x, y] = slotPos(p), h = m.ch;
+    if (pile.length) {
+      cursor.depth = clampDepth(p, cursor.depth);
+      const lastCard = pile[pile.length - 1], card = isCol(p) ? pile[cursor.depth] : lastCard;
+      x = card.x; y = card.y; h = lastCard.y - card.y + m.ch;
+    }
+    els.cursor.style.transform = `translate(${x}px, ${y}px)`;
+    els.cursor.style.height = `${h}px`;
+  }
+
+  function describe(p) {
+    const pile = piles[p];
+    if (!pile.length) return `${pileName(p)}: ${t.empty}`;
+    return `${pileName(p)}: ${cardName(isCol(p) ? pile[cursor.depth] : top(p))}`;
+  }
+
+  function moveCursor(key) {
+    let { p, depth } = cursor;
+    const row = isCol(p) ? null : TOP_ROW;
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      const d = key === 'ArrowLeft' ? -1 : 1;
+      if (row) p = row[(row.indexOf(p) + d + 8) % 8]; else { p = (p + d + COLS) % COLS; depth = Infinity; }
+    } else if (key === 'ArrowDown') {
+      if (row) { p = row.indexOf(p); depth = Infinity; } else depth += 1;
+    } else if (isCol(p)) {
+      const startAt = piles[p].length ? runStart(p) : 0;
+      if (Math.min(depth, piles[p].length - 1) <= startAt) p = TOP_ROW[p]; else depth = Math.min(depth, piles[p].length - 1) - 1;
+    }
+    cursor.p = p;
+    cursor.depth = clampDepth(p, depth);
+    renderCursor();
+    announce(describe(p));
+  }
+
+  function markHeld(on) {
+    if (!held) return;
+    piles[held.p].slice(-held.count).forEach(card => card.el.classList.toggle('held', on));
+  }
+
+  function releaseHeld() {
+    markHeld(false);
+    held = null;
+  }
+
+  function activate() {
+    if (state !== 'play') return;
+    const p = cursor.p;
+    if (!held) {
+      const pile = piles[p];
+      if (!pile.length || isHome(p)) return;
+      const i = isCol(p) ? clampDepth(p, cursor.depth) : 0;
+      held = { p, count: pile.length - i };
+      markHeld(true);
+      announce(t.picked(cardName(pile[i]), held.count));
+      return;
+    }
+    const { p: from, count } = held;
+    const card = piles[from][piles[from].length - count];
+    releaseHeld();
+    // Pressing Enter twice on the same pile works like a tap: the best destination is chosen.
+    if (from === p) return tapCard(card);
+    if (!tryMove(from, count, p)) { shake(card); if (moveError(from, count, p) !== 'many') announce(t.illegal); return; }
+    cursor.depth = Infinity;
+    renderCursor();
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' || overlayOpen() || state === 'idle') return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (document.activeElement && document.activeElement !== table && document.activeElement !== document.body && document.activeElement.tagName === 'BUTTON' && (event.key === 'Enter' || event.key === ' ')) return;
+    const key = event.key;
+    if (key.startsWith('Arrow')) {
+      event.preventDefault();
+      setKb(true);
+      if (document.activeElement !== table) table.focus({ preventScroll: true });
+      moveCursor(key);
+    } else if (/^[1-8]$/.test(key)) {
+      event.preventDefault();
+      setKb(true);
+      if (document.activeElement !== table) table.focus({ preventScroll: true });
+      cursor.p = +key - 1;
+      cursor.depth = Infinity;
+      renderCursor();
+      announce(describe(cursor.p));
+    } else if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
+      setKb(true);
+      activate();
+    } else if (key === 'h' || key === 'H') { event.preventDefault(); showHint(); }
+    else if (key === 'u' || key === 'U') { event.preventDefault(); undo(); }
+  });
+
+  // ---------- Buttons ----------
+
+  const focusTable = () => table.focus({ preventScroll: true });
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', showHint);
+  els.restart.addEventListener('click', restartDeal);
+  $('menu').addEventListener('click', openMenu);
+  $('resume').addEventListener('click', closeMenu);
+  $('play-random').addEventListener('click', () => { newGame(randomDeal(winnablePref), 'random'); focusTable(); });
+  els.daily.addEventListener('click', () => { newGame(dailyDeal(), 'daily'); focusTable(); });
+  $('deal-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const raw = els.dealInput.value.trim();
+    const n = /^\d{1,7}$/.test(raw) ? +raw : 0;
+    if (n < 1 || n > MAX_DEAL) {
+      els.dealNote.textContent = t.badDeal;
+      els.dealNote.classList.add('err');
+      els.dealInput.focus();
+      return;
+    }
+    newGame(n, 'pick');
+    focusTable();
+  });
+  els.dealInput.addEventListener('input', () => { els.dealInput.value = els.dealInput.value.replace(/\D/g, '').slice(0, 7); });
+  els.winnable.addEventListener('click', () => { winnablePref = !winnablePref; write('winnable', winnablePref); renderMenu(); });
+  els.auto.addEventListener('click', () => { autoPref = !autoPref; write('auto', autoPref); renderMenu(); });
+  els.again.addEventListener('click', () => { newGame(randomDeal(winnablePref), 'random'); focusTable(); });
+  $('replay').addEventListener('click', () => { newGame(dealNo, kind === 'daily' ? 'pick' : kind); focusTable(); });
+  $('win-menu').addEventListener('click', openMenu);
+  $('stuck-undo').addEventListener('click', () => { undo(); focusTable(); });
+  $('stuck-replay').addEventListener('click', () => { restartDeal(); focusTable(); });
+  $('stuck-new').addEventListener('click', () => { newGame(randomDeal(winnablePref), 'random'); focusTable(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+
+  new ResizeObserver(() => {
+    table.classList.add('instant');
+    if (measure()) layout();
+    requestAnimationFrame(() => requestAnimationFrame(() => table.classList.remove('instant')));
+  }).observe(table);
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console. Read-only.
+  if (navigator.webdriver) window.__freecell = {
+    state: () => ({ deal: dealNo, kind, state, moves, elapsed, started, home: homeCount(), free: freeCells(), capacity: capacity(false), undo: undoStack.length, auto: autoPref, winnable: isWinnable(dealNo), overlay: ['start', 'win', 'stuck'].find(id => !els[id].hidden) || null, card: m && { w: m.cw, h: m.ch, lane: m.lane } }),
+    piles: () => piles.map(pile => pile.map(card => card.id)),
+    // Centre of the visible strip of card i in pile p (or of the empty slot), in client coordinates.
+    point: (p, i) => {
+      const rect = table.getBoundingClientRect();
+      const pile = piles[p], card = pile[i ?? pile.length - 1];
+      if (!card) { const [x, y] = slotPos(p); return { x: rect.left + x + m.cw / 2, y: rect.top + y + m.ch / 2 }; }
+      const next = pile[card.index + 1];
+      const h = next && isCol(p) ? next.y - card.y : isCell(p) && m.lane && p < HOME - 1 ? Math.min(m.ch, m.laneStep) : m.ch;
+      return { x: rect.left + card.x + m.cw / 2, y: rect.top + card.y + Math.min(h, m.ch) / 2 };
+    },
+    // Solver run on the current position (does not change the game).
+    solve: (budget = 200000) => { const s = FC.solver(...solverInput()); const res = s.step(budget); return { res, path: s.path, nodes: s.nodes }; },
+    daily: key => dailyDeal(key),
+    checked: () => ({ range: CHECKED, unsolved: UNSOLVED.slice() }),
+  };
+
+  buildTable();
+  if (restoreGame()) {
+    if (measure()) layout();
+    updateHud();
+    openMenu();
+  } else {
+    // Before the first game a fresh deck waits in the columns of deal 1.
+    dealPiles(1);
+    if (measure()) layout();
+    updateHud();
+    openMenu();
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

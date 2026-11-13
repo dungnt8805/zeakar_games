@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hearts</title>
+<style>
+:root {
+  --bg: #150712;
+  --felt: #6a2156;
+  --felt-dark: #2c0926;
+  --felt-light: #93357a;
+  --rail: #2b1230;
+  --rail-light: #e597bb;
+  --text: #fff2f7;
+  --muted: #ebbdd2;
+  --rose: #ff7aa5;
+  --rose-light: #ffb3cb;
+  --rose-dark: #c2406d;
+  --mint: #74ebcb;
+  --mint-dark: #1f8c70;
+  --warn: #ffb070;
+  --red: #d61a4b;
+  --ink: #26162a;
+  --plate: linear-gradient(#5b1a4c, #300b2a);
+  --back: radial-gradient(circle at 50% 50%, #ffb3cb 0 9%, transparent 10%), repeating-linear-gradient(45deg, #ffffff22 0 2px, transparent 2px 6px), repeating-linear-gradient(-45deg, #ffffff22 0 2px, transparent 2px 6px), linear-gradient(160deg, #e0517f, #8c1d4a);
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: radial-gradient(120% 80% at 50% 0%, #3f0d35, var(--bg) 70%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid var(--rose-light); outline-offset: 3px; }
+.sr-only { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { height: 100%; max-width: 720px; margin: auto; display: flex; flex-direction: column; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 6px; }
+h1 { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-size: clamp(21px, 6.4vw, 28px); font-weight: 900; letter-spacing: -.02em; line-height: 1.1; color: var(--rose-light); text-shadow: 0 2px 0 #0006; white-space: nowrap; overflow: hidden; }
+h1 i { font-style: normal; color: var(--rose); }
+.pill { height: 34px; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 12px; background: #00000040; font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.pill span { overflow: hidden; text-overflow: ellipsis; }
+.pill:hover, .icon:hover { color: var(--rose-light); }
+.pill svg { width: 16px; height: 16px; flex-shrink: 0; }
+.icon { width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: #00000040; font-size: 16px; font-weight: 900; color: var(--muted); }
+.icon svg { width: 18px; height: 18px; }
+
+.hud { display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: #00000038; text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 16px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat.me strong { color: var(--rose-light); }
+.stat.bump strong { animation: bump .35s; }
+@keyframes bump { 40% { scale: 1.18; } }
+
+/* The table: three opponents around the trick, your hand along the bottom edge. Card sizes come from layout(). */
+.felt { --cw: 48px; --pw: 42px; --sw: 70px; --bw: 18px; flex: 1; min-height: 0; position: relative; display: grid; grid-template-columns: var(--sw) minmax(0, 1fr) var(--sw); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "top top top" "left pile right" "mine mine mine"; gap: 4px; padding: 6px; border-radius: 26px; border: 6px solid var(--rail); background: radial-gradient(#ffffff0b 1px, transparent 1.5px) 0 0 / 7px 7px, radial-gradient(100% 75% at 50% 42%, var(--felt-light), var(--felt) 48%, var(--felt-dark)); box-shadow: inset 0 0 0 2px #00000030, inset 0 0 50px #0008, 0 0 0 2px var(--rail-light), 0 12px 28px #0009; }
+
+.card { position: relative; flex: none; width: var(--cw); height: calc(var(--cw) * 1.4); padding: 0; border-radius: calc(var(--cw) * .1); background: linear-gradient(#fffdfb, #f6ebef); color: var(--ink); box-shadow: 0 1px 3px #0008, 0 0 0 .5px #0003; text-align: left; transition: translate .15s, box-shadow .15s, filter .2s; }
+.card.red { color: var(--red); }
+.card.queen { background: linear-gradient(#fffdfb, #efe2f6); box-shadow: inset 0 0 0 calc(var(--cw) * .035) #9b5bc4, 0 1px 3px #0008; }
+.ix { position: absolute; left: 6%; top: 4%; display: flex; flex-direction: column; align-items: center; font-weight: 900; font-size: calc(var(--cw) * .3); line-height: .95; letter-spacing: -.07em; pointer-events: none; }
+.ix i { font-style: normal; font-size: .8em; letter-spacing: 0; }
+.pip { position: absolute; right: 9%; bottom: 6%; font-size: calc(var(--cw) * .5); line-height: 1; pointer-events: none; }
+.card.deal { animation: deal .32s cubic-bezier(.2, .8, .3, 1) backwards; }
+@keyframes deal { from { opacity: 0; transform: translateY(-70%) rotate(-8deg) scale(.6); } }
+
+.seat { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: opacity .3s; }
+.seat.s1 { grid-area: left; align-self: center; }
+.seat.s3 { grid-area: right; align-self: center; }
+.seat.s2 { grid-area: top; justify-self: center; flex-direction: row; gap: 8px; }
+.backs { position: relative; display: flex; height: calc(var(--bw) * 1.4); }
+.backs i { width: var(--bw); height: calc(var(--bw) * 1.4); border-radius: calc(var(--bw) * .14); background: var(--back); box-shadow: inset 0 0 0 1.5px #fff, 0 1px 3px #0008; }
+.backs i:first-child { rotate: -8deg; }
+.backs i + i { margin-left: calc(var(--bw) * -.55); rotate: 8deg; }
+.backs .cnt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px #000; font-variant-numeric: tabular-nums; }
+.backs.none { visibility: hidden; }
+.plate { position: relative; width: var(--sw); min-height: 34px; display: flex; align-items: center; gap: 5px; padding: 4px 6px 4px 4px; border-radius: 12px; background: var(--plate); box-shadow: 0 0 0 1.5px #ffffff22, 0 4px 10px #0007; transition: box-shadow .2s; }
+.seat.s2 .plate { width: auto; min-width: var(--sw); max-width: 170px; }
+.av { width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: #ffffff1c; font-size: 16px; line-height: 1; }
+.who { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.18; }
+.who .nm { font-size: 11.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who b { font-size: 12px; font-weight: 900; color: var(--rose-light); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hp { position: absolute; right: -6px; bottom: -9px; z-index: 2; padding: 1px 6px; border-radius: 99px; background: var(--rose); color: #3b0820; font-size: 11px; font-weight: 900; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 2px 5px #0007; }
+.hp.q { background: #c9a0ff; color: #23083b; }
+.hp:empty { display: none; }
+.dots { position: absolute; right: 4px; top: -8px; display: none; gap: 3px; padding: 4px 6px; border-radius: 99px; background: var(--rose-light); }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: #3b0820; animation: dot 1s infinite; }
+.dots i:nth-child(2) { animation-delay: .15s; }
+.dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dot { 30% { translate: 0 -3px; opacity: .5; } }
+.seat.thinking .dots { display: flex; }
+.seat.turn .plate { box-shadow: 0 0 0 2px var(--rose-light), 0 0 16px #ff7aa588; }
+.felt.big .plate { min-height: 46px; gap: 8px; padding: 6px 10px 6px 6px; border-radius: 14px; }
+.felt.big .av { width: 34px; height: 34px; font-size: 21px; }
+.felt.big .who .nm { font-size: 14px; }
+.felt.big .who b { font-size: 14px; }
+.felt.big .hp { font-size: 13px; padding: 2px 8px; }
+.felt.big .backs .cnt { font-size: 16px; }
+.felt.big .plbl { font-size: 14px; line-height: 20px; padding: 3px 14px; }
+.felt:not(.wide) .seat.s1 .plate, .felt:not(.wide) .seat.s3 .plate { flex-direction: column; gap: 2px; padding: 6px 4px 6px; text-align: center; }
+.felt:not(.wide) .seat.s1 .who, .felt:not(.wide) .seat.s3 .who { width: 100%; align-items: center; }
+
+.pile { grid-area: pile; position: relative; z-index: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.cross { position: relative; flex: none; width: calc(var(--pw) * 2.8); height: calc(var(--pw) * 3.05); }
+.cross.flat { width: calc(var(--pw) * 3.9); height: calc(var(--pw) * 2.3); }
+.cross::before { content: ""; position: absolute; inset: 16% 6%; border-radius: 50%; border: 1.5px dashed #ffffff26; pointer-events: none; }
+.tc { position: absolute; width: var(--pw); height: calc(var(--pw) * 1.4); }
+.tc .card { --cw: var(--pw); }
+.t0 { left: 50%; bottom: 0; translate: -50% 0; }
+.t1 { left: 0; top: 50%; translate: 0 -50%; rotate: -6deg; }
+.t2 { left: 50%; top: 0; translate: -50% 0; }
+.t3 { right: 0; top: 50%; translate: 0 -50%; rotate: 6deg; }
+.tc .card.win { box-shadow: 0 0 0 2.5px var(--rose-light), 0 0 18px var(--rose), 0 2px 6px #0009; }
+.tc .card.fly { animation: fly .3s cubic-bezier(.2, .8, .3, 1) backwards; }
+@keyframes fly { from { transform: translate(var(--fx, 0), var(--fy, 0)) scale(.7); opacity: .3; } }
+.cross.collect .card { transition: transform .35s ease-in, opacity .35s ease-in; transform: translate(var(--cx, 0), var(--cy, 0)) scale(.45); opacity: 0; }
+.arrow { position: absolute; inset: 0; display: none; place-items: center; font-size: calc(var(--pw) * 1.15); font-weight: 900; line-height: 1; color: var(--rose-light); text-shadow: 0 3px 0 #0006; pointer-events: none; }
+.pile.passing .arrow { display: grid; animation: nudgeA 1.4s ease-in-out infinite; }
+@keyframes nudgeA { 50% { transform: translate(var(--ax, 0), var(--ay, 0)); } }
+.plbl { max-width: 100%; min-height: 20px; padding: 2px 10px; border-radius: 99px; background: #00000047; font-size: 12px; font-weight: 800; line-height: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plbl:empty { visibility: hidden; }
+.plbl b { color: var(--rose-light); }
+.boom { position: absolute; left: 50%; top: 45%; z-index: 9; translate: -50% -50%; font-size: clamp(24px, 8vw, 44px); font-weight: 900; color: var(--rose-light); white-space: nowrap; text-shadow: 0 3px 0 #000a, 0 0 22px var(--rose); pointer-events: none; animation: boom 1.3s ease-out forwards; }
+@keyframes boom { 0% { scale: .3; opacity: 0; } 18% { scale: 1.2; opacity: 1; rotate: -5deg; } 30% { scale: 1; rotate: 2deg; } 75% { opacity: 1; } 100% { opacity: 0; scale: 1.08; } }
+
+.mine { grid-area: mine; position: relative; z-index: 2; min-width: 0; }
+.hand { display: flex; justify-content: center; min-height: calc(var(--cw) * 1.66); padding-top: calc(var(--cw) * .26); touch-action: none; }
+.hand .card { margin-left: calc(var(--step, 30px) - var(--cw)); cursor: pointer; }
+.hand .card:first-child { margin-left: 0; }
+.hand .card.g { margin-left: calc(var(--step, 30px) - var(--cw) + var(--gap, 0px)); }
+.hand .card.sel { translate: 0 calc(var(--cw) * -.24); box-shadow: 0 0 0 2px var(--rose-light), 0 0 14px #ff7aa5aa, 0 4px 10px #0009; }
+.hand .card.new:not(.sel) { box-shadow: 0 0 0 2px var(--mint), 0 0 12px #74ebcb99, 0 2px 6px #0008; }
+.hand .card.new::after { content: ""; position: absolute; left: 50%; top: -5px; width: 8px; height: 8px; translate: -50% 0; border-radius: 50%; background: var(--mint); box-shadow: 0 0 6px var(--mint); }
+.hand .card.off { filter: brightness(.62) saturate(.6); translate: 0 calc(var(--cw) * .08); cursor: not-allowed; }
+.hand .card.hint { animation: hintP .9s 3; }
+@keyframes hintP { 50% { box-shadow: 0 0 0 3px var(--mint), 0 0 18px var(--mint); } }
+.hand .card.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.hand .card:focus-visible { outline-offset: 1px; z-index: 1; }
+.mine.turn::after { content: ""; position: absolute; left: 12%; right: 12%; bottom: -3px; height: 3px; border-radius: 3px; background: var(--rose-light); box-shadow: 0 0 12px var(--rose); }
+
+.msg { flex-shrink: 0; min-height: 20px; font-size: 14px; font-weight: 800; text-align: center; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg.good { color: var(--mint); }
+.msg.bad { color: var(--warn); }
+
+.controls { flex-shrink: 0; display: grid; grid-template-columns: repeat(4, auto); gap: 6px; }
+.btn { height: 46px; min-width: 0; padding: 0 6px; border-radius: 12px; font-size: 16px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(#ffaac6, var(--rose)); color: #3b0820; box-shadow: 0 3px 0 var(--rose-dark); }
+.btn.alt { background: linear-gradient(#fff7fa, #ecd8e2); color: var(--ink); box-shadow: 0 3px 0 #a98b9b; }
+.btn:not(:disabled):active { translate: 0 2px; box-shadow: none; }
+.btn:disabled { opacity: .38; }
+.btn.armed { animation: pulse .9s infinite; }
+.btn.nudge { animation: pulse .9s 3; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--rose-light), 0 0 18px var(--rose); } }
+
+/* Side column pieces, only shown in wide frames. */
+.board { display: none; min-height: 0; flex-direction: column; gap: 4px; }
+.brow { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; padding: 4px 8px 4px 4px; border-radius: 12px; background: #00000033; font-size: 13px; font-weight: 800; }
+.brow .av { width: 24px; height: 24px; font-size: 15px; }
+.brow .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brow .bh { min-width: 34px; text-align: right; color: var(--rose-light); font-variant-numeric: tabular-nums; }
+.brow .bt { min-width: 34px; text-align: right; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.brow.turn { box-shadow: inset 0 0 0 1.5px var(--rose-light); }
+.brow.lead .bt::before { content: "♛ "; color: var(--mint); font-size: 12px; }
+.bhead { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; column-gap: 8px; padding: 0 8px 0 4px; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.bhead span { min-width: 34px; text-align: right; white-space: nowrap; }
+.lastbox { display: none; min-height: 0; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 14px; background: #00000030; box-shadow: inset 0 0 0 1px #ffffff12; overflow: hidden; }
+.lastbox .bl { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt { --cw: 34px; display: flex; justify-content: center; gap: 6px; }
+.lt figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 14px; }
+.lt figure.w .card { box-shadow: 0 0 0 2px var(--rose-light), 0 0 10px var(--rose); }
+.lt .none { padding: 8px 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.lastbox .lw { font-size: 12.5px; font-weight: 800; text-align: center; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lastbox .lw:empty { display: none; }
+.seen { display: none; min-height: 0; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 14px; background: #00000030; box-shadow: inset 0 0 0 1px #ffffff12; overflow: hidden; }
+.seen .bl { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow { display: grid; grid-template-columns: 16px repeat(13, minmax(0, 1fr)); align-items: center; gap: 1px; font-size: 11px; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+.srow b { font-size: 13px; }
+.srow.r b, .srow.r span { color: #ff8fb0; }
+.srow span { padding: 1px 0; border-radius: 4px; color: var(--text); letter-spacing: -.04em; }
+.srow span.gone { opacity: .22; text-decoration: line-through; }
+.srow span.own { background: #ffffff24; box-shadow: inset 0 -2px 0 var(--rose); }
+
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: #14040fc4; }
+.overlay[hidden] { display: none; }
+.panel { width: min(420px, 100%); max-height: calc(100% - 16px); overflow-y: auto; padding: 20px 18px; border-radius: 20px; background: linear-gradient(#5a1a4d, #2c0a27); box-shadow: 0 0 0 1px #ffffff1c, 0 20px 50px #000a; text-align: center; animation: pop .3s; }
+@keyframes pop { from { scale: .3; opacity: 0; } }
+.panel h2 { font-size: 22px; font-weight: 900; color: var(--rose-light); }
+.panel .sub { margin-top: 2px; font-size: 13px; font-weight: 800; color: var(--text); }
+.panel p { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.panel .btn { width: 100%; margin-top: 16px; }
+.panel .btn + .btn { margin-top: 10px; }
+.panel .lbl { margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.fan { --cw: 40px; display: flex; justify-content: center; height: 60px; margin-bottom: 6px; }
+.fan .card:nth-child(1) { rotate: -14deg; translate: 6px 6px; }
+.fan .card:nth-child(3) { rotate: 14deg; translate: -6px 6px; }
+.seg { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: #00000040; }
+.seg button { flex: 1; min-width: 0; padding: 8px 4px; border-radius: 9px; font-size: 13.5px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg button[aria-pressed="true"] { background: var(--rose); color: #3b0820; }
+.panel > .seg { margin-top: 8px; }
+#moonSeg button { white-space: normal; line-height: 1.15; overflow-wrap: anywhere; }
+.toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #00000038; font-size: 13.5px; font-weight: 800; text-align: left; }
+.toggle::after { content: ""; flex-shrink: 0; width: 38px; height: 22px; border-radius: 99px; background: #ffffff2a radial-gradient(circle at 11px 50%, #fff 8px, transparent 8.5px); transition: background .2s; }
+.toggle[aria-pressed="true"]::after { background: var(--mint-dark) radial-gradient(circle at 27px 50%, #fff 8px, transparent 8.5px); }
+.speedrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 6px 6px 6px 12px; border-radius: 12px; background: #00000038; font-size: 14px; font-weight: 800; text-align: left; }
+.speedrow .seg button { flex: none; padding: 5px 9px; font-size: 12.5px; }
+.warn { font-size: 12.5px !important; color: var(--warn) !important; }
+.warn[hidden] { display: none; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; }
+.grid > div { padding: 6px; border-radius: 10px; background: #00000038; }
+.grid small { display: block; font-size: 11px; font-weight: 800; color: var(--muted); }
+.grid strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.panel ul { margin-top: 12px; padding-left: 18px; text-align: left; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.panel li + li { margin-top: 6px; }
+.panel .link { margin-top: 12px; font-size: 13px; font-weight: 800; color: var(--muted); text-decoration: underline; }
+.big { font-size: 44px; line-height: 1.1; }
+.rows { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; text-align: left; }
+.rrow { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; padding: 6px 8px; border-radius: 12px; background: #00000038; }
+.rrow.me { box-shadow: inset 0 0 0 1.5px #ffb3cb88; }
+.rrow .av { width: 28px; height: 28px; }
+.rrow .rn { min-width: 0; font-size: 13.5px; font-weight: 900; line-height: 1.25; }
+.rrow .rn span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rrow .rn small { display: block; font-size: 11px; font-weight: 700; color: var(--muted); white-space: normal; }
+.rrow .rp { padding: 2px 8px; border-radius: 99px; background: #ffffff1c; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.rrow .rp.p0 { background: var(--mint); color: #06291f; }
+.rrow .rd { min-width: 48px; text-align: right; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.rrow .rd.up { color: var(--warn); }
+.rrow .rd.down { color: var(--mint); }
+.rrow .rd small { display: block; font-size: 10.5px; font-weight: 800; color: var(--muted); }
+.note { margin-top: 10px !important; padding: 6px 10px; border-radius: 10px; background: #74ebcb22; color: var(--mint) !important; font-weight: 800; font-size: 13px !important; }
+.note:empty { display: none; }
+.sheet { width: 100%; margin-top: 12px; border-collapse: separate; border-spacing: 0 3px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sheet th { padding: 2px 4px; font-size: 11px; color: var(--muted); font-weight: 800; white-space: nowrap; max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
+.sheet td { padding: 4px; background: #00000030; }
+.sheet td:first-child { border-radius: 8px 0 0 8px; color: var(--muted); }
+.sheet td:last-child { border-radius: 0 8px 8px 0; }
+.sheet tfoot td { background: #ff7aa533; font-size: 15px; font-weight: 900; }
+.sheet .mo { color: var(--mint); }
+.sheet-wrap { max-height: 46vh; overflow-y: auto; }
+.lastrow { --cw: 46px; display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.lastrow figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.lastrow figure.w .card { box-shadow: 0 0 0 2.5px var(--rose-light), 0 0 14px var(--rose); }
+.lastrow figure.w { color: var(--rose-light); }
+.choice { display: grid; gap: 8px; margin-top: 14px; }
+.choice .btn { margin-top: 0 !important; height: auto; min-height: 46px; padding: 6px 10px; white-space: normal; line-height: 1.2; }
+.choice .btn small { display: block; font-size: 12px; font-weight: 800; opacity: .8; }
+
+@media (max-height: 620px) {
+  .btn { height: 42px; }
+}
+/* Small portrait frames: slimmer header, HUD and controls so the table keeps its height. */
+@media (max-height: 560px) and (max-aspect-ratio: 5/4) {
+  .app { gap: 6px; }
+  .pill, .icon { height: 30px; }
+  .icon { width: 30px; }
+  .stat { padding: 2px 3px 3px; }
+  .stat strong { font-size: 14px; }
+  .msg { min-height: 17px; font-size: 12.5px; }
+  .btn { height: 38px; font-size: 14px; }
+}
+@media (max-width: 360px) {
+  .stat small { letter-spacing: 0; }
+  .btn { padding: 0 4px; font-size: 13px; letter-spacing: -.01em; }
+  .controls { gap: 5px; }
+  .top { gap: 5px; }
+  .pill { padding: 0 8px; }
+}
+/* Wide frames: the table takes the full height on the left; HUD, scores, last trick and buttons move to a side column. */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: 1680px; display: grid; grid-template-columns: minmax(0, 1fr) clamp(220px, 26vw, 330px); grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto; grid-template-areas: "felt top" "felt hud" "felt board" "felt last" "felt seen" "felt msg" "felt controls"; column-gap: 12px; row-gap: 8px; }
+  .top { grid-area: top; }
+  .hud { grid-area: hud; }
+  .felt { grid-area: felt; }
+  .board { grid-area: board; display: flex; }
+  .lastbox { grid-area: last; display: flex; }
+  .seen { grid-area: seen; display: flex; align-self: start; max-height: 100%; }
+  .top { gap: 5px; }
+  .top h1 { font-size: clamp(19px, 1.9vw, 27px); }
+  .top .pill { padding: 0 9px; }
+  .top .pill span { display: none; }
+  .msg { grid-area: msg; min-height: 36px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; line-height: 1.3; font-size: 13.5px; }
+  .controls { grid-area: controls; grid-template-columns: 1fr 1fr; }
+}
+@media (min-aspect-ratio: 5/4) and (min-height: 700px) {
+  .lt { --cw: 44px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { row-gap: 6px; column-gap: 10px; }
+  .top h1 { font-size: 19px; }
+  .pill, .icon { height: 30px; }
+  .icon { width: 30px; }
+  .stat { padding: 2px 3px 3px; }
+  .stat strong { font-size: 14px; }
+  .msg { min-height: 0; font-size: 12.5px; }
+  .btn { height: 36px; font-size: 14px; }
+  .board { display: none; }
+  .lastbox { padding: 6px 8px; gap: 4px; }
+  .lt { --cw: 26px; gap: 4px; }
+  .lt figure { font-size: 12px; gap: 1px; }
+  .seen { padding: 6px 8px; gap: 3px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 450px) {
+  .seen { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 400px) {
+  .lastbox { display: none; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 360px) {
+  .top h1 { display: none; }
+  .top .pill { margin-right: auto; }
+}
+/* Short screens: compact panels so the main button stays reachable. */
+@media (max-height: 560px) {
+  .overlay { padding: 8px; }
+  .panel { width: min(540px, 100%); padding: 12px 16px; border-radius: 16px; }
+  .panel .big, .panel .fan { display: none; }
+  .panel h2 { font-size: 19px; }
+  .panel p { margin-top: 4px; font-size: 13px; line-height: 1.4; }
+  .panel .lbl { margin-top: 8px; }
+  .seg button { padding: 6px 4px; }
+  .panel .btn { height: 38px; margin-top: 10px; }
+  .panel .btn + .btn { margin-top: 8px; }
+  .panel > .btn:last-child { position: sticky; bottom: 0; }
+  .toggle, .speedrow { margin-top: 6px; padding-top: 7px; padding-bottom: 7px; }
+  .grid { margin-top: 8px; gap: 5px; }
+  .grid > div { padding: 4px 6px; }
+  .grid strong { font-size: 16px; }
+  .rows { margin-top: 8px; gap: 4px; }
+  .rrow { padding: 4px 8px; }
+  .panel ul { margin-top: 8px; font-size: 12.5px; line-height: 1.45; }
+  .lastrow { --cw: 38px; margin-top: 8px; }
+  .sheet-wrap { max-height: none; }
+}
+@media (max-height: 480px) and (min-aspect-ratio: 4/3) {
+  .panel { width: min(600px, 100%); }
+  .grid { grid-template-columns: repeat(4, 1fr); }
+  .rows { display: grid; grid-template-columns: 1fr 1fr; }
+  .lobby2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+  .lobby2 > div:last-child { grid-column: 1 / -1; }
+  .choice { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1><i aria-hidden="true">♥</i>Hearts</h1>
+    <button type="button" class="pill" id="gameBtn" data-i18n-label="gameAria"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="5" width="11" height="15" rx="2" transform="rotate(-10 8 12)"/><rect x="10" y="4" width="11" height="15" rx="2" opacity=".6" transform="rotate(10 15 11)"/></svg><span id="lvlLbl"></span></button>
+    <button type="button" class="icon" id="scoresBtn" data-i18n-label="scores"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="4" width="18" height="3.2" rx="1.2"/><rect x="3" y="10.4" width="18" height="3.2" rx="1.2" opacity=".75"/><rect x="3" y="16.8" width="18" height="3.2" rx="1.2" opacity=".5"/></svg></button>
+    <button type="button" class="icon" id="statsBtn" data-i18n-label="stats"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg></button>
+    <button type="button" class="icon" id="helpBtn" data-i18n-label="help">?</button>
+  </header>
+
+  <div class="hud">
+    <div class="stat me" id="scoreStat"><small data-i18n="score">Score</small><strong id="hudScore">0</strong></div>
+    <div class="stat" id="handStat"><small data-i18n="thisHand">This hand</small><strong id="hudHand">0</strong></div>
+    <div class="stat"><small id="hudNoLbl">Hand 1</small><strong id="hudPass">–</strong></div>
+  </div>
+
+  <section class="felt" id="felt">
+    <div class="seat s2" id="seat2" role="group"></div>
+    <div class="seat s1" id="seat1" role="group"></div>
+    <div class="seat s3" id="seat3" role="group"></div>
+    <div class="pile" id="pile" role="img">
+      <div class="cross" id="cross">
+        <div class="tc t0" aria-hidden="true"></div><div class="tc t1" aria-hidden="true"></div><div class="tc t2" aria-hidden="true"></div><div class="tc t3" aria-hidden="true"></div>
+        <div class="arrow" id="arrow" aria-hidden="true"></div>
+      </div>
+      <div class="plbl" id="plbl" aria-hidden="true"></div>
+    </div>
+    <div class="mine" id="mine">
+      <div class="hand" id="hand" role="group" data-i18n-label="handAria"></div>
+    </div>
+  </section>
+
+  <div class="board" id="board" aria-hidden="true"></div>
+  <div class="lastbox" id="lastbox" aria-hidden="true"><p class="bl" data-i18n="lastTitle">Last trick</p><div class="lt" id="lastMini"></div><p class="lw" id="lastWho"></p></div>
+  <div class="seen" id="seen" aria-hidden="true"><p class="bl" data-i18n="seenTitle">Cards played</p><div id="seenGrid"></div></div>
+  <p class="msg" id="msg"></p>
+
+  <div class="controls">
+    <button type="button" class="btn alt" id="sortBtn" aria-keyshortcuts="S" data-i18n="sort">Sort</button>
+    <button type="button" class="btn alt" id="lastBtn" aria-keyshortcuts="L" data-i18n="last">Last trick</button>
+    <button type="button" class="btn alt" id="hintBtn" aria-keyshortcuts="H" data-i18n="hint">Hint</button>
+    <button type="button" class="btn" id="actBtn" aria-keyshortcuts="P">Pass</button>
+  </div>
+</div>
+
+<div class="overlay" id="lobbyPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lobbyTitle">
+    <div class="fan" id="fan" aria-hidden="true"></div>
+    <h2 id="lobbyTitle" data-i18n="lobbyTitle">New game</h2>
+    <p class="sub" data-i18n="lobbySub"></p>
+    <p data-i18n="lobbyText"></p>
+    <div class="lobby2">
+      <div><p class="lbl" id="lvlLblP" data-i18n="levelLbl">Opponents</p><div class="seg" id="lvlSeg" role="group" aria-labelledby="lvlLblP"></div></div>
+      <div><p class="lbl" id="tgtLbl" data-i18n="targetLbl">Play to</p><div class="seg" id="tgtSeg" role="group" aria-labelledby="tgtLbl"></div></div>
+      <div><p class="lbl" id="moonLbl" data-i18n="moonLbl">Shooting the moon</p><div class="seg" id="moonSeg" role="group" aria-labelledby="moonLbl"></div></div>
+    </div>
+    <p class="warn" id="leaveWarn" data-i18n="leaveWarn" hidden></p>
+    <button type="button" class="btn" id="startBtn" data-i18n="start">Deal</button>
+    <button type="button" class="btn alt" id="cancelBtn" data-i18n="cancel" hidden>Keep playing</button>
+  </div>
+</div>
+
+<div class="overlay" id="statsPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <h2 id="statsTitle" data-i18n="statsTitle">Your stats</h2>
+    <div class="grid" id="statsGrid"></div>
+    <div class="speedrow"><span id="speedLbl" data-i18n="speed">Game speed</span><div class="seg" id="speedSeg" role="group" aria-labelledby="speedLbl"></div></div>
+    <button type="button" class="toggle" id="confirmToggle" aria-pressed="false" data-i18n="confirmLbl"></button>
+    <button type="button" class="link" id="resetStats" data-i18n="reset">Reset stats</button>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="helpPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle" data-i18n="help">How to play</h2>
+    <ul id="helpList"></ul>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="scoresPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="scoresTitle">
+    <h2 id="scoresTitle" data-i18n="scoresTitle">Scoreboard</h2>
+    <p class="sub" id="scoresSub"></p>
+    <div class="sheet-wrap" id="sheet"></div>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="lastPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lastTitle">
+    <h2 id="lastTitle" data-i18n="lastTitle">Last trick</h2>
+    <div class="lastrow" id="lastRow"></div>
+    <p id="lastText"></p>
+    <button type="button" class="btn" data-close data-i18n="close">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="moonPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="moonTitle">
+    <div class="big" aria-hidden="true">🌙</div>
+    <h2 id="moonTitle" data-i18n="moonYou">You shot the moon!</h2>
+    <p data-i18n="moonText"></p>
+    <div class="choice">
+      <button type="button" class="btn" id="moonOthersBtn"></button>
+      <button type="button" class="btn alt" id="moonSelfBtn"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="resPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="resTitle">
+    <div class="big" id="resIcon" aria-hidden="true">♥</div>
+    <h2 id="resTitle"></h2>
+    <p id="resText"></p>
+    <p class="note" id="resNote"></p>
+    <div class="rows" id="resRows"></div>
+    <button type="button" class="btn" id="nextBtn">Next hand</button>
+  </div>
+</div>
+
+<div class="overlay" id="overPanel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="overTitle">
+    <div class="big" id="overIcon" aria-hidden="true">🏆</div>
+    <h2 id="overTitle"></h2>
+    <p id="overText"></p>
+    <div class="rows" id="overRows"></div>
+    <button type="button" class="btn" id="againBtn" data-i18n="newGame">New game</button>
+  </div>
+</div>
+
+<p class="sr-only" id="sr" aria-live="polite"></p>
+
+<script>
+(() => {
+  'use strict';
+
+  const I18N = {
+    en: {
+      gameAria: 'New game and options', scores: 'Scoreboard', stats: 'Stats and settings', help: 'How to play',
+      score: 'Score', thisHand: 'This hand', handN: n => `Hand ${n}`, you: 'You',
+      dirs: { left: 'Left', right: 'Right', across: 'Across', hold: 'No pass' },
+      levels: { 0: 'Easy', 1: 'Normal', 2: 'Hard' },
+      sort: 'Sort', last: 'Last trick', hint: 'Hint', passBtn: 'Pass', scoresBtn: 'Scores',
+      sortedA: 'Sorted by suit, low to high', sortedB: 'Sorted by suit, high to low',
+      suitNames: ['clubs', 'diamonds', 'spades', 'hearts'], cardAria: (r, s) => `${r} of ${s}`,
+      handAria: 'Your hand', trickAria: 'Current trick', noCards: 'no cards yet',
+      passPick: n => `Choose 3 cards to pass to ${n}`, passMore: k => (k === 1 ? 'Pick 1 more card' : `Pick ${k} more cards`), passReady: n => `Ready — tap Pass to give them to ${n}`,
+      passMax: 'You can pass only 3 cards', passWait: 'Passing cards…', holdMsg: 'Keeper hand — no passing this time', received: n => `New cards from ${n} are marked in green`,
+      lead2c: 'You hold 2♣ — lead it to start', yourLead: 'Your lead — play any card', yourLeadNoHearts: 'Your lead — hearts are not broken yet',
+      follow: s => `Follow suit: play a ${s} card`, discard: 'You can’t follow suit — play any card', discardFirst: 'You can’t follow suit — no points on the first trick',
+      thinking: n => `${n} is thinking…`, tapAgain: 'Tap the card again to play it', yourTurn: 'Your turn',
+      errFollow: s => `You must follow suit (${s})`, errHearts: 'Hearts are not broken yet — lead another suit', errFirst: 'No hearts or Q♠ on the first trick', err2c: 'The first trick starts with 2♣',
+      trickYou: p => (p ? `You take the trick: +${p}` : 'You take the trick'), trickOther: (n, p) => (p ? `${n} takes the trick: +${p}` : `${n} takes the trick`),
+      broken: 'Hearts are broken!', trickN: n => `Trick ${n}/13`, brokenShort: '♥ broken', passTo: (d, n) => `Pass ${d} → ${n}`, holdLbl: 'Keeper hand',
+      queenTo: n => `${n} takes the Q♠!`, queenYou: 'You take the Q♠: +13',
+      moonBanner: 'Moon!', moonBy: n => `${n} shot the moon!`, moonYou: 'You shot the moon!', moonText: 'You took every heart and the Q♠. How do you want to score it?',
+      moonOthers: '+26 to everyone else', moonSelf: '−26 from your score', moonProj: s => `Your score: ${s}`, moonOthersNote: 'Everyone else +26', moonSelfNote: 'Shooter −26',
+      resTitle: n => `Hand ${n}`, resYou: p => (p === 0 ? 'A clean hand — no points!' : p === 1 ? 'You took 1 point.' : `You took ${p} points.`), resMoonYou: 'You shot the moon!',
+      handCol: 'Hand', total: 'Total', next: 'Next hand', toResults: 'Final results', tieMore: 'Tied for the lowest score — one more hand decides it!',
+      winTitle: 'You win!', loseTitle: p => `Game over — you finished ${p}`, overText: (s, n) => `Your final score: ${s} after ${n} hands. Lowest score wins.`,
+      places: ['1st', '2nd', '3rd', '4th'], newGame: 'New game',
+      lobbyTitle: 'New game', lobbySub: 'Classic Hearts · 4 players', lobbyText: 'You against three computer players. Dodge the hearts and the queen of spades — or take them all and shoot the moon. When someone reaches the target, the lowest score wins.',
+      levelLbl: 'Opponents', targetLbl: 'Play to', targetN: n => `${n} points`, moonLbl: 'Shooting the moon', moonOpts: { others: '+26 to others', choose: 'Shooter chooses' },
+      start: 'Deal', cancel: 'Keep playing', leaveWarn: 'Starting a new game ends the current one.',
+      statsTitle: 'Your stats', sGames: 'Games played', sWins: 'Games won', sHands: 'Hands played', sClean: 'Clean hands', sMoons: 'Moons shot', sQueens: 'Q♠ taken', sAvg: 'Points per hand', sBest: 'Best winning score', none: '—',
+      speed: 'Game speed', speeds: { slow: 'Slow', normal: 'Normal', fast: 'Fast' }, confirmLbl: 'Tap a card twice to play it', reset: 'Reset stats', close: 'Close',
+      scoresTitle: 'Scoreboard', scoresSub: n => `Game to ${n} points — lowest score wins`, noHands: 'No hands played yet.',
+      seenTitle: 'Cards played', lastTitle: 'Last trick', lastNone: 'No trick has been played yet.', lastWon: (n, p) => (p ? `${n} took it: +${p}` : `${n} took it`),
+      seatAria: (n, c, h, s) => `${n}: ${c} cards, ${h} points this hand, score ${s}`,
+      hintPass: 'Hint: these 3 cards are the riskiest to keep', hintPlay: c => `Hint: play ${c}`,
+      helpLines: [
+        'Four players get 13 cards each. Every heart you take costs 1 point and the queen of spades costs 13. When someone reaches the target score, the player with the lowest score wins.',
+        'Before each hand you pass 3 cards: to the left, then to the right, then across, then a keeper hand with no passing. Cards you receive are marked in green.',
+        'Whoever holds 2♣ leads it. You must follow the suit that was led if you can; if you can’t, play any card. The highest card of the led suit takes the trick and leads the next one.',
+        'No hearts and no Q♠ on the first trick (unless you have nothing else). Hearts can’t be led until a heart has been played — unless your hand holds only hearts.',
+        'Shooting the moon: take all 13 hearts and the Q♠ and you score 0 while everyone else gets 26. With the “Shooter chooses” option you may take 26 off your own score instead.',
+        'Tips: pass away high spades and high hearts, empty a short suit so you can throw away dangerous cards, and keep an eye on who has run out of a suit.',
+        'Keys: ←/→ move between cards, Enter or Space play (or pick for passing), P pass the chosen cards, H hint, S sort, L last trick.',
+      ],
+    },
+    vi: {
+      gameAria: 'Ván mới và tùy chọn', scores: 'Bảng điểm', stats: 'Thống kê và cài đặt', help: 'Cách chơi',
+      score: 'Điểm', thisHand: 'Ván này', handN: n => `Ván ${n}`, you: 'Bạn',
+      dirs: { left: 'Trái', right: 'Phải', across: 'Đối diện', hold: 'Giữ bài' },
+      levels: { 0: 'Dễ', 1: 'Vừa', 2: 'Khó' },
+      sort: 'Xếp bài', last: 'Nước trước', hint: 'Gợi ý', passBtn: 'Chuyển', scoresBtn: 'Bảng điểm',
+      sortedA: 'Đã xếp theo chất, nhỏ đến lớn', sortedB: 'Đã xếp theo chất, lớn đến nhỏ',
+      suitNames: ['chuồn', 'rô', 'bích', 'cơ'], cardAria: (r, s) => `${r} ${s}`,
+      handAria: 'Bài của bạn', trickAria: 'Nước bài hiện tại', noCards: 'chưa có lá nào',
+      passPick: n => `Chọn 3 lá để chuyển cho ${n}`, passMore: k => `Chọn thêm ${k} lá`, passReady: n => `Xong — bấm Chuyển để đưa cho ${n}`,
+      passMax: 'Chỉ được chuyển 3 lá', passWait: 'Đang chuyển bài…', holdMsg: 'Ván giữ bài — lần này không chuyển', received: n => `Các lá mới từ ${n} được đánh dấu xanh`,
+      lead2c: 'Bạn có 2♣ — hãy đánh lá này trước', yourLead: 'Lượt bạn đi đầu — đánh lá nào cũng được', yourLeadNoHearts: 'Lượt bạn đi đầu — chưa phá cơ',
+      follow: s => `Theo chất: đánh một lá ${s}`, discard: 'Bạn hết chất này — đánh lá nào cũng được', discardFirst: 'Bạn hết chất này — nước đầu không được đánh lá có điểm',
+      thinking: n => `${n} đang tính…`, tapAgain: 'Chạm lần nữa để đánh lá này', yourTurn: 'Đến lượt bạn',
+      errFollow: s => `Bạn phải theo chất (${s})`, errHearts: 'Chưa phá cơ — hãy đi chất khác', errFirst: 'Nước đầu không được đánh cơ hay Q♠', err2c: 'Nước đầu tiên phải đánh 2♣',
+      trickYou: p => (p ? `Bạn ăn nước này: +${p}` : 'Bạn ăn nước này'), trickOther: (n, p) => (p ? `${n} ăn nước này: +${p}` : `${n} ăn nước này`),
+      broken: 'Đã phá cơ!', trickN: n => `Nước ${n}/13`, brokenShort: 'đã phá cơ', passTo: (d, n) => `Chuyển ${d.toLowerCase()} → ${n}`, holdLbl: 'Ván giữ bài',
+      queenTo: n => `${n} ăn Q♠!`, queenYou: 'Bạn ăn Q♠: +13',
+      moonBanner: 'Bắn trăng!', moonBy: n => `${n} bắn trăng!`, moonYou: 'Bạn bắn trăng!', moonText: 'Bạn đã ăn hết các lá cơ và Q♠. Bạn muốn tính điểm thế nào?',
+      moonOthers: 'Cộng 26 cho mọi người khác', moonSelf: 'Trừ 26 điểm của bạn', moonProj: s => `Điểm của bạn: ${s}`, moonOthersNote: 'Mọi người khác +26', moonSelfNote: 'Người bắn trăng −26',
+      resTitle: n => `Ván ${n}`, resYou: p => (p === 0 ? 'Ván sạch — không mất điểm nào!' : `Bạn bị ${p} điểm.`), resMoonYou: 'Bạn bắn trăng!',
+      handCol: 'Ván', total: 'Tổng', next: 'Ván tiếp', toResults: 'Xem kết quả', tieMore: 'Đang hòa điểm thấp nhất — thêm một ván để phân định!',
+      winTitle: 'Bạn thắng!', loseTitle: p => `Hết trận — bạn xếp ${p.toLowerCase()}`, overText: (s, n) => `Điểm cuối của bạn: ${s} sau ${n} ván. Ít điểm nhất sẽ thắng.`,
+      places: ['Nhất', 'Nhì', 'Ba', 'Tư'], newGame: 'Trận mới',
+      lobbyTitle: 'Trận mới', lobbySub: 'Hearts cổ điển · 4 người', lobbyText: 'Bạn đấu với ba người chơi máy. Né các lá cơ và Q♠ — hoặc ăn hết để bắn trăng. Khi có người chạm mốc điểm, ai ít điểm nhất sẽ thắng.',
+      levelLbl: 'Đối thủ', targetLbl: 'Chơi đến', targetN: n => `${n} điểm`, moonLbl: 'Bắn trăng', moonOpts: { others: '+26 cho người khác', choose: 'Người bắn chọn' },
+      start: 'Chia bài', cancel: 'Chơi tiếp', leaveWarn: 'Bắt đầu trận mới sẽ kết thúc trận hiện tại.',
+      statsTitle: 'Thống kê của bạn', sGames: 'Số trận', sWins: 'Trận thắng', sHands: 'Số ván', sClean: 'Ván sạch', sMoons: 'Lần bắn trăng', sQueens: 'Lần ăn Q♠', sAvg: 'Điểm mỗi ván', sBest: 'Điểm thắng tốt nhất', none: '—',
+      speed: 'Tốc độ', speeds: { slow: 'Chậm', normal: 'Vừa', fast: 'Nhanh' }, confirmLbl: 'Chạm hai lần mới đánh lá bài', reset: 'Xóa thống kê', close: 'Đóng',
+      scoresTitle: 'Bảng điểm', scoresSub: n => `Chơi đến ${n} điểm — ít điểm nhất thắng`, noHands: 'Chưa chơi ván nào.',
+      seenTitle: 'Lá đã ra', lastTitle: 'Nước trước', lastNone: 'Chưa có nước bài nào.', lastWon: (n, p) => (p ? `${n} ăn: +${p}` : `${n} ăn`),
+      seatAria: (n, c, h, s) => `${n}: ${c} lá, ván này ${h} điểm, tổng ${s}`,
+      hintPass: 'Gợi ý: đây là 3 lá nguy hiểm nhất nếu giữ lại', hintPlay: c => `Gợi ý: đánh ${c}`,
+      helpLines: [
+        'Bốn người, mỗi người 13 lá. Mỗi lá cơ ăn phải bị 1 điểm, còn Q♠ (đầm bích) bị 13 điểm. Khi có người chạm mốc điểm, ai ít điểm nhất sẽ thắng.',
+        'Trước mỗi ván bạn chuyển 3 lá: sang trái, rồi sang phải, rồi cho người đối diện, rồi một ván giữ bài không chuyển. Các lá nhận được có viền xanh.',
+        'Ai có 2♣ đánh lá đó đầu tiên. Phải theo chất được đi nếu còn; nếu hết chất thì đánh lá bất kỳ. Lá cao nhất của chất được đi sẽ ăn nước đó và đi đầu nước sau.',
+        'Nước đầu tiên không được đánh cơ hay Q♠ (trừ khi không còn lá nào khác). Chưa phá cơ thì không được đi cơ — trừ khi trên tay chỉ còn cơ.',
+        'Bắn trăng: ăn đủ 13 lá cơ và Q♠ thì bạn được 0 điểm còn mọi người khác bị 26. Với tùy chọn “Người bắn chọn”, bạn có thể trừ 26 điểm của mình thay vào đó.',
+        'Mẹo: chuyển đi bích lớn và cơ lớn, làm hết một chất ngắn để có thể vứt lá nguy hiểm, và để ý xem ai đã hết chất nào.',
+        'Phím: ←/→ chọn lá, Enter hoặc Space đánh (hoặc chọn lá để chuyển), P chuyển bài, H gợi ý, S xếp bài, L xem nước trước.',
+      ],
+    },
+    zh: {
+      gameAria: '新游戏与选项', scores: '计分板', stats: '统计与设置', help: '玩法',
+      score: '总分', thisHand: '本局', handN: n => `第 ${n} 局`, you: '你',
+      dirs: { left: '向左', right: '向右', across: '对家', hold: '不传' },
+      levels: { 0: '简单', 1: '普通', 2: '困难' },
+      sort: '理牌', last: '上一墩', hint: '提示', passBtn: '传牌', scoresBtn: '计分',
+      sortedA: '已按花色排序，从小到大', sortedB: '已按花色排序，从大到小',
+      suitNames: ['梅花', '方块', '黑桃', '红心'], cardAria: (r, s) => `${s}${r}`,
+      handAria: '你的手牌', trickAria: '当前这一墩', noCards: '还没有出牌',
+      passPick: n => `选 3 张牌传给 ${n}`, passMore: k => `再选 ${k} 张`, passReady: n => `选好了——点“传牌”交给 ${n}`,
+      passMax: '只能传 3 张牌', passWait: '正在传牌…', holdMsg: '本局不传牌', received: n => `${n} 传来的新牌已用绿色标出`,
+      lead2c: '你有 2♣——先出这张牌', yourLead: '轮到你首出——任意牌都可以', yourLeadNoHearts: '轮到你首出——红心还没破',
+      follow: s => `请跟出${s}`, discard: '你没有这个花色——可以出任意牌', discardFirst: '你没有这个花色——第一墩不能出分牌',
+      thinking: n => `${n} 正在思考…`, tapAgain: '再点一次即可出牌', yourTurn: '轮到你了',
+      errFollow: s => `必须跟同花色（${s}）`, errHearts: '红心还没破——请出其他花色', errFirst: '第一墩不能出红心或 Q♠', err2c: '第一墩必须先出 2♣',
+      trickYou: p => (p ? `你赢下这一墩：+${p}` : '你赢下这一墩'), trickOther: (n, p) => (p ? `${n} 赢下这一墩：+${p}` : `${n} 赢下这一墩`),
+      broken: '红心已破！', trickN: n => `第 ${n}/13 墩`, brokenShort: '红心已破', passTo: (d, n) => `${d}传牌 → ${n}`, holdLbl: '本局不传牌',
+      queenTo: n => `${n} 吃到 Q♠！`, queenYou: '你吃到 Q♠：+13',
+      moonBanner: '全收！', moonBy: n => `${n} 全收（射月）！`, moonYou: '你全收了（射月）！', moonText: '你拿下了所有红心和 Q♠。想怎么计分？',
+      moonOthers: '其他人各加 26 分', moonSelf: '你自己减 26 分', moonProj: s => `你的总分：${s}`, moonOthersNote: '其他人 +26', moonSelfNote: '全收者 −26',
+      resTitle: n => `第 ${n} 局`, resYou: p => (p === 0 ? '干净的一局——一分未失！' : `你本局得了 ${p} 分。`), resMoonYou: '你全收了！',
+      handCol: '局', total: '总分', next: '下一局', toResults: '查看最终结果', tieMore: '最低分打平——再来一局决胜负！',
+      winTitle: '你赢了！', loseTitle: p => `游戏结束——你获得${p}`, overText: (s, n) => `${n} 局后你的最终得分为 ${s}。分数最低者获胜。`,
+      places: ['第一', '第二', '第三', '第四'], newGame: '新游戏',
+      lobbyTitle: '新游戏', lobbySub: '经典红心大战 · 4 人', lobbyText: '你对战三名电脑玩家。躲开红心和黑桃 Q——或者把它们全部收下来个“射月”。有人达到目标分时，分数最低者获胜。',
+      levelLbl: '对手', targetLbl: '目标分', targetN: n => `${n} 分`, moonLbl: '全收（射月）', moonOpts: { others: '他人 +26', choose: '全收者选择' },
+      start: '发牌', cancel: '继续游戏', leaveWarn: '开始新游戏会结束当前这一场。',
+      statsTitle: '你的统计', sGames: '已玩场数', sWins: '获胜场数', sHands: '已玩局数', sClean: '零分局', sMoons: '全收次数', sQueens: '吃到 Q♠', sAvg: '每局平均分', sBest: '最佳获胜分', none: '—',
+      speed: '游戏速度', speeds: { slow: '慢', normal: '正常', fast: '快' }, confirmLbl: '点两次才出牌', reset: '重置统计', close: '关闭',
+      scoresTitle: '计分板', scoresSub: n => `打到 ${n} 分——分数最低者获胜`, noHands: '还没有打完的局。',
+      seenTitle: '已出的牌', lastTitle: '上一墩', lastNone: '还没有完成的墩。', lastWon: (n, p) => (p ? `${n} 赢下：+${p}` : `${n} 赢下`),
+      seatAria: (n, c, h, s) => `${n}：${c} 张牌，本局 ${h} 分，总分 ${s}`,
+      hintPass: '提示：这 3 张牌留在手里最危险', hintPlay: c => `提示：出 ${c}`,
+      helpLines: [
+        '四名玩家各拿 13 张牌。每吃到一张红心计 1 分，黑桃 Q 计 13 分。有人达到目标分时，分数最低的玩家获胜。',
+        '每局开始前要传 3 张牌：依次向左、向右、给对家，然后一局不传牌。收到的牌会用绿色标出。',
+        '持有 2♣ 的玩家先出这张牌。能跟同花色就必须跟；没有该花色时可以出任意牌。首出花色中最大的牌赢下这一墩，并首出下一墩。',
+        '第一墩不能出红心或 Q♠（除非手里没有别的牌）。在有人出过红心之前不能首出红心——除非手里只剩红心。',
+        '全收（射月）：拿下全部 13 张红心和 Q♠，你得 0 分，其他人各得 26 分。开启“全收者选择”时，也可以改为自己减 26 分。',
+        '技巧：把大黑桃和大红心传出去，打空一门短花色以便垫掉危险牌，并留意谁已经缺门。',
+        '按键：←/→ 选牌，Enter 或空格 出牌（传牌时为选牌），P 传牌，H 提示，S 理牌，L 查看上一墩。',
+      ],
+    },
+    fr: {
+      gameAria: 'Nouvelle partie et options', scores: 'Tableau des scores', stats: 'Statistiques et réglages', help: 'Règles du jeu',
+      score: 'Score', thisHand: 'Cette donne', handN: n => `Donne ${n}`, you: 'Vous',
+      dirs: { left: 'À gauche', right: 'À droite', across: 'En face', hold: 'On garde' },
+      levels: { 0: 'Facile', 1: 'Normal', 2: 'Difficile' },
+      sort: 'Trier', last: 'Dernier pli', hint: 'Indice', passBtn: 'Passer', scoresBtn: 'Scores',
+      sortedA: 'Triées par couleur, croissant', sortedB: 'Triées par couleur, décroissant',
+      suitNames: ['trèfle', 'carreau', 'pique', 'cœur'], cardAria: (r, s) => `${r} de ${s}`,
+      handAria: 'Votre main', trickAria: 'Pli en cours', noCards: 'aucune carte jouée',
+      passPick: n => `Choisissez 3 cartes à passer à ${n}`, passMore: k => (k === 1 ? 'Encore 1 carte' : `Encore ${k} cartes`), passReady: n => `Prêt : touchez Passer pour les donner à ${n}`,
+      passMax: 'Vous ne pouvez passer que 3 cartes', passWait: 'Échange des cartes…', holdMsg: 'Donne sans échange cette fois', received: n => `Les cartes reçues de ${n} sont marquées en vert`,
+      lead2c: 'Vous avez le 2♣ : jouez-le pour commencer', yourLead: 'À vous d’entamer : n’importe quelle carte', yourLeadNoHearts: 'À vous d’entamer : les cœurs ne sont pas encore ouverts',
+      follow: s => `Fournissez : jouez un ${s}`, discard: 'Vous n’avez pas cette couleur : jouez ce que vous voulez', discardFirst: 'Vous n’avez pas cette couleur : pas de points au premier pli',
+      thinking: n => `${n} réfléchit…`, tapAgain: 'Touchez encore la carte pour la jouer', yourTurn: 'À vous de jouer',
+      errFollow: s => `Vous devez fournir (${s})`, errHearts: 'Les cœurs ne sont pas ouverts : entamez une autre couleur', errFirst: 'Ni cœur ni D♠ au premier pli', err2c: 'Le premier pli commence par le 2♣',
+      trickYou: p => (p ? `Vous remportez le pli : +${p}` : 'Vous remportez le pli'), trickOther: (n, p) => (p ? `${n} remporte le pli : +${p}` : `${n} remporte le pli`),
+      broken: 'Les cœurs sont ouverts !', trickN: n => `Pli ${n}/13`, brokenShort: '♥ ouverts', passTo: (d, n) => `${d} → ${n}`, holdLbl: 'Sans échange',
+      queenTo: n => `${n} ramasse la Q♠ !`, queenYou: 'Vous ramassez la Q♠ : +13',
+      moonBanner: 'Grand chelem !', moonBy: n => `${n} fait le grand chelem !`, moonYou: 'Grand chelem !', moonText: 'Vous avez ramassé tous les cœurs et la Q♠. Comment voulez-vous compter ?',
+      moonOthers: '+26 pour tous les autres', moonSelf: '−26 sur votre score', moonProj: s => `Votre score : ${s}`, moonOthersNote: 'Tous les autres +26', moonSelfNote: 'Le chelem −26',
+      resTitle: n => `Donne ${n}`, resYou: p => (p === 0 ? 'Donne propre : aucun point !' : p === 1 ? 'Vous prenez 1 point.' : `Vous prenez ${p} points.`), resMoonYou: 'Grand chelem !',
+      handCol: 'Donne', total: 'Total', next: 'Donne suivante', toResults: 'Résultats finaux', tieMore: 'Égalité pour le plus bas score : une donne de plus pour départager !',
+      winTitle: 'Vous gagnez !', loseTitle: p => `Partie terminée : vous finissez ${p}`, overText: (s, n) => `Score final : ${s} après ${n} donnes. Le plus petit score gagne.`,
+      places: ['1er', '2e', '3e', '4e'], newGame: 'Nouvelle partie',
+      lobbyTitle: 'Nouvelle partie', lobbySub: 'Hearts classique · 4 joueurs', lobbyText: 'Vous affrontez trois joueurs virtuels. Évitez les cœurs et la dame de pique, ou ramassez tout pour faire le grand chelem. Quand quelqu’un atteint l’objectif, le plus petit score gagne.',
+      levelLbl: 'Adversaires', targetLbl: 'Partie en', targetN: n => `${n} points`, moonLbl: 'Grand chelem', moonOpts: { others: '+26 aux autres', choose: 'Au choix' },
+      start: 'Distribuer', cancel: 'Continuer', leaveWarn: 'Une nouvelle partie met fin à la partie en cours.',
+      statsTitle: 'Vos statistiques', sGames: 'Parties jouées', sWins: 'Parties gagnées', sHands: 'Donnes jouées', sClean: 'Donnes propres', sMoons: 'Grands chelems', sQueens: 'Q♠ ramassées', sAvg: 'Points par donne', sBest: 'Meilleur score gagnant', none: '—',
+      speed: 'Vitesse de jeu', speeds: { slow: 'Lente', normal: 'Normale', fast: 'Rapide' }, confirmLbl: 'Toucher deux fois une carte pour la jouer', reset: 'Réinitialiser', close: 'Fermer',
+      scoresTitle: 'Tableau des scores', scoresSub: n => `Partie en ${n} points : le plus petit score gagne`, noHands: 'Aucune donne jouée pour l’instant.',
+      seenTitle: 'Cartes jouées', lastTitle: 'Dernier pli', lastNone: 'Aucun pli joué pour l’instant.', lastWon: (n, p) => (p ? `${n} l’a pris : +${p}` : `${n} l’a pris`),
+      seatAria: (n, c, h, s) => `${n} : ${c} cartes, ${h} points cette donne, score ${s}`,
+      hintPass: 'Indice : ces 3 cartes sont les plus risquées à garder', hintPlay: c => `Indice : jouez ${c}`,
+      helpLines: [
+        'Quatre joueurs reçoivent 13 cartes chacun. Chaque cœur ramassé coûte 1 point et la dame de pique 13. Quand quelqu’un atteint le score visé, le joueur au plus petit score gagne.',
+        'Avant chaque donne, vous passez 3 cartes : à gauche, puis à droite, puis en face, puis une donne sans échange. Les cartes reçues sont marquées en vert.',
+        'Le joueur qui a le 2♣ l’entame. Il faut fournir la couleur demandée si possible ; sinon, jouez n’importe quelle carte. La plus forte carte de la couleur demandée remporte le pli et entame le suivant.',
+        'Ni cœur ni Q♠ au premier pli (sauf si vous n’avez rien d’autre). On ne peut pas entamer cœur tant qu’aucun cœur n’a été joué, sauf si votre main ne contient que des cœurs.',
+        'Grand chelem : ramassez les 13 cœurs et la Q♠ et vous marquez 0 tandis que tous les autres prennent 26. Avec l’option « Au choix », vous pouvez plutôt retirer 26 à votre propre score.',
+        'Astuces : passez vos gros piques et gros cœurs, videz une couleur courte pour pouvoir défausser les cartes dangereuses et surveillez qui n’a plus une couleur.',
+        'Touches : ←/→ choisir une carte, Entrée ou Espace jouer (ou choisir pour l’échange), P passer les cartes, H indice, S trier, L dernier pli.',
+      ],
+    },
+    th: {
+      gameAria: 'เกมใหม่และตัวเลือก', scores: 'ตารางคะแนน', stats: 'สถิติและการตั้งค่า', help: 'วิธีเล่น',
+      score: 'คะแนน', thisHand: 'ตานี้', handN: n => `ตาที่ ${n}`, you: 'คุณ',
+      dirs: { left: 'ซ้าย', right: 'ขวา', across: 'ฝั่งตรงข้าม', hold: 'ไม่ส่ง' },
+      levels: { 0: 'ง่าย', 1: 'ปานกลาง', 2: 'ยาก' },
+      sort: 'เรียงไพ่', last: 'กองก่อน', hint: 'คำใบ้', passBtn: 'ส่งไพ่', scoresBtn: 'คะแนน',
+      sortedA: 'เรียงตามดอก จากน้อยไปมาก', sortedB: 'เรียงตามดอก จากมากไปน้อย',
+      suitNames: ['ดอกจิก', 'ข้าวหลามตัด', 'โพดำ', 'โพแดง'], cardAria: (r, s) => `${r} ${s}`,
+      handAria: 'ไพ่ในมือคุณ', trickAria: 'กองที่กำลังเล่น', noCards: 'ยังไม่มีใครลงไพ่',
+      passPick: n => `เลือกไพ่ 3 ใบส่งให้ ${n}`, passMore: k => `เลือกอีก ${k} ใบ`, passReady: n => `พร้อมแล้ว — แตะ ส่งไพ่ เพื่อให้ ${n}`,
+      passMax: 'ส่งได้แค่ 3 ใบ', passWait: 'กำลังส่งไพ่…', holdMsg: 'ตานี้ไม่ต้องส่งไพ่', received: n => `ไพ่ใหม่จาก ${n} มีขอบสีเขียว`,
+      lead2c: 'คุณมี 2♣ — ลงใบนี้ก่อน', yourLead: 'คุณเปิดกอง — ลงใบไหนก็ได้', yourLeadNoHearts: 'คุณเปิดกอง — ยังไม่เปิดโพแดง',
+      follow: s => `ต้องลงตามดอก: ${s}`, discard: 'คุณไม่มีดอกนี้ — ลงใบไหนก็ได้', discardFirst: 'คุณไม่มีดอกนี้ — กองแรกห้ามลงไพ่มีแต้ม',
+      thinking: n => `${n} กำลังคิด…`, tapAgain: 'แตะอีกครั้งเพื่อลงไพ่', yourTurn: 'ตาคุณ',
+      errFollow: s => `ต้องลงตามดอก (${s})`, errHearts: 'ยังไม่เปิดโพแดง — เปิดกองด้วยดอกอื่น', errFirst: 'กองแรกห้ามลงโพแดงหรือ Q♠', err2c: 'กองแรกต้องเริ่มด้วย 2♣',
+      trickYou: p => (p ? `คุณกินกองนี้: +${p}` : 'คุณกินกองนี้'), trickOther: (n, p) => (p ? `${n} กินกองนี้: +${p}` : `${n} กินกองนี้`),
+      broken: 'เปิดโพแดงแล้ว!', trickN: n => `กอง ${n}/13`, brokenShort: 'เปิด ♥ แล้ว', passTo: (d, n) => `ส่ง${d} → ${n}`, holdLbl: 'ตาไม่ส่งไพ่',
+      queenTo: n => `${n} ได้ Q♠!`, queenYou: 'คุณได้ Q♠: +13',
+      moonBanner: 'ยิงพระจันทร์!', moonBy: n => `${n} ยิงพระจันทร์!`, moonYou: 'คุณยิงพระจันทร์!', moonText: 'คุณกินโพแดงทุกใบและ Q♠ อยากนับคะแนนแบบไหน?',
+      moonOthers: 'ทุกคนที่เหลือ +26', moonSelf: 'หักคะแนนคุณ 26', moonProj: s => `คะแนนคุณ: ${s}`, moonOthersNote: 'ทุกคนที่เหลือ +26', moonSelfNote: 'คนยิง −26',
+      resTitle: n => `ตาที่ ${n}`, resYou: p => (p === 0 ? 'ตาสะอาด — ไม่เสียแต้มเลย!' : `ตานี้คุณได้ ${p} แต้ม`), resMoonYou: 'คุณยิงพระจันทร์!',
+      handCol: 'ตา', total: 'รวม', next: 'ตาต่อไป', toResults: 'ดูผลสุดท้าย', tieMore: 'คะแนนต่ำสุดเสมอกัน — เล่นอีกตาเพื่อตัดสิน!',
+      winTitle: 'คุณชนะ!', loseTitle: p => `จบเกม — คุณได้อันดับ${p}`, overText: (s, n) => `คะแนนสุดท้ายของคุณ ${s} หลังเล่น ${n} ตา คะแนนน้อยที่สุดชนะ`,
+      places: ['ที่ 1', 'ที่ 2', 'ที่ 3', 'ที่ 4'], newGame: 'เกมใหม่',
+      lobbyTitle: 'เกมใหม่', lobbySub: 'ไพ่ฮาร์ทแบบคลาสสิก · 4 คน', lobbyText: 'คุณเล่นกับคู่แข่งคอมพิวเตอร์สามคน หลบโพแดงและควีนโพดำ — หรือกินให้หมดเพื่อยิงพระจันทร์ เมื่อมีคนถึงคะแนนเป้าหมาย คนที่คะแนนน้อยที่สุดชนะ',
+      levelLbl: 'คู่แข่ง', targetLbl: 'เล่นถึง', targetN: n => `${n} แต้ม`, moonLbl: 'ยิงพระจันทร์', moonOpts: { others: 'คนอื่น +26', choose: 'คนยิงเลือก' },
+      start: 'แจกไพ่', cancel: 'เล่นต่อ', leaveWarn: 'การเริ่มเกมใหม่จะจบเกมที่เล่นอยู่',
+      statsTitle: 'สถิติของคุณ', sGames: 'เกมที่เล่น', sWins: 'เกมที่ชนะ', sHands: 'ตาที่เล่น', sClean: 'ตาสะอาด', sMoons: 'ยิงพระจันทร์', sQueens: 'ได้ Q♠', sAvg: 'แต้มต่อตา', sBest: 'คะแนนชนะที่ดีที่สุด', none: '—',
+      speed: 'ความเร็วเกม', speeds: { slow: 'ช้า', normal: 'ปกติ', fast: 'เร็ว' }, confirmLbl: 'แตะไพ่สองครั้งจึงจะลง', reset: 'ล้างสถิติ', close: 'ปิด',
+      scoresTitle: 'ตารางคะแนน', scoresSub: n => `เล่นถึง ${n} แต้ม — คะแนนน้อยที่สุดชนะ`, noHands: 'ยังไม่มีตาที่เล่นจบ',
+      seenTitle: 'ไพ่ที่ลงแล้ว', lastTitle: 'กองก่อนหน้า', lastNone: 'ยังไม่มีกองที่เล่นจบ', lastWon: (n, p) => (p ? `${n} กิน: +${p}` : `${n} กิน`),
+      seatAria: (n, c, h, s) => `${n}: ไพ่ ${c} ใบ ตานี้ ${h} แต้ม รวม ${s}`,
+      hintPass: 'คำใบ้: 3 ใบนี้เสี่ยงที่สุดถ้าเก็บไว้', hintPlay: c => `คำใบ้: ลง ${c}`,
+      helpLines: [
+        'ผู้เล่นสี่คนได้ไพ่คนละ 13 ใบ โพแดงแต่ละใบที่กินได้นับ 1 แต้ม ส่วนควีนโพดำนับ 13 แต้ม เมื่อมีคนถึงคะแนนเป้าหมาย คนที่คะแนนน้อยที่สุดชนะ',
+        'ก่อนแต่ละตาต้องส่งไพ่ 3 ใบ: ให้ทางซ้าย ทางขวา ฝั่งตรงข้าม แล้วตาถัดไปไม่ต้องส่ง ไพ่ที่ได้รับจะมีขอบสีเขียว',
+        'คนที่มี 2♣ ลงใบนี้เปิดกองแรก ต้องลงตามดอกที่เปิดถ้ามี ถ้าไม่มีลงใบไหนก็ได้ ไพ่ใหญ่สุดของดอกที่เปิดจะกินกองนั้นและเปิดกองต่อไป',
+        'กองแรกห้ามลงโพแดงหรือ Q♠ (ยกเว้นไม่มีไพ่อื่น) และห้ามเปิดกองด้วยโพแดงจนกว่าจะมีคนลงโพแดงแล้ว — ยกเว้นในมือเหลือแต่โพแดง',
+        'ยิงพระจันทร์: กินโพแดงครบ 13 ใบและ Q♠ คุณได้ 0 แต้ม ส่วนคนอื่นได้คนละ 26 ถ้าเปิดตัวเลือก “คนยิงเลือก” จะเลือกหักคะแนนตัวเอง 26 แทนก็ได้',
+        'เคล็ดลับ: ส่งโพดำใบใหญ่และโพแดงใบใหญ่ออกไป ทำให้ดอกที่มีน้อยหมดมือเพื่อทิ้งไพ่อันตราย และคอยดูว่าใครหมดดอกไหนแล้ว',
+        'ปุ่มลัด: ←/→ เลือกไพ่, Enter หรือ Space ลงไพ่ (หรือเลือกไพ่ที่จะส่ง), P ส่งไพ่, H คำใบ้, S เรียงไพ่, L ดูกองก่อน',
+      ],
+    },
+    ja: {
+      gameAria: '新しいゲームとオプション', scores: 'スコア表', stats: '記録と設定', help: '遊び方',
+      score: 'スコア', thisHand: 'この回', handN: n => `第${n}回`, you: 'あなた',
+      dirs: { left: '左へ', right: '右へ', across: '対面へ', hold: '交換なし' },
+      levels: { 0: 'かんたん', 1: 'ふつう', 2: 'むずかしい' },
+      sort: '並べ替え', last: '前のトリック', hint: 'ヒント', passBtn: '渡す', scoresBtn: 'スコア',
+      sortedA: 'スート順・小さい順に並べました', sortedB: 'スート順・大きい順に並べました',
+      suitNames: ['クラブ', 'ダイヤ', 'スペード', 'ハート'], cardAria: (r, s) => `${s}の${r}`,
+      handAria: 'あなたの手札', trickAria: '今のトリック', noCards: 'まだ誰も出していません',
+      passPick: n => `${n}に渡すカードを3枚選んでください`, passMore: k => `あと${k}枚選んでください`, passReady: n => `準備OK — 「渡す」で${n}に渡します`,
+      passMax: '渡せるのは3枚だけです', passWait: 'カードを交換中…', holdMsg: '今回はカード交換なし', received: n => `${n}から来たカードは緑色で表示`,
+      lead2c: '2♣を持っています — 最初に出してください', yourLead: 'あなたのリード — どのカードでもOK', yourLeadNoHearts: 'あなたのリード — ハートはまだブレイクしていません',
+      follow: s => `マストフォロー：${s}を出してください`, discard: 'そのスートがありません — どのカードでもOK', discardFirst: 'そのスートがありません — 最初のトリックでは点数札は出せません',
+      thinking: n => `${n}が考え中…`, tapAgain: 'もう一度タップで出します', yourTurn: 'あなたの番です',
+      errFollow: s => `同じスート（${s}）を出す必要があります`, errHearts: 'ハートはまだブレイクしていません — 他のスートでリード', errFirst: '最初のトリックにハートとスペードのQは出せません', err2c: '最初のトリックは2♣から始めます',
+      trickYou: p => (p ? `トリックを取りました：+${p}` : 'トリックを取りました'), trickOther: (n, p) => (p ? `${n}がトリックを取りました：+${p}` : `${n}がトリックを取りました`),
+      broken: 'ハートがブレイク！', trickN: n => `トリック ${n}/13`, brokenShort: '♥ブレイク済み', passTo: (d, n) => `${d}渡す → ${n}`, holdLbl: '交換なし',
+      queenTo: n => `${n}がスペードのQを取りました！`, queenYou: 'スペードのQを取りました：+13',
+      moonBanner: 'シュート・ザ・ムーン！', moonBy: n => `${n}がシュート・ザ・ムーン！`, moonYou: 'シュート・ザ・ムーン達成！', moonText: 'ハートを全部とスペードのQを取りました。点数のつけ方を選んでください。',
+      moonOthers: '他の全員に +26', moonSelf: '自分のスコアから −26', moonProj: s => `あなたのスコア：${s}`, moonOthersNote: '他の全員 +26', moonSelfNote: '達成者 −26',
+      resTitle: n => `第${n}回`, resYou: p => (p === 0 ? '失点ゼロのきれいな回！' : `この回は${p}点でした。`), resMoonYou: 'シュート・ザ・ムーン達成！',
+      handCol: '回', total: '合計', next: '次の回へ', toResults: '最終結果を見る', tieMore: '最少スコアが同点 — もう1回で決着！',
+      winTitle: 'あなたの勝ち！', loseTitle: p => `ゲーム終了 — あなたは${p}`, overText: (s, n) => `${n}回を終えて最終スコアは${s}。最少スコアが勝ちです。`,
+      places: ['1位', '2位', '3位', '4位'], newGame: '新しいゲーム',
+      lobbyTitle: '新しいゲーム', lobbySub: 'クラシック・ハーツ · 4人', lobbyText: 'CPU 3人と対戦します。ハートとスペードのQを避けるか、すべて取ってシュート・ザ・ムーンを狙いましょう。誰かが目標点に達したら、最少スコアの人の勝ちです。',
+      levelLbl: '対戦相手', targetLbl: '終了点数', targetN: n => `${n}点`, moonLbl: 'シュート・ザ・ムーン', moonOpts: { others: '他の人 +26', choose: '達成者が選ぶ' },
+      start: '配る', cancel: '続ける', leaveWarn: '新しいゲームを始めると今のゲームは終了します。',
+      statsTitle: 'あなたの記録', sGames: 'プレイ数', sWins: '勝利数', sHands: 'プレイした回', sClean: '失点ゼロの回', sMoons: 'ムーン達成', sQueens: '♠Qを取った回数', sAvg: '1回あたりの失点', sBest: '最高の勝利スコア', none: '—',
+      speed: 'ゲーム速度', speeds: { slow: 'おそい', normal: 'ふつう', fast: 'はやい' }, confirmLbl: '2回タップでカードを出す', reset: '記録をリセット', close: '閉じる',
+      scoresTitle: 'スコア表', scoresSub: n => `${n}点で終了 — 最少スコアの勝ち`, noHands: 'まだ終わった回はありません。',
+      seenTitle: '出たカード', lastTitle: '前のトリック', lastNone: 'まだ終わったトリックはありません。', lastWon: (n, p) => (p ? `${n}が取りました：+${p}` : `${n}が取りました`),
+      seatAria: (n, c, h, s) => `${n}：手札${c}枚、この回${h}点、合計${s}`,
+      hintPass: 'ヒント：この3枚は持っていると危険です', hintPlay: c => `ヒント：${c}を出す`,
+      helpLines: [
+        '4人に13枚ずつ配ります。取ったハートは1枚1点、スペードのQは13点。誰かが目標点に達したら、スコアが一番少ない人の勝ちです。',
+        '毎回の最初にカードを3枚渡します：左、右、対面の順で、4回目は交換なしです。受け取ったカードは緑色で表示されます。',
+        '2♣を持っている人がそれを出して始めます。リードされたスートを持っていれば必ず出し、なければ何を出してもかまいません。リードされたスートで一番強いカードがトリックを取り、次をリードします。',
+        '最初のトリックではハートとスペードのQは出せません（他にカードがない場合を除く）。ハートが一度出るまではハートでリードできません — 手札がハートだけの場合は別です。',
+        'シュート・ザ・ムーン：ハート13枚とスペードのQを全部取ると、自分は0点で他の全員が26点。「達成者が選ぶ」なら代わりに自分のスコアから26点引くこともできます。',
+        'コツ：大きなスペードとハートは渡してしまう、短いスートを早めになくして危ないカードを捨てられるようにする、誰がどのスートを切らしたかに注目。',
+        'キー操作：←/→ でカードを選ぶ、Enter か Space で出す（交換時は選択）、P で渡す、H ヒント、S 並べ替え、L 前のトリック。',
+      ],
+    },
+    ko: {
+      gameAria: '새 게임과 옵션', scores: '점수표', stats: '기록과 설정', help: '게임 방법',
+      score: '점수', thisHand: '이번 판', handN: n => `${n}번째 판`, you: '나',
+      dirs: { left: '왼쪽', right: '오른쪽', across: '맞은편', hold: '안 넘김' },
+      levels: { 0: '쉬움', 1: '보통', 2: '어려움' },
+      sort: '정렬', last: '지난 트릭', hint: '힌트', passBtn: '넘기기', scoresBtn: '점수',
+      sortedA: '무늬별, 낮은 순으로 정렬', sortedB: '무늬별, 높은 순으로 정렬',
+      suitNames: ['클럽', '다이아몬드', '스페이드', '하트'], cardAria: (r, s) => `${s} ${r}`,
+      handAria: '내 패', trickAria: '현재 트릭', noCards: '아직 낸 카드 없음',
+      passPick: n => `${n}에게 넘길 카드 3장을 고르세요`, passMore: k => `${k}장 더 고르세요`, passReady: n => `준비 완료 — 넘기기를 눌러 ${n}에게 주세요`,
+      passMax: '3장만 넘길 수 있어요', passWait: '카드를 넘기는 중…', holdMsg: '이번 판은 카드를 넘기지 않아요', received: n => `${n}에게 받은 카드는 초록색으로 표시돼요`,
+      lead2c: '2♣가 있어요 — 먼저 내세요', yourLead: '내가 리드 — 아무 카드나 내세요', yourLeadNoHearts: '내가 리드 — 아직 하트가 깨지지 않았어요',
+      follow: s => `같은 무늬를 내세요: ${s}`, discard: '이 무늬가 없어요 — 아무 카드나 내세요', discardFirst: '이 무늬가 없어요 — 첫 트릭에는 점수 카드를 낼 수 없어요',
+      thinking: n => `${n} 생각 중…`, tapAgain: '한 번 더 누르면 카드를 내요', yourTurn: '내 차례',
+      errFollow: s => `같은 무늬(${s})를 내야 해요`, errHearts: '아직 하트가 깨지지 않았어요 — 다른 무늬로 리드하세요', errFirst: '첫 트릭에는 하트와 스페이드 Q를 낼 수 없어요', err2c: '첫 트릭은 2♣로 시작해요',
+      trickYou: p => (p ? `트릭을 가져왔어요: +${p}` : '트릭을 가져왔어요'), trickOther: (n, p) => (p ? `${n}가 트릭을 가져갔어요: +${p}` : `${n}가 트릭을 가져갔어요`),
+      broken: '하트가 깨졌어요!', trickN: n => `트릭 ${n}/13`, brokenShort: '♥ 깨짐', passTo: (d, n) => `${d}으로 → ${n}`, holdLbl: '넘기지 않는 판',
+      queenTo: n => `${n}가 스페이드 Q를 가져갔어요!`, queenYou: '스페이드 Q를 가져왔어요: +13',
+      moonBanner: '슛 더 문!', moonBy: n => `${n}가 슛 더 문 성공!`, moonYou: '슛 더 문 성공!', moonText: '하트 전부와 스페이드 Q를 모두 가져왔어요. 점수를 어떻게 계산할까요?',
+      moonOthers: '다른 모두에게 +26', moonSelf: '내 점수에서 −26', moonProj: s => `내 점수: ${s}`, moonOthersNote: '다른 모두 +26', moonSelfNote: '성공한 사람 −26',
+      resTitle: n => `${n}번째 판`, resYou: p => (p === 0 ? '깨끗한 판 — 0점이에요!' : `이번 판 ${p}점을 받았어요.`), resMoonYou: '슛 더 문 성공!',
+      handCol: '판', total: '합계', next: '다음 판', toResults: '최종 결과', tieMore: '최저 점수가 동점 — 한 판 더 해서 승부를 가려요!',
+      winTitle: '승리!', loseTitle: p => `게임 끝 — ${p}를 했어요`, overText: (s, n) => `${n}판 후 최종 점수 ${s}점. 점수가 가장 낮은 사람이 이겨요.`,
+      places: ['1등', '2등', '3등', '4등'], newGame: '새 게임',
+      lobbyTitle: '새 게임', lobbySub: '클래식 하츠 · 4인', lobbyText: '컴퓨터 세 명과 대결해요. 하트와 스페이드 퀸을 피하거나, 전부 가져와 슛 더 문을 노리세요. 누군가 목표 점수에 닿으면 점수가 가장 낮은 사람이 이겨요.',
+      levelLbl: '상대', targetLbl: '목표 점수', targetN: n => `${n}점`, moonLbl: '슛 더 문', moonOpts: { others: '다른 사람 +26', choose: '성공자가 선택' },
+      start: '카드 돌리기', cancel: '계속하기', leaveWarn: '새 게임을 시작하면 지금 게임은 끝나요.',
+      statsTitle: '내 기록', sGames: '플레이한 게임', sWins: '이긴 게임', sHands: '플레이한 판', sClean: '0점 판', sMoons: '슛 더 문', sQueens: '스페이드 Q 받음', sAvg: '판당 점수', sBest: '최고 승리 점수', none: '—',
+      speed: '게임 속도', speeds: { slow: '느리게', normal: '보통', fast: '빠르게' }, confirmLbl: '카드를 두 번 눌러서 내기', reset: '기록 초기화', close: '닫기',
+      scoresTitle: '점수표', scoresSub: n => `${n}점까지 — 점수가 가장 낮은 사람이 승리`, noHands: '아직 끝난 판이 없어요.',
+      seenTitle: '나온 카드', lastTitle: '지난 트릭', lastNone: '아직 끝난 트릭이 없어요.', lastWon: (n, p) => (p ? `${n}가 가져감: +${p}` : `${n}가 가져감`),
+      seatAria: (n, c, h, s) => `${n}: 카드 ${c}장, 이번 판 ${h}점, 합계 ${s}점`,
+      hintPass: '힌트: 이 3장은 들고 있기 가장 위험해요', hintPlay: c => `힌트: ${c} 내기`,
+      helpLines: [
+        '네 명이 13장씩 받아요. 가져온 하트는 1장에 1점, 스페이드 퀸은 13점이에요. 누군가 목표 점수에 닿으면 점수가 가장 낮은 사람이 이겨요.',
+        '판마다 시작 전에 카드 3장을 넘겨요: 왼쪽, 오른쪽, 맞은편 순서이고 네 번째 판은 넘기지 않아요. 받은 카드는 초록색으로 표시돼요.',
+        '2♣를 가진 사람이 그 카드로 시작해요. 리드된 무늬가 있으면 반드시 내야 하고, 없으면 아무 카드나 낼 수 있어요. 리드된 무늬 중 가장 높은 카드가 트릭을 가져가고 다음 트릭을 리드해요.',
+        '첫 트릭에는 하트와 스페이드 Q를 낼 수 없어요(다른 카드가 없을 때 제외). 하트가 한 번 나오기 전에는 하트로 리드할 수 없어요 — 패가 하트뿐이라면 예외예요.',
+        '슛 더 문: 하트 13장과 스페이드 Q를 모두 가져오면 나는 0점, 다른 모두는 26점을 받아요. “성공자가 선택” 옵션이면 대신 내 점수에서 26점을 뺄 수도 있어요.',
+        '요령: 높은 스페이드와 높은 하트는 넘기고, 짧은 무늬를 빨리 비워 위험한 카드를 버릴 수 있게 하고, 누가 어떤 무늬가 떨어졌는지 잘 보세요.',
+        '키: ←/→ 카드 이동, Enter 또는 Space 카드 내기(넘길 때는 선택), P 넘기기, H 힌트, S 정렬, L 지난 트릭.',
+      ],
+    },
+  };
+
+  const param = new URLSearchParams(location.search).get('lang');
+  const lang = Object.hasOwn(I18N, param) ? param : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { const v = t[el.dataset.i18n]; if (typeof v === 'string') el.textContent = v; });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => el.setAttribute('aria-label', t[el.dataset.i18nLabel]));
+
+  const store = {
+    get(key, fallback) {
+      try { const raw = localStorage.getItem(`milaan.hearts.${key}`); return raw == null ? fallback : JSON.parse(raw); } catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(`milaan.hearts.${key}`, JSON.stringify(value)); } catch {}
+    },
+  };
+
+  const $ = id => document.getElementById(id);
+  const felt = $('felt');
+  const handEl = $('hand');
+  const cross = $('cross');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const now = () => performance.now();
+
+  // ---------- cards: c = suit * 13 + rank, suits ♣ ♦ ♠ ♥, ranks 2 … A ----------
+  const SUITS = ['♣', '♦', '♠', '♥'];
+  const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const QS = 36;
+  const suitOf = c => (c / 13) | 0;
+  const rankOf = c => c % 13;
+  const ptsOf = c => (c === QS ? 13 : c >= 39 ? 1 : 0);
+  const byNum = (a, b) => a - b;
+  const cardText = c => `${RANKS[rankOf(c)]}${SUITS[suitOf(c)]}`;
+  const DIRS = ['left', 'right', 'across', 'hold'];
+  const DIR_OFF = { left: 1, right: 3, across: 2, hold: 0 };
+  const DIR_ARROW = { left: '←', right: '→', across: '↑', hold: '•' };
+  const TARGETS = [50, 100];
+  const SPEEDS = { slow: 1.6, normal: 1, fast: 0.5 };
+  const MS = { deal: 900, recv: 1300, think: 650, after: 260, trick: 900, collect: 380 };
+  const AVATARS = ['🙂', '🐰', '🦉', '🐨'];
+  const NAMES = [t.you, 'Ruby', 'Theo', 'Nora'];
+  const MC = { ms: 26, min: 6, max: 80 };
+
+  // ---------- rules engine (seats clockwise: 0 you, 1 left, 2 across, 3 right) ----------
+  function makeState(hands) {
+    return { hands: hands.map(h => h.slice().sort(byNum)), trick: [], turn: -1, trickNo: 0, broken: false, played: new Uint8Array(52), taken: [0, 0, 0, 0], tricks: [0, 0, 0, 0], voids: new Uint8Array(16), last: null, queenBy: -1, over: false, passDir: 'hold', passes: null, shooter: -1 };
+  }
+  function legalOf(hand, st) {
+    if (st.trick.length) {
+      const led = suitOf(st.trick[0].c);
+      const follow = hand.filter(c => suitOf(c) === led);
+      if (follow.length) return follow;
+      if (st.trickNo === 0) { const safe = hand.filter(c => !ptsOf(c)); if (safe.length) return safe; }
+      return hand.slice();
+    }
+    if (st.trickNo === 0 && hand.includes(0)) return [0];
+    if (!st.broken) { const plain = hand.filter(c => c < 39); if (plain.length) return plain; }
+    return hand.slice();
+  }
+  function illegalWhy(hand, st, c) {
+    if (st.trick.length) {
+      const led = suitOf(st.trick[0].c);
+      if (suitOf(c) !== led && hand.some(x => suitOf(x) === led)) return t.errFollow(SUITS[led]);
+      return t.errFirst;
+    }
+    if (st.trickNo === 0) return t.err2c;
+    return t.errHearts;
+  }
+  function trickWinner(trick) {
+    const led = suitOf(trick[0].c);
+    let w = trick[0];
+    for (const x of trick) if (suitOf(x.c) === led && x.c > w.c) w = x;
+    return w.p;
+  }
+  // Plays one card; returns the finished trick when it was the fourth card. Voids are public: showing out of a suit, or leading hearts before they are broken, reveals them.
+  function playCard(S, p, c) {
+    const h = S.hands[p];
+    h.splice(h.indexOf(c), 1);
+    if (S.trick.length) {
+      const led = suitOf(S.trick[0].c);
+      if (suitOf(c) !== led) S.voids[p * 4 + led] = 1;
+    } else if (c >= 39 && !S.broken) S.voids[p * 4] = S.voids[p * 4 + 1] = S.voids[p * 4 + 2] = 1;
+    if (c >= 39) S.broken = true;
+    S.played[c] = 1;
+    S.trick.push({ p, c });
+    if (S.trick.length < 4) { S.turn = (p + 1) % 4; return null; }
+    const w = trickWinner(S.trick);
+    let pts = 0;
+    for (const x of S.trick) { pts += ptsOf(x.c); if (x.c === QS) S.queenBy = w; }
+    S.taken[w] += pts;
+    S.tricks[w]++;
+    const res = { cards: S.trick, winner: w, pts, no: S.trickNo };
+    S.last = res;
+    S.trick = [];
+    S.turn = w;
+    S.trickNo++;
+    if (S.trickNo === 13) S.over = true;
+    return res;
+  }
+  function applyPasses(S, picks) {
+    const off = DIR_OFF[S.passDir];
+    S.passes = [0, 1, 2, 3].map(p => ({ to: (p + off) % 4, cards: picks[p].slice() }));
+    for (let p = 0; p < 4; p++) S.hands[p] = S.hands[p].filter(c => !picks[p].includes(c));
+    for (let p = 0; p < 4; p++) S.hands[(p + off) % 4].push(...picks[p]);
+    for (const h of S.hands) h.sort(byNum);
+  }
+  function handAdds(taken, pick) {
+    const m = taken.indexOf(26);
+    if (m < 0) return { add: taken.slice(), moon: -1 };
+    const add = [0, 1, 2, 3].map(p => (pick === 'self' ? (p === m ? -26 : 0) : (p === m ? 0 : 26)));
+    return { add, moon: m };
+  }
+  // A shooter given the choice ends the game when that wins it, avoids ending it when that loses it, and otherwise pushes the field closer only while leading.
+  function moonChoice(totals, m, target) {
+    const others = totals.map((s, p) => (p === m ? s : s + 26));
+    if (others.some(s => s >= target)) {
+      const low = Math.min(...others);
+      return others[m] === low && others.filter(s => s === low).length === 1 ? 'others' : 'self';
+    }
+    return totals[m] <= Math.min(...totals) ? 'others' : 'self';
+  }
+
+  // ---------- computer players: they only ever see a view with their own hand and public information ----------
+  function viewFor(S, p) {
+    const pass = S.passes ? S.passes[p] : null;
+    return { me: p, hand: S.hands[p].slice(), counts: S.hands.map(h => h.length), trick: S.trick.slice(), trickNo: S.trickNo, broken: S.broken, played: S.played.slice(), taken: S.taken.slice(), voids: S.voids.slice(), gave: pass ? pass.cards.slice() : [], passTo: pass ? pass.to : -1, shooter: intents[p] === 'shoot' ? p : -1 };
+  }
+  const CFG = {
+    0: { count: false, defend: false, shoot: 0 },
+    1: { count: false, defend: false, shoot: 18 },
+    2: { count: true, defend: true, shoot: 15 },
+    roll: { count: false, defend: true, shoot: 15 },
+  };
+  // 'shoot' while going for the moon, a seat number while stopping that seat's moon, null otherwise.
+  function modeOf(st, p, cfg) {
+    const tk = st.taken, total = tk[0] + tk[1] + tk[2] + tk[3];
+    if (tk[p] === total && ((st.shooter === p && cfg.shoot) || (cfg.shoot && total >= cfg.shoot))) return 'shoot';
+    if (cfg.defend && total >= 15) for (let q = 0; q < 4; q++) if (q !== p && tk[q] === total) return q;
+    return null;
+  }
+  const maxOf = a => a.reduce((m, c) => (c > m ? c : m), -1);
+  const minOf = a => a.reduce((m, c) => (c < m ? c : m), 99);
+  const suitLen = (hand, s) => { let n = 0; for (const c of hand) if (suitOf(c) === s) n++; return n; };
+
+  function heur(st, p, hand, L, cfg) {
+    if (L.length === 1) return L[0];
+    const mode = modeOf(st, p, cfg);
+    const qOut = !st.played[QS] && !hand.includes(QS);
+    const trick = st.trick;
+    if (!trick.length) return leadPick(st, p, hand, L, cfg, mode, qOut);
+    const led = suitOf(trick[0].c);
+    let win = trick[0].c, winner = trick[0].p, tp = 0;
+    for (const x of trick) { tp += ptsOf(x.c); if (suitOf(x.c) === led && x.c > win) { win = x.c; winner = x.p; } }
+    const last = trick.length === 3;
+    const following = suitOf(L[0]) === led;
+    const over = following ? L.filter(c => c > win) : [];
+    if (mode === 'shoot') {
+      if (following) return over.length ? (last ? minOf(over) : maxOf(over)) : minOf(L);
+      const plain = L.filter(c => !ptsOf(c));
+      return plain.length ? minOf(plain) : minOf(L);
+    }
+    const target = typeof mode === 'number' ? mode : -1;
+    const targetToPlay = target >= 0 && !trick.some(x => x.p === target);
+    if (following) {
+      if (st.trickNo === 0) return maxOf(L);
+      if (target >= 0 && over.length && (winner === target || targetToPlay) && (tp > 0 || targetToPlay)) {
+        const o = over.filter(c => c !== QS);
+        return o.length ? maxOf(o) : QS;
+      }
+      if (led === 2 && L.includes(QS) && win > QS) return QS;
+      const under = L.filter(c => c < win);
+      if (last && tp === 0 && over.length) { const o = over.filter(c => c !== QS); if (o.length) return maxOf(o); }
+      if (under.length) return maxOf(under);
+      const o = over.filter(c => c !== QS);
+      if (!o.length) return QS;
+      return last ? maxOf(o) : minOf(o);
+    }
+    if (target >= 0 && (winner === target || targetToPlay)) {
+      const plain = L.filter(c => !ptsOf(c));
+      if (plain.length) return discardPick(plain, hand, qOut);
+    }
+    return discardPick(L, hand, qOut);
+  }
+  function discardPick(L, hand, qOut) {
+    if (L.includes(QS)) return QS;
+    if (qOut) { const hi = L.filter(c => c === 37 || c === 38); if (hi.length) return maxOf(hi); }
+    let best = L[0], bs = -1e9;
+    for (const c of L) {
+      const n = suitLen(hand, suitOf(c));
+      const sc = rankOf(c) + (c >= 39 ? 4 : 0) + (n <= 2 ? 3 : 0) - (suitOf(c) === 2 && !qOut && hand.includes(QS) ? 6 : 0);
+      if (sc > bs) { bs = sc; best = c; }
+    }
+    return best;
+  }
+  function unseenIn(st, hand, s) {
+    const out = [];
+    for (let c = s * 13; c < s * 13 + 13; c++) if (!st.played[c] && !hand.includes(c)) out.push(c);
+    return out;
+  }
+  function leadPick(st, p, hand, L, cfg, mode, qOut) {
+    if (mode === 'shoot') {
+      let best = L[0], bs = -1e9;
+      for (const c of L) {
+        const higher = unseenIn(st, hand, suitOf(c)).filter(x => x > c).length;
+        const sc = (higher ? 0 : 100) + rankOf(c) * 2 + suitLen(hand, suitOf(c)) - (c >= 39 && higher ? 30 : 0);
+        if (sc > bs) { bs = sc; best = c; }
+      }
+      return best;
+    }
+    let best = L[0], bs = 1e9;
+    for (const c of L) {
+      const s = suitOf(c), r = rankOf(c), n = suitLen(hand, s);
+      let sc = r;
+      if (s === 2) {
+        if (c === QS) sc += 40;
+        else if (qOut && r > 10) sc += 25;
+        else if (qOut) sc -= 3;
+        else if (hand.includes(QS)) sc += 3;
+      }
+      if (s === 3) sc += 1.5;
+      if (n <= 2 && s !== 3) sc -= 1;
+      if (cfg.count) {
+        const unseen = unseenIn(st, hand, s);
+        if (!unseen.length) sc += 12;
+        else {
+          const higher = unseen.filter(x => x > c).length;
+          if (!higher) sc += s === 3 ? 10 : 7;
+          else if (higher === unseen.length) sc -= 2;
+          let voidOpp = 0;
+          for (let q = 0; q < 4; q++) if (q !== p && st.voids[q * 4 + s]) voidOpp++;
+          sc += voidOpp * (s === 2 && qOut ? 1 : 3);
+        }
+      }
+      if (sc < bs) { bs = sc; best = c; }
+    }
+    return best;
+  }
+
+  // Deals the unseen cards to the opponents at random, honouring known voids and the cards this seat passed.
+  function sampleWorld(v) {
+    const me = v.me, opp = [0, 1, 2, 3].filter(q => q !== me);
+    const mine = new Uint8Array(52);
+    for (const c of v.hand) mine[c] = 1;
+    const fixed = [[], [], [], []], pool = [];
+    for (let c = 0; c < 52; c++) {
+      if (mine[c] || v.played[c]) continue;
+      if (v.passTo >= 0 && v.gave.includes(c)) fixed[v.passTo].push(c); else pool.push(c);
+    }
+    const eligN = [0, 1, 2, 3].map(s => opp.filter(q => !v.voids[q * 4 + s]).length);
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const strict = attempt < 18;
+      const hands = [[], [], [], []];
+      hands[me] = v.hand.slice();
+      const cap = [0, 0, 0, 0];
+      for (const q of opp) { hands[q] = fixed[q].slice(); cap[q] = v.counts[q] - hands[q].length; }
+      shuffle(pool);
+      const order = strict ? pool.slice().sort((a, b) => eligN[suitOf(a)] - eligN[suitOf(b)]) : pool;
+      let ok = true;
+      for (const c of order) {
+        const s = suitOf(c);
+        let tot = 0, lastQ = -1;
+        for (const q of opp) if (cap[q] > 0 && (!strict || !v.voids[q * 4 + s])) { tot += cap[q]; lastQ = q; }
+        if (!tot) { ok = false; break; }
+        let x = Math.random() * tot, pick = lastQ;
+        for (const q of opp) if (cap[q] > 0 && (!strict || !v.voids[q * 4 + s])) { x -= cap[q]; if (x < 0) { pick = q; break; } }
+        hands[pick].push(c);
+        cap[pick]--;
+      }
+      if (ok) return hands;
+    }
+    return null;
+  }
+  // Cards that sit next to each other once played and own cards are ignored give the same result, so only one of them is simulated.
+  function distinctMoves(L, v) {
+    const onTable = new Set(v.trick.map(x => x.c));
+    const out = [];
+    let prev = -1;
+    for (const c of L.slice().sort(byNum)) {
+      if (prev >= 0 && suitOf(prev) === suitOf(c) && ptsOf(prev) === ptsOf(c)) {
+        let same = true;
+        for (let x = prev + 1; x < c; x++) if ((!v.played[x] || onTable.has(x)) && !v.hand.includes(x)) { same = false; break; }
+        if (same) { prev = c; continue; }
+      }
+      out.push(c);
+      prev = c;
+    }
+    return out;
+  }
+  // Relative hand value for seat me: own points minus the opponents' average, with the moon applied.
+  function util(taken, me) {
+    const m = taken.indexOf(26);
+    let mine = 0, others = 0;
+    for (let p = 0; p < 4; p++) { const v = m < 0 ? taken[p] : p === m ? 0 : 26; if (p === me) mine = v; else others += v; }
+    return mine - others / 3;
+  }
+  // Hard level: try every distinct card in many sampled deals and play out the rest with the heuristic.
+  function mcPick(v, L) {
+    const cands = distinctMoves(L, v);
+    if (cands.length === 1) return cands[0];
+    const base = heur(v, v.me, v.hand, L, CFG[2]);
+    const sums = new Float64Array(cands.length);
+    const t0 = now();
+    let n = 0;
+    while (n < MC.max && (n < MC.min || now() - t0 < MC.ms)) {
+      const hands = sampleWorld(v);
+      if (!hands) break;
+      for (let i = 0; i < cands.length; i++) {
+        const st = { hands: hands.map(h => h.slice()), trick: v.trick.slice(), trickNo: v.trickNo, broken: v.broken, played: v.played.slice(), taken: v.taken.slice(), tricks: [0, 0, 0, 0], voids: v.voids.slice(), turn: v.me, over: false, queenBy: -1, shooter: v.shooter, last: null };
+        playCard(st, v.me, cands[i]);
+        while (!st.over) {
+          const p = st.turn, h = st.hands[p];
+          const Lr = legalOf(h, st);
+          playCard(st, p, Lr.length === 1 ? Lr[0] : heur(st, p, h, Lr, CFG.roll));
+        }
+        sums[i] += util(st.taken, v.me);
+      }
+      n++;
+    }
+    if (!n) return base;
+    let bi = 0;
+    const bonus = i => (cands[i] === base || (suitOf(cands[i]) === suitOf(base) && distinctMoves([cands[i], base], v).length === 1) ? 0.04 * n : 0);
+    for (let i = 1; i < cands.length; i++) if (sums[i] - bonus(i) < sums[bi] - bonus(bi)) bi = i;
+    return cands[bi];
+  }
+  function aiPlay(v, level) {
+    const L = legalOf(v.hand, v);
+    if (L.length === 1) return L[0];
+    if (level === 0) return Math.random() < 0.5 ? L[Math.floor(Math.random() * L.length)] : heur(v, v.me, v.hand, L, CFG[0]);
+    if (level === 1) return heur(v, v.me, v.hand, L, CFG[1]);
+    return mcPick(v, L);
+  }
+  function danger(c, hand, level) {
+    const s = suitOf(c), r = rankOf(c);
+    const lowSpades = hand.filter(x => x >= 26 && x < QS).length;
+    const guard = level === 2 ? 4 : 5;
+    if (c === QS) return lowSpades >= guard ? 15 : 100;
+    if (s === 2 && r > 10) return hand.includes(QS) && lowSpades >= guard ? 20 + r : 80 + r;
+    if (s === 2) return r * 0.5;
+    if (s === 3) return r < 4 ? r : 28 + r * 4;
+    const n = suitLen(hand, s);
+    let d = r * 4 + (r >= 9 ? 6 : 0);
+    if (level === 2 && n <= 3) d += (4 - n) * 6;
+    else if (n <= 2) d += 8;
+    return d;
+  }
+  // A hand strong enough to try for the moon: long, high hearts and plenty of winners.
+  function moonHand(hand) {
+    const hearts = hand.filter(c => c >= 39).length;
+    const top = [51, 50, 49].filter(c => hand.includes(c)).length;
+    const winners = hand.filter(c => rankOf(c) >= 10).length;
+    const lowLosers = hand.filter(c => rankOf(c) < 6 && c < 39).length;
+    return hearts >= 5 && top >= 3 && winners >= 7 && lowLosers <= 3;
+  }
+  function aiPass(hand, level, intent) {
+    if (level === 0) return shuffle(hand.slice().sort((a, b) => rankOf(b) - rankOf(a)).slice(0, 7)).slice(0, 3);
+    if (intent === 'shoot') return hand.slice().sort((a, b) => (a >= 39) - (b >= 39) || rankOf(a) - rankOf(b)).slice(0, 3);
+    let pool = hand.slice();
+    const out = [];
+    // Pick one at a time so emptying a short suit is re-judged after each choice.
+    while (out.length < 3) {
+      let best = pool[0], bs = -1e9;
+      for (const c of pool) { const d = danger(c, pool, level); if (d > bs) { bs = d; best = c; } }
+      out.push(best);
+      pool = pool.filter(c => c !== best);
+    }
+    return out;
+  }
+
+  // ---------- stats & settings ----------
+  const defaultStats = () => ({ games: 0, wins: 0, hands: 0, clean: 0, moons: 0, queens: 0, pts: 0, best: null });
+  const stats = Object.assign(defaultStats(), store.get('stats', {}));
+  const settings = Object.assign({ level: 1, target: 100, moon: 'others', speed: 'normal', sort: 'asc', confirm: false }, store.get('settings', {}));
+  if (![0, 1, 2].includes(settings.level)) settings.level = 1;
+  if (!TARGETS.includes(settings.target)) settings.target = 100;
+  if (!['others', 'choose'].includes(settings.moon)) settings.moon = 'others';
+  const save = () => store.set('stats', stats);
+  const saveSettings = () => store.set('settings', settings);
+
+  // ---------- table state ----------
+  let S = null;
+  let match = null;
+  let phase = 'lobby';
+  let gen = 0;
+  let resolveHuman = null, resolvePass = null, resolveMoon = null;
+  let delayScale = 1;
+  let humanAuto = null;
+  let rigQueue = [];
+  let intents = [null, null, null, null];
+  let shownTrick = null;
+  let raised = -1;
+  let hintCard = -1;
+  let focusIdx = 0;
+  let cwNow = 48;
+  let sticky = false;
+  const passSel = new Set();
+  const received = new Set();
+  const ABORT = { abort: true };
+  const SEATS = [null, $('seat1'), $('seat2'), $('seat3')];
+  const SLOTS = [...cross.querySelectorAll('.tc')];
+
+  const speedMul = () => (SPEEDS[settings.speed] || 1) * delayScale;
+  // Waits that only count visible time, in clamped steps, so a hidden tab never races ahead.
+  function sleep(ms) {
+    return new Promise(resolve => {
+      let left = ms * speedMul();
+      let last = now();
+      const tick = () => {
+        const n = now();
+        if (!document.hidden) left -= Math.min(n - last, 50);
+        last = n;
+        if (left <= 0) resolve(); else setTimeout(tick, Math.min(left, 40));
+      };
+      setTimeout(tick, Math.max(0, Math.min(left, 40)));
+    });
+  }
+  function announce(text) {
+    const sr = $('sr');
+    sr.textContent = '';
+    setTimeout(() => { sr.textContent = text; }, 30);
+  }
+  function abortWaits() {
+    for (const r of [resolveHuman, resolvePass, resolveMoon]) if (r) r(ABORT);
+    resolveHuman = resolvePass = resolveMoon = null;
+  }
+
+  // ---------- game flow ----------
+  function startGame() {
+    gen++;
+    abortWaits();
+    match = { level: settings.level, target: settings.target, moon: settings.moon, handNo: 1, totals: [0, 0, 0, 0], history: [], final: false };
+    runHand();
+  }
+  async function runHand() {
+    const g = ++gen;
+    let hands, hold = false;
+    if (rigQueue.length) { const r = rigQueue.shift(); hands = r.hands; hold = !!r.hold; }
+    else { const deck = shuffle([...Array(52).keys()]); hands = [0, 1, 2, 3].map(i => deck.slice(i * 13, i * 13 + 13)); }
+    S = makeState(hands);
+    S.passDir = hold ? 'hold' : DIRS[(match.handNo - 1) % 4];
+    intents = [null, null, null, null];
+    passSel.clear();
+    received.clear();
+    raised = hintCard = -1;
+    shownTrick = null;
+    focusIdx = 0;
+    sticky = false;
+    phase = 'deal';
+    render(true);
+    await sleep(MS.deal);
+    if (g !== gen) return;
+    if (S.passDir !== 'hold') {
+      const picks = [null];
+      for (let p = 1; p < 4; p++) {
+        intents[p] = match.level === 2 && moonHand(S.hands[p]) ? 'shoot' : null;
+        picks[p] = aiPass(S.hands[p], match.level, intents[p]);
+      }
+      phase = 'pass';
+      render();
+      announce(t.passPick(NAMES[(DIR_OFF[S.passDir]) % 4]));
+      const mine = await humanPass();
+      if (mine === ABORT || g !== gen) return;
+      picks[0] = mine;
+      applyPasses(S, picks);
+      const from = (4 - DIR_OFF[S.passDir]) % 4;
+      S.passes[from].cards.forEach(c => received.add(c));
+      phase = 'recv';
+      render();
+      setMsg(t.received(NAMES[from]), 'good');
+      announce(`${t.received(NAMES[from])}: ${S.passes[from].cards.map(cardText).join(', ')}`);
+      await sleep(MS.recv);
+      if (g !== gen) return;
+    }
+    S.turn = S.hands.findIndex(h => h.includes(0));
+    while (!S.over) {
+      const p = S.turn;
+      phase = p === 0 ? 'you' : 'ai';
+      if (p === 0) sticky = false;
+      render();
+      let c;
+      if (p === 0) {
+        announce(t.yourTurn);
+        c = await humanTurn();
+        if (c === ABORT || g !== gen) return;
+      } else {
+        await sleep(MS.think * (0.7 + Math.random() * 0.6));
+        if (g !== gen) return;
+        c = aiPlay(viewFor(S, p), match.level);
+      }
+      const wasBroken = S.broken;
+      const res = playCard(S, p, c);
+      raised = hintCard = -1;
+      phase = 'busy';
+      if (!wasBroken && S.broken) { announce(t.broken); boom(t.broken); }
+      if (res) {
+        shownTrick = res;
+        render();
+        await sleep(MS.trick);
+        if (g !== gen) return;
+        if (res.no === 0) received.clear();
+        collect(res.winner);
+        trickMessage(res);
+        await sleep(MS.collect);
+        if (g !== gen) return;
+        shownTrick = null;
+        render(false, true);
+      } else {
+        render();
+        await sleep(MS.after);
+        if (g !== gen) return;
+      }
+    }
+    finishHand(g);
+  }
+  function trickMessage(res) {
+    const txt = res.winner === 0 ? t.trickYou(res.pts) : t.trickOther(NAMES[res.winner], res.pts);
+    setMsg(txt, res.winner === 0 && res.pts ? 'bad' : '');
+    sticky = true;
+    if (res.cards.some(x => x.c === QS)) announce(res.winner === 0 ? t.queenYou : t.queenTo(NAMES[res.winner]));
+    else if (res.winner === 0) announce(txt);
+  }
+  function humanPass() {
+    return new Promise(resolve => {
+      resolvePass = resolve;
+      if (humanAuto != null) setTimeout(() => { if (resolvePass === resolve) { resolvePass = null; resolve(aiPass(S.hands[0], humanAuto, null)); } }, 0);
+    });
+  }
+  function humanTurn() {
+    return new Promise(resolve => {
+      resolveHuman = resolve;
+      render();
+      if (humanAuto != null) setTimeout(() => { if (resolveHuman === resolve) { resolveHuman = null; resolve(aiPlay(viewFor(S, 0), humanAuto)); } }, 0);
+    });
+  }
+  function askMoon() {
+    const tot = match.totals;
+    $('moonOthersBtn').innerHTML = `${t.moonOthers}<small>${t.moonProj(tot[0])}</small>`;
+    $('moonSelfBtn').innerHTML = `${t.moonSelf}<small>${t.moonProj(tot[0] - 26)}</small>`;
+    return new Promise(resolve => {
+      resolveMoon = resolve;
+      openPanel('moonPanel');
+    });
+  }
+  async function finishHand(g) {
+    const taken = S.taken.slice();
+    const m = taken.indexOf(26);
+    let pick = 'others';
+    if (m >= 0) {
+      boom(t.moonBanner);
+      announce(m === 0 ? t.moonYou : t.moonBy(NAMES[m]));
+      if (match.moon === 'choose') {
+        if (m === 0 && humanAuto == null) {
+          await sleep(500);
+          if (g !== gen) return;
+          pick = await askMoon();
+          if (pick === ABORT || g !== gen) return;
+        } else pick = moonChoice(match.totals, m, match.target);
+      }
+    }
+    const { add } = handAdds(taken, pick);
+    for (let p = 0; p < 4; p++) match.totals[p] += add[p];
+    match.history.push({ add, taken, moon: m, pick });
+    stats.hands++;
+    stats.pts += add[0];
+    if (m === 0) stats.moons++;
+    if (S.queenBy === 0) stats.queens++;
+    if (!taken[0]) stats.clean++;
+    save();
+    const ended = Math.max(...match.totals) >= match.target;
+    const low = Math.min(...match.totals);
+    const tie = match.totals.filter(s => s === low).length > 1;
+    match.final = ended && !tie;
+    phase = 'result';
+    render();
+    bump('scoreStat');
+    showResult(m, add, ended && tie);
+  }
+  function nextHand() {
+    $('resPanel').hidden = true;
+    if (match.final) showGameOver();
+    else { match.handNo++; runHand(); }
+  }
+
+  // ---------- player actions ----------
+  function onCard(c) {
+    if (phase === 'pass') { togglePass(c); return; }
+    if (phase !== 'you' || !resolveHuman) return;
+    const hand = S.hands[0];
+    if (!legalOf(hand, S).includes(c)) {
+      setMsg(illegalWhy(hand, S, c), 'bad');
+      const el = handEl.querySelector(`[data-c="${c}"]`);
+      if (el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+      return;
+    }
+    if (settings.confirm && raised !== c) {
+      raised = c;
+      renderHand();
+      setMsg(t.tapAgain);
+      return;
+    }
+    const r = resolveHuman;
+    resolveHuman = null;
+    r(c);
+  }
+  function togglePass(c) {
+    if (passSel.has(c)) passSel.delete(c);
+    else if (passSel.size < 3) passSel.add(c);
+    else { setMsg(t.passMax, 'bad'); return; }
+    renderHand();
+    renderControls();
+    updateMsg();
+  }
+  function confirmPass() {
+    if (phase !== 'pass' || !resolvePass || passSel.size !== 3) return;
+    const r = resolvePass;
+    resolvePass = null;
+    const cards = [...passSel];
+    passSel.clear();
+    phase = 'busy';
+    setMsg(t.passWait);
+    r(cards);
+  }
+  function hint() {
+    if (phase === 'pass') {
+      passSel.clear();
+      aiPass(S.hands[0], 2, null).forEach(c => passSel.add(c));
+      renderHand();
+      renderControls();
+      setMsg(t.hintPass);
+      return;
+    }
+    if (phase !== 'you') return;
+    const v = viewFor(S, 0);
+    hintCard = mcPick(v, legalOf(v.hand, v));
+    if (settings.confirm) raised = hintCard;
+    renderHand();
+    setMsg(t.hintPlay(cardText(hintCard)), 'good');
+    const i = sortedHand().indexOf(hintCard);
+    if (i >= 0) setFocus(i);
+  }
+  function toggleSort() {
+    settings.sort = settings.sort === 'asc' ? 'desc' : 'asc';
+    saveSettings();
+    renderHand();
+    const txt = settings.sort === 'asc' ? t.sortedA : t.sortedB;
+    announce(txt);
+    setMsg(txt);
+  }
+  function act() {
+    if (phase === 'pass') confirmPass();
+    else openPanel('scoresPanel');
+  }
+  function nudge(el) {
+    el.classList.remove('nudge');
+    void el.offsetWidth;
+    el.classList.add('nudge');
+  }
+
+  // ---------- rendering ----------
+  function cardEl(c, asButton = false) {
+    const el = document.createElement(asButton ? 'button' : 'div');
+    el.className = `card${suitOf(c) % 2 ? ' red' : ''}${c === QS ? ' queen' : ''}`;
+    el.innerHTML = `<span class="ix">${RANKS[rankOf(c)]}<i>${SUITS[suitOf(c)]}</i></span><span class="pip">${SUITS[suitOf(c)]}</span>`;
+    if (asButton) {
+      el.type = 'button';
+      el.dataset.c = c;
+      el.setAttribute('aria-label', t.cardAria(RANKS[rankOf(c)], t.suitNames[suitOf(c)]));
+    }
+    return el;
+  }
+  function sortedHand() {
+    const h = S ? S.hands[0].slice() : [];
+    if (settings.sort === 'desc') { const ord = [2, 3, 0, 1]; return h.sort((a, b) => ord.indexOf(suitOf(a)) - ord.indexOf(suitOf(b)) || b - a); }
+    return h.sort(byNum);
+  }
+  function renderHand(deal = false) {
+    const cards = sortedHand();
+    const hadFocus = handEl.contains(document.activeElement);
+    focusIdx = clamp(focusIdx, 0, Math.max(0, cards.length - 1));
+    const legal = phase === 'you' && S ? new Set(legalOf(S.hands[0], S)) : null;
+    handEl.replaceChildren(...cards.map((c, i) => {
+      const el = cardEl(c, true);
+      if (i && suitOf(cards[i - 1]) !== suitOf(c)) el.classList.add('g');
+      const sel = phase === 'pass' ? passSel.has(c) : raised === c;
+      if (sel) el.classList.add('sel');
+      if (received.has(c)) el.classList.add('new');
+      if (legal && !legal.has(c)) el.classList.add('off');
+      if (hintCard === c) el.classList.add('hint');
+      el.setAttribute('aria-pressed', String(sel));
+      el.tabIndex = i === focusIdx ? 0 : -1;
+      if (deal && !reduced) { el.classList.add('deal'); el.style.animationDelay = `${i * 40}ms`; }
+      return el;
+    }));
+    spaceHand();
+    if (hadFocus && handEl.children[focusIdx]) handEl.children[focusIdx].focus({ preventScroll: true });
+  }
+  function spaceHand() {
+    const n = handEl.children.length;
+    if (!n) return;
+    const groups = handEl.querySelectorAll('.g').length;
+    const W = handEl.clientWidth - 4;
+    const gap = groups ? Math.min(cwNow * 0.22, 10) : 0;
+    const step = n > 1 ? Math.min(cwNow * 0.64, (W - cwNow - groups * gap) / (n - 1)) : cwNow;
+    handEl.style.setProperty('--step', `${step.toFixed(1)}px`);
+    handEl.style.setProperty('--gap', `${gap.toFixed(1)}px`);
+  }
+  function seatVector(p) {
+    const W = felt.clientWidth, H = felt.clientHeight;
+    return [[0, H * 0.38], [-W * 0.36, 0], [0, -H * 0.36], [W * 0.36, 0]][p];
+  }
+  function renderPile() {
+    const cards = shownTrick ? shownTrick.cards : S ? S.trick : [];
+    if (!shownTrick) cross.classList.remove('collect');
+    SLOTS.forEach((slot, p) => {
+      const i = cards.findIndex(x => x.p === p);
+      const want = i < 0 ? -1 : cards[i].c;
+      if (Number(slot.dataset.c ?? -1) !== want) {
+        if (want < 0) slot.replaceChildren();
+        else {
+          const el = cardEl(want);
+          if (!reduced) {
+            const [fx, fy] = seatVector(p);
+            el.style.setProperty('--fx', `${fx}px`);
+            el.style.setProperty('--fy', `${fy}px`);
+            el.classList.add('fly');
+          }
+          slot.replaceChildren(el);
+        }
+        slot.dataset.c = want;
+      }
+      slot.style.zIndex = i + 1;
+      const card = slot.firstChild;
+      if (card) card.classList.toggle('win', !!shownTrick && shownTrick.winner === p);
+    });
+    const pile = $('pile');
+    const passing = phase === 'pass' && S && S.passDir !== 'hold';
+    pile.classList.toggle('passing', passing);
+    if (passing) {
+      const arrow = $('arrow');
+      arrow.textContent = DIR_ARROW[S.passDir];
+      const d = { left: [-8, 0], right: [8, 0], across: [0, -8] }[S.passDir];
+      arrow.style.setProperty('--ax', `${d[0]}px`);
+      arrow.style.setProperty('--ay', `${d[1]}px`);
+    }
+    let lbl = '';
+    if (S && match) {
+      if (phase === 'pass' || phase === 'deal' || phase === 'recv') lbl = S.passDir === 'hold' ? t.holdLbl : t.passTo(t.dirs[S.passDir], NAMES[DIR_OFF[S.passDir]]);
+      else if (!S.over || shownTrick) lbl = `${t.trickN(Math.min(13, S.trickNo + (shownTrick ? 0 : 1)))}${S.broken ? ` · <b>${t.brokenShort}</b>` : ''}`;
+    }
+    $('plbl').innerHTML = lbl;
+    pile.setAttribute('aria-label', `${t.trickAria}: ${cards.length ? cards.map(x => `${NAMES[x.p]} ${cardText(x.c)}`).join(', ') : t.noCards}`);
+  }
+  function collect(w) {
+    if (reduced) return;
+    const [cx, cy] = seatVector(w);
+    cross.style.setProperty('--cx', `${cx}px`);
+    cross.style.setProperty('--cy', `${cy}px`);
+    cross.classList.add('collect');
+  }
+  function renderSeats() {
+    for (let p = 1; p < 4; p++) {
+      const el = SEATS[p];
+      const n = S ? S.hands[p].length : 13;
+      const tot = match ? match.totals[p] : 0;
+      const hp = S ? S.taken[p] : 0;
+      el.querySelector('.cnt').textContent = n;
+      el.querySelector('.backs').classList.toggle('none', n === 0);
+      el.querySelector('.pts').textContent = tot;
+      const hpEl = el.querySelector('.hp');
+      hpEl.textContent = hp ? `♥${hp}` : '';
+      hpEl.classList.toggle('q', !!S && S.queenBy === p);
+      const active = !!S && !S.over && S.turn === p && phase === 'ai';
+      el.classList.toggle('turn', active);
+      el.classList.toggle('thinking', active);
+      el.setAttribute('aria-label', t.seatAria(NAMES[p], n, hp, tot));
+    }
+  }
+  function renderHud() {
+    $('hudScore').textContent = match ? match.totals[0] : 0;
+    $('hudHand').textContent = S ? `${S.taken[0]}${S.queenBy === 0 ? ' ♠' : ''}` : 0;
+    $('hudNoLbl').textContent = t.handN(match ? match.handNo : 1);
+    $('hudPass').textContent = S ? `${DIR_ARROW[S.passDir]} ${t.dirs[S.passDir]}` : '–';
+    $('lvlLbl').textContent = t.levels[match ? match.level : settings.level];
+  }
+  function renderBoard() {
+    const tot = match ? match.totals : [0, 0, 0, 0];
+    const low = Math.min(...tot);
+    const someone = match && match.history.length;
+    $('board').innerHTML = `<div class="bhead"><span></span><span></span><span>${t.thisHand}</span><span>${t.total}</span></div>` + [0, 1, 2, 3].map(p => {
+      const cls = `brow${S && !S.over && S.turn === p && (phase === 'ai' || phase === 'you') ? ' turn' : ''}${someone && tot[p] === low ? ' lead' : ''}`;
+      return `<div class="${cls}"><span class="av">${AVATARS[p]}</span><span class="nm">${NAMES[p]}</span><span class="bh">${S ? S.taken[p] : 0}</span><span class="bt">${tot[p]}</span></div>`;
+    }).join('');
+  }
+  function lastFigures(res) {
+    return res.cards.map(x => `<figure class="${x.p === res.winner ? 'w' : ''}" data-c="${x.c}"><span aria-hidden="true">${AVATARS[x.p]}</span></figure>`).join('');
+  }
+  function fillFigures(box) {
+    box.querySelectorAll('figure[data-c]').forEach(f => f.prepend(cardEl(Number(f.dataset.c))));
+  }
+  function renderLast() {
+    const res = S && S.last;
+    const box = $('lastMini');
+    if (!res) { box.innerHTML = `<p class="none">${t.lastNone}</p>`; $('lastWho').textContent = ''; return; }
+    if (box.dataset.k === `${res.no}-${match.handNo}`) return;
+    box.dataset.k = `${res.no}-${match.handNo}`;
+    box.innerHTML = lastFigures(res);
+    fillFigures(box);
+    $('lastWho').textContent = t.lastWon(NAMES[res.winner], res.pts);
+  }
+  function renderSeen() {
+    const grid = $('seenGrid');
+    if (!grid.firstChild) grid.innerHTML = [2, 3, 0, 1].map(s => `<div class="srow${s % 2 ? ' r' : ''}"><b>${SUITS[s]}</b>${RANKS.map((r, i) => `<span data-c="${s * 13 + i}">${r === '10' ? 'T' : r}</span>`).join('')}</div>`).join('');
+    const mine = new Set(S ? S.hands[0] : []);
+    grid.querySelectorAll('span').forEach(el => {
+      const c = Number(el.dataset.c);
+      el.className = S && S.played[c] ? 'gone' : mine.has(c) ? 'own' : '';
+    });
+  }
+  function renderControls() {
+    const act = $('actBtn');
+    const passing = phase === 'pass';
+    act.textContent = passing ? (passSel.size === 3 ? t.passBtn : `${t.passBtn} ${passSel.size}/3`) : t.scoresBtn;
+    act.disabled = passing && passSel.size !== 3;
+    act.classList.toggle('armed', passing && passSel.size === 3);
+    act.classList.toggle('alt', !passing);
+    $('hintBtn').disabled = !(passing || phase === 'you');
+    $('lastBtn').disabled = !(S && S.last);
+    $('sortBtn').disabled = !S || !S.hands[0].length;
+    $('mine').classList.toggle('turn', phase === 'you' || passing);
+  }
+  function setMsg(text, cls = '') {
+    const m = $('msg');
+    m.textContent = text;
+    m.className = `msg ${cls}`;
+  }
+  function updateMsg() {
+    if (!S || phase === 'deal' || phase === 'result' || phase === 'over' || phase === 'lobby') { if (phase !== 'result') setMsg(''); return; }
+    if (phase === 'pass') {
+      const to = NAMES[DIR_OFF[S.passDir]];
+      setMsg(passSel.size === 3 ? t.passReady(to) : passSel.size ? t.passMore(3 - passSel.size) : t.passPick(to), passSel.size === 3 ? 'good' : '');
+      return;
+    }
+    if (phase === 'you') {
+      if (raised >= 0) { setMsg(t.tapAgain); return; }
+      if (!S.trick.length) {
+        if (S.trickNo === 0) setMsg(t.lead2c);
+        else setMsg(S.broken || S.hands[0].every(c => c >= 39) ? t.yourLead : t.yourLeadNoHearts);
+        return;
+      }
+      const led = suitOf(S.trick[0].c);
+      if (S.hands[0].some(c => suitOf(c) === led)) setMsg(t.follow(SUITS[led]));
+      else setMsg(S.trickNo === 0 ? t.discardFirst : t.discard);
+      return;
+    }
+    if (phase === 'ai' && !sticky) setMsg(t.thinking(NAMES[S.turn]));
+  }
+  function render(deal = false, keepMsg = false) {
+    renderSeats();
+    renderHud();
+    renderPile();
+    renderHand(deal);
+    renderControls();
+    renderBoard();
+    renderLast();
+    renderSeen();
+    if (!keepMsg && phase !== 'recv') updateMsg();
+  }
+  function boom(text) {
+    if (reduced) return;
+    const el = document.createElement('div');
+    el.className = 'boom';
+    el.textContent = text;
+    felt.append(el);
+    setTimeout(() => el.remove(), 1300);
+  }
+  function bump(id) {
+    const el = $(id);
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
+  function layout() {
+    const W = felt.clientWidth, H = felt.clientHeight;
+    if (!W || !H) return;
+    const wide = W / H > 1.25;
+    const short = H < 360;
+    felt.classList.toggle('wide', wide);
+    felt.classList.toggle('big', W >= 640 && H >= 520);
+    const sw = wide ? clamp(W * 0.13, 92, 170) : clamp(W * 0.2, 62, 120);
+    cwNow = Math.round(clamp(Math.min((W - 20) / 6.2, (H * (short ? 0.3 : 0.25)) / 1.4), 30, 100));
+    felt.style.setProperty('--sw', `${Math.round(sw)}px`);
+    felt.style.setProperty('--cw', `${cwNow}px`);
+    felt.style.setProperty('--bw', `${Math.round(clamp(cwNow * 0.36, 15, 32))}px`);
+    const pile = $('pile');
+    // Short, wide tables spread the trick sideways so the cards can stay bigger.
+    const pwW = pile.clientWidth - 4, pwH = pile.clientHeight - 26;
+    const flat = pwH / pwW < 0.6;
+    cross.classList.toggle('flat', flat);
+    const pw = clamp(flat ? Math.min(pwW / 3.9, pwH / 2.3, cwNow * 0.95) : Math.min(pwW / 2.8, pwH / 3.05, cwNow * 0.95), 22, 96);
+    felt.style.setProperty('--pw', `${Math.round(pw)}px`);
+    spaceHand();
+  }
+
+  // ---------- panels ----------
+  let panelReturn = null;
+  function openPanel(id) {
+    if (!$(id).hidden) return;
+    panelReturn = document.activeElement;
+    if (id === 'statsPanel') fillStats();
+    if (id === 'lobbyPanel') fillLobby();
+    if (id === 'scoresPanel') fillScores();
+    if (id === 'lastPanel') fillLastPanel();
+    $(id).hidden = false;
+    const target = id === 'lobbyPanel' ? $('startBtn') : $(id).querySelector('.btn') || $(id).querySelector('button');
+    target.focus({ preventScroll: true });
+  }
+  function closePanel(el) {
+    el.hidden = true;
+    if (panelReturn && panelReturn.focus && document.contains(panelReturn)) panelReturn.focus({ preventScroll: true });
+  }
+  const running = () => !!match && phase !== 'over';
+  const lobby = { level: settings.level, target: settings.target, moon: settings.moon };
+  function fillLobby() {
+    Object.assign(lobby, { level: settings.level, target: settings.target, moon: settings.moon });
+    paintLobby();
+    $('leaveWarn').hidden = !running();
+    $('cancelBtn').hidden = !running();
+  }
+  function paintLobby() {
+    $('lvlSeg').innerHTML = [0, 1, 2].map(l => `<button type="button" data-level="${l}" aria-pressed="${l === lobby.level}">${t.levels[l]}</button>`).join('');
+    $('tgtSeg').innerHTML = TARGETS.map(n => `<button type="button" data-target="${n}" aria-pressed="${n === lobby.target}">${t.targetN(n)}</button>`).join('');
+    $('moonSeg').innerHTML = ['others', 'choose'].map(k => `<button type="button" data-moon="${k}" aria-pressed="${k === lobby.moon}">${t.moonOpts[k]}</button>`).join('');
+  }
+  function fillStats() {
+    const rows = [['sGames', stats.games], ['sWins', stats.wins], ['sHands', stats.hands], ['sClean', stats.clean], ['sMoons', stats.moons], ['sQueens', stats.queens]];
+    let html = rows.map(([k, v]) => `<div><small>${t[k]}</small><strong>${v}</strong></div>`).join('');
+    html += `<div><small>${t.sAvg}</small><strong>${stats.hands ? (stats.pts / stats.hands).toFixed(1) : t.none}</strong></div>`;
+    html += `<div><small>${t.sBest}</small><strong>${stats.best == null ? t.none : stats.best}</strong></div>`;
+    $('statsGrid').innerHTML = html;
+    $('speedSeg').innerHTML = Object.keys(SPEEDS).map(k => `<button type="button" data-speed="${k}" aria-pressed="${k === settings.speed}">${t.speeds[k]}</button>`).join('');
+    $('confirmToggle').setAttribute('aria-pressed', String(!!settings.confirm));
+  }
+  function fillScores() {
+    const tgt = match ? match.target : settings.target;
+    $('scoresSub').textContent = t.scoresSub(tgt);
+    if (!match || !match.history.length) { $('sheet').innerHTML = `<p>${t.noHands}</p>`; return; }
+    const head = `<tr><th>${t.handCol}</th>${NAMES.map((n, p) => `<th>${AVATARS[p]} ${n}</th>`).join('')}</tr>`;
+    const body = match.history.map((h, i) => `<tr><td>${i + 1}</td>${h.add.map((a, p) => `<td class="${h.moon === p ? 'mo' : ''}">${h.moon === p ? '🌙' : ''}${a}</td>`).join('')}</tr>`).join('');
+    const foot = `<tr><td>${t.total}</td>${match.totals.map(s => `<td>${s}</td>`).join('')}</tr>`;
+    $('sheet').innerHTML = `<table class="sheet"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
+  }
+  function fillLastPanel() {
+    const res = S && S.last;
+    if (!res) { $('lastRow').innerHTML = ''; $('lastText').textContent = t.lastNone; return; }
+    $('lastRow').innerHTML = res.cards.map(x => `<figure class="${x.p === res.winner ? 'w' : ''}" data-c="${x.c}"><span>${AVATARS[x.p]} ${NAMES[x.p]}</span></figure>`).join('');
+    fillFigures($('lastRow'));
+    $('lastText').textContent = `${t.trickN(res.no + 1)} · ${t.lastWon(NAMES[res.winner], res.pts)}`;
+  }
+  function showResult(m, add, tieMore) {
+    $('resIcon').textContent = m >= 0 ? '🌙' : add[0] === 0 ? '✨' : S.queenBy === 0 ? '♠' : '♥';
+    $('resTitle').textContent = t.resTitle(match.handNo);
+    $('resText').textContent = m === 0 ? t.resMoonYou : m > 0 ? t.moonBy(NAMES[m]) : t.resYou(S.taken[0]);
+    const notes = [];
+    if (m >= 0) notes.push(match.history[match.history.length - 1].pick === 'self' ? t.moonSelfNote : t.moonOthersNote);
+    if (tieMore) notes.push(t.tieMore);
+    $('resNote').textContent = notes.join(' · ');
+    const low = Math.min(...match.totals);
+    $('resRows').innerHTML = [0, 1, 2, 3].map(p => {
+      const d = add[p];
+      const dcls = d > 0 ? 'up' : d < 0 ? 'down' : '';
+      const sub = `♥ ${S.taken[p] - (S.queenBy === p ? 13 : 0)}${S.queenBy === p ? ' · Q♠' : ''}`;
+      const lead = match.totals[p] === low ? `<span class="rp p0">♛</span>` : '<span></span>';
+      return `<div class="rrow${p === 0 ? ' me' : ''}"><span class="av">${AVATARS[p]}</span><div class="rn"><span>${NAMES[p]}</span><small>${sub}</small></div>${lead}<b class="rd ${dcls}">${d > 0 ? `+${d}` : d}<small>${t.total} ${match.totals[p]}</small></b></div>`;
+    }).join('');
+    $('nextBtn').textContent = match.final ? t.toResults : t.next;
+    announce(`${$('resTitle').textContent}. ${$('resText').textContent} ${$('resNote').textContent}`);
+    openPanel('resPanel');
+  }
+  function showGameOver() {
+    phase = 'over';
+    const tot = match.totals;
+    const placeOf = p => [0, 1, 2, 3].filter(q => tot[q] < tot[p]).length;
+    const ranking = [0, 1, 2, 3].sort((a, b) => tot[a] - tot[b] || a - b);
+    const mine = placeOf(0);
+    const win = mine === 0;
+    stats.games++;
+    if (win) { stats.wins++; stats.best = stats.best == null ? tot[0] : Math.min(stats.best, tot[0]); }
+    save();
+    $('overIcon').textContent = win ? '🏆' : ['', '🥈', '🥉', '🃏'][mine];
+    $('overTitle').textContent = win ? t.winTitle : t.loseTitle(t.places[mine]);
+    $('overText').textContent = t.overText(tot[0], match.history.length);
+    $('overRows').innerHTML = ranking.map(p => {
+      const i = placeOf(p);
+      return `<div class="rrow${p === 0 ? ' me' : ''}"><span class="av">${AVATARS[p]}</span><div class="rn"><span>${NAMES[p]}</span></div><span class="rp${i === 0 ? ' p0' : ''}">${t.places[i]}</span><b class="rd">${tot[p]}</b></div>`;
+    }).join('');
+    announce(`${$('overTitle').textContent} ${$('overText').textContent}`);
+    render();
+    openPanel('overPanel');
+  }
+
+  // ---------- input ----------
+  function setFocus(i) {
+    const n = handEl.children.length;
+    if (!n) return;
+    focusIdx = clamp(i, 0, n - 1);
+    [...handEl.children].forEach((el, k) => { el.tabIndex = k === focusIdx ? 0 : -1; });
+    handEl.children[focusIdx].focus({ preventScroll: true });
+  }
+  handEl.addEventListener('click', e => {
+    const el = e.target.closest('.card');
+    if (!el) return;
+    focusIdx = [...handEl.children].indexOf(el);
+    onCard(Number(el.dataset.c));
+  });
+  handEl.addEventListener('focusin', e => { const el = e.target.closest('.card'); if (el) focusIdx = [...handEl.children].indexOf(el); });
+
+  $('actBtn').addEventListener('click', act);
+  $('hintBtn').addEventListener('click', hint);
+  $('sortBtn').addEventListener('click', toggleSort);
+  $('lastBtn').addEventListener('click', () => openPanel('lastPanel'));
+  $('gameBtn').addEventListener('click', () => openPanel('lobbyPanel'));
+  $('scoresBtn').addEventListener('click', () => openPanel('scoresPanel'));
+  $('statsBtn').addEventListener('click', () => openPanel('statsPanel'));
+  $('helpBtn').addEventListener('click', () => openPanel('helpPanel'));
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closePanel(b.closest('.overlay'))));
+  const segPick = (id, attr, apply) => $(id).addEventListener('click', e => {
+    const b = e.target.closest(`[data-${attr}]`);
+    if (!b) return;
+    apply(b.dataset[attr]);
+    paintLobby();
+    $(id).querySelector(`[data-${attr}="${b.dataset[attr]}"]`).focus({ preventScroll: true });
+  });
+  segPick('lvlSeg', 'level', v => { lobby.level = Number(v); });
+  segPick('tgtSeg', 'target', v => { lobby.target = Number(v); });
+  segPick('moonSeg', 'moon', v => { lobby.moon = v; });
+  $('startBtn').addEventListener('click', () => {
+    Object.assign(settings, lobby);
+    saveSettings();
+    $('lobbyPanel').hidden = true;
+    startGame();
+    $('actBtn').focus({ preventScroll: true });
+  });
+  $('cancelBtn').addEventListener('click', () => closePanel($('lobbyPanel')));
+  $('nextBtn').addEventListener('click', nextHand);
+  $('againBtn').addEventListener('click', () => { $('overPanel').hidden = true; openPanel('lobbyPanel'); });
+  const moonPicked = pick => {
+    $('moonPanel').hidden = true;
+    const r = resolveMoon;
+    resolveMoon = null;
+    if (r) r(pick);
+  };
+  $('moonOthersBtn').addEventListener('click', () => moonPicked('others'));
+  $('moonSelfBtn').addEventListener('click', () => moonPicked('self'));
+  $('speedSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-speed]');
+    if (!b) return;
+    settings.speed = b.dataset.speed;
+    saveSettings();
+    fillStats();
+    $('speedSeg').querySelector(`[data-speed="${settings.speed}"]`).focus({ preventScroll: true });
+  });
+  $('confirmToggle').addEventListener('click', () => {
+    settings.confirm = !settings.confirm;
+    raised = -1;
+    saveSettings();
+    fillStats();
+  });
+  $('resetStats').addEventListener('click', () => {
+    Object.assign(stats, defaultStats());
+    save();
+    fillStats();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.querySelector('.overlay:not([hidden])')) return;
+    const key = e.key.toLowerCase();
+    const onCardEl = !!(e.target.closest && e.target.closest('#hand .card'));
+    const onButton = e.target instanceof HTMLButtonElement;
+    if (key === 'arrowleft' || key === 'arrowright') {
+      if (!handEl.children.length) return;
+      e.preventDefault();
+      setFocus(onCardEl ? focusIdx + (key === 'arrowright' ? 1 : -1) : focusIdx);
+    } else if ((key === 'enter' || key === ' ') && !onButton) {
+      const el = handEl.children[focusIdx];
+      if (phase === 'pass' && key === 'enter' && passSel.size === 3) { e.preventDefault(); confirmPass(); } else if (el && (phase === 'pass' || phase === 'you')) { e.preventDefault(); onCard(Number(el.dataset.c)); }
+    } else if (key === 'p') { if (phase === 'pass') { e.preventDefault(); confirmPass(); } }
+    else if (key === 'h') { e.preventDefault(); hint(); }
+    else if (key === 's') { e.preventDefault(); if (S && S.hands[0].length) toggleSort(); }
+    else if (key === 'l') { if (S && S.last) { e.preventDefault(); openPanel('lastPanel'); } }
+  });
+
+  for (let p = 1; p < 4; p++) {
+    SEATS[p].innerHTML = `<div class="backs" aria-hidden="true"><i></i><i></i><b class="cnt">13</b></div><div class="plate"><span class="av" aria-hidden="true">${AVATARS[p]}</span><span class="who"><span class="nm">${NAMES[p]}</span><b class="pts">0</b></span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="hp" aria-hidden="true"></span></div>`;
+  }
+  $('fan').replaceChildren(...[0, QS, 51].map(c => cardEl(c)));
+  $('helpList').innerHTML = t.helpLines.map(l => `<li>${l}</li>`).join('');
+
+  new ResizeObserver(() => { layout(); }).observe(felt);
+  layout();
+  render();
+  openPanel('lobbyPanel');
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__hearts = {
+    get S() { return S; }, get phase() { return phase; }, get match() { return match; }, get stats() { return stats; }, get settings() { return settings; },
+    get passSel() { return [...passSel]; }, get intents() { return intents.slice(); },
+    legalOf, heur, aiPlay, aiPass, mcPick, viewFor, makeState, playCard, applyPasses, handAdds, moonChoice, util, sampleWorld, CFG,
+    rig(deals) { rigQueue = deals.map(d => ({ hands: d.hands.map(h => h.slice()), hold: !!d.hold })); },
+    speed(x) { delayScale = x; }, mcBudget(ms) { MC.ms = ms; },
+    autoHuman(level) {
+      humanAuto = level;
+      if (level == null) return;
+      if (resolvePass) { const r = resolvePass; resolvePass = null; r(aiPass(S.hands[0], level, null)); }
+      if (resolveHuman) { const r = resolveHuman; resolveHuman = null; r(aiPlay(viewFor(S, 0), level)); }
+    },
+    cardCenter(c) { const el = handEl.querySelector(`[data-c="${c}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 8), y: r.top + r.height * 0.3 }; },
+    // Engine-only hands between computer players; checks every card is legal and returns per-seat totals.
+    simulate(levels, hands) {
+      const res = { pts: [0, 0, 0, 0], moons: [0, 0, 0, 0], illegal: 0, bad: 0, maxMs: 0 };
+      const saved = intents;
+      for (let k = 0; k < hands; k++) {
+        const deck = shuffle([...Array(52).keys()]);
+        const st = makeState([0, 1, 2, 3].map(i => deck.slice(i * 13, i * 13 + 13)));
+        st.passDir = DIRS[k % 4];
+        intents = [0, 1, 2, 3].map(p => (levels[p] === 2 && moonHand(st.hands[p]) ? 'shoot' : null));
+        if (st.passDir !== 'hold') applyPasses(st, [0, 1, 2, 3].map(p => aiPass(st.hands[p], levels[p], intents[p])));
+        st.turn = st.hands.findIndex(h => h.includes(0));
+        while (!st.over) {
+          const p = st.turn;
+          const t0 = now();
+          const c = aiPlay(viewFor(st, p), levels[p]);
+          res.maxMs = Math.max(res.maxMs, now() - t0);
+          if (!legalOf(st.hands[p], st).includes(c)) { res.illegal++; break; }
+          playCard(st, p, c);
+        }
+        if (st.taken.reduce((a, b) => a + b, 0) !== 26) res.bad++;
+        const { add, moon } = handAdds(st.taken, 'others');
+        if (moon >= 0) res.moons[moon]++;
+        for (let p = 0; p < 4; p++) res.pts[p] += add[p];
+      }
+      intents = saved;
+      return res;
+    },
+  };
+})();
+</script>
+</body>
+</html>

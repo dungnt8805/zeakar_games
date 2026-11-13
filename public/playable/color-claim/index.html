@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Color Claim</title>
+<style>
+:root {
+  --bg: #2a2140;
+  --ink: #fff8ee;
+  --muted: #c3b6dc;
+  --accent: #ffc93c;
+  --accent-dark: #c9900a;
+  --coral: #ff6b5b;
+  --coral-dark: #c4402f;
+  --panel: #2b2147;
+  --panel-2: #3a2d5e;
+  --line: #4d3d78;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+canvas#canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+canvas#canvas:focus-visible { outline: none; }
+
+.hud { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); display: grid; gap: 6px; justify-items: start; pointer-events: none; }
+.hud[hidden], .board[hidden] { display: none; }
+.card { display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; border-radius: 14px; background: #241b3ae6; border: 1px solid #ffffff1a; box-shadow: 0 4px 14px #0004; pointer-events: auto; }
+.pause { flex: none; width: 34px; height: 34px; border-radius: 10px; background: #ffffff1f; display: grid; place-items: center; }
+.pause svg { width: 14px; height: 14px; fill: #fff; }
+.stat { display: grid; min-width: 0; }
+.stat small { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { font-size: 20px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat.land strong { color: var(--accent); min-width: 58px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 3px 10px; border-radius: 99px; background: #241b3ad9; border: 1px solid #ffffff17; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.low { color: #ff8f84; }
+.chip[hidden] { display: none; }
+
+.board { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 160px; padding: 7px 10px 8px; border-radius: 14px; background: #241b3ad9; border: 1px solid #ffffff17; font-size: 12px; box-shadow: 0 4px 14px #0004; pointer-events: none; }
+.board h2 { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board ol { list-style: none; padding: 0; display: grid; gap: 1px; overflow: hidden; }
+.board li { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; line-height: 1.45; color: #e7def7; }
+.board li i { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.board li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.board li b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.board li.you { color: var(--accent); font-weight: 800; }
+
+.toast { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); padding: 8px 16px; border-radius: 99px; background: #241b3aeb; border: 1px solid #ffffff22; color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: 0; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.toast.show { animation: toast 1.8s ease-out both; }
+.toast.good { background: #3ccf8e; color: #08301d; }
+.toast.gold { background: var(--accent); color: #3a2600; }
+.toast.bad { background: var(--coral); color: #fff; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 12%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+
+.overlay { position: fixed; inset: 0; display: flex; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: #1d153299; overflow: auto; }
+.overlay[hidden] { display: none; }
+.panel { margin: auto; width: min(100%, 400px); padding: 18px 18px 16px; border-radius: 24px; background: linear-gradient(180deg, #3a2b62, var(--panel)); border: 1px solid var(--line); text-align: center; box-shadow: 0 24px 60px #0009; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.logo { display: block; width: 150px; height: 56px; margin: 0 auto 4px; }
+.panel h1 { font-size: clamp(30px, 9vw, 40px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.panel h1 span { color: var(--accent); }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+.panel p { margin-top: 6px; font-size: 14px; line-height: 1.4; color: var(--muted); }
+.panel .small { font-size: 12px; }
+.panel h3 { display: flex; justify-content: center; gap: 6px; margin: 10px 0 5px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel h3 em { font-style: normal; letter-spacing: 0; text-transform: none; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.menu { display: grid; grid-template-areas: "intro" "opts" "go"; width: min(100%, 420px); }
+.menu .intro { grid-area: intro; }
+.menu .opts { grid-area: opts; min-width: 0; }
+.menu .go { grid-area: go; }
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.choices.two { grid-template-columns: repeat(2, 1fr); }
+.choice { min-width: 0; padding: 7px 4px 6px; border-radius: 13px; background: var(--panel-2); border: 2px solid transparent; display: grid; gap: 1px; align-content: center; }
+.choice b { font-size: 14px; font-weight: 900; line-height: 1.15; }
+.choice small { font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.2; }
+.choice[aria-checked="true"] { border-color: var(--accent); background: #574117; }
+.choice[aria-checked="true"] small { color: #ffe7a8; }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.swatch { min-width: 0; aspect-ratio: 1; min-height: 30px; border-radius: 10px; border: 3px solid transparent; display: grid; place-items: center; box-shadow: inset 0 -5px 0 #0003; }
+.swatch[aria-checked="true"] { border-color: #fff; box-shadow: inset 0 -5px 0 #0003, 0 0 0 2px var(--accent); }
+.swatch svg { width: 60%; height: 60%; }
+.touch-row[hidden] { display: none; }
+.btn { display: block; width: 100%; margin-top: 12px; padding: 13px 10px; border-radius: 15px; background: var(--accent); color: #3a2600; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark); }
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.btn.ghost { background: var(--panel-2); color: var(--ink); box-shadow: 0 4px 0 #1b1430; font-size: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.actions .btn { flex: 1 1 130px; }
+.best { margin-top: 8px !important; font-weight: 700; color: #ddd1f0 !important; }
+.hint { margin-top: 8px !important; }
+
+.results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.results div { padding: 7px 2px; border-radius: 12px; background: var(--panel-2); min-width: 0; }
+.results small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.results strong { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin: 10px 3px 0 !important; padding: 5px 14px; border-radius: 99px; background: var(--accent); color: #3a2600 !important; font-weight: 800; font-size: 13px !important; }
+.badge[hidden] { display: none; }
+.end-art { font-size: 44px; line-height: 1; margin-bottom: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (min-aspect-ratio: 5/4) and (min-width: 540px) {
+  .menu { width: min(100%, 800px); grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); grid-template-rows: 1fr auto; grid-template-areas: "intro opts" "go opts"; column-gap: 22px; text-align: left; }
+  .menu .intro, .menu .go { text-align: center; }
+  .menu .intro { align-self: center; }
+  .menu .opts h3 { justify-content: flex-start; }
+  .menu .go { align-self: end; }
+}
+@media (max-height: 640px) { .logo { height: 44px; width: 118px; } }
+@media (max-height: 600px) { .logo { display: none; } }
+@media (max-height: 620px) and (max-aspect-ratio: 5/4), (max-height: 460px) { .menu .hint { display: none; } }
+@media (max-height: 560px) { .panel { padding: 14px 14px 12px; } .panel h3 { margin: 8px 0 4px; } }
+@media (max-height: 540px) and (max-aspect-ratio: 5/4) { .menu .tag { display: none; } }
+@media (max-height: 460px) {
+  .panel h1 { font-size: 28px; } .panel h2 { font-size: 22px; }
+  .panel p { font-size: 13px; }
+  .btn { padding: 10px; font-size: 17px; margin-top: 8px; }
+  .choice { padding: 4px 3px 3px; } .choice b { font-size: 13px; }
+  .swatch { min-height: 28px; border-radius: 8px; }
+  .end-art { display: none; }
+  .results { margin-top: 8px; } .results strong { font-size: 16px; }
+}
+@media (max-height: 360px) {
+  .panel { padding: 10px 12px; border-radius: 18px; }
+  .panel h1 { font-size: 24px; }
+  .panel p { margin-top: 3px; font-size: 12px; line-height: 1.3; }
+  .panel h3 { margin: 5px 0 3px; }
+  .choice small { font-size: 10px; }
+  .swatch { min-height: 24px; aspect-ratio: auto; height: 26px; }
+  .menu .best { margin-top: 4px !important; }
+  .card { padding: 3px 10px 3px 3px; } .pause { width: 30px; height: 30px; } .stat strong { font-size: 17px; }
+  .board li:nth-child(n+6) { display: none; }
+}
+@media (max-width: 420px) {
+  .board { width: 138px; font-size: 11px; padding: 6px 8px 7px; }
+  .board h2 { white-space: normal; line-height: 1.2; }
+  .board li:nth-child(n+7) { display: none; }
+  .card { gap: 8px; padding-right: 10px; }
+  .stat strong { font-size: 18px; }
+  .stat.land strong { min-width: 50px; }
+  .results strong { font-size: 16px; }
+}
+@media (max-width: 340px) {
+  .board { width: 134px; }
+  .choice b { font-size: 13px; } .choice small { font-size: 10px; }
+  .panel { padding-left: 12px; padding-right: 12px; }
+  .swatches { gap: 4px; }
+  .results { gap: 4px; } .results small { letter-spacing: 0; }
+}
+@media (min-width: 1100px) and (min-height: 700px) {
+  .board { width: 200px; font-size: 14px; padding: 9px 12px 10px; } .board h2 { font-size: 11px; } .board li i { width: 11px; height: 11px; }
+  .stat strong { font-size: 24px; } .stat small { font-size: 11px; } .chip { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .toast.show { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" role="img"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="card">
+    <button type="button" class="pause" id="pause-btn"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" rx="1.2"/><rect x="8.4" y="1" width="3.6" height="12" rx="1.2"/></svg></button>
+    <div class="stat land"><small data-i18n="land"></small><strong id="land">0</strong></div>
+    <div class="stat"><small data-i18n="kills"></small><strong id="kills">0</strong></div>
+  </div>
+  <div class="chips"><span class="chip" id="rank">#1</span><span class="chip" id="clock">0:00</span><span class="chip" id="left" hidden></span></div>
+</div>
+<div class="board" id="board" hidden aria-hidden="true"><h2 data-i18n="leaders"></h2><ol id="leaders"></ol></div>
+<div class="toast" id="toast" aria-hidden="true"></div>
+
+<div class="overlay" id="menu">
+  <div class="panel menu" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="intro">
+      <svg class="logo" viewBox="0 0 150 56" aria-hidden="true">
+        <rect x="6" y="10" width="44" height="40" rx="7" fill="#3fa7ff"/><rect x="6" y="44" width="44" height="6" rx="3" fill="#1f5fa3"/>
+        <rect x="98" y="6" width="46" height="44" rx="7" fill="#7ccf35"/><rect x="98" y="44" width="46" height="6" rx="3" fill="#3f7a17"/>
+        <path d="M50 22 H78 V40 H98" stroke="#ffb0a6" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="60" y="30" width="38" height="16" rx="4" fill="#ff6b5b" opacity=".35"/>
+        <rect x="64" y="12" width="20" height="20" rx="5" fill="#ff8a7d" stroke="#8a2a20" stroke-width="2.4"/>
+        <circle cx="77" cy="19" r="3.2" fill="#fff"/><circle cx="77" cy="26" r="3.2" fill="#fff"/><circle cx="78.4" cy="19" r="1.6" fill="#2a2140"/><circle cx="78.4" cy="26" r="1.6" fill="#2a2140"/>
+      </svg>
+      <h1 id="menu-title">Color <span>Claim</span></h1>
+      <p class="tag" data-i18n="tagline"></p>
+    </div>
+    <div class="opts">
+      <h3 id="mode-h" data-i18n="mode"></h3>
+      <div class="choices" id="modes" role="radiogroup" aria-labelledby="mode-h"></div>
+      <h3 id="level-h" data-i18n="level"></h3>
+      <div class="choices" id="levels" role="radiogroup" aria-labelledby="level-h"></div>
+      <h3><span id="color-h" data-i18n="color"></span><em id="color-name"></em></h3>
+      <div class="swatches" id="colors" role="radiogroup" aria-labelledby="color-h"></div>
+      <div class="touch-row" id="touch-row">
+        <h3 id="touch-h" data-i18n="touch"></h3>
+        <div class="choices two" id="touches" role="radiogroup" aria-labelledby="touch-h"></div>
+      </div>
+      <p class="small hint" data-i18n="controls"></p>
+    </div>
+    <div class="go">
+      <button type="button" class="btn" id="play" data-i18n="play"></button>
+      <p class="small best" id="menu-best"></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="paused" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <h2 id="paused-title" data-i18n="paused"></h2>
+    <div class="actions"><button type="button" class="btn" id="resume" data-i18n="resume"></button><button type="button" class="btn ghost" id="quit" data-i18n="menu"></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="end-title">
+    <div class="end-art" id="end-art" aria-hidden="true"></div>
+    <h2 id="end-title"></h2>
+    <p id="end-sub"></p>
+    <div class="results">
+      <div><small data-i18n="bestLand"></small><strong id="r-land"></strong></div>
+      <div><small data-i18n="kills"></small><strong id="r-kills"></strong></div>
+      <div><small data-i18n="rank"></small><strong id="r-rank"></strong></div>
+      <div><small data-i18n="time"></small><strong id="r-time"></strong></div>
+    </div>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <p class="small" id="end-note"></p>
+    <div class="actions">
+      <button type="button" class="btn" id="again"></button>
+      <button type="button" class="btn ghost" id="to-menu" data-i18n="menu"></button>
+    </div>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  const I18N = {
+    en: {
+      tagline: 'Leave your base, draw a loop and come home to paint everything inside it. Careful: if a rival touches your trail, you’re out!',
+      controls: 'Swipe, drag or point to turn · arrow keys / WASD · P pauses',
+      mode: 'Mode', modes: { classic: 'Classic', timed: 'Timed', battle: 'Battle' },
+      modeInfo: { classic: 'Endless respawns', timed: '3 min · most land', battle: 'Shrinking map · 1 life' },
+      level: 'Rivals', levels: { easy: 'Easy', normal: 'Normal', hard: 'Hard' }, rivals: n => `${n} rivals`,
+      color: 'Color', colors: { coral: 'Coral', sky: 'Sky', lime: 'Lime', grape: 'Grape', sun: 'Sunny', pink: 'Pink', teal: 'Teal', orange: 'Orange' },
+      touch: 'Touch steering', touchModes: { swipe: 'Swipe', stick: 'Joystick' },
+      play: 'Play', land: 'Land', bestLand: 'Top land', kills: 'Kills', rank: 'Rank', time: 'Time', leaders: 'Leaderboard', you: 'You', left: n => `${n} left`,
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', menu: 'Menu', again: 'Play again', respawn: 'Respawn',
+      go: 'Go! Leave your base and draw a loop!', gain: p => `+${p}`, landUp: p => `You own ${p} of the map!`, top: 'You’re #1!',
+      cut: n => `You cut ${n}’s trail!`, wiped: n => `You took all of ${n}’s land!`,
+      cutBy: n => `${n} cut your trail`, selfCut: 'You crossed your own trail', hitWall: 'You hit the edge of the map', crash: n => `You crashed into ${n}`,
+      lostLand: n => `${n} took all your land`, storm: 'The storm swallowed you', stormStart: 'The map is shrinking!',
+      timeUp: 'Time’s up!', winner: 'You win!', champion: 'Last one standing!', gameOver: 'Game over',
+      place: n => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'} place`,
+      backIn: n => `Back in ${n}…`, remaining: n => `${n} players left`,
+      newBest: 'New best!', best: (p, w) => `Best land ${p} · Wins ${w}`,
+      canvas: 'Color Claim: a square map seen from above where colored blocks draw trails and claim land',
+    },
+    vi: {
+      tagline: 'Rời căn cứ, vẽ một vòng rồi quay về để tô màu cả vùng đất bên trong. Cẩn thận: đối thủ chạm vào vệt của bạn là bạn thua!',
+      controls: 'Vuốt, kéo hoặc trỏ chuột để rẽ · phím mũi tên / WASD · P để tạm dừng',
+      mode: 'Chế độ', modes: { classic: 'Cổ điển', timed: 'Tính giờ', battle: 'Đại chiến' },
+      modeInfo: { classic: 'Hồi sinh thoải mái', timed: '3 phút · nhiều đất nhất', battle: 'Bản đồ thu hẹp · 1 mạng' },
+      level: 'Đối thủ', levels: { easy: 'Dễ', normal: 'Vừa', hard: 'Khó' }, rivals: n => `${n} đối thủ`,
+      color: 'Màu', colors: { coral: 'San hô', sky: 'Bầu trời', lime: 'Chanh', grape: 'Nho', sun: 'Nắng', pink: 'Hồng', teal: 'Ngọc', orange: 'Cam' },
+      touch: 'Điều khiển cảm ứng', touchModes: { swipe: 'Vuốt', stick: 'Cần điều khiển' },
+      play: 'Chơi', land: 'Đất', bestLand: 'Đất tối đa', kills: 'Hạ gục', rank: 'Hạng', time: 'Thời gian', leaders: 'Bảng xếp hạng', you: 'Bạn', left: n => `Còn ${n}`,
+      pause: 'Tạm dừng', paused: 'Đang tạm dừng', resume: 'Tiếp tục', menu: 'Menu', again: 'Chơi lại', respawn: 'Hồi sinh',
+      go: 'Bắt đầu! Rời căn cứ và vẽ một vòng!', gain: p => `+${p}`, landUp: p => `Bạn đã chiếm ${p} bản đồ!`, top: 'Bạn đang dẫn đầu!',
+      cut: n => `Bạn đã cắt vệt của ${n}!`, wiped: n => `Bạn đã chiếm sạch đất của ${n}!`,
+      cutBy: n => `${n} đã cắt vệt của bạn`, selfCut: 'Bạn đi cắt vào vệt của chính mình', hitWall: 'Bạn đâm vào mép bản đồ', crash: n => `Bạn đụng đầu với ${n}`,
+      lostLand: n => `${n} đã chiếm hết đất của bạn`, storm: 'Vùng tối đã nuốt chửng bạn', stormStart: 'Bản đồ đang thu hẹp!',
+      timeUp: 'Hết giờ!', winner: 'Bạn thắng!', champion: 'Người trụ lại cuối cùng!', gameOver: 'Kết thúc ván',
+      place: n => `Hạng ${n}`,
+      backIn: n => `Hồi sinh sau ${n}…`, remaining: n => `Còn ${n} người chơi`,
+      newBest: 'Kỷ lục mới!', best: (p, w) => `Đất nhiều nhất ${p} · Thắng ${w} trận`,
+      canvas: 'Color Claim: bản đồ ô vuông nhìn từ trên cao, nơi các khối màu vẽ vệt và chiếm đất',
+    },
+    zh: {
+      tagline: '离开你的领地，画出一个圈再回家，圈里的地盘就全归你。小心：对手碰到你的尾迹，你就出局了！',
+      controls: '滑动、拖动或用鼠标指向来转弯 · 方向键 / WASD · P 暂停',
+      mode: '模式', modes: { classic: '经典', timed: '限时', battle: '大乱斗' },
+      modeInfo: { classic: '无限复活', timed: '3 分钟 · 地盘最大', battle: '地图缩小 · 只有一条命' },
+      level: '对手', levels: { easy: '简单', normal: '普通', hard: '困难' }, rivals: n => `${n} 个对手`,
+      color: '颜色', colors: { coral: '珊瑚', sky: '天空', lime: '青柠', grape: '葡萄', sun: '阳光', pink: '粉红', teal: '青绿', orange: '橙子' },
+      touch: '触屏操作', touchModes: { swipe: '滑动', stick: '摇杆' },
+      play: '开始', land: '地盘', bestLand: '最大地盘', kills: '击败', rank: '排名', time: '时间', leaders: '排行榜', you: '你', left: n => `剩 ${n}`,
+      pause: '暂停', paused: '已暂停', resume: '继续', menu: '菜单', again: '再玩一次', respawn: '复活',
+      go: '出发！离开领地画个圈吧！', gain: p => `+${p}`, landUp: p => `你占领了 ${p} 的地图！`, top: '你排名第一！',
+      cut: n => `你切断了 ${n} 的尾迹！`, wiped: n => `你吞掉了 ${n} 的全部地盘！`,
+      cutBy: n => `${n} 切断了你的尾迹`, selfCut: '你撞上了自己的尾迹', hitWall: '你撞到了地图边缘', crash: n => `你和 ${n} 迎头相撞`,
+      lostLand: n => `${n} 夺走了你的全部地盘`, storm: '你被黑雾吞没了', stormStart: '地图正在缩小！',
+      timeUp: '时间到！', winner: '你赢了！', champion: '最后的幸存者！', gameOver: '游戏结束',
+      place: n => `第 ${n} 名`,
+      backIn: n => `${n} 秒后复活…`, remaining: n => `还剩 ${n} 名玩家`,
+      newBest: '新纪录！', best: (p, w) => `最大地盘 ${p} · 胜利 ${w} 次`,
+      canvas: 'Color Claim：俯视的方格地图，彩色方块在上面画出尾迹、占领地盘',
+    },
+    fr: {
+      tagline: 'Quittez votre base, tracez une boucle et rentrez pour peindre tout l’intérieur. Attention : si un rival touche votre traînée, vous êtes éliminé !',
+      controls: 'Glissez, faites glisser ou pointez pour tourner · flèches / WASD · P pour la pause',
+      mode: 'Mode', modes: { classic: 'Classique', timed: 'Chrono', battle: 'Bataille' },
+      modeInfo: { classic: 'Réapparitions sans fin', timed: '3 min · plus grand territoire', battle: 'Carte qui rétrécit · 1 vie' },
+      level: 'Rivaux', levels: { easy: 'Facile', normal: 'Normal', hard: 'Difficile' }, rivals: n => `${n} rivaux`,
+      color: 'Couleur', colors: { coral: 'Corail', sky: 'Ciel', lime: 'Citron vert', grape: 'Raisin', sun: 'Soleil', pink: 'Rose', teal: 'Turquoise', orange: 'Orange' },
+      touch: 'Commandes tactiles', touchModes: { swipe: 'Glisser', stick: 'Joystick' },
+      play: 'Jouer', land: 'Terrain', bestLand: 'Record', kills: 'Victimes', rank: 'Rang', time: 'Temps', leaders: 'Classement', you: 'Vous', left: n => `${n} restants`,
+      pause: 'Pause', paused: 'En pause', resume: 'Reprendre', menu: 'Menu', again: 'Rejouer', respawn: 'Réapparaître',
+      go: 'C’est parti ! Sortez de votre base et tracez une boucle !', gain: p => `+${p}`, landUp: p => `Vous possédez ${p} de la carte !`, top: 'Vous êtes n° 1 !',
+      cut: n => `Vous avez coupé la traînée de ${n} !`, wiped: n => `Vous avez pris tout le terrain de ${n} !`,
+      cutBy: n => `${n} a coupé votre traînée`, selfCut: 'Vous avez croisé votre propre traînée', hitWall: 'Vous avez heurté le bord de la carte', crash: n => `Collision frontale avec ${n}`,
+      lostLand: n => `${n} a pris tout votre terrain`, storm: 'La tempête vous a englouti', stormStart: 'La carte rétrécit !',
+      timeUp: 'Temps écoulé !', winner: 'Vous gagnez !', champion: 'Dernier en lice !', gameOver: 'Partie terminée',
+      place: n => (n === 1 ? '1re place' : `${n}e place`),
+      backIn: n => `Retour dans ${n}…`, remaining: n => `Plus que ${n} joueurs`,
+      newBest: 'Nouveau record !', best: (p, w) => `Record ${p} · ${w} victoires`,
+      canvas: 'Color Claim : une carte quadrillée vue de dessus où des blocs colorés tracent des traînées et conquièrent du terrain',
+    },
+    th: {
+      tagline: 'ออกจากฐาน ลากเส้นเป็นวงแล้วกลับบ้าน พื้นที่ข้างในทั้งหมดจะเป็นสีของคุณ ระวัง: ถ้าคู่แข่งแตะเส้นของคุณ คุณจะตกรอบ!',
+      controls: 'ปัด ลาก หรือชี้เมาส์เพื่อเลี้ยว · ปุ่มลูกศร / WASD · P หยุดชั่วคราว',
+      mode: 'โหมด', modes: { classic: 'คลาสสิก', timed: 'จับเวลา', battle: 'ศึกใหญ่' },
+      modeInfo: { classic: 'เกิดใหม่ได้ไม่จำกัด', timed: '3 นาที · พื้นที่มากสุด', battle: 'แผนที่หดลง · 1 ชีวิต' },
+      level: 'คู่แข่ง', levels: { easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก' }, rivals: n => `คู่แข่ง ${n} คน`,
+      color: 'สี', colors: { coral: 'ปะการัง', sky: 'ฟ้า', lime: 'มะนาว', grape: 'องุ่น', sun: 'แดดจ้า', pink: 'ชมพู', teal: 'เขียวอมฟ้า', orange: 'ส้ม' },
+      touch: 'การควบคุมแบบสัมผัส', touchModes: { swipe: 'ปัด', stick: 'จอยสติ๊ก' },
+      play: 'เล่น', land: 'พื้นที่', bestLand: 'พื้นที่สูงสุด', kills: 'กำจัด', rank: 'อันดับ', time: 'เวลา', leaders: 'กระดานผู้นำ', you: 'คุณ', left: n => `เหลือ ${n}`,
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', again: 'เล่นอีกครั้ง', respawn: 'เกิดใหม่',
+      go: 'เริ่ม! ออกจากฐานแล้วลากเส้นเป็นวง!', gain: p => `+${p}`, landUp: p => `คุณยึดได้ ${p} ของแผนที่!`, top: 'คุณขึ้นอันดับ 1!',
+      cut: n => `คุณตัดเส้นของ ${n} ได้!`, wiped: n => `คุณยึดพื้นที่ทั้งหมดของ ${n}!`,
+      cutBy: n => `${n} ตัดเส้นของคุณ`, selfCut: 'คุณชนเส้นของตัวเอง', hitWall: 'คุณชนขอบแผนที่', crash: n => `คุณชนประสานงากับ ${n}`,
+      lostLand: n => `${n} ยึดพื้นที่ของคุณไปหมด`, storm: 'พายุกลืนคุณไปแล้ว', stormStart: 'แผนที่กำลังหดลง!',
+      timeUp: 'หมดเวลา!', winner: 'คุณชนะ!', champion: 'ผู้รอดคนสุดท้าย!', gameOver: 'จบเกม',
+      place: n => `อันดับ ${n}`,
+      backIn: n => `กลับมาใน ${n}…`, remaining: n => `เหลือผู้เล่น ${n} คน`,
+      newBest: 'สถิติใหม่!', best: (p, w) => `พื้นที่สูงสุด ${p} · ชนะ ${w} ครั้ง`,
+      canvas: 'Color Claim: แผนที่ตารางมองจากด้านบน บล็อกสีต่างๆ ลากเส้นและยึดพื้นที่',
+    },
+    ja: {
+      tagline: '陣地を出て線でぐるっと囲み、戻ってくれば中がまるごと自分の色に。ただしライバルに線を踏まれたらアウト！',
+      controls: 'スワイプ・ドラッグ・マウスで方向転換 · 矢印キー / WASD · P で一時停止',
+      mode: 'モード', modes: { classic: 'クラシック', timed: 'タイム制', battle: 'バトル' },
+      modeInfo: { classic: '何度でも復活', timed: '3分 · 陣地の広さで勝負', battle: '縮むマップ · 残機1' },
+      level: 'ライバル', levels: { easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい' }, rivals: n => `${n}人`,
+      color: 'カラー', colors: { coral: 'コーラル', sky: 'スカイ', lime: 'ライム', grape: 'グレープ', sun: 'サニー', pink: 'ピンク', teal: 'ティール', orange: 'オレンジ' },
+      touch: 'タッチ操作', touchModes: { swipe: 'スワイプ', stick: 'スティック' },
+      play: 'プレイ', land: '陣地', bestLand: '最大陣地', kills: 'キル', rank: '順位', time: 'タイム', leaders: 'ランキング', you: 'あなた', left: n => `残り${n}`,
+      pause: '一時停止', paused: '一時停止中', resume: '再開', menu: 'メニュー', again: 'もう一度', respawn: '復活する',
+      go: 'スタート！陣地を出て線で囲もう！', gain: p => `+${p}`, landUp: p => `マップの${p}を占領！`, top: '1位になった！',
+      cut: n => `${n}の線を切った！`, wiped: n => `${n}の陣地をすべて奪った！`,
+      cutBy: n => `${n}に線を切られた`, selfCut: '自分の線を踏んでしまった', hitWall: 'マップの端にぶつかった', crash: n => `${n}と正面衝突`,
+      lostLand: n => `${n}に陣地をすべて奪われた`, storm: '嵐に飲み込まれた', stormStart: 'マップが縮み始めた！',
+      timeUp: 'タイムアップ！', winner: 'あなたの勝ち！', champion: '最後の生き残り！', gameOver: 'ゲームオーバー',
+      place: n => `${n}位`,
+      backIn: n => `${n}秒後に復活…`, remaining: n => `残り${n}人`,
+      newBest: '自己ベスト更新！', best: (p, w) => `最大陣地 ${p} · 勝利 ${w}回`,
+      canvas: 'Color Claim：上から見たマス目のマップ。色のブロックが線を引いて陣地を広げる',
+    },
+    ko: {
+      tagline: '기지를 벗어나 선으로 한 바퀴 두르고 돌아오면 안쪽이 전부 내 색이 돼요. 조심하세요: 라이벌이 내 선을 밟으면 탈락!',
+      controls: '스와이프, 드래그 또는 마우스로 방향 전환 · 방향키 / WASD · P 일시정지',
+      mode: '모드', modes: { classic: '클래식', timed: '타임', battle: '배틀' },
+      modeInfo: { classic: '무한 부활', timed: '3분 · 가장 넓은 땅', battle: '줄어드는 맵 · 목숨 1개' },
+      level: '상대', levels: { easy: '쉬움', normal: '보통', hard: '어려움' }, rivals: n => `상대 ${n}명`,
+      color: '색상', colors: { coral: '코랄', sky: '하늘', lime: '라임', grape: '포도', sun: '햇살', pink: '핑크', teal: '청록', orange: '오렌지' },
+      touch: '터치 조작', touchModes: { swipe: '스와이프', stick: '조이스틱' },
+      play: '플레이', land: '땅', bestLand: '최대 땅', kills: '처치', rank: '순위', time: '시간', leaders: '순위표', you: '나', left: n => `${n}명 남음`,
+      pause: '일시정지', paused: '일시정지됨', resume: '계속하기', menu: '메뉴', again: '다시 하기', respawn: '부활하기',
+      go: '시작! 기지를 나가서 선으로 둘러싸세요!', gain: p => `+${p}`, landUp: p => `맵의 ${p}를 차지했어요!`, top: '1위 달성!',
+      cut: n => `${n}의 선을 끊었어요!`, wiped: n => `${n}의 땅을 모두 빼앗았어요!`,
+      cutBy: n => `${n}에게 선이 끊겼어요`, selfCut: '내 선을 밟고 말았어요', hitWall: '맵 가장자리에 부딪혔어요', crash: n => `${n}와 정면충돌했어요`,
+      lostLand: n => `${n}에게 땅을 모두 빼앗겼어요`, storm: '폭풍에 휩쓸렸어요', stormStart: '맵이 줄어들고 있어요!',
+      timeUp: '시간 종료!', winner: '승리!', champion: '최후의 생존자!', gameOver: '게임 오버',
+      place: n => `${n}위`,
+      backIn: n => `${n}초 후 부활…`, remaining: n => `${n}명 남음`,
+      newBest: '최고 기록!', best: (p, w) => `최대 땅 ${p} · ${w}승`,
+      canvas: 'Color Claim: 위에서 내려다본 격자 맵. 색깔 블록들이 선을 그어 땅을 차지해요',
+    },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  const locale = lang === 'zh' ? 'zh-Hans' : lang;
+  document.documentElement.lang = locale;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  const pctFmt = new Intl.NumberFormat(locale, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const fmtPct = v => pctFmt.format(Math.max(0, v) / 100);
+  const clockText = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Constants ----------
+  const TAU = Math.PI * 2;
+  const TICK = 1 / 7.5;
+  const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+  const TIMED_SECONDS = 180;
+  const BATTLE = { start: 40, shrink: 170, minSize: 20, final: 45 };
+  const LAND_MARKS = [5, 10, 20, 30, 50, 75];
+  const MODES = ['classic', 'timed', 'battle'];
+  // react = chance a bot checks for danger each step; margin = extra safety steps; hunt = how eagerly it chases trails.
+  const LEVELS = {
+    easy: { bots: 6, N: 92, react: 0.45, margin: -1, hunt: 0.06, wobble: 0.05, reach: [1.3, 1.7], headOn: false },
+    normal: { bots: 9, N: 108, react: 0.8, margin: 1, hunt: 0.5, wobble: 0.015, reach: [1, 1.25], headOn: true },
+    hard: { bots: 12, N: 124, react: 1, margin: 2, hunt: 1, wobble: 0, reach: [0.95, 1.15], headOn: true },
+  };
+  // Distinct bot personalities: loop sizes (cells), love of raiding rival land, trail hunting, extra caution.
+  const STYLES = {
+    turtle: { out: [2, 5], side: [2, 5], raid: 0, hunt: 0.25, care: 2, maxTrail: 16 },
+    builder: { out: [5, 11], side: [4, 10], raid: 0.1, hunt: 0.3, care: 0, maxTrail: 44 },
+    raider: { out: [4, 9], side: [3, 7], raid: 0.9, hunt: 0.6, care: 0, maxTrail: 30 },
+    hunter: { out: [3, 7], side: [3, 6], raid: 0.3, hunt: 1.6, care: 1, maxTrail: 22 },
+    roamer: { out: [3, 13], side: [2, 9], raid: 0.4, hunt: 0.5, care: 0, maxTrail: 38 },
+  };
+  const STYLE_ORDER = ['builder', 'hunter', 'turtle', 'raider', 'roamer', 'builder', 'hunter', 'raider', 'turtle', 'roamer', 'builder', 'hunter'];
+  const COLORS = ['#ff6b5b', '#3fa7ff', '#7ccf35', '#9a6bff', '#ffc23d', '#ff6fb5', '#18bfa8', '#ff8f2e', '#5566ff', '#d63f78', '#2fd0ea', '#a3b23a', '#b5774a', '#63dba0'];
+  const COLOR_IDS = ['coral', 'sky', 'lime', 'grape', 'sun', 'pink', 'teal', 'orange'];
+  const NAMES = ['Pixel', 'Mochi', 'Tango', 'Blip', 'Zuzu', 'Kiwi', 'Nova', 'Pogo', 'Bean', 'Ziggy', 'Tofu', 'Luma', 'Rex', 'Bubbles', 'Dot', 'Skipper', 'Pepper', 'Waffle', 'Nori', 'Boop', 'Cosmo', 'Juno', 'Fizz', 'Taco', 'Momo', 'Zap', 'Biscuit', 'Bingo', 'Echo', 'Puck', 'Sprout', 'Jelly', 'Noodle', 'Pickle', 'Gizmo', 'Peanut'];
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = ([a, b]) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const hexRgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const mixRgb = (a, b, f) => { const x = hexRgb(a), y = hexRgb(b); return x.map((v, i) => Math.round(v + (y[i] - v) * f)); };
+  const css = c => `rgb(${c.join(',')})`;
+  const u32 = c => ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0;
+  const PAL = COLORS.map(c => {
+    const dark = mixRgb(c, '#1d1430', 0.36);
+    return { base: c, dark: css(dark), edge: css(mixRgb(c, '#1d1430', 0.6)), light: css(mixRgb(c, '#ffffff', 0.45)), head: css(mixRgb(c, '#ffffff', 0.14)), px: u32(hexRgb(c)), pxDark: u32(dark) };
+  });
+
+  // Storage: every access guarded, the sandbox may block it.
+  const KEY = name => `milaan.colorClaim.${name}`;
+  const load = (name, fallback) => { try { const v = JSON.parse(localStorage.getItem(KEY(name))); return v && typeof v === 'object' ? Object.assign({}, fallback, v) : { ...fallback }; } catch { return { ...fallback }; } };
+  const save = (name, value) => { try { localStorage.setItem(KEY(name), JSON.stringify(value)); } catch {} };
+  const stats = load('stats', { games: 0, kills: 0, wins: 0 });
+  const best = load('best', { classic: 0, timed: 0, battle: 0 });
+  const prefs = load('prefs', { mode: 'classic', level: 'normal', color: 0, touch: 'swipe' });
+  if (!MODES.includes(prefs.mode)) prefs.mode = 'classic';
+  if (!LEVELS[prefs.level]) prefs.level = 'normal';
+  if (!(prefs.color >= 0 && prefs.color < COLOR_IDS.length)) prefs.color = 0;
+  if (prefs.touch !== 'stick') prefs.touch = 'swipe';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const els = {
+    hud: $('hud'), land: $('land'), kills: $('kills'), rank: $('rank'), clock: $('clock'), left: $('left'), board: $('board'), leaders: $('leaders'), toast: $('toast'),
+    menu: $('menu'), modes: $('modes'), levels: $('levels'), colors: $('colors'), colorName: $('color-name'), touches: $('touches'), touchRow: $('touch-row'), menuBest: $('menu-best'),
+    paused: $('paused'), end: $('end'), endArt: $('end-art'), endTitle: $('end-title'), endSub: $('end-sub'), rLand: $('r-land'), rKills: $('r-kills'), rRank: $('r-rank'), rTime: $('r-time'),
+    newBest: $('new-best'), endNote: $('end-note'), again: $('again'), announcer: $('announcer'),
+  };
+  canvas.setAttribute('aria-label', t.canvas);
+  $('pause-btn').setAttribute('aria-label', t.pause);
+  const announce = text => { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = text; }, 30); };
+  function toast(text, kind) {
+    els.toast.textContent = text;
+    els.toast.className = 'toast' + (kind ? ` ${kind}` : '');
+    void els.toast.offsetWidth;
+    els.toast.classList.add('show');
+  }
+
+  let view = { w: 1, h: 1, dpr: 1 };
+  function resize() {
+    view = { w: Math.max(1, innerWidth), h: Math.max(1, innerHeight), dpr: Math.min(devicePixelRatio || 1, 2) };
+    canvas.width = Math.round(view.w * view.dpr);
+    canvas.height = Math.round(view.h * view.dpr);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // ---------- World ----------
+  // owner/trail hold player ids (1..13, 0 = none). Territory is mirrored into two 1px-per-cell images drawn scaled up.
+  let G = null, N = 0;
+  let owner, trail, flash, seen, fdir, dist, qbuf, stamp = 0;
+  let terr, terrCtx, terrImg, terr32, shade, shadeCtx, shadeImg, shade32, checker;
+
+  function makeLayer() { const c = document.createElement('canvas'); c.width = c.height = N; return c; }
+  function allocGrid(n) {
+    N = n;
+    const S = N * N;
+    owner = new Uint8Array(S); trail = new Uint8Array(S); flash = new Float32Array(S);
+    seen = new Int32Array(S); fdir = new Int8Array(S); dist = new Int16Array(S); qbuf = new Int32Array(S); stamp = 0;
+    terr = makeLayer(); terrCtx = terr.getContext('2d'); terrImg = terrCtx.createImageData(N, N); terr32 = new Uint32Array(terrImg.data.buffer);
+    shade = makeLayer(); shadeCtx = shade.getContext('2d'); shadeImg = shadeCtx.createImageData(N, N); shade32 = new Uint32Array(shadeImg.data.buffer);
+    checker = makeLayer();
+    const cc = checker.getContext('2d'), img = cc.createImageData(N, N), p = new Uint32Array(img.data.buffer);
+    const a = u32(hexRgb('#f6f0e3')), b = u32(hexRgb('#ede4d3'));
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) p[y * N + x] = (x + y) & 1 ? b : a;
+    cc.putImageData(img, 0, 0);
+  }
+
+  const inZone = (x, y) => { const z = G.zone; return x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1; };
+  // The ring the storm will swallow next, while the warning is on.
+  const doomed = (x, y) => { const z = G.zone; return G.warn && (x === z.x0 || x === z.x1 || y === z.y0 || y === z.y1); };
+  const passable = (e, x, y) => inZone(x, y) && trail[y * N + x] !== e.id;
+
+  function setOwner(i, id) {
+    const prev = owner[i];
+    if (prev === id) return;
+    if (prev) G.counts[prev]--;
+    owner[i] = id;
+    if (id) {
+      G.counts[id]++;
+      const e = G.byId[id], x = i % N, y = (i / N) | 0;
+      terr32[i] = PAL[e.color].px; shade32[i] = PAL[e.color].pxDark;
+      if (x < e.bx0) e.bx0 = x; if (x > e.bx1) e.bx1 = x; if (y < e.by0) e.by0 = y; if (y > e.by1) e.by1 = y;
+    } else { terr32[i] = 0; shade32[i] = 0; }
+    G.dirty = true;
+  }
+
+  function makeEnt(id, color, isPlayer, style) {
+    return {
+      id, color, isPlayer, alive: false, name: isPlayer ? t.you : '', x: 0, y: 0, px: 0, py: 0, dir: 0, queue: [], trail: [], sx: 0, sy: 0,
+      bx0: 0, by0: 0, bx1: 0, by1: 0, kills: 0, deaths: 0,
+      ai: { style, plan: [], exit: 0, ret: false, homeSteps: 0, hd: -1, hdTick: -1 },
+    };
+  }
+
+  function createWorld(mode, level, demo) {
+    const L = LEVELS[level];
+    allocGrid(L.N);
+    G = {
+      mode, level, L, demo, time: 0, ticks: 0, acc: 0, ents: [], byId: [null], counts: new Int32Array(16), player: null,
+      zone: { x0: 0, y0: 0, x1: N - 1, y1: N - 1 }, warn: false, nextShrink: 0, shrinkEvery: 0, zoneDoneAt: 0,
+      respawns: [], particles: [], over: false, endShown: false, endAt: 0, win: false, paused: false, auto: false, dirty: true,
+      kills: 0, maxPct: 0, lifeStart: 0, mark: 0, rankToastAt: -99, cause: null, killer: null, deathRank: 0, deadAt: null, backAt: 0, backShown: 0,
+      cam: { x: N / 2, y: N / 2 }, stormWarned: false,
+    };
+    if (mode === 'battle') G.shrinkEvery = BATTLE.shrink / ((N - BATTLE.minSize) / 2);
+    G.nextShrink = BATTLE.start;
+    const used = new Set();
+    const botColors = COLORS.map((_, i) => i).filter(i => demo || i !== prefs.color);
+    const count = demo ? 9 : L.bots;
+    for (let k = 0; k < count; k++) {
+      const e = makeEnt(G.ents.length + 1, botColors[k % botColors.length], false, STYLE_ORDER[k % STYLE_ORDER.length]);
+      G.ents.push(e); G.byId[e.id] = e;
+      e.name = pick(NAMES.filter(n => !used.has(n))); used.add(e.name);
+      spawn(e);
+    }
+    return G;
+  }
+
+  // Find a quiet spot for a new 5×5 base: few claimed cells and no heads nearby.
+  function findSpot() {
+    const z = G.zone, m = 4;
+    let bestP = null, bestS = Infinity;
+    for (let tries = 0; tries < 60; tries++) {
+      const x = Math.floor(rand(z.x0 + m, z.x1 - m + 1)), y = Math.floor(rand(z.y0 + m, z.y1 - m + 1));
+      let s = 0;
+      for (let yy = y - 3; yy <= y + 3; yy++) for (let xx = x - 3; xx <= x + 3; xx++) {
+        if (!inZone(xx, yy)) { s += 2; continue; }
+        const i = yy * N + xx;
+        if (owner[i]) s += 1;
+        if (trail[i]) s += 3;
+      }
+      for (const o of G.ents) if (o.alive && Math.abs(o.x - x) + Math.abs(o.y - y) < 9) s += 12;
+      if (s === 0) return { x, y };
+      if (s < bestS) { bestS = s; bestP = { x, y }; }
+    }
+    return bestP;
+  }
+
+  function spawn(e, spot) {
+    const p = spot || findSpot();
+    e.alive = true; e.x = e.px = p.x; e.y = e.py = p.y; e.trail.length = 0; e.queue.length = 0;
+    e.bx0 = e.bx1 = p.x; e.by0 = e.by1 = p.y;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      if (Math.abs(dx) === 2 && Math.abs(dy) === 2) continue;
+      const x = p.x + dx, y = p.y + dy;
+      if (inZone(x, y)) { const i = y * N + x; setOwner(i, e.id); if (!reduced) flash[i] = G.time + 0.1; }
+    }
+    // Face the open middle of the map.
+    const cx = N / 2 - p.x, cy = N / 2 - p.y;
+    e.dir = Math.abs(cx) > Math.abs(cy) ? (cx > 0 ? 0 : 2) : (cy > 0 ? 1 : 3);
+    e.ai.plan = []; e.ai.ret = false; e.ai.homeSteps = 0;
+    for (const o of G.ents) if (o !== e && o.alive && G.counts[o.id] === 0) die(o, e, 'land');
+  }
+
+  // ---------- Bot brain ----------
+  // Breadth-first search from a cell, skipping the bot's own trail. Returns the first step toward the nearest goal cell.
+  function bfs(e, sx, sy, startDirs, goal, maxD) {
+    const s = ++stamp;
+    let qh = 0, qt = 0;
+    for (const d of startDirs) {
+      const x = sx + DX[d], y = sy + DY[d];
+      if (!passable(e, x, y) || doomed(x, y)) continue;
+      const i = y * N + x;
+      if (seen[i] === s) continue;
+      seen[i] = s; fdir[i] = d; dist[i] = 1;
+      if (goal(i)) return { d: 1, dir: d };
+      qbuf[qt++] = i;
+    }
+    while (qh < qt) {
+      const i = qbuf[qh++], nd = dist[i] + 1;
+      if (nd > maxD) break;
+      const x = i % N, y = (i / N) | 0;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + DX[d], ny = y + DY[d];
+        if (!passable(e, nx, ny) || doomed(nx, ny)) continue;
+        const j = ny * N + nx;
+        if (seen[j] === s) continue;
+        seen[j] = s; fdir[j] = fdir[i]; dist[j] = nd;
+        if (goal(j)) return { d: nd, dir: fdir[j] };
+        qbuf[qt++] = j;
+      }
+    }
+    return null;
+  }
+  const fwdDirs = d => [d, (d + 1) % 4, (d + 3) % 4];
+
+  function homeDist(e) {
+    if (!e.trail.length) return 0;
+    if (e.ai.hdTick === G.ticks) return e.ai.hd;
+    const r = bfs(e, e.x, e.y, fwdDirs(e.dir), i => owner[i] === e.id, 90);
+    e.ai.hdTick = G.ticks; e.ai.hd = r ? r.d : 99;
+    return e.ai.hd;
+  }
+
+  // Closest any rival head is to my trail (or head): how soon someone could cut me.
+  function threat(e) {
+    let bestD = 1e9;
+    for (const o of G.ents) {
+      if (!o.alive || o === e) continue;
+      let d = Math.abs(o.x - e.x) + Math.abs(o.y - e.y);
+      for (let k = 0; k < e.trail.length; k++) {
+        const i = e.trail[k], dd = Math.abs(o.x - (i % N)) + Math.abs(o.y - ((i / N) | 0));
+        if (dd < d) d = dd;
+      }
+      if (d < bestD) bestD = d;
+    }
+    return bestD;
+  }
+
+  function space(e, x, y, cap) {
+    if (!passable(e, x, y)) return 0;
+    const s = ++stamp;
+    let qh = 0, qt = 0;
+    seen[y * N + x] = s; qbuf[qt++] = y * N + x;
+    while (qh < qt && qt < cap) {
+      const i = qbuf[qh++], cx = i % N, cy = (i / N) | 0;
+      for (let d = 0; d < 4; d++) {
+        const nx = cx + DX[d], ny = cy + DY[d];
+        if (!passable(e, nx, ny)) continue;
+        const j = ny * N + nx;
+        if (seen[j] !== s) { seen[j] = s; qbuf[qt++] = j; }
+      }
+    }
+    return qt;
+  }
+
+  function makePlan(e) {
+    const S = STYLES[e.ai.style], L = e.isPlayer ? LEVELS.hard : G.L, k = rand(L.reach[0], L.reach[1]);
+    let bestD = -1, bestScore = -Infinity;
+    for (let d = 0; d < 4; d++) {
+      let x = e.x, y = e.y, steps = 0;
+      while (steps < 40 && inZone(x, y) && owner[y * N + x] === e.id) { x += DX[d]; y += DY[d]; steps++; }
+      if (!inZone(x, y) || doomed(x, y)) continue;
+      let ahead = 0;
+      for (let s = 0; s < 12; s++) { if (!inZone(x + DX[d] * s, y + DY[d] * s)) break; ahead++; }
+      let empty = 0, rival = 0, mine = 0;
+      const cx = x + DX[d] * 4, cy = y + DY[d] * 4;
+      for (let yy = cy - 3; yy <= cy + 3; yy++) for (let xx = cx - 3; xx <= cx + 3; xx++) {
+        if (!inZone(xx, yy)) continue;
+        const o = owner[yy * N + xx];
+        if (!o) empty++; else if (o === e.id) mine++; else rival++;
+      }
+      let heads = 0;
+      for (const o of G.ents) if (o.alive && o !== e && Math.abs(o.x - cx) + Math.abs(o.y - cy) < 9) heads++;
+      const score = ahead * 1.2 + empty * 0.12 + rival * 0.12 * (0.4 + S.raid * 2) - mine * 0.25 - steps * 0.3 - heads * 3 * (1 - S.raid * 0.5) + Math.random() * 3 + (d === e.dir ? 1 : 0) - (d === (e.dir + 2) % 4 ? 2 : 0);
+      if (score > bestScore) { bestScore = score; bestD = d; }
+    }
+    if (bestD < 0) bestD = e.dir;
+    const s1 = (bestD + 1) % 4, s2 = (bestD + 3) % 4;
+    const room = d => { let n = 0; for (let s = 1; s <= 12; s++) { if (!inZone(e.x + DX[d] * s, e.y + DY[d] * s)) break; n++; } return n; };
+    const side = room(s1) + rand(-3, 3) > room(s2) ? s1 : s2;
+    const a = Math.max(2, Math.round(randInt(S.out) * k)), b = Math.max(2, Math.round(randInt(S.side) * k));
+    e.ai.exit = bestD;
+    e.ai.plan = [{ d: bestD, n: a }, { d: side, n: b }];
+    if (Math.random() < 0.45) e.ai.plan.push({ d: (bestD + 2) % 4, n: Math.max(1, a - 1) });
+    e.ai.homeSteps = 0;
+  }
+
+  // Path to the nearest rival trail, if I can get there before its owner gets home.
+  function huntDir(e) {
+    let target = null, bestM = 13;
+    for (const o of G.ents) {
+      if (!o.alive || o === e || !o.trail.length) continue;
+      let m = 1e9;
+      for (let k = 0; k < o.trail.length; k++) { const i = o.trail[k], d = Math.abs(i % N - e.x) + Math.abs(((i / N) | 0) - e.y); if (d < m) m = d; }
+      if (m < bestM && m < homeDist(o)) { bestM = m; target = o; }
+    }
+    if (!target) return -1;
+    const r = bfs(e, e.x, e.y, fwdDirs(e.dir), i => trail[i] === target.id, 18);
+    return r && r.d <= homeDist(target) ? r.dir : -1;
+  }
+
+  function decide(e) {
+    const ai = e.ai, S = STYLES[ai.style], L = e.isPlayer ? LEVELS.hard : G.L;
+    const fwd = fwdDirs(e.dir);
+    const ok = fwd.filter(d => passable(e, e.x + DX[d], e.y + DY[d]) && !doomed(e.x + DX[d], e.y + DY[d]));
+    if (!ok.length) { const any = fwd.filter(d => passable(e, e.x + DX[d], e.y + DY[d])); if (any.length) e.dir = any[0]; return; }
+    const homeAt = (x, y) => owner[y * N + x] === e.id;
+    let want = -1;
+    if (!e.trail.length) {
+      ai.ret = false;
+      if (Math.random() < S.hunt * L.hunt) want = huntDir(e);
+      if (want < 0) {
+        if (!ai.plan.length || ++ai.homeSteps > 45) makePlan(e);
+        want = ai.exit;
+        if (!ok.includes(want)) { makePlan(e); want = ok.includes(ai.exit) ? ai.exit : pick(ok); }
+      }
+    } else {
+      const home = bfs(e, e.x, e.y, fwd, i => owner[i] === e.id, 90);
+      if (!home) {
+        let bestD = ok[0], bestN = -1;
+        for (const d of ok) { const n = space(e, e.x + DX[d], e.y + DY[d], 120); if (n > bestN) { bestN = n; bestD = d; } }
+        e.dir = bestD; return;
+      }
+      if (Math.random() < L.react && threat(e) <= home.d + L.margin + S.care) ai.ret = true;
+      if (e.trail.length >= S.maxTrail * L.reach[1]) ai.ret = true;
+      while (ai.plan.length && ai.plan[0].n <= 0) ai.plan.shift();
+      if (!ai.plan.length) ai.ret = true;
+      if (!ai.ret && e.trail.length < 10 && Math.random() < S.hunt * L.hunt * 0.6) want = huntDir(e);
+      if (want < 0) {
+        if (ai.ret) want = home.dir;
+        else { want = ai.plan[0].d; ai.plan[0].n--; }
+        if (!ai.ret && L.wobble && Math.random() < L.wobble) want = pick(ok);
+      }
+      // Never step somewhere I could not get home from.
+      if (want !== home.dir) {
+        const nx = e.x + DX[want], ny = e.y + DY[want];
+        if (!ok.includes(want) || (!homeAt(nx, ny) && !bfs(e, nx, ny, fwdDirs(want), i => owner[i] === e.id, 90))) { want = home.dir; ai.ret = true; }
+      }
+      // Dodge head-on bumps I would lose (the shorter trail wins).
+      if (L.headOn) {
+        const nx = e.x + DX[want], ny = e.y + DY[want];
+        for (const o of G.ents) {
+          if (!o.alive || o === e || o.trail.length > e.trail.length) continue;
+          if (Math.abs(o.x - nx) + Math.abs(o.y - ny) <= 1) {
+            const alt = ok.filter(d => d !== want && Math.abs(o.x - e.x - DX[d]) + Math.abs(o.y - e.y - DY[d]) > 1);
+            if (alt.length) want = alt.includes(home.dir) ? home.dir : alt[0];
+            break;
+          }
+        }
+      }
+    }
+    if (!ok.includes(want)) want = ok[0];
+    e.dir = want;
+  }
+
+  // ---------- Rules ----------
+  function capture(e) {
+    const id = e.id, now = G.time, before = G.counts[id];
+    for (const i of e.trail) { if (trail[i] === id) trail[i] = 0; setOwner(i, id); if (!reduced) flash[i] = now; }
+    e.trail.length = 0;
+    // Flood the outside from the edge of my bounding box; whatever it cannot reach is enclosed.
+    const x0 = Math.max(0, e.bx0 - 1), x1 = Math.min(N - 1, e.bx1 + 1), y0 = Math.max(0, e.by0 - 1), y1 = Math.min(N - 1, e.by1 + 1);
+    const s = ++stamp;
+    let qh = 0, qt = 0;
+    const seed = (x, y) => { const i = y * N + x; if (owner[i] !== id && seen[i] !== s) { seen[i] = s; qbuf[qt++] = i; } };
+    for (let x = x0; x <= x1; x++) { seed(x, y0); seed(x, y1); }
+    for (let y = y0; y <= y1; y++) { seed(x0, y); seed(x1, y); }
+    while (qh < qt) {
+      const i = qbuf[qh++], x = i % N, y = (i / N) | 0;
+      if (x > x0) seed(x - 1, y); if (x < x1) seed(x + 1, y);
+      if (y > y0) seed(x, y - 1); if (y < y1) seed(x, y + 1);
+    }
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * N + x;
+      if (owner[i] !== id && seen[i] !== s && inZone(x, y)) { setOwner(i, id); if (!reduced) flash[i] = now + (Math.abs(x - e.x) + Math.abs(y - e.y)) * 0.008; }
+    }
+    e.ai.plan = []; e.ai.ret = false;
+    for (const o of G.ents) if (o !== e && o.alive && G.counts[o.id] === 0) die(o, e, 'land');
+    if (e.isPlayer && !G.over) {
+      const gain = ((G.counts[id] - before) / (N * N)) * 100;
+      if (gain >= 0.25) toast(t.gain(fmtPct(gain)), 'good');
+    }
+  }
+
+  function burst(e) {
+    if (reduced) return;
+    const x = e.x + 0.5, y = e.y + 0.5;
+    for (let k = 0; k < 16; k++) {
+      const a = Math.random() * TAU, v = rand(2, 7);
+      G.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.5, 0.9), max: 0.9, c: PAL[e.color].base, s: rand(0.25, 0.5) });
+    }
+  }
+
+  const rankOf = e => 1 + G.ents.reduce((n, o) => n + (o.alive && o !== e && G.counts[o.id] > G.counts[e.id] ? 1 : 0), 0);
+  const pctOf = e => (G.counts[e.id] / (N * N)) * 100;
+
+  function die(e, killer, cause) {
+    if (!e.alive) return;
+    // A fallen player is never #1 in Battle, even when the last rival falls in the same step.
+    if (e.isPlayer) G.deathRank = G.mode === 'battle' ? Math.max(2, G.ents.filter(o => o.alive).length) : rankOf(e);
+    e.alive = false; e.deaths++;
+    for (const i of e.trail) if (trail[i] === e.id) trail[i] = 0;
+    e.trail.length = 0;
+    for (let i = 0; i < owner.length; i++) if (owner[i] === e.id) setOwner(i, 0);
+    burst(e);
+    if (killer) {
+      killer.kills++;
+      if (killer.isPlayer && !G.over && !G.demo) {
+        G.kills++;
+        const msg = cause === 'land' ? t.wiped(e.name) : t.cut(e.name);
+        toast(msg, 'good'); announce(msg);
+      }
+    }
+    if (e.isPlayer) playerDied(killer, cause);
+    else if (G.mode === 'battle' && !G.demo) {
+      const left = G.ents.filter(o => o.alive).length;
+      if (G.player && G.player.alive && !G.over && left > 1 && left <= 5) toast(t.remaining(left));
+    } else G.respawns.push({ e, at: G.time + rand(1.5, 3.5) });
+  }
+
+  function respawnBot(e) {
+    const used = new Set(G.ents.filter(o => o.alive).map(o => o.name));
+    e.name = pick(NAMES.filter(n => !used.has(n)));
+    spawn(e);
+  }
+
+  function updateZone() {
+    const g = G, z = g.zone;
+    if (g.mode !== 'battle' || g.demo) return;
+    if (z.x1 - z.x0 + 1 <= BATTLE.minSize) { g.warn = false; if (!g.zoneDoneAt) g.zoneDoneAt = g.time; return; }
+    g.warn = g.time >= g.nextShrink - 2.2;
+    if (g.warn && !g.stormWarned) { g.stormWarned = true; if (g.player && g.player.alive && !g.over) { toast(t.stormStart, 'bad'); announce(t.stormStart); } }
+    if (g.time < g.nextShrink) return;
+    g.nextShrink += g.shrinkEvery;
+    const ring = [];
+    for (let x = z.x0; x <= z.x1; x++) ring.push(z.y0 * N + x, z.y1 * N + x);
+    for (let y = z.y0 + 1; y < z.y1; y++) ring.push(y * N + z.x0, y * N + z.x1);
+    z.x0++; z.y0++; z.x1--; z.y1--;
+    for (const i of ring) { setOwner(i, 0); trail[i] = 0; }
+    for (const e of g.ents) {
+      if (!e.alive) continue;
+      if (!inZone(e.x, e.y)) die(e, null, 'storm');
+      else if (g.counts[e.id] === 0) die(e, null, 'storm');
+    }
+  }
+
+  // One grid step for everyone: move, walls, head-on bumps, trail cuts, then claim or extend trails.
+  function tick() {
+    const g = G;
+    g.time += TICK; g.ticks++;
+    const movers = g.ents.filter(e => e.alive);
+    for (const e of movers) { e.px = e.x; e.py = e.y; e.x += DX[e.dir]; e.y += DY[e.dir]; }
+    const dead = new Map();
+    const kill = (e, killer, cause) => { if (!dead.has(e)) dead.set(e, { killer, cause }); };
+    for (const e of movers) if (!inZone(e.x, e.y)) kill(e, null, g.zone.x0 > 0 ? 'storm' : 'wall');
+    for (let a = 0; a < movers.length; a++) for (let b = a + 1; b < movers.length; b++) {
+      const p = movers[a], q = movers[b];
+      if (dead.has(p) || dead.has(q)) continue;
+      const same = p.x === q.x && p.y === q.y, swap = p.x === q.px && p.y === q.py && q.x === p.px && q.y === p.py;
+      if (!same && !swap) continue;
+      const lp = owner[p.y * N + p.x] === p.id ? 0 : p.trail.length, lq = owner[q.y * N + q.x] === q.id ? 0 : q.trail.length;
+      if (lp < lq) kill(q, p, 'head'); else if (lq < lp) kill(p, q, 'head'); else { kill(p, q, 'head'); kill(q, p, 'head'); }
+    }
+    const walkers = movers.filter(e => !dead.has(e));
+    for (const e of walkers) {
+      const v = g.byId[trail[e.y * N + e.x]];
+      if (v && v.alive) kill(v, v === e ? null : e, v === e ? 'self' : 'cut');
+    }
+    for (const e of walkers) {
+      if (dead.has(e) || !e.alive) continue;
+      const i = e.y * N + e.x;
+      if (owner[i] === e.id) { if (e.trail.length) capture(e); }
+      else {
+        if (!e.trail.length) { e.sx = e.px; e.sy = e.py; }
+        trail[i] = e.id; e.trail.push(i);
+      }
+    }
+    for (const [e, info] of dead) die(e, info.killer, info.cause);
+    updateZone();
+    for (let k = g.respawns.length - 1; k >= 0; k--) if (g.respawns[k].at <= g.time) { const r = g.respawns.splice(k, 1)[0]; if (!r.e.alive) respawnBot(r.e); }
+    const p = g.player;
+    if (p && !g.demo) {
+      if (!p.alive && g.backAt && !g.over) {
+        const n = Math.ceil(g.backAt - g.time);
+        if (n > 0 && n !== g.backShown) { g.backShown = n; toast(t.backIn(n)); }
+        if (g.time >= g.backAt) { g.backAt = 0; spawn(p); toast(t.go, 'good'); }
+      }
+      if (p.alive && !g.over) {
+        const pct = pctOf(p);
+        g.maxPct = Math.max(g.maxPct, pct);
+        if (g.mark < LAND_MARKS.length && pct >= LAND_MARKS[g.mark]) { const m = fmtPct(LAND_MARKS[g.mark++]); toast(t.landUp(m), 'gold'); announce(t.landUp(m)); }
+        const alive = g.ents.filter(e => e.alive).length;
+        if (rankOf(p) === 1 && alive > 3 && pct > 1 && g.time - g.rankToastAt > 25) { g.rankToastAt = g.time; toast(t.top, 'gold'); announce(t.top); }
+        if (g.mode === 'battle' && alive === 1) { g.deathRank = 1; finish(true, 'last'); }
+      }
+      if (!g.over && g.mode === 'timed' && g.time >= TIMED_SECONDS) { g.deathRank = p.alive ? rankOf(p) : g.ents.filter(e => e.alive).length + 1; finish(g.deathRank === 1 && p.alive, 'time'); }
+      if (!g.over && g.mode === 'battle' && g.zoneDoneAt && g.time >= g.zoneDoneAt + BATTLE.final && p.alive) { g.deathRank = rankOf(p); finish(g.deathRank === 1, 'time'); }
+    }
+    // Decide next steps. The player's queued turn applies here; bots (and autopilot) think.
+    for (const e of g.ents) {
+      if (!e.alive) continue;
+      if (e.isPlayer && !g.auto) {
+        if (input.mode === 'mouse' && !e.queue.length) mouseSteer(e);
+        while (e.queue.length) { const d = e.queue.shift(); if (d !== (e.dir + 2) % 4) { e.dir = d; break; } }
+      } else decide(e);
+    }
+    if (g.over && !g.endShown && g.time >= g.endAt) { g.endShown = true; showEnd(); }
+  }
+
+  function playerDied(killer, cause) {
+    const g = G;
+    if (g.over) return;
+    g.cause = cause; g.killer = killer ? killer.name : null; g.deadAt = { x: g.player.x, y: g.player.y };
+    const msg = deathText();
+    if (g.mode === 'timed') { g.backAt = g.time + 3; g.backShown = 0; toast(msg, 'bad'); announce(msg); return; }
+    finish(false, 'dead');
+  }
+  function deathText() {
+    const g = G;
+    switch (g.cause) {
+      case 'cut': return t.cutBy(g.killer);
+      case 'self': return t.selfCut;
+      case 'head': return t.crash(g.killer);
+      case 'land': return t.lostLand(g.killer);
+      case 'storm': return t.storm;
+      default: return t.hitWall;
+    }
+  }
+
+  // ---------- Player input ----------
+  const input = { mode: 'none', mx: 0, my: 0, touch: null, mouseDir: -1 };
+  let alpha = 0;
+
+  function queueTurn(d) {
+    const p = G && G.player;
+    if (!playing()) return;
+    const last = p.queue.length ? p.queue[p.queue.length - 1] : p.dir;
+    if (d === last || d === (last + 2) % 4 || p.queue.length >= 2) return;
+    // A turn pressed just after a step still counts for that step.
+    if (!p.queue.length && alpha < 0.22) { p.dir = d; return; }
+    p.queue.push(d);
+  }
+
+  function headScreen(e) {
+    const z = view.z || 20;
+    return { x: (e.x + DX[e.dir] * alpha + 0.5 - G.cam.x) * z + view.w / 2, y: (e.y + DY[e.dir] * alpha + 0.5 - G.cam.y) * z + view.h / 2 };
+  }
+  // Mouse: steer toward the pointer along the stronger axis, never straight back.
+  function mouseSteer(p) {
+    const h = headScreen(p), dx = input.mx - h.x, dy = input.my - h.y, z = view.z || 20;
+    if (Math.abs(dx) < z * 0.6 && Math.abs(dy) < z * 0.6) return;
+    const horiz = p.dir % 2 === 0;
+    // Hysteresis: keep the current axis unless the other one clearly wins.
+    let d = Math.abs(dx) > Math.abs(dy) * (horiz ? 0.8 : 1.25) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
+    if (d === (p.dir + 2) % 4) d = horiz ? (dy > 0 ? 1 : 3) : (dx > 0 ? 0 : 2);
+    if (d !== p.dir) p.dir = d;
+  }
+
+  // ---------- Drawing ----------
+  function cellSize() { const s = Math.sqrt(view.w * view.h); return clamp(s / 26, 15, 30) * (G.demo ? 0.8 : 1); }
+
+  function draw(dt) {
+    const g = G, w = view.w, h = view.h, dpr = view.dpr, cam = g.cam;
+    const z = cellSize(); view.z = z;
+    const p = g.player;
+    let fx, fy, follow = 14;
+    if (p && p.alive) { fx = p.x + DX[p.dir] * alpha + 0.5; fy = p.y + DY[p.dir] * alpha + 0.5; }
+    else if (g.deadAt) { fx = g.deadAt.x + 0.5; fy = g.deadAt.y + 0.5; follow = 3; }
+    else {
+      let lead = null;
+      for (const e of g.ents) if (e.alive && (!lead || g.counts[e.id] > g.counts[lead.id])) lead = e;
+      fx = lead ? lead.x + 0.5 : N / 2; fy = lead ? lead.y + 0.5 : N / 2; follow = 1.2;
+    }
+    const k = 1 - Math.exp(-dt * follow);
+    cam.x += (fx - cam.x) * k; cam.y += (fy - cam.y) * k;
+    if (g.dirty) { terrCtx.putImageData(terrImg, 0, 0); shadeCtx.putImageData(shadeImg, 0, 0); g.dirty = false; }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#2a2140'; ctx.fillRect(0, 0, w, h);
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (w / 2 - cam.x * z), dpr * (h / 2 - cam.y * z));
+    ctx.imageSmoothingEnabled = false;
+    const left = cam.x - w / 2 / z, right = cam.x + w / 2 / z, top = cam.y - h / 2 / z, bottom = cam.y + h / 2 / z;
+
+    ctx.fillStyle = '#1d1630'; ctx.fillRect(-0.45, -0.45, N + 0.9, N + 0.9);
+    ctx.drawImage(checker, 0, 0, N, N);
+    ctx.drawImage(shade, 0, 0.24, N, N);
+    ctx.drawImage(terr, 0, 0, N, N);
+
+    // Fresh claims flash white for a moment.
+    const vx0 = Math.max(0, Math.floor(left)), vx1 = Math.min(N - 1, Math.ceil(right)), vy0 = Math.max(0, Math.floor(top)), vy1 = Math.min(N - 1, Math.ceil(bottom));
+    if (!reduced) {
+      ctx.fillStyle = '#ffffff';
+      for (let y = vy0; y <= vy1; y++) for (let x = vx0; x <= vx1; x++) {
+        const f = flash[y * N + x];
+        if (!f) continue;
+        const age = g.time - f;
+        if (age < 0 || age > 0.5) continue;
+        ctx.globalAlpha = (1 - age / 0.5) * 0.6;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Storm: everything outside the zone is swallowed; the next ring blinks while it is doomed.
+    const zn = g.zone;
+    if (zn.x0 > 0) {
+      ctx.fillStyle = '#3b2d5ef2';
+      ctx.fillRect(0, 0, N, zn.y0); ctx.fillRect(0, zn.y1 + 1, N, N - zn.y1 - 1);
+      ctx.fillRect(0, zn.y0, zn.x0, zn.y1 - zn.y0 + 1); ctx.fillRect(zn.x1 + 1, zn.y0, N - zn.x1 - 1, zn.y1 - zn.y0 + 1);
+    }
+    if (g.warn) {
+      ctx.globalAlpha = reduced ? 0.4 : 0.25 + 0.25 * Math.sin(g.time * 12);
+      ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 1;
+      ctx.strokeRect(zn.x0 + 0.5, zn.y0 + 0.5, zn.x1 - zn.x0, zn.y1 - zn.y0);
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = '#ff5a6e'; ctx.lineWidth = 0.3;
+    ctx.strokeRect(zn.x0 - 0.15, zn.y0 - 0.15, zn.x1 - zn.x0 + 1.3, zn.y1 - zn.y0 + 1.3);
+
+    // Trails.
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const e of g.ents) {
+      if (!e.alive) continue;
+      const nx = e.x + DX[e.dir], ny = e.y + DY[e.dir];
+      const leaving = !e.trail.length && inZone(nx, ny) && owner[ny * N + nx] !== e.id && owner[e.y * N + e.x] === e.id;
+      if (!e.trail.length && !leaving) continue;
+      ctx.beginPath();
+      if (e.trail.length) {
+        ctx.moveTo(e.sx + 0.5, e.sy + 0.5);
+        for (const i of e.trail) ctx.lineTo((i % N) + 0.5, ((i / N) | 0) + 0.5);
+      } else ctx.moveTo(e.x + 0.5, e.y + 0.5);
+      ctx.lineTo(e.x + DX[e.dir] * alpha + 0.5, e.y + DY[e.dir] * alpha + 0.5);
+      ctx.strokeStyle = PAL[e.color].edge; ctx.globalAlpha = 0.35; ctx.lineWidth = 0.66; ctx.stroke();
+      ctx.globalAlpha = 1; ctx.strokeStyle = PAL[e.color].light; ctx.lineWidth = 0.5; ctx.stroke();
+    }
+
+    // Heads.
+    for (const e of g.ents) {
+      if (!e.alive) continue;
+      const hx = e.x + DX[e.dir] * alpha, hy = e.y + DY[e.dir] * alpha;
+      if (hx < left - 2 || hx > right + 2 || hy < top - 2 || hy > bottom + 2) continue;
+      drawHead(e, hx + 0.5, hy + 0.5);
+    }
+    for (const q of g.particles) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.c; ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s); }
+    ctx.globalAlpha = 1;
+
+    // Names in screen space.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = '800 11px ui-rounded, "SF Pro Rounded", system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.lineJoin = 'round';
+    for (const e of g.ents) {
+      if (!e.alive || e.isPlayer) continue;
+      const sx = (e.x + DX[e.dir] * alpha + 0.5 - cam.x) * z + w / 2, sy = (e.y + DY[e.dir] * alpha + 0.5 - cam.y) * z + h / 2;
+      if (sx < -40 || sx > w + 40 || sy < -20 || sy > h + 40) continue;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#ffffffd0'; ctx.strokeText(e.name, sx, sy - z * 0.55 - 2);
+      ctx.fillStyle = PAL[e.color].edge; ctx.fillText(e.name, sx, sy - z * 0.55 - 2);
+    }
+    drawMinimap(g, w, h, z);
+    const j = input.touch;
+    if (j && j.stick && p && p.alive && !g.paused) {
+      const dx = j.x - j.x0, dy = j.y - j.y0, d = Math.hypot(dx, dy), m = Math.min(1, 40 / (d || 1));
+      ctx.fillStyle = '#2a214033'; ctx.strokeStyle = '#2a214066'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(j.x0, j.y0, 44, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#2a214077'; ctx.beginPath(); ctx.arc(j.x0 + dx * m, j.y0 + dy * m, 20, 0, TAU); ctx.fill();
+    }
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+
+  function drawHead(e, cx, cy) {
+    const pal = PAL[e.color], s = 0.92, d = e.dir;
+    ctx.fillStyle = '#00000033'; roundRect(ctx, cx - s / 2, cy - s / 2 + 0.14, s, s, 0.24); ctx.fill();
+    roundRect(ctx, cx - s / 2, cy - s / 2, s, s, 0.24);
+    ctx.fillStyle = pal.head; ctx.fill();
+    ctx.lineWidth = e.isPlayer ? 0.12 : 0.08; ctx.strokeStyle = e.isPlayer ? '#ffffff' : pal.edge; ctx.stroke();
+    const fx = DX[d], fy = DY[d], sx = -fy, sy = fx;
+    for (const side of [-1, 1]) {
+      const ex = cx + fx * 0.16 + sx * 0.19 * side, ey = cy + fy * 0.16 + sy * 0.19 * side;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ex, ey, 0.14, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.arc(ex + fx * 0.05, ey + fy * 0.05, 0.075, 0, TAU); ctx.fill();
+    }
+  }
+
+  function drawMinimap(g, w, h, z) {
+    const size = clamp(Math.min(w, h) * 0.24, 72, 150), pad = 4;
+    const x = w - size - 10, y = h - size - 10, inner = size - pad * 2, s = inner / N;
+    ctx.fillStyle = '#241b3ae0'; roundRect(ctx, x, y, size, size, 12); ctx.fill();
+    ctx.fillStyle = '#efe7d7'; ctx.fillRect(x + pad, y + pad, inner, inner);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(terr, x + pad, y + pad, inner, inner);
+    const zn = g.zone;
+    if (zn.x0 > 0) {
+      ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#3b2d5ed0';
+      ctx.fillRect(x + pad, y + pad, inner, zn.y0 * s); ctx.fillRect(x + pad, y + pad + (zn.y1 + 1) * s, inner, (N - zn.y1 - 1) * s);
+      ctx.fillRect(x + pad, y + pad + zn.y0 * s, zn.x0 * s, (zn.y1 - zn.y0 + 1) * s); ctx.fillRect(x + pad + (zn.x1 + 1) * s, y + pad + zn.y0 * s, (N - zn.x1 - 1) * s, (zn.y1 - zn.y0 + 1) * s);
+      ctx.strokeRect(x + pad + zn.x0 * s, y + pad + zn.y0 * s, (zn.x1 - zn.x0 + 1) * s, (zn.y1 - zn.y0 + 1) * s);
+    }
+    for (const e of g.ents) {
+      if (!e.alive || e.isPlayer) continue;
+      ctx.fillStyle = PAL[e.color].edge;
+      ctx.fillRect(x + pad + e.x * s - 1.5, y + pad + e.y * s - 1.5, 3, 3);
+    }
+    const p = g.player;
+    if (p && p.alive) {
+      const px = x + pad + (p.x + 0.5) * s, py = y + pad + (p.y + 0.5) * s;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2a2140'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = '#2a214088'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + pad + (g.cam.x - w / 2 / z) * s, y + pad + (g.cam.y - h / 2 / z) * s, (w / z) * s, (h / z) * s);
+    }
+  }
+
+  // ---------- HUD ----------
+  let hudAt = 0;
+  function updateHud(now) {
+    if (now - hudAt < 150 || !G || G.demo) return;
+    hudAt = now;
+    const g = G, p = g.player;
+    const alive = g.ents.filter(e => e.alive).sort((a, b) => g.counts[b.id] - g.counts[a.id] || b.isPlayer - a.isPlayer);
+    els.land.textContent = fmtPct(p.alive ? pctOf(p) : 0);
+    els.kills.textContent = String(g.kills);
+    els.rank.textContent = p.alive ? `${t.rank} #${rankOf(p)}/${alive.length}` : `${t.rank} –`;
+    if (g.mode === 'timed') {
+      const left = Math.max(0, TIMED_SECONDS - g.time);
+      els.clock.textContent = clockText(Math.ceil(left));
+      els.clock.classList.toggle('low', left <= 20);
+    } else els.clock.textContent = clockText(g.time - g.lifeStart);
+    els.left.hidden = g.mode !== 'battle';
+    if (g.mode === 'battle') els.left.textContent = t.left(alive.length);
+    const rows = alive.slice(0, 8).map((e, i) => row(e, i + 1));
+    if (p.alive && alive.indexOf(p) >= 8) rows[7] = row(p, alive.indexOf(p) + 1);
+    els.leaders.innerHTML = rows.join('');
+  }
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const row = (e, pos) => `<li class="${e.isPlayer ? 'you' : ''}"><i style="background:${PAL[e.color].base}"></i><span>${pos}. ${esc(e.name)}</span><b>${fmtPct(pctOf(e))}</b></li>`;
+
+  // ---------- Screens ----------
+  function choiceButton(label, info, checked) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'choice'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(checked));
+    b.innerHTML = '<b></b>' + (info ? '<small></small>' : '');
+    b.firstChild.textContent = label;
+    if (info) b.lastChild.textContent = info;
+    return b;
+  }
+
+  function renderMenu() {
+    els.modes.innerHTML = '';
+    for (const m of MODES) {
+      const b = choiceButton(t.modes[m], t.modeInfo[m], prefs.mode === m);
+      b.addEventListener('click', () => { prefs.mode = m; save('prefs', prefs); renderMenu(); els.modes.querySelector('[aria-checked="true"]').focus(); });
+      els.modes.append(b);
+    }
+    els.levels.innerHTML = '';
+    for (const l of Object.keys(LEVELS)) {
+      const b = choiceButton(t.levels[l], t.rivals(LEVELS[l].bots), prefs.level === l);
+      b.addEventListener('click', () => { prefs.level = l; save('prefs', prefs); renderMenu(); els.levels.querySelector('[aria-checked="true"]').focus(); });
+      els.levels.append(b);
+    }
+    els.colors.innerHTML = '';
+    COLOR_IDS.forEach((id, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'swatch'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(prefs.color === i)); b.setAttribute('aria-label', t.colors[id]);
+      b.style.background = COLORS[i];
+      if (prefs.color === i) b.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="8" r="2.6" fill="#fff"/><circle cx="13" cy="8" r="2.6" fill="#fff"/><circle cx="7.6" cy="8.4" r="1.3" fill="#2a2140"/><circle cx="13.6" cy="8.4" r="1.3" fill="#2a2140"/><path d="M6.5 13.2q3.5 2.6 7 0" stroke="#2a2140" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+      b.addEventListener('click', () => { prefs.color = i; save('prefs', prefs); renderMenu(); els.colors.querySelector('[aria-checked="true"]').focus(); });
+      els.colors.append(b);
+    });
+    els.colorName.textContent = t.colors[COLOR_IDS[prefs.color]];
+    els.touches.innerHTML = '';
+    for (const m of ['swipe', 'stick']) {
+      const b = choiceButton(t.touchModes[m], '', prefs.touch === m);
+      b.addEventListener('click', () => { prefs.touch = m; save('prefs', prefs); renderMenu(); els.touches.querySelector('[aria-checked="true"]').focus(); });
+      els.touches.append(b);
+    }
+    els.touchRow.hidden = !(coarse || navigator.maxTouchPoints > 0);
+    els.menuBest.textContent = t.best(fmtPct(best[prefs.mode]), stats.wins);
+  }
+
+  function showMenu() {
+    els.end.hidden = true; els.paused.hidden = true; els.hud.hidden = true; els.board.hidden = true;
+    createWorld('classic', 'normal', true);
+    renderMenu();
+    els.menu.hidden = false;
+    $('play').focus({ preventScroll: true });
+  }
+
+  let coarse = matchMedia('(pointer: coarse)').matches;
+  function startGame(mode = prefs.mode, level = prefs.level) {
+    createWorld(mode, level, false);
+    const p = makeEnt(G.ents.length + 1, prefs.color, true, 'builder');
+    G.player = p; G.ents.push(p); G.byId[p.id] = p;
+    // Start away from the edges, in the quietest place found.
+    spawn(p);
+    G.cam.x = p.x + 0.5; G.cam.y = p.y + 0.5;
+    input.touch = null; input.mouseDir = -1;
+    if (input.mode !== 'mouse') input.mode = 'none';
+    els.menu.hidden = true; els.end.hidden = true; els.paused.hidden = true;
+    els.hud.hidden = false; els.board.hidden = false;
+    hudAt = 0;
+    toast(t.go, 'good'); announce(t.go);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function respawnPlayer() {
+    const g = G;
+    g.over = false; g.endShown = false; g.win = false; g.deadAt = null; g.cause = null; g.killer = null;
+    g.kills = 0; g.maxPct = 0; g.mark = 0; g.lifeStart = g.time;
+    spawn(g.player);
+    g.cam.x = g.player.x + 0.5; g.cam.y = g.player.y + 0.5;
+    els.end.hidden = true; els.hud.hidden = false;
+    hudAt = 0;
+    toast(t.go, 'good'); announce(t.go);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function finish(win, why) {
+    const g = G;
+    if (g.over || g.demo) return;
+    g.over = true; g.win = win; g.why = why; g.endAt = g.time + (win || why === 'time' ? 0.5 : 1.1);
+    const p = g.player;
+    if (p.alive) g.maxPct = Math.max(g.maxPct, pctOf(p));
+    g.finalPct = why === 'time' && p.alive ? pctOf(p) : g.maxPct;
+    g.lifeTime = g.time - g.lifeStart;
+    stats.games++;
+    stats.kills += g.kills;
+    if (win) stats.wins++;
+    g.newBest = g.maxPct > best[g.mode] + 1e-9 && g.maxPct >= 0.1;
+    if (g.newBest) best[g.mode] = Math.round(g.maxPct * 10) / 10;
+    save('stats', stats); save('best', best);
+    if (win) announce(`${g.mode === 'battle' ? t.champion : t.winner} ${t.land}: ${fmtPct(g.finalPct)}`);
+  }
+
+  function showEnd() {
+    const g = G;
+    let title, sub, art;
+    if (g.win) { title = g.mode === 'battle' ? t.champion : t.winner; sub = t.place(1); art = '🏆'; }
+    else if (g.why === 'time') { title = t.timeUp; sub = t.place(g.deathRank); art = '⏱️'; }
+    else { title = deathText(); sub = g.mode === 'classic' ? t.gameOver : t.place(g.deathRank); art = '💥'; }
+    els.endArt.textContent = art;
+    els.endTitle.textContent = title;
+    els.endSub.textContent = sub;
+    els.rLand.textContent = fmtPct(g.maxPct);
+    els.rKills.textContent = String(g.kills);
+    els.rRank.textContent = `#${g.deathRank || 1}`;
+    els.rTime.textContent = clockText(Math.min(g.lifeTime, g.mode === 'timed' ? TIMED_SECONDS : g.lifeTime));
+    els.newBest.hidden = !g.newBest;
+    els.endNote.textContent = t.best(fmtPct(best[g.mode]), stats.wins);
+    els.again.textContent = g.mode === 'classic' && !g.win ? t.respawn : t.again;
+    els.hud.hidden = true;
+    els.end.hidden = false;
+    if (!g.win) announce(`${title}. ${sub}. ${t.bestLand}: ${fmtPct(g.maxPct)}`);
+    els.again.focus({ preventScroll: true });
+  }
+
+  function pause() {
+    if (!G || G.demo || G.over || G.paused) return;
+    G.paused = true;
+    input.touch = null;
+    els.paused.hidden = false;
+    $('resume').focus({ preventScroll: true });
+  }
+  function resume() {
+    if (!G || !G.paused) return;
+    G.paused = false;
+    els.paused.hidden = true;
+    canvas.focus({ preventScroll: true });
+  }
+  const playing = () => G && !G.demo && !G.over && !G.paused && G.player && G.player.alive;
+
+  // ---------- Input wiring ----------
+  const axisDir = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3));
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') { input.mode = 'mouse'; input.mx = e.clientX; input.my = e.clientY; return; }
+    if (!coarse) coarse = true;
+    input.mode = 'touch';
+    input.touch = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, stick: prefs.touch === 'stick', last: -1 };
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') { input.mx = e.clientX; input.my = e.clientY; input.mode = 'mouse'; return; }
+    const j = input.touch;
+    if (!j || j.id !== e.pointerId) return;
+    j.x = e.clientX; j.y = e.clientY;
+    const dx = j.x - j.x0, dy = j.y - j.y0, d = Math.hypot(dx, dy);
+    if (j.stick) {
+      // Floating stick: the base trails the finger past its rim.
+      if (d > 56) { j.x0 = j.x - (dx / d) * 56; j.y0 = j.y - (dy / d) * 56; }
+      if (d > 14) { const dir = axisDir(dx, dy); if (dir !== j.last) { j.last = dir; queueTurn(dir); } }
+    } else if (d > 18) {
+      // Swipe: each stroke of ~18px turns once, then re-anchors so a zig-zag drag gives several turns.
+      const dir = axisDir(dx, dy);
+      if (dir !== j.last) { j.last = dir; queueTurn(dir); }
+      j.x0 = j.x; j.y0 = j.y;
+    }
+  });
+  const release = e => { if (input.touch && input.touch.id === e.pointerId) input.touch = null; };
+  addEventListener('pointerup', release);
+  addEventListener('pointercancel', release);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  const KEYS = { ArrowRight: 0, d: 0, D: 0, ArrowDown: 1, s: 1, S: 1, ArrowLeft: 2, a: 2, A: 2, ArrowUp: 3, w: 3, W: 3 };
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'p' || e.key === 'P') && G && !G.demo && !G.over) { G.paused ? resume() : pause(); e.preventDefault(); return; }
+    const d = KEYS[e.key];
+    if (d === undefined || !playing()) return;
+    e.preventDefault();
+    input.mode = 'keys';
+    queueTurn(d);
+  });
+  addEventListener('blur', () => pause());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  $('play').addEventListener('click', () => startGame());
+  els.again.addEventListener('click', () => { if (G && G.mode === 'classic' && !G.win && !G.demo) respawnPlayer(); else startGame(G ? G.mode : prefs.mode, G ? G.level : prefs.level); });
+  $('to-menu').addEventListener('click', showMenu);
+  $('quit').addEventListener('click', showMenu);
+  $('resume').addEventListener('click', resume);
+  $('pause-btn').addEventListener('click', pause);
+
+  // ---------- Loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (G && !G.paused) {
+      G.acc += dt;
+      while (G.acc >= TICK) { G.acc -= TICK; tick(); }
+      alpha = G.acc / TICK;
+      for (const q of G.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.92; q.vy *= 0.92; q.life -= dt; }
+      if (G.particles.length) G.particles = G.particles.filter(q => q.life > 0);
+    }
+    if (G) { draw(G.paused ? 0 : dt); updateHud(now); }
+    requestAnimationFrame(frame);
+  }
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__colorClaim = {
+    state: () => G && {
+      mode: G.mode, level: G.level, demo: G.demo, N, time: +G.time.toFixed(2), over: G.over, win: G.win, why: G.why || null, paused: G.paused, endShown: G.endShown,
+      zone: { ...G.zone }, alive: G.ents.filter(e => e.alive).length, bots: G.ents.filter(e => e.alive && !e.isPlayer).length,
+      player: G.player && { alive: G.player.alive, x: G.player.x, y: G.player.y, dir: G.player.dir, trail: G.player.trail.length, pct: +pctOf(G.player).toFixed(2), rank: G.player.alive ? rankOf(G.player) : G.deathRank, queue: [...G.player.queue] },
+      kills: G.kills, maxPct: +G.maxPct.toFixed(2), cause: G.cause, killer: G.killer, deathRank: G.deathRank, backAt: G.backAt,
+      ents: G.ents.map(e => ({ id: e.id, name: e.name, style: e.ai.style, alive: e.alive, x: e.x, y: e.y, trail: e.trail.length, cells: G.counts[e.id], kills: e.kills, deaths: e.deaths })),
+    },
+    cell: (x, y) => ({ owner: owner[y * N + x], trail: trail[y * N + x] }),
+    sim: sec => { for (let i = 0, n = Math.round(sec / TICK); i < n && G; i++) tick(); },
+    autopilot: on => { if (G) G.auto = !!on; },
+    stats: () => ({ ...stats, best: { ...best } }),
+  };
+
+  showMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
