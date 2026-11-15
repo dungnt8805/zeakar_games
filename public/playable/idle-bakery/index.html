@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Idle Bakery</title>
+<style>
+:root {
+  --bg: #fde8e4;
+  --bg2: #f7cfd0;
+  --panel: #fffaf3;
+  --panel2: #fbefe2;
+  --line: #ebd3c2;
+  --ink: #5a3326;
+  --muted: #9a7262;
+  --accent: #e8577a;
+  --accent-dark: #b93a5b;
+  --gold: #f4b63f;
+  --mint: #4fb48f;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: radial-gradient(ellipse at 30% 0%, #fff4ee 0%, var(--bg) 50%, var(--bg2) 100%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+.app { position: fixed; inset: 0; display: grid; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  grid-template: "hud" auto "bake" minmax(130px, 36%) "panel" minmax(0, 1fr) / minmax(0, 1fr); max-width: 560px; margin: 0 auto; }
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: 1280px; grid-template: "hud panel" auto "bake panel" minmax(0, 1fr) / minmax(220px, 42%) minmax(0, 1fr); }
+}
+
+/* HUD */
+.hud { grid-area: hud; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bank { flex: 1; min-width: 0; background: var(--panel); border-radius: 16px; padding: 6px 12px; box-shadow: 0 3px 0 var(--line); text-align: center; }
+.bank b { display: block; font-size: clamp(20px, 6vw, 30px); font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank small { display: block; font-size: 12.5px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank .frenzy { color: var(--accent-dark); }
+.city { flex: none; max-width: 40%; background: var(--panel); border-radius: 16px; padding: 6px 10px; box-shadow: 0 3px 0 var(--line); font-size: 12px; font-weight: 800; color: var(--muted); text-align: center; line-height: 1.25; }
+.city b { display: block; color: var(--ink); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Bake area */
+.bake { grid-area: bake; position: relative; container-type: size; min-height: 0; display: grid; place-items: center; border-radius: 22px; background: radial-gradient(circle at 50% 55%, #fff6ea 0%, #fbe2d2 60%, #f5cdbf 100%); box-shadow: inset 0 0 0 2px #f1cdbb; overflow: hidden; overflow: clip; }
+.bake::before { content: ""; position: absolute; inset: 0; background: repeating-conic-gradient(from 0deg at 50% 55%, #ffffff40 0 10deg, transparent 10deg 20deg); animation: spin 40s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.bake-btn { position: relative; width: min(78cqw, 80cqh, 300px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 35%, #fffdf8, #f9e3c8 70%, #e9c29d); box-shadow: 0 6px 0 #d6a57e, 0 12px 24px #b5735a40; transition: transform .08s; }
+.bake-btn span { font-size: min(44cqw, 46cqh, 170px); line-height: 1; filter: drop-shadow(0 4px 2px #a0603b55); pointer-events: none; }
+.bake-btn:active, .bake-btn.pop { transform: scale(.94); }
+.bake-hint { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); pointer-events: none; }
+.float { position: absolute; pointer-events: none; font-weight: 900; font-size: 18px; color: var(--accent-dark); text-shadow: 0 2px 0 #fff; animation: rise .9s ease-out forwards; white-space: nowrap; }
+@keyframes rise { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, -260%); } }
+.golden { position: absolute; width: 58px; height: 58px; border-radius: 50%; font-size: 38px; display: grid; place-items: center; background: radial-gradient(circle, #fff3c4, #f4b63f 70%); box-shadow: 0 0 0 4px #fff8, 0 0 22px #f4b63f; animation: wob 1.2s ease-in-out infinite; z-index: 3; }
+@keyframes wob { 50% { transform: rotate(14deg) scale(1.08); } }
+.toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); max-width: 92%; background: var(--ink); color: #fff; font-weight: 800; font-size: 13px; padding: 6px 12px; border-radius: 12px; z-index: 4; text-align: center; animation: fade 2.6s forwards; }
+@keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Panel */
+.panel { grid-area: panel; min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-radius: 20px; box-shadow: 0 4px 0 var(--line); overflow: hidden; }
+.tabs { display: flex; flex: none; border-bottom: 2px solid var(--line); }
+.tab { flex: 1 1 0; min-width: 0; padding: 6px 2px 5px; font-size: 11.5px; font-weight: 800; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 1px; position: relative; }
+.tab i { font-style: normal; font-size: 18px; line-height: 1.1; }
+.tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--accent-dark); background: var(--panel2); box-shadow: inset 0 -3px 0 var(--accent); }
+.tab .dot { position: absolute; top: 4px; right: calc(50% - 18px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px 0; }
+.bar .lbl { font-size: 12px; font-weight: 800; color: var(--muted); margin-right: auto; }
+.amt { min-width: 44px; min-height: 30px; padding: 0 8px; border-radius: 10px; background: var(--panel2); font-weight: 900; font-size: 13px; box-shadow: inset 0 0 0 1px var(--line); }
+.amt[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: none; }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; overscroll-behavior: contain; }
+.row { flex: none; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; text-align: start; padding: 6px 8px; border-radius: 14px; background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line), 0 2px 0 var(--line); min-height: 52px; }
+.row .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 25px; background: #fff; }
+.row .nm { font-weight: 900; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .meta { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.row .meta .cost { flex: none; }
+.row .sub { font-size: 12px; font-weight: 700; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .cost { font-weight: 900; font-size: 13.5px; color: var(--mint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .cnt { font-size: 22px; font-weight: 900; color: #d9b8a5; text-align: end; font-variant-numeric: tabular-nums; }
+.row.poor { opacity: .55; }
+.row.poor .cost { color: var(--accent-dark); }
+.row.locked .ic { filter: grayscale(1) brightness(.6); }
+.row:not(.poor):not(.static):active { transform: translateY(2px); box-shadow: inset 0 0 0 1px var(--line); }
+.row.static { cursor: default; }
+.row.got { background: #fff6d8; }
+.empty { text-align: center; color: var(--muted); font-weight: 700; font-size: 13.5px; padding: 18px 8px; }
+.card { background: var(--panel2); border-radius: 14px; padding: 10px 12px; box-shadow: inset 0 0 0 1px var(--line); font-size: 13.5px; font-weight: 700; line-height: 1.4; }
+.card h3 { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
+.card .big { font-size: 22px; font-weight: 900; color: var(--accent-dark); }
+.stat { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.stat:last-child { border: 0; }
+.stat b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.btn { min-height: 44px; padding: 8px 18px; border-radius: 14px; font-weight: 900; font-size: 16px; color: #fff; background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-dark); }
+.btn:disabled { background: #d9c2b8; box-shadow: 0 4px 0 #bba399; cursor: default; transform: none; }
+.btn.alt { background: #fff; color: var(--ink); box-shadow: 0 4px 0 var(--line), inset 0 0 0 2px var(--line); }
+.btn.small { min-height: 36px; font-size: 14px; padding: 6px 14px; }
+
+/* Overlays */
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 12px; background: #5a332655; }
+.dlg { width: min(400px, 100%); max-height: calc(100% - 16px); overflow-y: auto; background: var(--panel); border-radius: 24px; padding: 20px 18px; text-align: center; box-shadow: 0 8px 0 var(--line), 0 20px 40px #5a332640; }
+.dlg .emoji { font-size: 54px; line-height: 1.1; }
+.dlg h2 { font-size: 26px; font-weight: 900; margin: 4px 0 6px; color: var(--accent-dark); }
+.dlg p { font-size: 14.5px; font-weight: 700; color: var(--muted); line-height: 1.45; margin-bottom: 8px; }
+.dlg ul { text-align: start; font-size: 14px; font-weight: 700; line-height: 1.45; padding-inline-start: 20px; margin: 6px 0 14px; }
+.dlg .acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.dlg .big { font-size: 26px; font-weight: 900; color: var(--ink); margin: 6px 0; }
+
+@media (max-height: 480px) {
+  .app { gap: 6px; }
+  .bank { padding: 3px 10px; }
+  .bank b { font-size: 21px; }
+  .city { display: none; }
+  .tab { font-size: 10.5px; flex-direction: row; justify-content: center; gap: 4px; padding: 5px 2px; }
+  .tab i { font-size: 15px; }
+  .row { min-height: 44px; padding: 4px 8px; }
+  .row .ic { width: 34px; height: 34px; font-size: 20px; }
+  .row { grid-template-columns: 34px minmax(0, 1fr) auto; }
+  .dlg { padding: 12px 14px; }
+  .dlg .emoji { font-size: 36px; }
+  .dlg h2 { font-size: 21px; margin: 0 0 4px; }
+  .dlg ul { margin: 4px 0 8px; font-size: 13px; }
+  .bake-hint { display: none; }
+}
+@media (max-width: 380px) { .tab span { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) {
+  .bake::before, .golden { animation: none; }
+  .float { animation-duration: .01s; }
+  .bake-btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="hud">
+    <div class="bank" aria-live="off"><b id="coins">0</b><small id="cps">0</small></div>
+    <div class="city"><span id="city-lbl"></span><b id="city-name"></b></div>
+  </header>
+  <section class="bake" id="bake">
+    <button class="bake-btn" id="bake-btn" type="button"><span aria-hidden="true">🥐</span></button>
+    <div class="bake-hint" id="bake-hint" data-i18n="hint"></div>
+  </section>
+  <section class="panel">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="bar" id="bar"></div>
+    <div class="list" id="list" role="tabpanel"></div>
+  </section>
+</div>
+
+<div class="overlay" id="menu" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="emoji" aria-hidden="true">🥐🧁🍞</div>
+    <h2 id="menu-title">Idle Bakery</h2>
+    <p data-i18n="tagline"></p>
+    <ul><li data-i18n="how1"></li><li data-i18n="how2"></li><li data-i18n="how3"></li></ul>
+    <button class="btn" id="play" type="button" data-i18n="play"></button>
+  </div>
+</div>
+<div class="overlay" id="away" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="away-title">
+    <div class="emoji" aria-hidden="true">🌙🥖</div>
+    <h2 id="away-title" data-i18n="welcome"></h2>
+    <p id="away-text"></p>
+    <div class="big" id="away-amt"></div>
+    <p id="away-cap"></p>
+    <div class="acts"><button class="btn" id="collect" type="button" data-i18n="collect"></button></div>
+  </div>
+</div>
+<div class="overlay" id="confirm" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="emoji" aria-hidden="true" id="confirm-emoji">🏙️</div>
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-text"></p>
+    <div class="acts"><button class="btn alt" id="confirm-no" type="button" data-i18n="cancel"></button><button class="btn" id="confirm-yes" type="button"></button></div>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  'use strict';
+  const I18N = {
+    en: {
+      tagline: 'Bake, hire, expand — your bakery keeps baking even while you are away.',
+      how1: 'Tap the croissant to bake and earn coins.',
+      how2: 'Buy bakers, ovens and shops that bake for you, then upgrades that multiply them.',
+      how3: 'Open a new city to earn fame stars: a permanent production bonus.',
+      play: 'Start baking', hint: 'Tap to bake!',
+      perSec: n => `${n} per second`, frenzy: s => `Sugar rush ×7 · ${s}s`,
+      cityLbl: 'Baking in', tabs: ['Shop', 'Upgrades', 'Awards', 'City', 'Stats'], max: 'Max', buy: 'Buy',
+      prod: ['Apprentice', 'Dough Mixer', 'Brick Oven', 'Market Stall', 'Café', 'Bread Factory', 'Delivery Fleet', 'Sky Bakery', 'Moon Bakery', 'Time Oven'],
+      each: n => `+${n}/s each`, total: n => `${n}/s total`,
+      clickUp: ['Wooden Rolling Pin', 'Marble Rolling Pin', 'Golden Whisk', "Baker's Gloves", "Master's Touch"],
+      recipeUp: ['Family Recipe', 'Sourdough Starter', 'Secret Spices', 'Royal Recipe', 'Legendary Cookbook'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n} bake twice as much`,
+      upClick2: 'Taps bake twice as much', upClickPct: 'Taps also earn 1% of your per-second',
+      upRecipe: 'All production +50%', noUp: 'Keep baking and buying to unlock new upgrades.',
+      achBaked: n => `Bake ${n} coins`, achCps: n => `Reach ${n} per second`, achClicks: n => `Tap ${n} times`,
+      achOwn: n => `Own ${n} buildings`, achCity: n => n === 1 ? 'Open a second city' : `Open ${n} new cities`,
+      achGold: n => n === 1 ? 'Catch a golden croissant' : `Catch ${n} golden croissants`, achAway: 'Collect earnings from a nap',
+      achHead: (a, b) => `${a} / ${b} awards`, achBonus: 'Each award adds +1% production.', achGot: n => `Award unlocked: ${n}`,
+      cities: ['Maple Town', 'Harbor Bay', 'Pine Hills', 'Sunny Coast', 'Rosewood', 'Silver Lake', 'Grand Capital', 'Star Port'],
+      cityN: n => `New City ${n}`,
+      starsHead: 'Fame stars', starsBonus: p => `+${p}% production, forever`,
+      cityText: 'Sell your bakery and open a new one in the next city. Coins, buildings and upgrades reset; stars and awards stay.',
+      gain: n => `Open now to earn ${n} ⭐`, nextStar: n => `Bake ${n} more in total for the next star.`,
+      openCity: 'Open a new city', confirmCity: n => `Move to ${n}?`, confirmCityText: n => `You will earn ${n} ⭐. Coins, buildings and upgrades reset.`,
+      move: 'Move', cancel: 'Cancel', newCity: n => `Welcome to ${n}!`,
+      stats: ['Coins baked here', 'Coins baked ever', 'Taps', 'Buildings', 'Golden croissants', 'Cities opened', 'Time played', 'Best per second'],
+      reset: 'Erase save', resetTitle: 'Erase everything?', resetText: 'This deletes all progress, stars and awards.', erase: 'Erase',
+      welcome: 'Welcome back!', away: t => `While you were away for ${t}, your bakers kept the ovens warm.`, collect: 'Collect',
+      awayCap: h => `Away earnings run at 50% and are capped at ${h} hours.`,
+      lucky: n => `Lucky batch! +${n}`, rush: 'Sugar rush! ×7 for 30 seconds', golden: 'Golden croissant',
+      dur: (h, m) => h ? `${h}h ${m}m` : `${m}m`, bakeAria: n => `Bake (+${n})`, bought: (n, c) => `${n} bought, ${c} owned`,
+    },
+    vi: {
+      tagline: 'Nướng bánh, thuê thợ, mở rộng — tiệm vẫn nướng bánh cả khi bạn vắng mặt.',
+      how1: 'Chạm vào bánh sừng bò để nướng và kiếm xu.',
+      how2: 'Mua thợ, lò và cửa hàng tự nướng bánh, rồi mua nâng cấp để nhân sản lượng.',
+      how3: 'Mở tiệm ở thành phố mới để nhận sao danh tiếng: thưởng sản lượng vĩnh viễn.',
+      play: 'Bắt đầu nướng', hint: 'Chạm để nướng!',
+      perSec: n => `${n} mỗi giây`, frenzy: s => `Cơn sốt đường ×7 · ${s}s`,
+      cityLbl: 'Đang ở', tabs: ['Cửa hàng', 'Nâng cấp', 'Thành tích', 'Thành phố', 'Thống kê'], max: 'Tối đa', buy: 'Mua',
+      prod: ['Thợ học việc', 'Máy trộn bột', 'Lò gạch', 'Quầy chợ', 'Quán cà phê', 'Nhà máy bánh mì', 'Đội giao hàng', 'Tiệm bánh trên mây', 'Tiệm bánh mặt trăng', 'Lò thời gian'],
+      each: n => `+${n}/giây mỗi cái`, total: n => `tổng ${n}/giây`,
+      clickUp: ['Cây cán bột gỗ', 'Cây cán bột đá', 'Phới lồng vàng', 'Găng tay thợ bánh', 'Bàn tay bậc thầy'],
+      recipeUp: ['Công thức gia truyền', 'Men chua lâu năm', 'Gia vị bí mật', 'Công thức hoàng gia', 'Sách nấu ăn huyền thoại'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n} nướng gấp đôi`,
+      upClick2: 'Mỗi lần chạm nướng gấp đôi', upClickPct: 'Mỗi lần chạm nhận thêm 1% sản lượng mỗi giây',
+      upRecipe: 'Toàn bộ sản lượng +50%', noUp: 'Hãy tiếp tục nướng và mua để mở khóa nâng cấp mới.',
+      achBaked: n => `Nướng ${n} xu`, achCps: n => `Đạt ${n} mỗi giây`, achClicks: n => `Chạm ${n} lần`,
+      achOwn: n => `Sở hữu ${n} công trình`, achCity: n => n === 1 ? 'Mở thành phố thứ hai' : `Mở ${n} thành phố mới`,
+      achGold: n => n === 1 ? 'Bắt một bánh sừng bò vàng' : `Bắt ${n} bánh sừng bò vàng`, achAway: 'Nhận tiền sau một giấc ngủ',
+      achHead: (a, b) => `${a} / ${b} thành tích`, achBonus: 'Mỗi thành tích cộng +1% sản lượng.', achGot: n => `Mở khóa thành tích: ${n}`,
+      cities: ['Thị trấn Phong', 'Vịnh Cảng', 'Đồi Thông', 'Bờ Biển Nắng', 'Làng Hồng', 'Hồ Bạc', 'Thủ Đô Lớn', 'Cảng Sao'],
+      cityN: n => `Thành phố mới ${n}`,
+      starsHead: 'Sao danh tiếng', starsBonus: p => `+${p}% sản lượng, vĩnh viễn`,
+      cityText: 'Bán tiệm và mở tiệm mới ở thành phố kế tiếp. Xu, công trình và nâng cấp được đặt lại; sao và thành tích được giữ.',
+      gain: n => `Mở ngay để nhận ${n} ⭐`, nextStar: n => `Nướng thêm ${n} xu tổng cộng để có sao tiếp theo.`,
+      openCity: 'Mở thành phố mới', confirmCity: n => `Chuyển đến ${n}?`, confirmCityText: n => `Bạn sẽ nhận ${n} ⭐. Xu, công trình và nâng cấp sẽ được đặt lại.`,
+      move: 'Chuyển', cancel: 'Hủy', newCity: n => `Chào mừng đến ${n}!`,
+      stats: ['Xu nướng ở đây', 'Tổng xu đã nướng', 'Số lần chạm', 'Công trình', 'Bánh sừng bò vàng', 'Thành phố đã mở', 'Thời gian chơi', 'Kỷ lục mỗi giây'],
+      reset: 'Xóa dữ liệu', resetTitle: 'Xóa tất cả?', resetText: 'Toàn bộ tiến trình, sao và thành tích sẽ bị xóa.', erase: 'Xóa',
+      welcome: 'Chào mừng trở lại!', away: t => `Trong ${t} bạn vắng mặt, thợ bánh vẫn giữ lò luôn nóng.`, collect: 'Nhận',
+      awayCap: h => `Thu nhập khi vắng mặt đạt 50% và tối đa ${h} giờ.`,
+      lucky: n => `Mẻ bánh may mắn! +${n}`, rush: 'Cơn sốt đường! ×7 trong 30 giây', golden: 'Bánh sừng bò vàng',
+      dur: (h, m) => h ? `${h} giờ ${m} phút` : `${m} phút`, bakeAria: n => `Nướng (+${n})`, bought: (n, c) => `Đã mua ${n}, đang có ${c}`,
+    },
+    zh: {
+      tagline: '烘焙、雇人、扩张——你不在的时候，面包店也在照常烤面包。',
+      how1: '点击可颂来烘焙，赚取金币。',
+      how2: '购买学徒、烤炉和店铺自动烘焙，再用升级成倍提升产量。',
+      how3: '去新城市开店可获得名气之星：永久提升产量。',
+      play: '开始烘焙', hint: '点击烘焙！',
+      perSec: n => `每秒 ${n}`, frenzy: s => `糖分爆发 ×7 · ${s}秒`,
+      cityLbl: '当前城市', tabs: ['商店', '升级', '成就', '城市', '统计'], max: '最大', buy: '购买',
+      prod: ['学徒', '和面机', '砖窑烤炉', '集市摊位', '咖啡馆', '面包工厂', '配送车队', '云端面包坊', '月球面包坊', '时光烤炉'],
+      each: n => `每个 +${n}/秒`, total: n => `合计 ${n}/秒`,
+      clickUp: ['木擀面杖', '大理石擀面杖', '黄金打蛋器', '烘焙手套', '大师之手'],
+      recipeUp: ['家传配方', '老面酵种', '秘制香料', '皇家配方', '传奇食谱'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n}产量翻倍`,
+      upClick2: '每次点击产量翻倍', upClickPct: '每次点击额外获得每秒产量的 1%',
+      upRecipe: '全部产量 +50%', noUp: '继续烘焙和购买，即可解锁新的升级。',
+      achBaked: n => `烘焙 ${n} 金币`, achCps: n => `达到每秒 ${n}`, achClicks: n => `点击 ${n} 次`,
+      achOwn: n => `拥有 ${n} 座建筑`, achCity: n => n === 1 ? '开第二座城市' : `开 ${n} 座新城市`,
+      achGold: n => n === 1 ? '抓到一个黄金可颂' : `抓到 ${n} 个黄金可颂`, achAway: '睡一觉后领取收益',
+      achHead: (a, b) => `${a} / ${b} 个成就`, achBonus: '每个成就使产量 +1%。', achGot: n => `成就解锁：${n}`,
+      cities: ['枫叶镇', '海港湾', '松林丘', '阳光海岸', '玫瑰村', '银湖', '大都城', '星港'],
+      cityN: n => `新城市 ${n}`,
+      starsHead: '名气之星', starsBonus: p => `永久 +${p}% 产量`,
+      cityText: '卖掉面包店，到下一座城市重新开店。金币、建筑和升级会重置，星星和成就会保留。',
+      gain: n => `现在开店可获得 ${n} ⭐`, nextStar: n => `累计再烘焙 ${n} 即可获得下一颗星。`,
+      openCity: '去新城市开店', confirmCity: n => `搬到${n}？`, confirmCityText: n => `你将获得 ${n} ⭐。金币、建筑和升级将重置。`,
+      move: '搬家', cancel: '取消', newCity: n => `欢迎来到${n}！`,
+      stats: ['本城烘焙金币', '累计烘焙金币', '点击次数', '建筑数量', '黄金可颂', '已开城市', '游戏时长', '最高每秒产量'],
+      reset: '清除存档', resetTitle: '清除全部？', resetText: '所有进度、星星和成就都将被删除。', erase: '清除',
+      welcome: '欢迎回来！', away: t => `你离开的 ${t} 里，面包师们一直让烤炉保持温热。`, collect: '领取',
+      awayCap: h => `离线收益为 50%，最多累计 ${h} 小时。`,
+      lucky: n => `幸运出炉！+${n}`, rush: '糖分爆发！30 秒内 ×7', golden: '黄金可颂',
+      dur: (h, m) => h ? `${h}小时${m}分钟` : `${m}分钟`, bakeAria: n => `烘焙（+${n}）`, bought: (n, c) => `购买 ${n} 个，共 ${c} 个`,
+    },
+    fr: {
+      tagline: 'Cuisez, embauchez, agrandissez : votre boulangerie continue même en votre absence.',
+      how1: 'Touchez le croissant pour cuire et gagner des pièces.',
+      how2: 'Achetez apprentis, fours et boutiques qui cuisent pour vous, puis des améliorations qui les multiplient.',
+      how3: 'Ouvrez dans une nouvelle ville pour gagner des étoiles : un bonus permanent.',
+      play: 'Commencer', hint: 'Touchez pour cuire !',
+      perSec: n => `${n} par seconde`, frenzy: s => `Coup de sucre ×7 · ${s} s`,
+      cityLbl: 'Ville', tabs: ['Boutique', 'Améliorer', 'Succès', 'Ville', 'Stats'], max: 'Max', buy: 'Acheter',
+      prod: ['Apprenti', 'Pétrin', 'Four à bois', 'Étal de marché', 'Café', 'Usine à pain', 'Flotte de livraison', 'Boulangerie céleste', 'Boulangerie lunaire', 'Four temporel'],
+      each: n => `+${n}/s chacun`, total: n => `${n}/s au total`,
+      clickUp: ['Rouleau en bois', 'Rouleau en marbre', 'Fouet doré', 'Gants de boulanger', 'Main de maître'],
+      recipeUp: ['Recette de famille', 'Levain maison', 'Épices secrètes', 'Recette royale', 'Livre de recettes légendaire'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n} : production doublée`,
+      upClick2: 'Chaque toucher cuit deux fois plus', upClickPct: 'Chaque toucher rapporte aussi 1 % de la production par seconde',
+      upRecipe: 'Toute la production +50 %', noUp: 'Continuez à cuire et à acheter pour débloquer de nouvelles améliorations.',
+      achBaked: n => `Cuire ${n} pièces`, achCps: n => `Atteindre ${n} par seconde`, achClicks: n => `Toucher ${n} fois`,
+      achOwn: n => `Posséder ${n} bâtiments`, achCity: n => n === 1 ? 'Ouvrir une deuxième ville' : `Ouvrir ${n} nouvelles villes`,
+      achGold: n => n === 1 ? 'Attraper un croissant doré' : `Attraper ${n} croissants dorés`, achAway: 'Encaisser après une sieste',
+      achHead: (a, b) => `${a} / ${b} succès`, achBonus: 'Chaque succès ajoute +1 % de production.', achGot: n => `Succès débloqué : ${n}`,
+      cities: ['Bourg-Érable', 'Baie du Port', 'Collines-Pins', 'Côte Soleil', 'Bois-Rose', 'Lac d’Argent', 'Grande Capitale', 'Port-Étoile'],
+      cityN: n => `Nouvelle ville ${n}`,
+      starsHead: 'Étoiles de renom', starsBonus: p => `+${p} % de production, pour toujours`,
+      cityText: 'Vendez votre boulangerie et ouvrez-en une dans la ville suivante. Pièces, bâtiments et améliorations repartent à zéro ; étoiles et succès restent.',
+      gain: n => `Ouvrez maintenant pour gagner ${n} ⭐`, nextStar: n => `Cuisez encore ${n} au total pour la prochaine étoile.`,
+      openCity: 'Ouvrir une nouvelle ville', confirmCity: n => `Partir pour ${n} ?`, confirmCityText: n => `Vous gagnerez ${n} ⭐. Pièces, bâtiments et améliorations repartent à zéro.`,
+      move: 'Partir', cancel: 'Annuler', newCity: n => `Bienvenue à ${n} !`,
+      stats: ['Pièces cuites ici', 'Pièces cuites au total', 'Touchers', 'Bâtiments', 'Croissants dorés', 'Villes ouvertes', 'Temps de jeu', 'Record par seconde'],
+      reset: 'Effacer la sauvegarde', resetTitle: 'Tout effacer ?', resetText: 'Toute la progression, les étoiles et les succès seront supprimés.', erase: 'Effacer',
+      welcome: 'Bon retour !', away: t => `Pendant votre absence (${t}), vos boulangers ont gardé les fours chauds.`, collect: 'Encaisser',
+      awayCap: h => `Les gains hors ligne sont à 50 % et limités à ${h} heures.`,
+      lucky: n => `Fournée chanceuse ! +${n}`, rush: 'Coup de sucre ! ×7 pendant 30 secondes', golden: 'Croissant doré',
+      dur: (h, m) => h ? `${h} h ${m} min` : `${m} min`, bakeAria: n => `Cuire (+${n})`, bought: (n, c) => `${n} acheté(s), ${c} au total`,
+    },
+    th: {
+      tagline: 'อบ จ้าง ขยายกิจการ — ร้านเบเกอรี่ของคุณยังอบต่อแม้ตอนที่คุณไม่อยู่',
+      how1: 'แตะครัวซองต์เพื่ออบขนมและรับเหรียญ',
+      how2: 'ซื้อคนทำขนม เตาอบ และร้านค้าที่อบให้อัตโนมัติ แล้วอัปเกรดเพื่อเพิ่มผลผลิตหลายเท่า',
+      how3: 'เปิดร้านในเมืองใหม่เพื่อรับดาวชื่อเสียง: โบนัสผลผลิตถาวร',
+      play: 'เริ่มอบขนม', hint: 'แตะเพื่ออบ!',
+      perSec: n => `${n} ต่อวินาที`, frenzy: s => `น้ำตาลพุ่ง ×7 · ${s} วิ`,
+      cityLbl: 'เมือง', tabs: ['ร้านค้า', 'อัปเกรด', 'รางวัล', 'เมือง', 'สถิติ'], max: 'สูงสุด', buy: 'ซื้อ',
+      prod: ['เด็กฝึกงาน', 'เครื่องนวดแป้ง', 'เตาอิฐ', 'แผงตลาด', 'คาเฟ่', 'โรงงานขนมปัง', 'ทีมส่งของ', 'เบเกอรี่ลอยฟ้า', 'เบเกอรี่บนดวงจันทร์', 'เตาข้ามเวลา'],
+      each: n => `+${n}/วิ ต่อชิ้น`, total: n => `รวม ${n}/วิ`,
+      clickUp: ['ไม้นวดแป้ง', 'ไม้นวดหินอ่อน', 'ตะกร้อทองคำ', 'ถุงมือคนทำขนม', 'สัมผัสปรมาจารย์'],
+      recipeUp: ['สูตรประจำบ้าน', 'หัวเชื้อซาวโดว์', 'เครื่องเทศลับ', 'สูตรราชวงศ์', 'ตำราในตำนาน'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n} อบได้เป็นสองเท่า`,
+      upClick2: 'แต่ละครั้งที่แตะอบได้สองเท่า', upClickPct: 'การแตะได้เพิ่ม 1% ของผลผลิตต่อวินาที',
+      upRecipe: 'ผลผลิตทั้งหมด +50%', noUp: 'อบและซื้อต่อไปเพื่อปลดล็อกอัปเกรดใหม่',
+      achBaked: n => `อบได้ ${n} เหรียญ`, achCps: n => `ถึง ${n} ต่อวินาที`, achClicks: n => `แตะ ${n} ครั้ง`,
+      achOwn: n => `มีสิ่งก่อสร้าง ${n} แห่ง`, achCity: n => n === 1 ? 'เปิดเมืองที่สอง' : `เปิดเมืองใหม่ ${n} เมือง`,
+      achGold: n => n === 1 ? 'จับครัวซองต์ทองคำ' : `จับครัวซองต์ทองคำ ${n} ชิ้น`, achAway: 'รับรายได้หลังงีบหลับ',
+      achHead: (a, b) => `รางวัล ${a} / ${b}`, achBonus: 'แต่ละรางวัลเพิ่มผลผลิต +1%', achGot: n => `ปลดล็อกรางวัล: ${n}`,
+      cities: ['เมืองเมเปิล', 'อ่าวท่าเรือ', 'เนินสน', 'ชายฝั่งแดดจ้า', 'หมู่บ้านกุหลาบ', 'ทะเลสาบเงิน', 'มหานคร', 'ท่าดวงดาว'],
+      cityN: n => `เมืองใหม่ ${n}`,
+      starsHead: 'ดาวชื่อเสียง', starsBonus: p => `ผลผลิต +${p}% ถาวร`,
+      cityText: 'ขายร้านแล้วไปเปิดร้านใหม่ในเมืองถัดไป เหรียญ สิ่งก่อสร้าง และอัปเกรดจะรีเซ็ต แต่ดาวและรางวัลยังอยู่',
+      gain: n => `เปิดตอนนี้เพื่อรับ ${n} ⭐`, nextStar: n => `อบเพิ่มอีก ${n} เพื่อรับดาวดวงถัดไป`,
+      openCity: 'เปิดร้านเมืองใหม่', confirmCity: n => `ย้ายไป${n}?`, confirmCityText: n => `คุณจะได้รับ ${n} ⭐ เหรียญ สิ่งก่อสร้าง และอัปเกรดจะรีเซ็ต`,
+      move: 'ย้าย', cancel: 'ยกเลิก', newCity: n => `ยินดีต้อนรับสู่${n}!`,
+      stats: ['เหรียญที่อบในเมืองนี้', 'เหรียญที่อบทั้งหมด', 'จำนวนแตะ', 'สิ่งก่อสร้าง', 'ครัวซองต์ทองคำ', 'เมืองที่เปิด', 'เวลาเล่น', 'สถิติต่อวินาที'],
+      reset: 'ลบเซฟ', resetTitle: 'ลบทั้งหมด?', resetText: 'ความคืบหน้า ดาว และรางวัลทั้งหมดจะถูกลบ', erase: 'ลบ',
+      welcome: 'ยินดีต้อนรับกลับ!', away: t => `ระหว่างที่คุณไม่อยู่ ${t} คนทำขนมช่วยดูแลเตาให้ร้อนเสมอ`, collect: 'รับ',
+      awayCap: h => `รายได้ตอนออฟไลน์ได้ 50% และสูงสุด ${h} ชั่วโมง`,
+      lucky: n => `อบได้โชค! +${n}`, rush: 'น้ำตาลพุ่ง! ×7 นาน 30 วินาที', golden: 'ครัวซองต์ทองคำ',
+      dur: (h, m) => h ? `${h} ชม. ${m} นาที` : `${m} นาที`, bakeAria: n => `อบ (+${n})`, bought: (n, c) => `ซื้อ ${n} มีทั้งหมด ${c}`,
+    },
+    ja: {
+      tagline: '焼いて、雇って、広げよう。留守のあいだもベーカリーは焼き続けます。',
+      how1: 'クロワッサンをタップして焼き、コインを稼ごう。',
+      how2: '見習い・オーブン・お店を買えば自動で焼いてくれます。アップグレードで生産量を倍増！',
+      how3: '新しい街に出店すると名声スターがもらえ、生産量がずっとアップします。',
+      play: '焼きはじめる', hint: 'タップで焼こう！',
+      perSec: n => `毎秒 ${n}`, frenzy: s => `シュガーラッシュ ×7 · ${s}秒`,
+      cityLbl: '営業中の街', tabs: ['ショップ', '強化', '実績', '街', '統計'], max: '最大', buy: '購入',
+      prod: ['見習い', 'ミキサー', 'レンガ窯', '市場の屋台', 'カフェ', 'パン工場', '配達チーム', '空のベーカリー', '月のベーカリー', '時のオーブン'],
+      each: n => `1つあたり +${n}/秒`, total: n => `合計 ${n}/秒`,
+      clickUp: ['木のめん棒', '大理石のめん棒', '金の泡立て器', 'パン職人の手袋', '匠の手'],
+      recipeUp: ['家伝のレシピ', '自家製天然酵母', '秘伝のスパイス', '王室のレシピ', '伝説のレシピ本'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n}の生産量が2倍`,
+      upClick2: 'タップで焼ける量が2倍', upClickPct: 'タップで毎秒生産量の1%も獲得',
+      upRecipe: '全生産量 +50%', noUp: '焼いて買い続けると、新しい強化が解放されます。',
+      achBaked: n => `${n} コイン焼く`, achCps: n => `毎秒 ${n} に到達`, achClicks: n => `${n} 回タップ`,
+      achOwn: n => `建物を ${n} 個所有`, achCity: n => n === 1 ? '2つ目の街に出店' : `新しい街に ${n} 回出店`,
+      achGold: n => n === 1 ? '金のクロワッサンをつかむ' : `金のクロワッサンを ${n} 個つかむ`, achAway: 'ひと眠り後に売上を受け取る',
+      achHead: (a, b) => `実績 ${a} / ${b}`, achBonus: '実績1つごとに生産量 +1%。', achGot: n => `実績解除：${n}`,
+      cities: ['メープルタウン', 'ハーバーベイ', 'パインヒルズ', 'サニーコースト', 'ローズウッド', 'シルバーレイク', 'グランドキャピタル', 'スターポート'],
+      cityN: n => `新しい街 ${n}`,
+      starsHead: '名声スター', starsBonus: p => `生産量 +${p}%（永続）`,
+      cityText: 'ベーカリーを売って、次の街で新しく開店します。コイン・建物・強化はリセットされ、スターと実績は残ります。',
+      gain: n => `今出店すると ${n} ⭐ 獲得`, nextStar: n => `次のスターまで累計あと ${n}。`,
+      openCity: '新しい街に出店', confirmCity: n => `${n}へ移りますか？`, confirmCityText: n => `${n} ⭐ を獲得します。コイン・建物・強化はリセットされます。`,
+      move: '移る', cancel: 'キャンセル', newCity: n => `${n}へようこそ！`,
+      stats: ['この街で焼いたコイン', '累計で焼いたコイン', 'タップ数', '建物', '金のクロワッサン', '出店した街', 'プレイ時間', '最高の毎秒生産'],
+      reset: 'セーブを消去', resetTitle: 'すべて消去しますか？', resetText: '進行状況、スター、実績がすべて削除されます。', erase: '消去',
+      welcome: 'おかえりなさい！', away: t => `留守にしていた ${t} のあいだも、職人たちがオーブンを温めていました。`, collect: '受け取る',
+      awayCap: h => `留守中の売上は50%で、最大${h}時間分です。`,
+      lucky: n => `ラッキーな焼き上がり！ +${n}`, rush: 'シュガーラッシュ！30秒間 ×7', golden: '金のクロワッサン',
+      dur: (h, m) => h ? `${h}時間${m}分` : `${m}分`, bakeAria: n => `焼く（+${n}）`, bought: (n, c) => `${n}個購入、所有 ${c}個`,
+    },
+    ko: {
+      tagline: '굽고, 고용하고, 확장하세요. 자리를 비운 동안에도 빵집은 계속 빵을 굽습니다.',
+      how1: '크루아상을 탭해서 빵을 굽고 코인을 버세요.',
+      how2: '견습생, 오븐, 가게를 사면 자동으로 구워 줍니다. 업그레이드로 생산량을 몇 배로!',
+      how3: '새 도시에 개점하면 명성 별을 받아 생산량이 영구히 늘어납니다.',
+      play: '굽기 시작', hint: '탭해서 굽기!',
+      perSec: n => `초당 ${n}`, frenzy: s => `슈거 러시 ×7 · ${s}초`,
+      cityLbl: '영업 중인 도시', tabs: ['상점', '업그레이드', '업적', '도시', '통계'], max: '최대', buy: '구매',
+      prod: ['견습생', '반죽기', '벽돌 화덕', '시장 노점', '카페', '빵 공장', '배달 차량단', '하늘 빵집', '달 빵집', '시간 오븐'],
+      each: n => `개당 +${n}/초`, total: n => `총 ${n}/초`,
+      clickUp: ['나무 밀대', '대리석 밀대', '황금 거품기', '제빵사 장갑', '장인의 손길'],
+      recipeUp: ['집안 비법', '천연 발효종', '비밀 향신료', '왕실 레시피', '전설의 요리책'],
+      upProd: n => `${n} ×2`, upProdDesc: n => `${n} 생산량 2배`,
+      upClick2: '탭할 때 굽는 양 2배', upClickPct: '탭할 때 초당 생산량의 1%도 획득',
+      upRecipe: '전체 생산량 +50%', noUp: '계속 굽고 구매하면 새 업그레이드가 열립니다.',
+      achBaked: n => `코인 ${n}개 굽기`, achCps: n => `초당 ${n} 달성`, achClicks: n => `${n}번 탭하기`,
+      achOwn: n => `건물 ${n}개 보유`, achCity: n => n === 1 ? '두 번째 도시 개점' : `새 도시 ${n}번 개점`,
+      achGold: n => n === 1 ? '황금 크루아상 잡기' : `황금 크루아상 ${n}개 잡기`, achAway: '한숨 자고 수익 받기',
+      achHead: (a, b) => `업적 ${a} / ${b}`, achBonus: '업적 하나마다 생산량 +1%.', achGot: n => `업적 달성: ${n}`,
+      cities: ['메이플 타운', '하버 베이', '파인 힐스', '서니 코스트', '로즈우드', '실버 레이크', '그랜드 캐피털', '스타 포트'],
+      cityN: n => `새 도시 ${n}`,
+      starsHead: '명성 별', starsBonus: p => `생산량 +${p}% (영구)`,
+      cityText: '빵집을 팔고 다음 도시에서 새로 개점합니다. 코인, 건물, 업그레이드는 초기화되고 별과 업적은 유지됩니다.',
+      gain: n => `지금 개점하면 ${n} ⭐ 획득`, nextStar: n => `다음 별까지 누적 ${n} 더 굽기.`,
+      openCity: '새 도시에 개점', confirmCity: n => `${n}(으)로 이사할까요?`, confirmCityText: n => `${n} ⭐을 받습니다. 코인, 건물, 업그레이드는 초기화됩니다.`,
+      move: '이사', cancel: '취소', newCity: n => `${n}에 오신 걸 환영해요!`,
+      stats: ['이 도시에서 구운 코인', '누적 구운 코인', '탭 횟수', '건물', '황금 크루아상', '개점한 도시', '플레이 시간', '최고 초당 생산'],
+      reset: '저장 삭제', resetTitle: '모두 삭제할까요?', resetText: '모든 진행 상황, 별, 업적이 삭제됩니다.', erase: '삭제',
+      welcome: '다시 오셨군요!', away: t => `자리를 비운 ${t} 동안 제빵사들이 오븐을 따뜻하게 지켰어요.`, collect: '받기',
+      awayCap: h => `오프라인 수익은 50%이며 최대 ${h}시간까지 쌓입니다.`,
+      lucky: n => `행운의 한 판! +${n}`, rush: '슈거 러시! 30초 동안 ×7', golden: '황금 크루아상',
+      dur: (h, m) => h ? `${h}시간 ${m}분` : `${m}분`, bakeAria: n => `굽기 (+${n})`, bought: (n, c) => `${n}개 구매, 보유 ${c}개`,
+    },
+  };
+
+  const qs = new URLSearchParams(location.search);
+  const lang = Object.prototype.hasOwnProperty.call(I18N, qs.get('lang')) ? qs.get('lang') : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t[el.dataset.i18n]; });
+
+  // ---------- Numbers ----------
+  const SUFFIX = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+  const nf = [0, 1, 2].map(d => new Intl.NumberFormat(lang === 'zh' ? 'zh-Hans' : lang, { minimumFractionDigits: 0, maximumFractionDigits: d }));
+  function fmt(n) {
+    if (!isFinite(n)) return '∞';
+    if (n < 0) return '-' + fmt(-n);
+    if (n < 1000) return nf[n < 10 ? 1 : 0].format(n < 10 ? Math.floor(n * 10) / 10 : Math.floor(n));
+    const e = Math.floor(Math.log10(n) / 3);
+    if (e >= SUFFIX.length) { const x = Math.floor(Math.log10(n)); return nf[2].format(Math.floor(n / 10 ** x * 100) / 100) + 'e' + x; }
+    const m = n / 1000 ** e;
+    const d = m < 10 ? 2 : m < 100 ? 1 : 0;
+    return nf[d].format(Math.floor(m * 10 ** d) / 10 ** d) + SUFFIX[e];
+  }
+  function dur(sec) { const m = Math.floor(sec / 60); return t.dur(Math.floor(m / 60), m % 60); }
+
+  // ---------- Data ----------
+  const PROD = [
+    ['🧑‍🍳', 15, 0.1], ['🥣', 100, 1], ['🔥', 1100, 8], ['🧺', 12e3, 47], ['☕', 130e3, 260],
+    ['🏭', 1.4e6, 1400], ['🚚', 2e7, 7800], ['🎈', 3.3e8, 44e3], ['🌙', 5.1e9, 260e3], ['⏳', 7.5e10, 1.6e6],
+  ].map(([icon, cost, cps]) => ({ icon, cost, cps }));
+  const GROWTH = 1.15;
+  const TIER_NEED = [1, 5, 25, 50, 100], TIER_COST = [10, 50, 500, 5e3, 5e4];
+  const UPG = [];
+  PROD.forEach((p, i) => TIER_NEED.forEach((need, k) => UPG.push({ id: `p${i}.${k}`, kind: 'p', p: i, cost: p.cost * TIER_COST[k], ok: () => S.owned[i] >= need })));
+  [100, 1000, 5e4, 5e6, 5e8].forEach((cost, k) => UPG.push({ id: `c${k}`, kind: 'c', k, cost, ok: () => S.runEarned >= cost * 0.4 }));
+  [5e4, 5e6, 5e8, 5e10, 5e12].forEach((cost, k) => UPG.push({ id: `r${k}`, kind: 'r', k, cost, ok: () => S.runEarned >= cost * 0.3 }));
+  const UPG_BY_ID = Object.fromEntries(UPG.map(u => [u.id, u]));
+
+  const ACH = [];
+  [100, 1e4, 1e6, 1e8, 1e10, 1e12, 1e15, 1e18].forEach(n => ACH.push({ id: 'b' + n, icon: '🍞', name: () => t.achBaked(fmt(n)), test: () => S.lifeEarned >= n }));
+  [10, 1e3, 1e5, 1e7, 1e9].forEach(n => ACH.push({ id: 's' + n, icon: '⚡', name: () => t.achCps(fmt(n)), test: () => baseCps() >= n }));
+  [100, 1000, 5000].forEach(n => ACH.push({ id: 'k' + n, icon: '👆', name: () => t.achClicks(fmt(n)), test: () => S.clicks >= n }));
+  [10, 50, 150, 300, 600].forEach(n => ACH.push({ id: 'o' + n, icon: '🏠', name: () => t.achOwn(n), test: () => ownedTotal() >= n }));
+  [1, 3, 7].forEach(n => ACH.push({ id: 'c' + n, icon: '🏙️', name: () => t.achCity(n), test: () => S.cities >= n }));
+  [1, 10, 50].forEach(n => ACH.push({ id: 'g' + n, icon: '🌟', name: () => t.achGold(n), test: () => S.golds >= n }));
+  ACH.push({ id: 'away', icon: '🌙', name: () => t.achAway, test: () => S.napped });
+
+  const KEY = 'milaan.idleBakery.save';
+  const OFFLINE_CAP_H = 3, OFFLINE_RATE = 0.5, STAR_PCT = 2, STAR_UNIT = 1e8;
+
+  function fresh() {
+    return { coins: 0, runEarned: 0, lifeEarned: 0, clicks: 0, owned: PROD.map(() => 0), upg: [], ach: [], stars: 0, cities: 0, golds: 0, napped: false, played: 0, bestCps: 0, savedTs: 0, started: false };
+  }
+  let S = fresh();
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      S = Object.assign(fresh(), d);
+      S.owned = PROD.map((_, i) => Math.max(0, +(d.owned || [])[i] || 0));
+      ['coins', 'runEarned', 'lifeEarned'].forEach(k => { if (!isFinite(S[k]) || S[k] < 0) S[k] = 0; });
+      return true;
+    } catch (e) { return false; }
+  }
+  let saveFrozen = false; // test hook only: keeps an aged save intact across a reload
+  function save() {
+    if (saveFrozen) return;
+    S.savedTs = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+  }
+
+  // ---------- Economy ----------
+  const has = id => S.upg.includes(id);
+  const ownedTotal = () => S.owned.reduce((a, b) => a + b, 0);
+  function prodMult(i) { let m = 1; for (let k = 0; k < 5; k++) if (has(`p${i}.${k}`)) m *= 2; return m; }
+  function globalMult() {
+    let m = 1 + S.stars * STAR_PCT / 100;
+    for (let k = 0; k < 5; k++) if (has('r' + k)) m *= 1.5;
+    return m * (1 + S.ach.length / 100);
+  }
+  const unitCps = i => PROD[i].cps * prodMult(i) * globalMult();
+  function baseCps() { let s = 0; for (let i = 0; i < PROD.length; i++) s += S.owned[i] * PROD[i].cps * prodMult(i); return s * globalMult(); }
+  let frenzyT = 0;
+  const cps = () => baseCps() * (frenzyT > 0 ? 7 : 1);
+  function clickValue() {
+    let v = 1, pct = 0;
+    for (let k = 0; k < 5; k++) if (has('c' + k)) { if (k < 2) v *= 2; else { v *= 2; pct += 0.01; } }
+    return (v + baseCps() * pct) * (frenzyT > 0 ? 7 : 1);
+  }
+  function costOf(i, n) { const b = PROD[i].cost * GROWTH ** S.owned[i]; return b * (GROWTH ** n - 1) / (GROWTH - 1); }
+  function maxBuy(i) { const b = PROD[i].cost * GROWTH ** S.owned[i]; return Math.max(0, Math.floor(Math.log(S.coins * (GROWTH - 1) / b + 1) / Math.log(GROWTH))); }
+  const starsFor = life => Math.floor(Math.sqrt(life / STAR_UNIT));
+  const pendingStars = () => Math.max(0, starsFor(S.lifeEarned) - S.stars);
+  const cityName = n => n < t.cities.length ? t.cities[n] : t.cityN(n + 1);
+
+  function earn(n) { S.coins += n; S.runEarned += n; S.lifeEarned += n; }
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const els = { coins: $('coins'), cps: $('cps'), bake: $('bake'), bakeBtn: $('bake-btn'), tabs: $('tabs'), bar: $('bar'), list: $('list'), announcer: $('announcer'), cityLbl: $('city-lbl'), cityName: $('city-name') };
+  const TAB_ICONS = ['🏪', '⬆️', '🏆', '🏙️', '📊'];
+  let tab = 0, buyAmt = 1, rows = [];
+  try { const a = +localStorage.getItem('milaan.idleBakery.buyAmt'); if ([1, 10, 100, -1].includes(a)) buyAmt = a; } catch (e) { /* ignore */ }
+
+  t.tabs.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab'); b.id = 'tab-' + i;
+    b.innerHTML = `<i aria-hidden="true">${TAB_ICONS[i]}</i><span></span>`;
+    b.querySelector('span').textContent = name;
+    b.addEventListener('click', () => setTab(i));
+    els.tabs.appendChild(b);
+  });
+  els.tabs.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const n = (tab + (e.key === 'ArrowRight' ? 1 : 4)) % 5;
+    setTab(n); els.tabs.children[n].focus();
+  });
+
+  let announceTimer = 0;
+  function announce(msg) { els.announcer.textContent = ''; clearTimeout(announceTimer); announceTimer = setTimeout(() => { els.announcer.textContent = msg; }, 30); }
+  function toast(msg) {
+    const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg;
+    els.bake.appendChild(d); setTimeout(() => d.remove(), 2600);
+  }
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  function setTab(i) {
+    tab = i;
+    [...els.tabs.children].forEach((b, k) => { b.setAttribute('aria-selected', k === i ? 'true' : 'false'); b.tabIndex = k === i ? 0 : -1; });
+    els.list.setAttribute('aria-labelledby', 'tab-' + i);
+    build();
+  }
+
+  function rowButton(icon) {
+    const b = el('button', 'row'); b.type = 'button';
+    b.append(el('span', 'ic', icon), el('span', 'txt'), el('span', 'cnt'));
+    b.children[0].setAttribute('aria-hidden', 'true');
+    const meta = el('div', 'meta'); meta.append(el('span', 'cost'), el('span', 'sub'));
+    b.children[1].append(el('div', 'nm'), meta);
+    return b;
+  }
+
+  function build() {
+    els.list.textContent = ''; els.bar.textContent = ''; rows = [];
+    els.bar.hidden = tab !== 0;
+    if (tab === 0) buildShop();
+    else if (tab === 1) buildUpgrades();
+    else if (tab === 2) buildAwards();
+    else if (tab === 3) buildCity();
+    else buildStats();
+    refresh(true);
+  }
+
+  function buildShop() {
+    els.bar.append(el('span', 'lbl', t.buy));
+    [1, 10, 100, -1].forEach(a => {
+      const b = el('button', 'amt', a < 0 ? t.max : '×' + a); b.type = 'button';
+      b.setAttribute('aria-pressed', String(a === buyAmt));
+      b.addEventListener('click', () => { buyAmt = a; try { localStorage.setItem('milaan.idleBakery.buyAmt', String(a)); } catch (e) { /* ignore */ } build(); });
+      els.bar.append(b);
+    });
+    PROD.forEach((p, i) => {
+      const b = rowButton(p.icon); b.dataset.p = i;
+      b.addEventListener('click', () => buy(i));
+      els.list.append(b); rows.push(b);
+    });
+  }
+  function buyCount(i) { return buyAmt > 0 ? buyAmt : Math.max(1, maxBuy(i)); }
+  // Only the next locked building is revealed, the rest stay hidden.
+  function shopVisible(i) { return i === 0 || S.owned[i - 1] > 0 || S.owned[i] > 0 || S.runEarned >= PROD[i].cost * 0.5; }
+  function buy(i) {
+    const n = buyCount(i), c = costOf(i, n);
+    if (c > S.coins) return;
+    S.coins -= c; S.owned[i] += n;
+    announce(t.bought(n, S.owned[i]) + ' · ' + t.prod[i]);
+    checkAch(); refresh(true);
+  }
+
+  function availableUpgrades() { return UPG.filter(u => !has(u.id) && u.ok()).sort((a, b) => a.cost - b.cost); }
+  function upgText(u) {
+    if (u.kind === 'p') return [t.upProd(t.prod[u.p]), t.upProdDesc(t.prod[u.p]), PROD[u.p].icon];
+    if (u.kind === 'c') return [t.clickUp[u.k], u.k < 2 ? t.upClick2 : t.upClick2 + ' · ' + t.upClickPct, '🥖'];
+    return [t.recipeUp[u.k], t.upRecipe, '📜'];
+  }
+  function buildUpgrades() {
+    const list = availableUpgrades();
+    if (!list.length) { els.list.append(el('p', 'empty', t.noUp)); return; }
+    list.forEach(u => {
+      const [nm, sub, icon] = upgText(u);
+      const b = rowButton(icon); b.dataset.u = u.id;
+      b.querySelector('.nm').textContent = nm; b.querySelector('.sub').textContent = sub;
+      b.addEventListener('click', () => buyUpgrade(u.id));
+      els.list.append(b); rows.push(b);
+    });
+  }
+  function buyUpgrade(id) {
+    const u = UPG_BY_ID[id];
+    if (!u || has(id) || !u.ok() || S.coins < u.cost) return;
+    S.coins -= u.cost; S.upg.push(id);
+    announce(upgText(u)[0]);
+    checkAch(); build();
+  }
+
+  function buildAwards() {
+    const head = el('div', 'card');
+    head.append(el('h3', '', t.achHead(S.ach.length, ACH.length)), el('div', '', t.achBonus));
+    els.list.append(head);
+    ACH.forEach(a => {
+      const got = S.ach.includes(a.id);
+      const b = el('div', 'row static' + (got ? ' got' : ' locked'));
+      b.append(el('span', 'ic', got ? a.icon : '🔒'), el('span', 'txt'), el('span', 'cnt', got ? '✓' : ''));
+      b.children[1].append(el('div', 'nm', a.name()));
+      els.list.append(b);
+    });
+  }
+
+  function buildCity() {
+    const c1 = el('div', 'card');
+    c1.append(el('h3', '', t.starsHead), el('div', 'big', '⭐ ' + fmt(S.stars)), el('div', '', t.starsBonus(fmt(S.stars * STAR_PCT))));
+    const c2 = el('div', 'card');
+    c2.append(el('h3', '', '🏙️ ' + cityName(S.cities + 1)), el('p', '', t.cityText), el('p', 'gain'), el('p', 'next'));
+    c2.querySelector('.gain').style.cssText = 'font-weight:900;color:var(--accent-dark);margin-top:6px';
+    c2.querySelector('.next').style.cssText = 'color:var(--muted);font-size:12.5px';
+    const b = el('button', 'btn', t.openCity); b.type = 'button'; b.id = 'open-city'; b.style.marginTop = '8px';
+    b.addEventListener('click', askCity);
+    c2.append(b);
+    els.list.append(c1, c2);
+  }
+  function buildStats() {
+    const c = el('div', 'card');
+    t.stats.forEach((name, i) => { const r = el('div', 'stat'); r.append(el('span', '', name), el('b')); r.dataset.i = i; c.append(r); });
+    const b = el('button', 'btn alt small', t.reset); b.type = 'button'; b.id = 'reset'; b.style.alignSelf = 'center';
+    b.addEventListener('click', () => confirmBox('🗑️', t.resetTitle, t.resetText, t.erase, resetAll));
+    els.list.append(c, b);
+  }
+
+  // Update texts in place (called 10×/s), rebuilding only when the set of rows must change.
+  let lastUpgKey = '';
+  function refresh(force) {
+    els.coins.textContent = fmt(S.coins);
+    els.cps.textContent = t.perSec(fmt(cps())) + (frenzyT > 0 ? ' · ' + t.frenzy(Math.ceil(frenzyT)) : '');
+    els.cps.classList.toggle('frenzy', frenzyT > 0);
+    els.cityLbl.textContent = t.cityLbl; els.cityName.textContent = cityName(S.cities);
+    els.bakeBtn.setAttribute('aria-label', t.bakeAria(fmt(clickValue())));
+    const ups = availableUpgrades();
+    const upKey = ups.map(u => u.id).join();
+    const affordable = ups.some(u => u.cost <= S.coins);
+    let dot = els.tabs.children[1].querySelector('.dot');
+    if (affordable && !dot) { dot = el('span', 'dot'); dot.setAttribute('aria-hidden', 'true'); els.tabs.children[1].append(dot); }
+    if (!affordable && dot) dot.remove();
+    if (tab === 0) {
+      rows.forEach(b => {
+        const i = +b.dataset.p, vis = shopVisible(i);
+        b.hidden = !vis;
+        if (!vis) return;
+        const n = buyCount(i), c = costOf(i, n), poor = c > S.coins;
+        b.classList.toggle('poor', poor);
+        b.setAttribute('aria-disabled', String(poor));
+        b.querySelector('.nm').textContent = t.prod[i] + (n > 1 ? ' ×' + n : '');
+        b.querySelector('.sub').textContent = S.owned[i] ? t.each(fmt(unitCps(i))) + ' · ' + t.total(fmt(unitCps(i) * S.owned[i])) : t.each(fmt(unitCps(i)));
+        b.querySelector('.cost').textContent = '🪙 ' + fmt(c);
+        b.querySelector('.cnt').textContent = S.owned[i] || '';
+        b.setAttribute('aria-label', `${t.prod[i]} ×${n}, 🪙 ${fmt(c)}, ${S.owned[i]}`);
+      });
+    } else if (tab === 1) {
+      if (upKey !== lastUpgKey && !force) { lastUpgKey = upKey; build(); return; }
+      rows.forEach(b => {
+        const u = UPG_BY_ID[b.dataset.u], poor = u.cost > S.coins;
+        b.classList.toggle('poor', poor); b.setAttribute('aria-disabled', String(poor));
+        b.querySelector('.cost').textContent = '🪙 ' + fmt(u.cost);
+      });
+    } else if (tab === 3) {
+      const g = pendingStars();
+      const gainEl = els.list.querySelector('.gain'), nextEl = els.list.querySelector('.next');
+      gainEl.textContent = t.gain(fmt(g));
+      nextEl.textContent = t.nextStar(fmt(Math.max(0, (starsFor(S.lifeEarned) + 1) ** 2 * STAR_UNIT - S.lifeEarned)));
+      $('open-city').disabled = g < 1;
+    } else if (tab === 4) {
+      const vals = [fmt(S.runEarned), fmt(S.lifeEarned), fmt(S.clicks), fmt(ownedTotal()), fmt(S.golds), fmt(S.cities), dur(S.played), fmt(S.bestCps)];
+      els.list.querySelectorAll('.stat b').forEach((b, i) => { b.textContent = vals[i]; });
+    }
+    lastUpgKey = upKey;
+  }
+
+  // ---------- Baking ----------
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  function bake(x, y) {
+    const v = clickValue();
+    earn(v); S.clicks++;
+    const r = els.bake.getBoundingClientRect();
+    if (x == null) { const br = els.bakeBtn.getBoundingClientRect(); x = br.left + br.width / 2; y = br.top + br.height * 0.3; }
+    const f = el('div', 'float', '+' + fmt(v));
+    f.style.left = (x - r.left + (Math.random() * 30 - 15)) + 'px'; f.style.top = (y - r.top) + 'px';
+    els.bake.appendChild(f); setTimeout(() => f.remove(), reduced.matches ? 300 : 900);
+    els.bakeBtn.classList.add('pop'); setTimeout(() => els.bakeBtn.classList.remove('pop'), 70);
+    if (S.clicks % 100 === 0) checkAch();
+  }
+  els.bakeBtn.addEventListener('click', e => { bake(e.detail ? e.clientX : null, e.detail ? e.clientY : null); refresh(); });
+
+  // ---------- Golden croissant ----------
+  let goldT = 40 + Math.random() * 50, goldEl = null, goldLife = 0;
+  function spawnGolden() {
+    if (goldEl) return;
+    goldEl = el('button', 'golden', '🥐'); goldEl.type = 'button';
+    goldEl.setAttribute('aria-label', t.golden);
+    const r = els.bake.getBoundingClientRect();
+    goldEl.style.left = (8 + Math.random() * Math.max(0, r.width - 74)) + 'px';
+    goldEl.style.top = (8 + Math.random() * Math.max(0, r.height - 74)) + 'px';
+    goldEl.addEventListener('click', catchGolden);
+    els.bake.appendChild(goldEl); goldLife = 13;
+  }
+  function catchGolden() {
+    if (!goldEl) return;
+    goldEl.remove(); goldEl = null; S.golds++;
+    goldT = 60 + Math.random() * 90;
+    let msg;
+    if (Math.random() < 0.5) {
+      const amt = Math.max(13, Math.min(S.coins * 0.15, baseCps() * 900) + clickValue() * 10);
+      earn(amt); msg = t.lucky(fmt(amt));
+    } else { frenzyT = 30; msg = t.rush; }
+    toast(msg); announce(msg); checkAch(); refresh();
+  }
+
+  // ---------- Achievements ----------
+  function checkAch() {
+    let got = null;
+    ACH.forEach(a => { if (!S.ach.includes(a.id) && a.test()) { S.ach.push(a.id); got = a; } });
+    if (got) {
+      const msg = t.achGot(got.name());
+      toast('🏆 ' + msg); announce(msg);
+      if (tab === 2) build();
+    }
+  }
+
+  // ---------- Prestige ----------
+  const ov = { menu: $('menu'), away: $('away'), confirm: $('confirm') };
+  let confirmAction = null, lastFocus = null;
+  function openOverlay(o, focus) { lastFocus = document.activeElement; o.hidden = false; (focus || o.querySelector('button')).focus({ preventScroll: true }); }
+  function closeOverlay(o) { o.hidden = true; if (lastFocus && lastFocus.isConnected) lastFocus.focus({ preventScroll: true }); else els.bakeBtn.focus({ preventScroll: true }); }
+  function confirmBox(emoji, title, text, yes, action) {
+    $('confirm-emoji').textContent = emoji; $('confirm-title').textContent = title; $('confirm-text').textContent = text;
+    $('confirm-yes').textContent = yes; confirmAction = action;
+    openOverlay(ov.confirm, $('confirm-no'));
+  }
+  $('confirm-no').addEventListener('click', () => closeOverlay(ov.confirm));
+  $('confirm-yes').addEventListener('click', () => { closeOverlay(ov.confirm); const a = confirmAction; confirmAction = null; if (a) a(); });
+
+  function askCity() {
+    const g = pendingStars();
+    if (g < 1) return;
+    confirmBox('🏙️', t.confirmCity(cityName(S.cities + 1)), t.confirmCityText(fmt(g)), t.move, openCity);
+  }
+  function openCity() {
+    const g = pendingStars();
+    if (g < 1) return;
+    S.stars += g; S.cities++;
+    S.coins = 0; S.runEarned = 0; S.owned = PROD.map(() => 0); S.upg = [];
+    frenzyT = 0;
+    checkAch(); save();
+    const msg = t.newCity(cityName(S.cities));
+    toast('🏙️ ' + msg); announce(msg);
+    setTab(0);
+  }
+  function resetAll() {
+    S = fresh(); S.started = true; frenzyT = 0;
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+    save(); setTab(0);
+  }
+
+  // ---------- Offline earnings ----------
+  let pendingAway = 0;
+  function offlineCheck(fromTs) {
+    if (!fromTs || !S.started) return;
+    const sec = Math.min((Date.now() - fromTs) / 1000, OFFLINE_CAP_H * 3600);
+    if (sec < 30) return;
+    const amt = baseCps() * sec * OFFLINE_RATE;
+    if (amt <= 0) return;
+    pendingAway += amt;
+    $('away-text').textContent = t.away(dur(sec));
+    $('away-amt').textContent = '🪙 +' + fmt(pendingAway);
+    $('away-cap').textContent = t.awayCap(OFFLINE_CAP_H);
+    if (ov.away.hidden) openOverlay(ov.away, $('collect'));
+  }
+  $('collect').addEventListener('click', () => {
+    earn(pendingAway); pendingAway = 0; S.napped = true;
+    closeOverlay(ov.away); checkAch(); refresh(true); save();
+  });
+
+  // ---------- Loop ----------
+  let last = performance.now(), uiT = 0, achT = 0, saveT = 0, hiddenAt = 0;
+  function step(dt) {
+    const rate = cps();
+    if (rate > 0) earn(rate * dt);
+    if (frenzyT > 0) frenzyT = Math.max(0, frenzyT - dt);
+    S.played += dt;
+    S.bestCps = Math.max(S.bestCps, rate);
+    if (goldEl) { goldLife -= dt; if (goldLife <= 0) { goldEl.remove(); goldEl = null; goldT = 60 + Math.random() * 90; } }
+    else if (S.started && ov.menu.hidden) { goldT -= dt; if (goldT <= 0) spawnGolden(); }
+    achT += dt; if (achT >= 0.5) { achT = 0; checkAch(); }
+    saveT += dt; if (saveT >= 5) { saveT = 0; save(); }
+  }
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (!document.hidden && S.started) {
+      step(dt);
+      uiT += dt; if (uiT >= 0.1) { uiT = 0; refresh(); }
+    }
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { hiddenAt = Date.now(); save(); }
+    else { last = performance.now(); if (hiddenAt) offlineCheck(hiddenAt); hiddenAt = 0; }
+  });
+  addEventListener('pagehide', save);
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || !ov.menu.hidden || !ov.away.hidden || !ov.confirm.hidden) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if ((e.key === ' ' || e.key === 'Enter') && tag === 'BUTTON') return;
+    if (e.key === ' ' || e.key === 'b' || e.key === 'B') { e.preventDefault(); if (!e.repeat) { bake(); refresh(); } return; }
+    if (/^[0-9]$/.test(e.key)) {
+      const i = e.key === '0' ? 9 : +e.key - 1;
+      if (shopVisible(i)) { e.preventDefault(); buy(i); }
+    }
+  });
+
+  $('play').addEventListener('click', () => { S.started = true; save(); closeOverlay(ov.menu); });
+
+  if (navigator.webdriver) window.__idleBakery = {
+    state: () => ({ coins: S.coins, runEarned: S.runEarned, lifeEarned: S.lifeEarned, clicks: S.clicks, owned: S.owned.slice(), upg: S.upg.slice(), ach: S.ach.slice(), stars: S.stars, cities: S.cities, golds: S.golds, cps: cps(), click: clickValue(), frenzy: frenzyT, pending: pendingStars(), tab, buyAmt, golden: !!goldEl, overlay: Object.keys(ov).find(k => !ov[k].hidden) || null, achTotal: ACH.length }),
+    sim: sec => { for (let s = 0; s < sec; s += 0.05) step(Math.min(0.05, sec - s)); refresh(true); },
+    give: n => { earn(n); refresh(true); },
+    costOf, fmt, spawnGolden: () => { spawnGolden(); },
+    ageSave: sec => { saveFrozen = true; S.savedTs = Date.now() - sec * 1000; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } },
+  };
+
+  const hadSave = load();
+  setTab(0);
+  if (!hadSave || !S.started) openOverlay(ov.menu, $('play'));
+  else offlineCheck(S.savedTs);
+  refresh(true);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swing Hook</title>
+<style>
+:root {
+  --bg: #1e1433;
+  --ink: #2a1c45;
+  --text: #ffffff;
+  --muted: #7a6b94;
+  --coral: #ff6b4a;
+  --coral-dark: #c94a2e;
+  --gold: #ffd166;
+  --paper: #fff6e6;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+.app { position: fixed; inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.frame { position: relative; width: 100%; height: 100%; overflow: hidden; container-type: size; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+canvas:focus-visible { outline: none; }
+
+.hud { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.hud[hidden] { display: none; }
+.chip { background: #1e1433b8; border: 1px solid #ffffff22; padding: 6px 12px; border-radius: 99px; font-weight: 800; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip small { font-size: 12px; color: #d9cdf0; font-weight: 700; margin-right: 4px; }
+.hud .grow { flex: 1; }
+.icon { pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background: #1e1433b8; border: 1px solid #ffffff22; display: grid; place-items: center; font-size: 18px; font-weight: 900; }
+.icon:active { transform: scale(.94); }
+.stars-row { color: #ffffff44; letter-spacing: 1px; }
+.stars-row b { color: var(--gold); font-weight: 900; }
+
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; text-align: center; background: #160e27a6; }
+.overlay[hidden] { display: none; }
+.title { font-size: clamp(36px, min(13cqw, 13cqh), 84px); font-weight: 900; letter-spacing: -.03em; line-height: 1; color: #fff; text-shadow: 0 4px 0 var(--coral-dark), 0 10px 28px #0008; }
+.title span { color: var(--gold); }
+.tagline { margin-top: 10px; max-width: 26em; font-size: clamp(13px, 3.6cqw, 17px); font-weight: 700; line-height: 1.4; color: #f3eaff; }
+.menu-btns { display: grid; gap: 10px; margin-top: clamp(14px, 5cqh, 34px); width: min(100%, 280px); }
+.cta { padding: 14px 26px; border-radius: 99px; background: var(--coral); color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 var(--coral-dark), 0 10px 24px #0005; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--coral-dark); }
+.ghost { padding: 11px 22px; border-radius: 99px; background: #ffffff1c; border: 2px solid #ffffff44; font-size: 16px; font-weight: 800; }
+.hint { margin-top: 14px; font-size: 13px; font-weight: 700; color: #d9cdf0; max-width: 30em; line-height: 1.4; }
+.hint:empty { display: none; }
+
+.panel { width: min(100%, 340px); max-height: calc(100% - 8px); overflow-y: auto; padding: 18px; border-radius: 22px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 0 #e2cfa9, 0 20px 50px #0008; animation: rise .25s ease-out; }
+.panel.wide { width: min(100%, 520px); }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel .row { display: flex; gap: 8px; margin-top: 14px; }
+.panel .row > * { flex: 1; }
+.pbtn { padding: 12px 10px; border-radius: 14px; background: var(--coral); color: #fff; font-size: 16px; font-weight: 900; box-shadow: 0 4px 0 var(--coral-dark); }
+.pbtn.alt { background: #eadcc2; color: var(--ink); box-shadow: 0 4px 0 #cdb991; }
+.pbtn:active { transform: translateY(2px); box-shadow: none; }
+.big-stars { font-size: 44px; letter-spacing: 6px; margin-top: 8px; color: #e4d6bb; line-height: 1; }
+.big-stars b { color: #f4b400; text-shadow: 0 2px 0 #c98a00; }
+.stats { display: flex; justify-content: center; gap: 22px; margin-top: 10px; }
+.stats small { display: block; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.stats strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.goal { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.badge { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 99px; background: var(--coral); color: #fff; font-size: 13px; font-weight: 800; }
+.badge[hidden] { display: none; }
+
+.world-head { display: flex; align-items: center; gap: 8px; }
+.world-head h2 { flex: 1; font-size: 22px; }
+.world-head .sub { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+.arrow { width: 40px; height: 40px; border-radius: 50%; background: #eadcc2; font-size: 20px; font-weight: 900; color: var(--ink); }
+.arrow:disabled { opacity: .35; cursor: default; }
+.grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.lvl { aspect-ratio: 1; min-height: 40px; min-width: 0; border-radius: 14px; background: #fff; border: 2px solid #e6d5b5; color: var(--ink); font-weight: 900; font-size: 18px; display: grid; place-content: center; gap: 1px; }
+.lvl small { font-size: 11px; letter-spacing: 1px; color: #d8c8a8; }
+.lvl small b { color: #f4b400; }
+.lvl[data-theme="0"] { border-color: #ffb08f; }
+.lvl[data-theme="1"] { border-color: #8fd9a8; }
+.lvl[data-theme="2"] { border-color: #9fd8ff; }
+.lvl[data-theme="3"] { border-color: #ff9a7a; }
+.lvl:disabled { background: #f1e6d2; color: #bba98a; cursor: default; }
+
+.flash { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: clamp(26px, 8cqw, 46px); font-weight: 900; color: #fff; text-shadow: 0 3px 0 var(--coral-dark), 0 8px 20px #0008; pointer-events: none; white-space: nowrap; }
+.flash[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-height: 420px) {
+  .title { font-size: clamp(30px, 14cqh, 56px); }
+  .tagline { margin-top: 4px; font-size: 13px; }
+  .menu-btns { margin-top: 10px; grid-template-columns: 1fr 1fr; width: min(100%, 420px); }
+  .cta { padding: 10px 18px; font-size: 17px; }
+  .ghost { padding: 8px 16px; }
+  .hint { margin-top: 8px; font-size: 12px; }
+  .panel { padding: 12px 14px; }
+  .panel h2 { font-size: 20px; }
+  .big-stars { font-size: 30px; margin-top: 2px; }
+  .stats { margin-top: 4px; }
+  .stats strong { font-size: 20px; }
+  .panel .row { margin-top: 8px; }
+  .pbtn { padding: 9px 8px; }
+  .panel.wide { width: min(100%, 640px); }
+  .grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .lvl { aspect-ratio: auto; min-height: 50px; font-size: 16px; }
+  .icon { width: 36px; height: 36px; }
+  .chip { padding: 5px 10px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="frame" id="frame">
+    <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+    <div class="hud" id="hud" hidden>
+      <span class="chip" id="hud-level"></span>
+      <span class="chip"><small data-i18n="time"></small><span id="hud-time">0.0</span></span>
+      <span class="grow"></span>
+      <button type="button" class="icon" id="btn-restart" data-i18n-label="restart">↻</button>
+      <button type="button" class="icon" id="btn-pause" data-i18n-label="pause">❚❚</button>
+    </div>
+    <p class="flash" id="flash" hidden></p>
+
+    <div class="overlay" id="start">
+      <h1 class="title">Swing <span>Hook</span></h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <div class="menu-btns">
+        <button type="button" class="cta" id="play"></button>
+        <button type="button" class="ghost" id="open-levels" data-i18n="levels"></button>
+      </div>
+      <p class="hint" data-i18n="controls"></p>
+      <p class="hint" id="start-stars"></p>
+    </div>
+
+    <div class="overlay" id="levels" hidden>
+      <div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="world-name">
+        <div class="world-head">
+          <button type="button" class="arrow" id="w-prev" data-i18n-label="prevWorld">‹</button>
+          <h2><span id="world-name"></span><span class="sub" id="world-stars"></span></h2>
+          <button type="button" class="arrow" id="w-next" data-i18n-label="nextWorld">›</button>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="row"><button type="button" class="pbtn alt" id="levels-back" data-i18n="back"></button></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="paused" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+        <h2 id="paused-title" data-i18n="paused"></h2>
+        <div class="row"><button type="button" class="pbtn" id="resume" data-i18n="resume"></button></div>
+        <div class="row">
+          <button type="button" class="pbtn alt" id="pause-restart" data-i18n="restart"></button>
+          <button type="button" class="pbtn alt" id="pause-levels" data-i18n="levels"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="win" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+        <h2 id="win-title"></h2>
+        <p class="big-stars" id="win-stars" aria-hidden="true"></p>
+        <div class="stats">
+          <div><small data-i18n="time"></small><strong id="win-time"></strong></div>
+          <div><small data-i18n="best"></small><strong id="win-best"></strong></div>
+        </div>
+        <p class="goal" id="win-goal"></p>
+        <p class="badge" id="win-new" data-i18n="newBest" hidden></p>
+        <div class="row">
+          <button type="button" class="pbtn alt" id="win-retry" data-i18n="retry"></button>
+          <button type="button" class="pbtn" id="win-next" data-i18n="next"></button>
+        </div>
+        <div class="row"><button type="button" class="pbtn alt" id="win-levels" data-i18n="levels"></button></div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  // ---- Engine (pure, deterministic: fixed 1/120 s steps, no randomness) ----
+  const STEP = 1 / 120, GRAV = 1300, RANGE = 290, PR = 12, FLOOR_DIE = 660, VMAX = 1500, MIN_SWING = 360, PUMP = 520;
+  // Each level is a string of hand-placed chunks; letters are explained in chunk().
+  // h hook · g wide gap hook · l low hook · u high hook · p bounce pad (no hook) · s saw under a hook pair
+  // m moving hook · w wall to swing over · c hanging ceiling block · z saw on a moving hook · d double saw
+  const LEVELS = [
+    'hhhh', 'hhhhh', 'hlhuh', 'hhghh', 'hphh', 'hhuhlh', 'hghgh', 'hphph', 'hulhgh', 'hhpghuh',
+    'hhwhh', 'hwhgh', 'hshhh', 'hhshwh', 'hphwh', 'hchhh', 'hshch', 'hwphsh', 'hgshwh', 'hchwpsh',
+    'hmhh', 'hmhmh', 'hhmsh', 'hpmhh', 'hmwmh', 'hcmhsh', 'hzhh', 'hmzhwh', 'hgmpmh', 'hmsmczh',
+    'hdhh', 'hshdh', 'hzdhh', 'hwdph', 'hcdmh', 'hgzdwh', 'hdpdmh', 'hmdczh', 'hsdwzph', 'hzdcmdwh',
+  ];
+  const THEMES = 4;
+
+  function chunk(ch, cx, y0, L, idx) {
+    const H = L.hooks, gap = 245 + Math.min(idx, 39) * 1.2;
+    switch (ch) {
+      case 'h': H.push({ x: cx + gap, y: y0 }); return cx + gap;
+      case 'l': H.push({ x: cx + gap, y: y0 + 70 }); return cx + gap;
+      case 'u': H.push({ x: cx + gap, y: y0 - 60 }); return cx + gap;
+      case 'g': H.push({ x: cx + gap + 95, y: y0 - 20 }); return cx + gap + 95;
+      case 'p': L.pads.push({ x: cx + 140, y: 560, w: 150, power: 1000 }); H.push({ x: cx + 470, y: y0 }); return cx + 470;
+      case 's': L.saws.push({ x: cx + gap / 2 + 20, y: y0 + 300, r: 30 }); H.push({ x: cx + gap, y: y0 }); return cx + gap;
+      case 'm': H.push({ x: cx + gap, y: y0, ax: 70, ay: 0, per: 3.2 }); return cx + gap;
+      case 'w': L.blocks.push({ x: cx + gap / 2 + 10, y: y0 + 230, w: 46, h: 600 }); H.push({ x: cx + gap, y: y0 - 20 }); return cx + gap;
+      case 'c': L.blocks.push({ x: cx + gap / 2 - 30, y: -400, w: 60, h: 400 + y0 - 70 }); H.push({ x: cx + gap, y: y0 + 30 }); return cx + gap;
+      case 'z': L.saws.push({ x: cx + gap / 2 + 20, y: y0 + 310, r: 28, ax: 60, per: 2.6 }); H.push({ x: cx + gap, y: y0, ax: 0, ay: 40, per: 2.8 }); return cx + gap;
+      case 'd': L.saws.push({ x: cx + gap / 2 - 30, y: y0 + 290, r: 26 }, { x: cx + gap / 2 + 70, y: y0 + 320, r: 26 }); H.push({ x: cx + gap, y: y0 }); return cx + gap;
+    }
+    return cx;
+  }
+
+  function buildLevel(idx) {
+    const L = { idx, hooks: [], pads: [], blocks: [], saws: [], theme: Math.floor(idx / 10) % THEMES };
+    L.blocks.push({ x: -400, y: 420, w: 560, h: 400, start: true });
+    let cx = 60;
+    const s = LEVELS[idx];
+    for (let i = 0; i < s.length; i++) {
+      const y0 = 150 + ((i * 37 + idx * 23) % 3) * 22;
+      cx = chunk(s[i], cx, y0, L, idx);
+    }
+    const fx = cx + 200;
+    L.finish = { x: fx, y: 400, w: 420, h: 400 };
+    L.blocks.push(L.finish);
+    L.length = fx;
+    // Star times (seconds): 3 stars needs a clean, fluid run.
+    L.par3 = Math.round((fx / 470 + 1.2) * 10) / 10;
+    L.par2 = Math.round(L.par3 * 1.6 * 10) / 10;
+    return L;
+  }
+
+  const wave = (a, per, t) => a ? a * Math.sin(t * 2 * Math.PI / per) : 0;
+  function hookPos(h, t) { return { x: h.x + wave(h.ax, h.per, t), y: h.y + wave(h.ay, h.per, t) }; }
+  function sawPos(s, t) { return { x: s.x + wave(s.ax, s.per, t), y: s.y }; }
+
+  function newState() {
+    return { x: 90, y: 400, vx: 330, vy: -480, hook: -1, len: 0, t: 0, dead: false, won: false, ang: 0, spin: 0, ground: false, steps: 0 };
+  }
+
+  function pickHook(L, S) {
+    let best = -1, bs = Infinity;
+    for (let i = 0; i < L.hooks.length; i++) {
+      const p = hookPos(L.hooks[i], S.t);
+      const dx = p.x - S.x, dy = p.y - S.y, d = Math.hypot(dx, dy);
+      if (d > RANGE || p.y > S.y + 20) continue;
+      const score = d - dx * 0.5;
+      if (score < bs) { bs = score; best = i; }
+    }
+    return best;
+  }
+
+  function collideBlocks(L, S) {
+    S.ground = false;
+    for (const b of L.blocks) {
+      const nx = Math.max(b.x, Math.min(S.x, b.x + b.w)), ny = Math.max(b.y, Math.min(S.y, b.y + b.h));
+      const dx = S.x - nx, dy = S.y - ny, d2 = dx * dx + dy * dy;
+      if (d2 >= PR * PR) continue;
+      if (b === L.finish) { S.won = true; return; }
+      let ux, uy, d = Math.sqrt(d2);
+      if (d > 1e-6) { ux = dx / d; uy = dy / d; } else { ux = 0; uy = -1; d = 0; }
+      S.x += ux * (PR - d); S.y += uy * (PR - d);
+      const vn = S.vx * ux + S.vy * uy;
+      if (vn < 0) {
+        S.vx -= 1.4 * vn * ux; S.vy -= 1.4 * vn * uy;
+        if (uy < -0.7) { S.ground = true; S.vx *= 0.96; S.spin *= 0.8; }
+      }
+    }
+  }
+
+  // One fixed step; `hold` is whether the player is pressing.
+  function step(L, S, hold) {
+    if (S.dead || S.won) return;
+    const dt = STEP;
+    if (!hold && S.hook >= 0) {
+      // Release: keep the swing's angular speed as a tumble.
+      S.spin = Math.max(-14, Math.min(14, S.vx / 60));
+      S.hook = -1;
+    }
+    if (hold && S.hook < 0) {
+      const h = pickHook(L, S);
+      if (h >= 0) {
+        const p = hookPos(L.hooks[h], S.t);
+        S.hook = h; S.len = Math.max(60, Math.hypot(p.x - S.x, p.y - S.y));
+        // Grab assist: a weak swing is topped up so a hook never leaves you stuck hanging.
+        const rx = (S.x - p.x) / S.len, ry = (S.y - p.y) / S.len, tx = -ry, ty = rx;
+        let vt = S.vx * tx + S.vy * ty;
+        if (Math.abs(vt) < MIN_SWING) vt = (Math.sign(vt) || Math.sign(S.vx * tx) || 1) * MIN_SWING;
+        S.vx = vt * tx; S.vy = vt * ty;
+      } else if (S.ground) { S.vx = 300; S.vy = -520; S.ground = false; }
+    }
+    S.vy += GRAV * dt;
+    if (S.hook >= 0 && S.vx > 0) {
+      // Forward pump: swinging toward the goal gains speed, so momentum builds hook to hook.
+      const p = hookPos(L.hooks[S.hook], S.t), dx = S.x - p.x, dy = S.y - p.y, d = Math.hypot(dx, dy) || 1;
+      let tx = -dy / d, ty = dx / d; if (tx < 0) { tx = -tx; ty = -ty; }
+      S.vx += tx * PUMP * dt; S.vy += ty * PUMP * dt;
+    }
+    S.x += S.vx * dt; S.y += S.vy * dt;
+    if (S.hook >= 0) {
+      const p = hookPos(L.hooks[S.hook], S.t + dt);
+      const dx = S.x - p.x, dy = S.y - p.y, d = Math.hypot(dx, dy);
+      if (d > S.len) {
+        const ux = dx / d, uy = dy / d;
+        S.x = p.x + ux * S.len; S.y = p.y + uy * S.len;
+        const vr = S.vx * ux + S.vy * uy;
+        if (vr > 0) { S.vx -= vr * ux; S.vy -= vr * uy; }
+      }
+      S.ang = Math.atan2(S.x - p.x, -(S.y - p.y)) + Math.PI;
+    } else {
+      S.ang += S.spin * dt;
+    }
+    const sp = Math.hypot(S.vx, S.vy);
+    if (sp > VMAX) { S.vx *= VMAX / sp; S.vy *= VMAX / sp; }
+    for (const pd of L.pads) {
+      if (S.vy > 0 && S.x > pd.x - 4 && S.x < pd.x + pd.w + 4 && S.y + PR > pd.y && S.y - S.vy * dt + PR <= pd.y + 2) {
+        S.y = pd.y - PR; S.vy = -pd.power; S.spin = 9 * Math.sign(S.vx || 1); S.bounced = (S.bounced || 0) + 1;
+      }
+    }
+    collideBlocks(L, S);
+    if (S.x < -380) { S.x = -380; S.vx = Math.abs(S.vx); }
+    for (const sw of L.saws) {
+      const q = sawPos(sw, S.t);
+      if (Math.hypot(S.x - q.x, S.y - q.y) < sw.r + PR - 3) { S.dead = 'saw'; break; }
+    }
+    if (S.y > FLOOR_DIE) S.dead = 'fall';
+    S.t += dt; S.steps++;
+  }
+  const cloneState = S => Object.assign({}, S);
+  const I18N = {
+    en: { tagline: 'Grab a hook, swing, let go and fly. Reach the flag in 40 levels!', play: 'Play', cont: n => `Play · Level ${n}`, levels: 'Levels', controls: 'Hold (tap, click or Space) to grab the nearest hook, release to fly. R restarts.', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — hold to grab a hook, release to let go', time: 'Time', best: 'Best', level: n => `Level ${n}`, restart: 'Restart', pause: 'Pause', paused: 'Paused', resume: 'Resume', back: 'Back', retry: 'Retry', next: 'Next', cleared: n => `Level ${n} cleared!`, newBest: 'New best time!', goal3: s => `★★★ under ${s} s`, goal2: s => `★★ under ${s} s`, allStars: 'Three stars — perfect run!', worlds: ['Sunset City', 'Jungle Vines', 'Frozen Caves', 'Lava Works'], prevWorld: 'Previous world', nextWorld: 'Next world', locked: 'Locked', fall: 'Whoops!', saw: 'Ouch!', go: 'Swing!', tries: n => `Try ${n}`, wonAll: 'You finished every level!', announceWin: (n, s, t) => `Level ${n} cleared in ${t} seconds, ${s} stars.`, lvlLabel: (n, s) => `Level ${n}, ${s} stars` },
+    vi: { tagline: 'Bám móc, đu người, buông tay và bay. Chạm cờ đích qua 40 màn!', play: 'Chơi', cont: n => `Chơi · Màn ${n}`, levels: 'Chọn màn', controls: 'Giữ (chạm, nhấp chuột hoặc Space) để móc vào điểm gần nhất, thả ra để bay. R để chơi lại.', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — giữ để móc, thả ra để buông', time: 'Thời gian', best: 'Kỷ lục', level: n => `Màn ${n}`, restart: 'Chơi lại', pause: 'Tạm dừng', paused: 'Tạm dừng', resume: 'Tiếp tục', back: 'Quay lại', retry: 'Thử lại', next: 'Màn tiếp', cleared: n => `Qua màn ${n}!`, newBest: 'Kỷ lục mới!', goal3: s => `★★★ dưới ${s} giây`, goal2: s => `★★ dưới ${s} giây`, allStars: 'Ba sao — hoàn hảo!', worlds: ['Phố hoàng hôn', 'Rừng dây leo', 'Hang băng', 'Xưởng dung nham'], prevWorld: 'Thế giới trước', nextWorld: 'Thế giới sau', locked: 'Chưa mở', fall: 'Hụt rồi!', saw: 'Ui da!', go: 'Đu nào!', tries: n => `Lần ${n}`, wonAll: 'Bạn đã qua tất cả các màn!', announceWin: (n, s, t) => `Qua màn ${n} trong ${t} giây, ${s} sao.`, lvlLabel: (n, s) => `Màn ${n}, ${s} sao` },
+    zh: { tagline: '抓住钩子，荡起来，松手飞出去。闯过 40 关抵达终点旗！', play: '开始', cont: n => `继续 · 第 ${n} 关`, levels: '选关', controls: '按住（点击屏幕或空格键）抓住最近的钩子，松开即可飞出。按 R 重来。', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook——按住抓钩，松开放手', time: '时间', best: '最佳', level: n => `第 ${n} 关`, restart: '重来', pause: '暂停', paused: '已暂停', resume: '继续', back: '返回', retry: '再试一次', next: '下一关', cleared: n => `第 ${n} 关通过！`, newBest: '新的最佳时间！', goal3: s => `★★★ 需 ${s} 秒内`, goal2: s => `★★ 需 ${s} 秒内`, allStars: '三星——完美通关！', worlds: ['落日之城', '丛林藤蔓', '冰封洞窟', '熔岩工厂'], prevWorld: '上一个世界', nextWorld: '下一个世界', locked: '未解锁', fall: '掉下去了！', saw: '好痛！', go: '荡起来！', tries: n => `第 ${n} 次`, wonAll: '你已通过全部关卡！', announceWin: (n, s, t) => `第 ${n} 关通过，用时 ${t} 秒，获得 ${s} 星。`, lvlLabel: (n, s) => `第 ${n} 关，${s} 星` },
+    fr: { tagline: 'Agrippe un crochet, balance-toi, lâche et vole. Atteins le drapeau dans 40 niveaux !', play: 'Jouer', cont: n => `Jouer · Niveau ${n}`, levels: 'Niveaux', controls: 'Maintiens (touche, clic ou Espace) pour t’accrocher au crochet le plus proche, relâche pour voler. R pour recommencer.', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — maintiens pour t’accrocher, relâche pour lâcher', time: 'Temps', best: 'Record', level: n => `Niveau ${n}`, restart: 'Recommencer', pause: 'Pause', paused: 'Pause', resume: 'Reprendre', back: 'Retour', retry: 'Réessayer', next: 'Suivant', cleared: n => `Niveau ${n} réussi !`, newBest: 'Nouveau record !', goal3: s => `★★★ en moins de ${s} s`, goal2: s => `★★ en moins de ${s} s`, allStars: 'Trois étoiles : parcours parfait !', worlds: ['Ville au couchant', 'Lianes de la jungle', 'Grottes gelées', 'Forge de lave'], prevWorld: 'Monde précédent', nextWorld: 'Monde suivant', locked: 'Verrouillé', fall: 'Oups !', saw: 'Aïe !', go: 'Balance-toi !', tries: n => `Essai ${n}`, wonAll: 'Tu as terminé tous les niveaux !', announceWin: (n, s, t) => `Niveau ${n} réussi en ${t} secondes, ${s} étoiles.`, lvlLabel: (n, s) => `Niveau ${n}, ${s} étoiles` },
+    th: { tagline: 'คว้าตะขอ แกว่งตัว ปล่อยมือแล้วพุ่งไป ไปให้ถึงธงใน 40 ด่าน!', play: 'เล่น', cont: n => `เล่น · ด่าน ${n}`, levels: 'เลือกด่าน', controls: 'กดค้าง (แตะ คลิก หรือ Space) เพื่อเกี่ยวตะขอที่ใกล้ที่สุด ปล่อยเพื่อพุ่งตัว กด R เพื่อเริ่มใหม่', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — กดค้างเพื่อเกี่ยวตะขอ ปล่อยเพื่อปล่อยมือ', time: 'เวลา', best: 'ดีที่สุด', level: n => `ด่าน ${n}`, restart: 'เริ่มใหม่', pause: 'หยุด', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', back: 'กลับ', retry: 'ลองใหม่', next: 'ด่านต่อไป', cleared: n => `ผ่านด่าน ${n}!`, newBest: 'สถิติเวลาใหม่!', goal3: s => `★★★ ภายใน ${s} วินาที`, goal2: s => `★★ ภายใน ${s} วินาที`, allStars: 'สามดาว — สมบูรณ์แบบ!', worlds: ['เมืองยามเย็น', 'เถาวัลย์ป่า', 'ถ้ำน้ำแข็ง', 'โรงงานลาวา'], prevWorld: 'โลกก่อนหน้า', nextWorld: 'โลกถัดไป', locked: 'ยังล็อกอยู่', fall: 'พลาดแล้ว!', saw: 'โอ๊ย!', go: 'แกว่งเลย!', tries: n => `ครั้งที่ ${n}`, wonAll: 'คุณผ่านครบทุกด่านแล้ว!', announceWin: (n, s, t) => `ผ่านด่าน ${n} ใน ${t} วินาที ได้ ${s} ดาว`, lvlLabel: (n, s) => `ด่าน ${n} ${s} ดาว` },
+    ja: { tagline: 'フックをつかんでスイング、手を離して大ジャンプ！全40ステージでゴールの旗を目指そう。', play: 'プレイ', cont: n => `つづき · ステージ ${n}`, levels: 'ステージ', controls: '長押し（タップ・クリック・スペース）で近くのフックをつかみ、離すと飛び出す。R でやり直し。', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — 長押しでフックをつかみ、離して手放す', time: 'タイム', best: 'ベスト', level: n => `ステージ ${n}`, restart: 'やり直し', pause: '一時停止', paused: '一時停止中', resume: '再開', back: 'もどる', retry: 'リトライ', next: '次へ', cleared: n => `ステージ ${n} クリア！`, newBest: 'ベストタイム更新！', goal3: s => `★★★ は ${s} 秒以内`, goal2: s => `★★ は ${s} 秒以内`, allStars: '星3つ — パーフェクト！', worlds: ['夕焼けシティ', 'ジャングルのつる', '氷の洞窟', '溶岩工場'], prevWorld: '前のワールド', nextWorld: '次のワールド', locked: '未開放', fall: 'おっと！', saw: 'いたっ！', go: 'スイング！', tries: n => `${n} 回目`, wonAll: '全ステージクリア！', announceWin: (n, s, t) => `ステージ ${n} を ${t} 秒でクリア、星 ${s} つ。`, lvlLabel: (n, s) => `ステージ ${n}、星 ${s}` },
+    ko: { tagline: '갈고리를 잡고 흔들다가 손을 놓고 날아가세요. 40개 레벨의 깃발까지!', play: '플레이', cont: n => `계속 · 레벨 ${n}`, levels: '레벨 선택', controls: '길게 누르면(탭, 클릭, Space) 가장 가까운 갈고리를 잡고, 떼면 날아가요. R로 다시 시작.', starsTotal: (n, m) => `★ ${n} / ${m}`, canvas: 'Swing Hook — 길게 눌러 갈고리를 잡고 떼서 놓기', time: '시간', best: '최고', level: n => `레벨 ${n}`, restart: '다시 시작', pause: '일시 정지', paused: '일시 정지', resume: '계속하기', back: '뒤로', retry: '다시 하기', next: '다음', cleared: n => `레벨 ${n} 클리어!`, newBest: '최고 기록 경신!', goal3: s => `★★★ ${s}초 이내`, goal2: s => `★★ ${s}초 이내`, allStars: '별 3개 — 완벽해요!', worlds: ['노을 도시', '정글 덩굴', '얼음 동굴', '용암 공장'], prevWorld: '이전 월드', nextWorld: '다음 월드', locked: '잠김', fall: '앗!', saw: '아야!', go: '스윙!', tries: n => `${n}번째 시도`, wonAll: '모든 레벨을 클리어했어요!', announceWin: (n, s, t) => `레벨 ${n}을 ${t}초에 클리어, 별 ${s}개.`, lvlLabel: (n, s) => `레벨 ${n}, 별 ${s}개` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas'), ctx = canvas.getContext('2d'), frame = $('frame');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const N = LEVELS.length, VIEW_H = 640;
+  const STORE = 'milaan.swingHook.progress';
+  const PALETTES = [
+    { sky: ['#3b1d5e', '#ff8a5c'], far: '#5a2f72', near: '#2c1846', block: '#4a2b66', top: '#ffb38a', abyss: '#1a0d2b', hook: '#ffd166' },
+    { sky: ['#0f3d3a', '#9be3b0'], far: '#2a6a4f', near: '#123d2f', block: '#5b3d24', top: '#86d46b', abyss: '#082019', hook: '#ffe27a' },
+    { sky: ['#17305e', '#bfeaff'], far: '#5d8cc4', near: '#2b4f86', block: '#3d6aa8', top: '#e8f7ff', abyss: '#0b1733', hook: '#fff1a8' },
+    { sky: ['#2a0f14', '#ff7a3d'], far: '#5c2219', near: '#33110f', block: '#4a2a2a', top: '#ff9f5a', abyss: '#ff4d1a', hook: '#ffd166' },
+  ];
+
+  let progress = { best: {} };
+  try { const raw = localStorage.getItem(STORE); if (raw) progress = Object.assign({ best: {} }, JSON.parse(raw)); } catch (e) { /* storage blocked */ }
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(progress)); } catch (e) { /* storage blocked */ } };
+  const starsFor = (L, time) => time <= L.par3 ? 3 : time <= L.par2 ? 2 : 1;
+  const levelCache = [];
+  const levelData = i => levelCache[i] || (levelCache[i] = buildLevel(i));
+  const levelStars = i => progress.best[i] != null ? starsFor(levelData(i), progress.best[i]) : 0;
+  const unlockedUpTo = () => { let u = 0; while (u < N - 1 && progress.best[u] != null) u++; return u; };
+  const totalStars = () => { let s = 0; for (let i = 0; i < N; i++) s += levelStars(i); return s; };
+
+  let mode = 'menu', L = null, S = null, holding = false, acc = 0, tries = 1, deadTimer = 0, last = 0, world = 0;
+  let camX = 0, camY = 0, viewW = 400, scale = 1, script = null, particles = [], trail = [];
+
+  function announce(msg) { $('announcer').textContent = ''; requestAnimationFrame(() => { $('announcer').textContent = msg; }); }
+  function show(id) { for (const o of ['start', 'levels', 'paused', 'win']) $(o).hidden = o !== id; $('hud').hidden = !(mode === 'play' || mode === 'paused' || mode === 'dead'); }
+  function flash(msg, ms) { const f = $('flash'); f.textContent = msg; f.hidden = false; clearTimeout(flash.tm); flash.tm = setTimeout(() => { f.hidden = true; }, ms); }
+
+  function refreshMenu() {
+    const u = unlockedUpTo();
+    $('play').textContent = u > 0 ? t.cont(u + 1) : t.play;
+    $('start-stars').textContent = t.starsTotal(totalStars(), N * 3);
+  }
+  function openMenu() { mode = 'menu'; holding = false; refreshMenu(); show('start'); if (!L) L = levelData(0); }
+
+  function renderGrid() {
+    const g = $('grid'), u = unlockedUpTo();
+    g.textContent = '';
+    $('world-name').textContent = t.worlds[world];
+    let ws = 0; for (let i = world * 10; i < world * 10 + 10; i++) ws += levelStars(i);
+    $('world-stars').textContent = t.starsTotal(ws, 30);
+    $('w-prev').disabled = world === 0; $('w-next').disabled = world === 3;
+    for (let i = world * 10; i < world * 10 + 10; i++) {
+      const b = document.createElement('button'), st = levelStars(i);
+      b.type = 'button'; b.className = 'lvl'; b.dataset.theme = world;
+      b.disabled = i > u;
+      b.setAttribute('aria-label', i > u ? `${t.level(i + 1)} — ${t.locked}` : t.lvlLabel(i + 1, st));
+      b.innerHTML = `<span>${i > u ? '🔒' : i + 1}</span><small>${'<b>★</b>'.repeat(st)}${'★'.repeat(3 - st)}</small>`;
+      b.addEventListener('click', () => startLevel(i));
+      g.appendChild(b);
+    }
+  }
+  function openLevels() { mode = 'levels'; world = Math.min(3, Math.floor(unlockedUpTo() / 10)); renderGrid(); show('levels'); const first = $('grid').querySelector('button:not(:disabled)'); if (first) first.focus(); }
+
+  function startLevel(i, keepTries) {
+    L = levelData(i); S = newState(); acc = 0; holding = false; particles = []; trail = [];
+    tries = keepTries ? tries + 1 : 1;
+    camX = S.x - viewW * 0.3; camY = 0;
+    mode = 'play'; show(null);
+    $('hud-level').textContent = t.level(i + 1);
+    flash(keepTries ? t.tries(tries) : t.go, 700);
+    canvas.focus({ preventScroll: true });
+  }
+
+  function die(kind) {
+    mode = 'dead'; deadTimer = 0.85;
+    flash(kind === 'saw' ? t.saw : t.fall, 800);
+    if (!reducedMotion) for (let k = 0; k < 18; k++) particles.push({ x: S.x, y: S.y, vx: (k * 97 % 13 - 6) * 40, vy: -(k * 53 % 11) * 50, life: 0.8 });
+  }
+
+  function win() {
+    mode = 'won'; holding = false;
+    const time = Math.round(S.t * 100) / 100, prev = progress.best[L.idx];
+    const isNew = prev == null || time < prev;
+    if (isNew) { progress.best[L.idx] = time; save(); }
+    const st = starsFor(L, time);
+    $('win-title').textContent = t.cleared(L.idx + 1);
+    $('win-stars').innerHTML = '<b>★</b>'.repeat(st) + '★'.repeat(3 - st);
+    $('win-time').textContent = time.toFixed(2);
+    $('win-best').textContent = progress.best[L.idx].toFixed(2);
+    $('win-goal').textContent = st === 3 ? t.allStars : st === 2 ? t.goal3(L.par3) : t.goal2(L.par2);
+    $('win-new').hidden = !(isNew && prev != null);
+    const lastLevel = L.idx === N - 1;
+    $('win-next').hidden = lastLevel;
+    if (lastLevel) $('win-goal').textContent += ' ' + t.wonAll;
+    show('win');
+    announce(t.announceWin(L.idx + 1, st, time.toFixed(2)));
+    (lastLevel ? $('win-retry') : $('win-next')).focus();
+  }
+
+  function pause() { if (mode !== 'play') return; mode = 'paused'; holding = false; show('paused'); $('resume').focus(); }
+  function resume() { if (mode !== 'paused') return; mode = 'play'; show(null); last = performance.now(); canvas.focus({ preventScroll: true }); }
+
+  // ---- Simulation ----
+  function scriptedHold() { let c = 0; for (const s of script) if (s <= S.steps) c++; return c % 2 === 1; }
+  function update(dt) {
+    if (mode === 'dead') {
+      deadTimer -= dt; tickParticles(dt);
+      if (deadTimer <= 0) startLevel(L.idx, true);
+      return;
+    }
+    if (mode !== 'play') { tickParticles(dt); return; }
+    acc += dt;
+    while (acc >= STEP && mode === 'play') {
+      acc -= STEP;
+      step(L, S, script ? scriptedHold() : holding);
+      if (S.steps % 3 === 0) { trail.push({ x: S.x, y: S.y }); if (trail.length > 14) trail.shift(); }
+      if (S.won) win();
+      else if (S.dead) die(S.dead);
+    }
+    $('hud-time').textContent = S.t.toFixed(1);
+    tickParticles(dt);
+  }
+  function tickParticles(dt) {
+    for (const p of particles) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    particles = particles.filter(p => p.life > 0);
+  }
+
+  // ---- Rendering ----
+  function resize() {
+    const r = frame.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
+    // Short screens see a little less height so the stickman stays readable.
+    const vh = r.height < 420 ? 560 : VIEW_H;
+    scale = canvas.height / vh; viewW = canvas.width / scale;
+  }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+  function drawBackground(P, time) {
+    const vh = canvas.height / scale;
+    const g = ctx.createLinearGradient(0, 0, 0, vh);
+    g.addColorStop(0, P.sky[0]); g.addColorStop(1, P.sky[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, viewW, vh);
+    // Two parallax silhouette layers built from deterministic sines.
+    const layers = [[P.far, 0.25, 360, 70], [P.near, 0.5, 450, 90]];
+    for (const [col, par, base, amp] of layers) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, vh);
+      for (let x = 0; x <= viewW + 20; x += 20) {
+        const wx = x + camX * par;
+        const y = base - camY * par + Math.sin(wx / 130) * amp * 0.4 + Math.sin(wx / 47) * amp * 0.25 + (L && L.theme === 0 ? (Math.floor(wx / 60) % 3) * 22 : 0);
+        ctx.lineTo(x, L && L.theme === 0 ? Math.round(y / 20) * 20 : y);
+      }
+      ctx.lineTo(viewW, vh); ctx.fill();
+    }
+  }
+
+  function drawWorld(time) {
+    const P = PALETTES[L ? L.theme : 0];
+    drawBackground(P, time);
+    if (!L) return;
+    ctx.save(); ctx.translate(-camX, -camY);
+    const vh = canvas.height / scale;
+    // Abyss
+    const ag = ctx.createLinearGradient(0, 590, 0, 700);
+    ag.addColorStop(0, P.abyss + '00'); ag.addColorStop(1, P.abyss);
+    ctx.fillStyle = ag; ctx.fillRect(camX, 590, viewW, Math.max(110, vh + camY - 590));
+    if (L.theme === 3) { ctx.fillStyle = '#ffb347'; for (let x = Math.floor(camX / 40) * 40; x < camX + viewW + 40; x += 40) { ctx.beginPath(); ctx.arc(x + Math.sin(time * 2 + x) * 6, 650, 10, 0, 7); ctx.fill(); } }
+    // Blocks and platforms
+    for (const b of L.blocks) {
+      if (b.x > camX + viewW || b.x + b.w < camX) continue;
+      ctx.fillStyle = P.block; roundRect(b.x, b.y, b.w, b.h, 8); ctx.fill();
+      if (b.y > 0) { ctx.fillStyle = P.top; roundRect(b.x, b.y, b.w, 12, 6); ctx.fill(); }
+      else { ctx.fillStyle = '#00000033'; ctx.fillRect(b.x, b.y + b.h - 10, b.w, 10); }
+    }
+    // Finish flag
+    const f = L.finish, fx = f.x + 60;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(fx, f.y); ctx.lineTo(fx, f.y - 120); ctx.stroke();
+    const wv = reducedMotion ? 0 : Math.sin(time * 6) * 5;
+    ctx.fillStyle = '#ff6b4a'; ctx.beginPath(); ctx.moveTo(fx, f.y - 120); ctx.quadraticCurveTo(fx + 30, f.y - 112 + wv, fx + 62, f.y - 104); ctx.lineTo(fx, f.y - 84); ctx.fill();
+    ctx.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) ctx.fillRect(f.x + 100 + i * 40, f.y + 4, 20, 8);
+    // Bounce pads
+    for (const pd of L.pads) {
+      ctx.fillStyle = '#2a1c45'; roundRect(pd.x, pd.y, pd.w, 50, 8); ctx.fill();
+      ctx.fillStyle = '#4ee0a1'; roundRect(pd.x - 4, pd.y - 8, pd.w + 8, 14, 7); ctx.fill();
+      ctx.strokeStyle = '#4ee0a1'; ctx.lineWidth = 3; ctx.beginPath();
+      for (let x = pd.x + 10; x < pd.x + pd.w; x += 18) { ctx.moveTo(x, pd.y + 8); ctx.lineTo(x + 9, pd.y + 22); ctx.lineTo(x, pd.y + 36); }
+      ctx.stroke();
+    }
+    // Saws
+    for (const sw of L.saws) {
+      const q = sawPos(sw, S ? S.t : 0);
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(reducedMotion ? 0 : time * 8);
+      ctx.fillStyle = '#d7dbe6'; ctx.beginPath();
+      for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, r = k % 2 ? sw.r - 6 : sw.r; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.fill(); ctx.fillStyle = '#7a8195'; ctx.beginPath(); ctx.arc(0, 0, sw.r * 0.35, 0, 7); ctx.fill();
+      ctx.restore();
+      if (sw.ax) { ctx.strokeStyle = '#ffffff33'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sw.x - sw.ax, sw.y); ctx.lineTo(sw.x + sw.ax, sw.y); ctx.stroke(); }
+    }
+    // Hooks; the one a press would grab is highlighted.
+    const target = S && S.hook < 0 && mode === 'play' ? pickHook(L, S) : -1;
+    L.hooks.forEach((h, i) => {
+      const p = hookPos(h, S ? S.t : 0);
+      if (h.ax || h.ay) { ctx.strokeStyle = '#ffffff30'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(h.x - (h.ax || 0), h.y - (h.ay || 0)); ctx.lineTo(h.x + (h.ax || 0), h.y + (h.ay || 0)); ctx.stroke(); }
+      if (i === target) { ctx.strokeStyle = P.hook + '88'; ctx.lineWidth = 3; ctx.setLineDash([6, 8]); ctx.beginPath(); ctx.arc(p.x, p.y, 24, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.fillStyle = '#00000044'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, 12, 0, 7); ctx.fill();
+      ctx.strokeStyle = S && S.hook === i ? '#ffffff' : P.hook; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, 7); ctx.stroke();
+    });
+    if (S) drawPlayer(time);
+    for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / 0.8); ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function drawPlayer(time) {
+    if (S.hook >= 0) {
+      const p = hookPos(L.hooks[S.hook], S.t);
+      ctx.strokeStyle = '#f4e9d0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(S.x, S.y); ctx.stroke();
+    }
+    if (!reducedMotion) { ctx.fillStyle = '#ffffff'; trail.forEach((q, i) => { ctx.globalAlpha = i / trail.length * 0.25; ctx.beginPath(); ctx.arc(q.x, q.y, 4, 0, 7); ctx.fill(); }); ctx.globalAlpha = 1; }
+    if (mode === 'dead') return;
+    // Stickman around the grab point: body hangs "down" from the hands along S.ang.
+    ctx.save(); ctx.translate(S.x, S.y); ctx.rotate(S.ang);
+    const sway = Math.sin(time * 9) * (S.hook >= 0 ? 0.25 : 0.6);
+    ctx.strokeStyle = '#1b1029'; ctx.lineCap = 'round'; ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(-5, -4); ctx.lineTo(0, 10); ctx.moveTo(5, -4); ctx.lineTo(0, 10); // arms up to the hands
+    ctx.moveTo(0, 10); ctx.lineTo(0, 34); // torso
+    ctx.moveTo(0, 34); ctx.lineTo(-9 - sway * 8, 52); ctx.moveTo(0, 34); ctx.lineTo(9 + sway * 8, 50); // legs
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.moveTo(-5, -4); ctx.lineTo(0, 10); ctx.moveTo(5, -4); ctx.lineTo(0, 10); ctx.moveTo(0, 10); ctx.lineTo(0, 34);
+    ctx.moveTo(0, 34); ctx.lineTo(-9 - sway * 8, 52); ctx.moveTo(0, 34); ctx.lineTo(9 + sway * 8, 50);
+    ctx.stroke();
+    ctx.fillStyle = '#ff6b4a'; ctx.strokeStyle = '#1b1029'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 2, 8, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-8, 0, 16, 3);
+    ctx.restore();
+  }
+
+  function render(time) {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    if (S && (mode === 'play' || mode === 'dead' || mode === 'paused' || mode === 'won')) {
+      const tx = S.x - viewW * 0.32 + Math.max(-60, Math.min(160, S.vx * 0.12));
+      const ty = Math.min(0, S.y - 200);
+      const k = mode === 'play' ? 0.12 : 0.05;
+      camX += (Math.max(-160, tx) - camX) * k; camY += (ty - camY) * k;
+    } else {
+      camX = -120 + time * 30 % 2000; camY = 0;
+    }
+    drawWorld(time);
+  }
+
+  function frameLoop(now) {
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    if (!document.hidden) update(dt);
+    render(now / 1000);
+    requestAnimationFrame(frameLoop);
+  }
+
+  // ---- Input ----
+  function press() { if (mode === 'play') holding = true; }
+  function releaseHold() { holding = false; }
+  canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } press(); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, releaseHold);
+  window.addEventListener('blur', releaseHold);
+  document.addEventListener('keydown', e => {
+    const k = e.key;
+    if ((k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') && mode === 'play') {
+      if (e.target.tagName === 'BUTTON' && e.target !== canvas) return;
+      e.preventDefault(); if (!e.repeat) press();
+    } else if ((k === 'r' || k === 'R') && (mode === 'play' || mode === 'dead' || mode === 'won' || mode === 'paused')) { e.preventDefault(); startLevel(L.idx); }
+    else if ((k === 'p' || k === 'P') && (mode === 'play' || mode === 'paused')) { e.preventDefault(); mode === 'play' ? pause() : resume(); }
+  });
+  document.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') releaseHold(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseHold(); pause(); } });
+
+  $('play').addEventListener('click', () => startLevel(unlockedUpTo()));
+  $('open-levels').addEventListener('click', openLevels);
+  $('levels-back').addEventListener('click', openMenu);
+  $('w-prev').addEventListener('click', () => { world = Math.max(0, world - 1); renderGrid(); });
+  $('w-next').addEventListener('click', () => { world = Math.min(3, world + 1); renderGrid(); });
+  $('btn-pause').addEventListener('click', pause);
+  $('btn-restart').addEventListener('click', () => startLevel(L.idx));
+  $('resume').addEventListener('click', resume);
+  $('pause-restart').addEventListener('click', () => startLevel(L.idx));
+  $('pause-levels').addEventListener('click', openLevels);
+  $('win-retry').addEventListener('click', () => startLevel(L.idx));
+  $('win-next').addEventListener('click', () => startLevel(Math.min(N - 1, L.idx + 1)));
+  $('win-levels').addEventListener('click', openLevels);
+
+  new ResizeObserver(resize).observe(frame);
+  resize();
+  openMenu();
+  requestAnimationFrame(frameLoop);
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__swingHook = {
+    levels: N,
+    state: () => ({ mode, level: L ? L.idx : -1, x: S && S.x, y: S && S.y, hook: S ? S.hook : -1, t: S && S.t, dead: S && S.dead, won: S && S.won, tries, unlocked: unlockedUpTo(), stars: totalStars() }),
+    level: i => { const d = levelData(i); return { par3: d.par3, par2: d.par2, length: d.length }; },
+    start: i => startLevel(i),
+    play: toggles => { script = toggles; },
+    stopScript: () => { script = null; },
+  };
+})();
+</script>
+</body>
+</html>

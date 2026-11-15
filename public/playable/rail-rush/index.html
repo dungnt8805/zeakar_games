@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rail Rush</title>
+<style>
+:root {
+  --bg: #2b1d4a;
+  --ink: #2a1840;
+  --muted: #76648f;
+  --sun: #ffb43a;
+  --sun-dark: #d9821a;
+  --teal: #20b8a8;
+  --teal-dark: #13877b;
+  --paper: #fff9f0;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+.app { position: relative; height: 100%; overflow: hidden; }
+canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+canvas:focus-visible { outline: none; }
+
+.hud { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: flex-start; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left)); pointer-events: none; }
+.app.menu .hud, .app.menu .powers { visibility: hidden; }
+.chip { min-width: 56px; padding: 4px 10px; border-radius: 12px; background: #fff9f0e0; box-shadow: 0 2px 0 #00000040; text-align: center; }
+.chip small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.chip strong { display: block; font-size: 17px; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.mult strong { color: var(--sun-dark); }
+.hud .grow { flex: 1; }
+.iconbtn { pointer-events: auto; width: 40px; height: 40px; border-radius: 12px; background: #fff9f0e0; box-shadow: 0 2px 0 #00000040; font-size: 16px; font-weight: 900; display: grid; place-items: center; }
+.powers { position: absolute; left: max(8px, env(safe-area-inset-left)); top: calc(max(6px, env(safe-area-inset-top)) + 50px); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.pw { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px; border-radius: 99px; background: #2a1840c0; color: #fff; font-size: 12px; font-weight: 800; }
+.pw i { font-style: normal; font-size: 16px; width: 22px; text-align: center; }
+.pw b { display: block; width: 46px; height: 6px; border-radius: 3px; background: #ffffff40; overflow: hidden; }
+.pw b span { display: block; height: 100%; background: var(--sun); }
+
+.toast { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); padding: 6px 14px; border-radius: 99px; background: var(--ink); color: #fff; font-weight: 900; font-size: 15px; white-space: nowrap; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 8px; background: #1a0f2e70; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: calc(100% - 8px); overflow-y: auto; padding: 18px 16px; border-radius: 22px; background: var(--paper); box-shadow: 0 7px 0 #c99a5a, 0 20px 50px #0007; text-align: center; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.title { font-size: clamp(36px, 12vw, 56px); font-weight: 900; letter-spacing: -.02em; line-height: 1; color: var(--sun); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); }
+.title span { color: var(--teal); }
+.tagline { margin-top: 10px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--muted); }
+.stats { display: flex; justify-content: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.stat { padding: 5px 12px; border-radius: 12px; background: #f6ead8; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat small { display: block; font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .03em; }
+.btn { flex: 1; padding: 12px; border-radius: 14px; background: #f6ead8; box-shadow: 0 3px 0 #d8c09c; font-size: 16px; font-weight: 900; }
+.btn.primary { background: var(--sun); box-shadow: 0 4px 0 var(--sun-dark); }
+.btn.teal { background: var(--teal); color: #fff; box-shadow: 0 4px 0 var(--teal-dark); }
+.btn:active { transform: translateY(2px); }
+.btn:disabled { opacity: .5; cursor: default; }
+.big { display: block; width: 100%; margin-top: 14px; font-size: 22px; padding: 14px; }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.help { margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.4; }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.01em; }
+.list { display: grid; gap: 8px; margin-top: 12px; text-align: left; }
+.item { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: #f6ead8; }
+.item .ic { font-size: 26px; text-align: center; }
+.item b { display: block; font-size: 15px; font-weight: 900; line-height: 1.25; }
+.item span { display: block; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+.item.done { background: #d4f3ec; }
+.item .btn { flex: none; padding: 8px 12px; font-size: 14px; min-width: 76px; }
+.bar { height: 7px; margin-top: 4px; border-radius: 4px; background: #00000018; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--teal); }
+.tabs { display: flex; gap: 6px; margin-top: 10px; }
+.tab { flex: 1; padding: 8px; border-radius: 12px; background: #f6ead8; font-weight: 900; font-size: 15px; }
+.tab[aria-selected="true"] { background: var(--ink); color: #fff; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto; box-shadow: inset 0 -5px 0 #0003; }
+.medal { font-size: 46px; line-height: 1.1; margin-top: 6px; }
+.sub { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--muted); line-height: 1.35; }
+.scores { display: flex; justify-content: center; gap: 22px; margin-top: 12px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 99px; background: var(--teal); color: #fff; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-height: 520px) {
+  .panel { padding: 10px 14px; }
+  .title { font-size: 34px; }
+  .tagline { display: none; }
+  .stats { margin-top: 6px; }
+  .big { margin-top: 8px; padding: 10px; font-size: 19px; }
+  .row { margin-top: 6px; }
+  .btn { padding: 9px; }
+  .help { margin-top: 6px; }
+  .panel h2 { font-size: 20px; }
+  .medal { font-size: 30px; }
+  .scores { margin-top: 4px; }
+  .scores strong { font-size: 20px; }
+  .list { margin-top: 8px; gap: 6px; }
+  .item { padding: 5px 10px; }
+}
+@media (max-height: 520px) and (min-aspect-ratio: 3/2) {
+  .panel.wide { width: min(100%, 680px); }
+  .panel.wide .list { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .panel.wide { width: min(100%, 560px); }
+  .chip strong { font-size: 22px; }
+  .chip { min-width: 72px; padding: 6px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app menu" id="app">
+  <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+  <div class="hud">
+    <div class="chip"><small data-i18n="score"></small><strong id="hScore">0</strong></div>
+    <div class="chip"><small data-i18n="coins"></small><strong id="hCoins">0</strong></div>
+    <div class="chip mult"><small data-i18n="mult"></small><strong id="hMult">×1</strong></div>
+    <div class="grow"></div>
+    <button type="button" class="iconbtn" id="pause" data-i18n-label="pause">II</button>
+  </div>
+  <div class="powers" id="powers"></div>
+  <div class="toast" id="toast" aria-hidden="true"></div>
+
+  <div class="overlay" id="menu">
+    <div class="panel" role="dialog" aria-labelledby="menu-title">
+      <h1 class="title" id="menu-title">Rail <span>Rush</span></h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <div class="stats">
+        <div class="stat"><small data-i18n="best"></small><span id="mBest">0</span></div>
+        <div class="stat"><small data-i18n="bank"></small>🪙 <span id="mBank">0</span></div>
+        <div class="stat"><small data-i18n="mult"></small>×<span id="mMult">1</span></div>
+      </div>
+      <button type="button" class="btn primary big" id="play" data-i18n="play"></button>
+      <div class="row">
+        <button type="button" class="btn teal" id="openMissions" data-i18n="missions"></button>
+        <button type="button" class="btn" id="openShop" data-i18n="shop"></button>
+      </div>
+      <p class="help" id="help"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="missions" hidden>
+    <div class="panel wide" role="dialog" aria-labelledby="missions-title">
+      <h2 id="missions-title" data-i18n="missions"></h2>
+      <p class="sub" id="msub"></p>
+      <div class="list" id="mlist"></div>
+      <div class="row"><button type="button" class="btn primary" id="mback" data-i18n="back"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="shop" hidden>
+    <div class="panel wide" role="dialog" aria-labelledby="shop-title">
+      <h2 id="shop-title" data-i18n="shop"></h2>
+      <p class="sub">🪙 <span id="sBank">0</span></p>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" id="tabRunners" aria-selected="true" data-i18n="runners"></button>
+        <button type="button" class="tab" role="tab" id="tabUpg" aria-selected="false" data-i18n="upgrades"></button>
+      </div>
+      <div class="list" id="slist"></div>
+      <div class="row"><button type="button" class="btn primary" id="sback" data-i18n="back"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="panel" role="dialog" aria-labelledby="paused-title">
+      <h2 id="paused-title" data-i18n="paused"></h2>
+      <div class="list" id="plist"></div>
+      <div class="row"><button type="button" class="btn" id="quit" data-i18n="menu"></button><button type="button" class="btn primary" id="resume" data-i18n="resume"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="panel" role="dialog" aria-labelledby="over-title">
+      <h2 id="over-title"></h2>
+      <p class="medal" id="medal">💥</p>
+      <div class="scores">
+        <div><small data-i18n="score"></small><strong id="oScore">0</strong></div>
+        <div><small data-i18n="coins"></small><strong id="oCoins">0</strong></div>
+        <div><small data-i18n="best"></small><strong id="oBest">0</strong></div>
+      </div>
+      <p class="sub" id="oDist"></p>
+      <p class="badge" id="newbest" data-i18n="newBest" hidden></p>
+      <div class="row"><button type="button" class="btn" id="omenu" data-i18n="menu"></button><button type="button" class="btn primary" id="oretry" data-i18n="retry"></button></div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Dash along the rails, dodge trains and grab every coin.', play: 'Run!', missions: 'Missions', shop: 'Shop', runners: 'Runners', upgrades: 'Upgrades', best: 'Best', bank: 'Coins', score: 'Score', coins: 'Coins', mult: 'Multi', pause: 'Pause', paused: 'Paused', resume: 'Resume', menu: 'Menu', retry: 'Run again', back: 'Back', crashed: 'Crashed!', caught: 'Caught by the patrol drone!', newBest: 'New best!', dist: m => `${m} m run`, buy: 'Buy', select: 'Choose', selected: 'Running', max: 'Max', level: (n, s) => `Level ${n} · ${s} s`, jetpack: 'Jetpack', magnet: 'Coin magnet', double: 'Double score', sneakers: 'Super sneakers', setInfo: m => `Finish all three to raise your multiplier to ×${m}.`, setDone: m => `Missions done! Multiplier ×${m}`, missionDone: 'Mission complete!', stumble: 'Stumble! The drone is right behind you', m_coins: n => `Collect ${n} coins`, m_jump: n => `Jump ${n} times`, m_roll: n => `Roll ${n} times`, m_score: n => `Score ${n} in one run`, m_power: n => `Pick up ${n} power-ups`, m_roof: n => `Run ${n} m on train roofs`, m_dist: n => `Run ${n} m in one run`, m_lane: n => `Switch lanes ${n} times`, helpKeys: '← → switch lanes · ↑ or Space jump · ↓ roll · P pause', helpTouch: 'Swipe left or right to switch lanes, up to jump, down to roll', canvas: 'Rail Rush — swipe or use the arrow keys to dodge trains and barriers' },
+    vi: { tagline: 'Lao vút trên đường ray, né tàu và nhặt từng đồng xu.', play: 'Chạy!', missions: 'Nhiệm vụ', shop: 'Cửa hàng', runners: 'Nhân vật', upgrades: 'Nâng cấp', best: 'Kỷ lục', bank: 'Xu', score: 'Điểm', coins: 'Xu', mult: 'Hệ số', pause: 'Tạm dừng', paused: 'Tạm dừng', resume: 'Tiếp tục', menu: 'Menu', retry: 'Chạy lại', back: 'Quay lại', crashed: 'Đâm rồi!', caught: 'Bị drone tuần tra tóm được!', newBest: 'Kỷ lục mới!', dist: m => `Đã chạy ${m} m`, buy: 'Mua', select: 'Chọn', selected: 'Đang chạy', max: 'Tối đa', level: (n, s) => `Cấp ${n} · ${s} giây`, jetpack: 'Ba lô phản lực', magnet: 'Nam châm hút xu', double: 'Nhân đôi điểm', sneakers: 'Giày siêu bật', setInfo: m => `Hoàn thành cả ba để tăng hệ số lên ×${m}.`, setDone: m => `Xong nhiệm vụ! Hệ số ×${m}`, missionDone: 'Hoàn thành nhiệm vụ!', stumble: 'Vấp rồi! Drone ngay sau lưng', m_coins: n => `Nhặt ${n} xu`, m_jump: n => `Nhảy ${n} lần`, m_roll: n => `Lăn ${n} lần`, m_score: n => `Đạt ${n} điểm trong một lượt`, m_power: n => `Nhặt ${n} vật phẩm hỗ trợ`, m_roof: n => `Chạy ${n} m trên nóc tàu`, m_dist: n => `Chạy ${n} m trong một lượt`, m_lane: n => `Đổi làn ${n} lần`, helpKeys: '← → đổi làn · ↑ hoặc Space nhảy · ↓ lăn · P tạm dừng', helpTouch: 'Vuốt trái hoặc phải để đổi làn, vuốt lên để nhảy, vuốt xuống để lăn', canvas: 'Rail Rush — vuốt hoặc dùng phím mũi tên để né tàu và rào chắn' },
+    zh: { tagline: '沿着铁轨飞奔，躲开列车，收集每一枚金币。', play: '开跑！', missions: '任务', shop: '商店', runners: '角色', upgrades: '升级', best: '最佳', bank: '金币', score: '得分', coins: '金币', mult: '倍数', pause: '暂停', paused: '已暂停', resume: '继续', menu: '菜单', retry: '再跑一次', back: '返回', crashed: '撞上了！', caught: '被巡逻无人机抓住了！', newBest: '新纪录！', dist: m => `跑了 ${m} 米`, buy: '购买', select: '选择', selected: '使用中', max: '已满级', level: (n, s) => `等级 ${n} · ${s} 秒`, jetpack: '喷气背包', magnet: '金币磁铁', double: '双倍得分', sneakers: '超级跑鞋', setInfo: m => `完成全部三个任务，倍数提升到 ×${m}。`, setDone: m => `任务完成！倍数 ×${m}`, missionDone: '任务完成！', stumble: '绊了一下！无人机就在身后', m_coins: n => `收集 ${n} 枚金币`, m_jump: n => `跳跃 ${n} 次`, m_roll: n => `翻滚 ${n} 次`, m_score: n => `单局得分达到 ${n}`, m_power: n => `拾取 ${n} 个道具`, m_roof: n => `在列车顶上跑 ${n} 米`, m_dist: n => `单局跑 ${n} 米`, m_lane: n => `换道 ${n} 次`, helpKeys: '← → 换道 · ↑ 或空格跳跃 · ↓ 翻滚 · P 暂停', helpTouch: '左右滑动换道，上滑跳跃，下滑翻滚', canvas: 'Rail Rush——滑动屏幕或用方向键躲避列车和路障' },
+    fr: { tagline: 'Foncez sur les rails, évitez les trains et ramassez chaque pièce.', play: 'Courir !', missions: 'Missions', shop: 'Boutique', runners: 'Coureurs', upgrades: 'Améliorations', best: 'Record', bank: 'Pièces', score: 'Score', coins: 'Pièces', mult: 'Multi', pause: 'Pause', paused: 'Pause', resume: 'Reprendre', menu: 'Menu', retry: 'Recourir', back: 'Retour', crashed: 'Collision !', caught: 'Rattrapé par le drone de patrouille !', newBest: 'Nouveau record !', dist: m => `${m} m parcourus`, buy: 'Acheter', select: 'Choisir', selected: 'En course', max: 'Max', level: (n, s) => `Niveau ${n} · ${s} s`, jetpack: 'Jetpack', magnet: 'Aimant à pièces', double: 'Score double', sneakers: 'Super baskets', setInfo: m => `Terminez les trois pour passer le multiplicateur à ×${m}.`, setDone: m => `Missions réussies ! Multi ×${m}`, missionDone: 'Mission réussie !', stumble: 'Trébuché ! Le drone vous talonne', m_coins: n => `Ramasser ${n} pièces`, m_jump: n => `Sauter ${n} fois`, m_roll: n => `Faire ${n} roulades`, m_score: n => `Marquer ${n} points en une course`, m_power: n => `Prendre ${n} bonus`, m_roof: n => `Courir ${n} m sur les toits des trains`, m_dist: n => `Courir ${n} m en une course`, m_lane: n => `Changer de voie ${n} fois`, helpKeys: '← → changer de voie · ↑ ou Espace sauter · ↓ roulade · P pause', helpTouch: 'Glissez à gauche ou à droite pour changer de voie, vers le haut pour sauter, vers le bas pour rouler', canvas: 'Rail Rush — glissez ou utilisez les flèches pour éviter trains et barrières' },
+    th: { tagline: 'วิ่งฉิวไปตามราง หลบรถไฟ และเก็บเหรียญให้หมด', play: 'วิ่ง!', missions: 'ภารกิจ', shop: 'ร้านค้า', runners: 'ตัวละคร', upgrades: 'อัปเกรด', best: 'สูงสุด', bank: 'เหรียญ', score: 'คะแนน', coins: 'เหรียญ', mult: 'ตัวคูณ', pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', retry: 'วิ่งอีกครั้ง', back: 'กลับ', crashed: 'ชนแล้ว!', caught: 'โดนโดรนลาดตระเวนจับได้!', newBest: 'สถิติใหม่!', dist: m => `วิ่งได้ ${m} ม.`, buy: 'ซื้อ', select: 'เลือก', selected: 'กำลังใช้', max: 'สูงสุด', level: (n, s) => `ระดับ ${n} · ${s} วิ`, jetpack: 'เจ็ตแพ็ก', magnet: 'แม่เหล็กดูดเหรียญ', double: 'คะแนนสองเท่า', sneakers: 'รองเท้าซุปเปอร์', setInfo: m => `ทำครบทั้งสามเพื่อเพิ่มตัวคูณเป็น ×${m}`, setDone: m => `ภารกิจสำเร็จ! ตัวคูณ ×${m}`, missionDone: 'ภารกิจสำเร็จ!', stumble: 'สะดุด! โดรนตามมาติด ๆ', m_coins: n => `เก็บ ${n} เหรียญ`, m_jump: n => `กระโดด ${n} ครั้ง`, m_roll: n => `กลิ้ง ${n} ครั้ง`, m_score: n => `ทำ ${n} คะแนนในรอบเดียว`, m_power: n => `เก็บไอเทมพิเศษ ${n} ชิ้น`, m_roof: n => `วิ่งบนหลังคารถไฟ ${n} ม.`, m_dist: n => `วิ่ง ${n} ม. ในรอบเดียว`, m_lane: n => `เปลี่ยนเลน ${n} ครั้ง`, helpKeys: '← → เปลี่ยนเลน · ↑ หรือ Space กระโดด · ↓ กลิ้ง · P หยุด', helpTouch: 'ปัดซ้ายหรือขวาเพื่อเปลี่ยนเลน ปัดขึ้นเพื่อกระโดด ปัดลงเพื่อกลิ้ง', canvas: 'Rail Rush — ปัดหรือใช้ปุ่มลูกศรเพื่อหลบรถไฟและแผงกั้น' },
+    ja: { tagline: '線路を駆け抜け、列車をかわし、コインを集めよう。', play: 'ラン！', missions: 'ミッション', shop: 'ショップ', runners: 'ランナー', upgrades: 'アップグレード', best: 'ベスト', bank: 'コイン', score: 'スコア', coins: 'コイン', mult: '倍率', pause: '一時停止', paused: '一時停止中', resume: '再開', menu: 'メニュー', retry: 'もう一度', back: '戻る', crashed: 'クラッシュ！', caught: 'パトロールドローンに捕まった！', newBest: '自己ベスト更新！', dist: m => `${m} m 走った`, buy: '購入', select: '選ぶ', selected: '使用中', max: '最大', level: (n, s) => `レベル ${n} · ${s}秒`, jetpack: 'ジェットパック', magnet: 'コインマグネット', double: 'スコア2倍', sneakers: 'スーパースニーカー', setInfo: m => `3つすべてクリアで倍率が ×${m} にアップ。`, setDone: m => `ミッション達成！倍率 ×${m}`, missionDone: 'ミッション達成！', stumble: 'つまずいた！ドローンがすぐ後ろに', m_coins: n => `コインを ${n} 枚集める`, m_jump: n => `${n} 回ジャンプする`, m_roll: n => `${n} 回ローリングする`, m_score: n => `1回のランで ${n} 点取る`, m_power: n => `パワーアップを ${n} 個取る`, m_roof: n => `列車の屋根の上を ${n} m 走る`, m_dist: n => `1回のランで ${n} m 走る`, m_lane: n => `レーンを ${n} 回変える`, helpKeys: '← → レーン変更 · ↑ かスペースでジャンプ · ↓ ローリング · P 一時停止', helpTouch: '左右にスワイプでレーン変更、上でジャンプ、下でローリング', canvas: 'Rail Rush — スワイプか矢印キーで列車や柵をかわそう' },
+    ko: { tagline: '선로를 질주하며 기차를 피하고 코인을 모두 모으세요.', play: '달리기!', missions: '미션', shop: '상점', runners: '러너', upgrades: '업그레이드', best: '최고', bank: '코인', score: '점수', coins: '코인', mult: '배수', pause: '일시 정지', paused: '일시 정지', resume: '계속하기', menu: '메뉴', retry: '다시 달리기', back: '뒤로', crashed: '부딪혔어요!', caught: '순찰 드론에게 잡혔어요!', newBest: '최고 기록!', dist: m => `${m}m 달림`, buy: '구매', select: '선택', selected: '사용 중', max: '최대', level: (n, s) => `레벨 ${n} · ${s}초`, jetpack: '제트팩', magnet: '코인 자석', double: '점수 2배', sneakers: '슈퍼 운동화', setInfo: m => `세 가지를 모두 끝내면 배수가 ×${m}로 올라요.`, setDone: m => `미션 완료! 배수 ×${m}`, missionDone: '미션 완료!', stumble: '휘청! 드론이 바로 뒤에 있어요', m_coins: n => `코인 ${n}개 모으기`, m_jump: n => `${n}번 점프하기`, m_roll: n => `${n}번 구르기`, m_score: n => `한 판에 ${n}점 얻기`, m_power: n => `아이템 ${n}개 줍기`, m_roof: n => `기차 지붕 위로 ${n}m 달리기`, m_dist: n => `한 판에 ${n}m 달리기`, m_lane: n => `레인 ${n}번 바꾸기`, helpKeys: '← → 레인 변경 · ↑ 또는 Space 점프 · ↓ 구르기 · P 일시 정지', helpTouch: '왼쪽·오른쪽으로 밀어 레인 변경, 위로 밀어 점프, 아래로 밀어 구르기', canvas: 'Rail Rush — 화면을 밀거나 방향키로 기차와 바리케이드를 피하세요' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // World units are metres; +z runs forward along the tracks, +y is up.
+  const STEP = 1 / 120, LANE = 2.4, G = 30, JUMP_V = 10.4, SUPER_V = 15, ROLL_T = 0.7, TRAIN_H = 3.2, RAMP_L = 5;
+  const HALF_W = 0.42, HALF_D = 0.35, STAND_H = 1.7, ROLL_H = 0.8, VIEW = 150, CAM_D = 8.5;
+  const KEY = s => `milaan.railRush.${s}`;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas'), ctx = canvas.getContext('2d'), app = $('app');
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  const read = (k, d) => { try { const v = localStorage.getItem(KEY(k)); return v == null ? d : JSON.parse(v); } catch { return d; } };
+  const write = (k, v) => { try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch {} };
+  const save = { best: read('best', 0), bank: read('bank', 0), mlevel: read('mlevel', 0), mprog: read('mprog', [0, 0, 0]), owned: read('owned', [0]), char: read('char', 0), upg: read('upg', { jetpack: 0, magnet: 0, double: 0, sneakers: 0 }) };
+  const persist = () => { for (const k in save) write(k, save[k]); };
+  const announce = s => { $('announcer').textContent = s; };
+
+  function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let x = Math.imul(a ^ (a >>> 15), 1 | a); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; }; }
+
+  // ---------- meta: runners, upgrades, missions ----------
+  const RUNNERS = [
+    { name: 'Kit', body: '#ff6b5a', legs: '#2f3e7a', hat: '#ffd23f', price: 0 },
+    { name: 'Ollie', body: '#20b8a8', legs: '#3a2a5c', hat: '#ff8fb1', price: 600 },
+    { name: 'Rumi', body: '#9b6bff', legs: '#24324f', hat: '#7ef0c8', price: 1500 },
+    { name: 'Dex', body: '#ffb43a', legs: '#5b2b2b', hat: '#3fa7ff', price: 3000 },
+    { name: 'Nova', body: '#ff4fa3', legs: '#1f2d3d', hat: '#ffffff', price: 5000 },
+    { name: 'Zuri', body: '#3ddc84', legs: '#2a1840', hat: '#ff6b5a', price: 8000 },
+  ];
+  const POWERS = { jetpack: { ic: '🚀', base: 6 }, magnet: { ic: '🧲', base: 8 }, double: { ic: '⭐', base: 10 }, sneakers: { ic: '👟', base: 9 } };
+  const POWER_KEYS = Object.keys(POWERS);
+  const powerTime = k => POWERS[k].base + save.upg[k] * 2;
+  const upgCost = lvl => [400, 900, 1800, 3200, 5200][lvl];
+  const MTYPES = { coins: 80, jump: 15, roll: 12, score: 1500, power: 3, roof: 150, dist: 600, lane: 40 };
+  const RUN_TYPES = { score: 1, dist: 1 };
+  function missionSet(level) {
+    const r = rng(777 + level * 31), keys = Object.keys(MTYPES), out = [];
+    while (out.length < 3) { const k = keys[Math.floor(r() * keys.length)]; if (!out.some(m => m.k === k)) out.push({ k, n: Math.round(MTYPES[k] * (1 + level * 0.45) / 5) * 5 || 5 }); }
+    return out;
+  }
+  const multBase = () => 1 + save.mlevel;
+
+  // ---------- state ----------
+  const S = { state: 'menu' };
+  let P, objs, coins, items, genZ, genR, spans, cam = { x: 0, y: 3, z: -CAM_D }, view = { w: 360, h: 640, F: 300, hz: 200, camH: 3, dpr: 1 }, parts = [], runStats, clock = 0;
+
+  function newWorld(seed) {
+    genR = rng(seed); objs = []; coins = []; items = []; genZ = 40; spans = [[], [], []];
+    P = { lane: 1, x: 0, y: 0, vy: 0, z: 0, v: 14, roll: 0, ground: true, power: {}, stumbleT: 0, inv: 0, dead: false, score: 0, coins: 0, onRoof: false, runT: 0 };
+    while (genZ < VIEW) genRow();
+  }
+
+  // ---------- track generator ----------
+  // Every row blocks at most two lanes with trains so a free lane always exists, and while two lanes
+  // are covered by trains the third stays clear of trains for the whole overlap.
+  function trainCovered(lane, a, b) { return spans[lane].some(s => s.a < b && s.b > a); }
+  function genRow() {
+    const r = genR, v = Math.max(P.v, 14), z = genZ;
+    const gap = clamp(v * 1.05, 16, 36) * (0.9 + r() * 0.35);
+    const lanes = [0, 1, 2], busy = lanes.filter(l => trainCovered(l, z - 2, z + 2));
+    const free = lanes.filter(l => !busy.includes(l));
+    const difficulty = clamp(P.z / 2500, 0, 1);
+    const plan = [];
+    for (const l of free) {
+      const roll = r();
+      if (roll < 0.28 + difficulty * 0.12) plan.push({ l, k: 'train' });
+      else if (roll < 0.46 + difficulty * 0.08) plan.push({ l, k: 'low' });
+      else if (roll < 0.62 + difficulty * 0.06) plan.push({ l, k: 'high' });
+      else plan.push({ l, k: 'none' });
+    }
+    // trains: never let all three lanes be covered at the same time
+    let trainCount = busy.length;
+    for (const p of plan) {
+      if (p.k !== 'train') continue;
+      const len = 10 + Math.floor(r() * 3) * 6;
+      let moving = P.z > 300 && r() < 0.18 + difficulty * 0.2;
+      // a moving train sweeps its lane back to where it meets the runner, so check that whole stretch
+      const reach = l => moving ? trainCovered(l, z - movingLead(z) - 8, z + len + 4) : trainCovered(l, z - 4, z + len + 4);
+      if (moving && lanes.filter(l => l !== p.l && reach(l)).length >= 1) moving = false;
+      const others = lanes.filter(l => l !== p.l && reach(l)).length;
+      if (trainCount >= 2 || others >= 2) { p.k = r() < 0.5 ? 'low' : 'none'; continue; }
+      trainCount++;
+      const ramp = !moving && r() < 0.35;
+      addTrain(p.l, z + (ramp ? RAMP_L : 0), len, moving, ramp);
+    }
+    // a row must leave something passable without a train in at least one lane
+    const blockers = plan.filter(p => p.k === 'low' || p.k === 'high');
+    if (blockers.length && blockers.length === plan.length && !plan.some(p => p.k === 'none') && busy.length + blockers.length >= 3 && r() < 0.5) blockers[0].k = 'none';
+    for (const p of plan) if (p.k === 'low' || p.k === 'high') objs.push({ k: p.k, lane: p.l, z0: z, len: 0.4, bot: p.k === 'low' ? 0 : 1.25, top: p.k === 'low' ? 1.0 : 2.6, sp: 0 });
+    // coins and power-ups
+    const coinLane = plan.length ? plan[Math.floor(r() * plan.length)] : null;
+    if (coinLane && r() < 0.75) {
+      if (coinLane.k === 'low') for (let i = -3; i <= 3; i++) coins.push({ x: coinLane.l, z: z + i * 1.4, y: 0.7 + 1.5 * Math.cos(i / 3 * Math.PI / 2) });
+      else if (coinLane.k === 'none') for (let i = 0; i < 8; i++) coins.push({ x: coinLane.l, z: z - gap * 0.4 + i * 1.6, y: 0.7 });
+      else if (coinLane.k === 'train') { const tr = objs[objs.length - 1]; if (tr && tr.k === 'train' && tr.ramp) for (let i = 1; i < 8; i++) coins.push({ x: tr.lane, z: tr.z0 + i * 1.6, y: TRAIN_H + 0.7 }); }
+    }
+    const pfree = plan.find(p => p.k === 'none');
+    if (pfree && r() < 0.075) items.push({ k: POWER_KEYS[Math.floor(r() * 4)], x: pfree.l, z: z + gap * 0.5, y: 0.9 });
+    genZ += gap;
+  }
+  const movingLead = z0 => (z0 - P.z) * 11 / (P.v + 11) + 6;
+  function addTrain(lane, z0, len, moving, ramp) {
+    const sp = moving ? 7 + genR() * 4 : 0;
+    // a moving train meets the runner earlier than its spawn point; reserve that span too
+    const lead = moving ? movingLead(z0) : 0;
+    if (moving) for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.lane === lane && o.z0 > P.z + 10 && o.z0 < z0 + len) objs.splice(i, 1); }
+    if (moving) coins = coins.filter(c => !(c.x === lane && c.z > P.z + 10 && c.z < z0 + len));
+    spans[lane].push({ a: z0 - lead - (ramp ? RAMP_L : 0), b: z0 + len });
+    const hue = Math.floor(genR() * 4);
+    objs.push({ k: 'train', lane, z0, len, bot: 0, top: TRAIN_H, sp, ramp, hue });
+  }
+
+  // ---------- physics ----------
+  const laneX = l => (l - 1) * LANE;
+  function surfaceAt(x, z, yNow) {
+    let fl = 0;
+    const lane = Math.round(x / LANE) + 1;
+    if (Math.abs(x - laneX(lane)) > 1.1) return 0;
+    for (const o of objs) {
+      if (o.lane !== lane || o.k !== 'train') continue;
+      if (z >= o.z0 - HALF_D && z <= o.z0 + o.len + HALF_D && yNow >= o.top - 0.6) fl = Math.max(fl, o.top);
+      if (o.ramp && z >= o.z0 - RAMP_L && z < o.z0) { const h = o.top * (z - (o.z0 - RAMP_L)) / RAMP_L; if (yNow >= h - 0.7) fl = Math.max(fl, h); }
+    }
+    return fl;
+  }
+  function act(a) {
+    if (S.state !== 'play' || P.dead) return;
+    if (a === 'left' || a === 'right') {
+      const nl = clamp(P.lane + (a === 'left' ? -1 : 1), 0, 2);
+      if (nl !== P.lane) { P.prevLane = P.lane; P.lane = nl; runStats.lane++; bump('lane', 1); }
+    } else if (a === 'jump') {
+      if (P.ground && !P.power.jetpack) { P.vy = P.power.sneakers ? SUPER_V : JUMP_V; P.ground = false; P.roll = 0; runStats.jump++; bump('jump', 1); }
+    } else if (a === 'roll') {
+      if (P.power.jetpack) return;
+      if (!P.ground) P.vy = Math.min(P.vy, -22);
+      if (P.roll <= 0) { runStats.roll++; bump('roll', 1); }
+      P.roll = ROLL_T;
+    }
+  }
+  function stumble() {
+    P.lane = P.prevLane != null ? P.prevLane : P.lane;
+    P.inv = 0.5;
+    if (P.stumbleT > 0) return die('caught');
+    P.stumbleT = 5; toast(t.stumble); announce(t.stumble);
+  }
+  function die(why) {
+    if (P.dead) return;
+    P.dead = true; P.why = why; burst(P.x, P.y + 1, P.z, 24);
+    S.state = 'dying'; S.dieT = 0.9;
+  }
+
+  function step(dt) {
+    if (S.state !== 'play') { if (S.state === 'menu') { P.z += 9 * dt; P.x = 0; cleanAndGen(); } return; }
+    clock += dt; P.runT += dt;
+    P.v = 14 + Math.min(20, P.runT * 0.11);
+    const zPrev = P.z, xPrev = P.x;
+    P.z += P.v * dt;
+    const tx = laneX(P.lane);
+    P.x += clamp(tx - P.x, -18 * dt, 18 * dt);
+    for (const k in P.power) { P.power[k] -= dt; if (P.power[k] <= 0) { delete P.power[k]; if (k === 'jetpack') { P.inv = 1.2; P.vy = 0; } } }
+    if (P.stumbleT > 0) P.stumbleT -= dt;
+    if (P.inv > 0) P.inv -= dt;
+    if (P.roll > 0) P.roll -= dt;
+    // vertical
+    if (P.power.jetpack) { P.y += (6.5 - P.y) * Math.min(1, dt * 3); P.vy = 0; P.ground = false; }
+    else {
+      P.vy -= G * dt; P.y += P.vy * dt;
+      const fl = surfaceAt(P.x, P.z, P.y + 0.01);
+      if (P.y <= fl) { P.y = fl; P.vy = 0; P.ground = true; } else if (P.y > fl + 0.05) P.ground = false;
+    }
+    P.onRoof = P.ground && P.y > TRAIN_H - 0.1;
+    if (P.onRoof) { runStats.roof += P.v * dt; bump('roof', P.v * dt); }
+    for (const o of objs) if (o.sp) o.z0 -= o.sp * dt;
+    const mult = multBase() * (P.power.double ? 2 : 1);
+    P.score += P.v * dt * mult;
+    runStats.dist = P.z;
+    if (!P.power.jetpack) collide(zPrev, xPrev, dt);
+    pickups(dt);
+    cleanAndGen();
+  }
+  function collide(zPrev, xPrev, dt) {
+    const h = P.roll > 0 ? ROLL_H : STAND_H;
+    for (const o of objs) {
+      const ox = laneX(o.lane), halfW = o.k === 'train' ? 1.05 : 1.0;
+      if (Math.abs(P.x - ox) >= HALF_W + halfW) continue;
+      if (P.z + HALF_D <= o.z0 || P.z - HALF_D >= o.z0 + o.len) continue;
+      if (P.y >= o.top - 0.08 || P.y + h <= o.bot) continue;
+      if (P.inv > 0 && o.k !== 'train') continue;
+      // came in through the front face (relative to a possibly moving object) → crash; from the side → stumble
+      const prevFront = zPrev + HALF_D <= o.z0 + o.sp * dt + 0.02;
+      const prevBeside = Math.abs(xPrev - ox) >= HALF_W + halfW - 0.01;
+      if (prevFront && !prevBeside) return die('crash');
+      P.x = xPrev;
+      if (P.inv > 0) continue;
+      return stumble();
+    }
+  }
+  function pickups(dt) {
+    const pr = P.power.magnet ? 1 : 0, cy = P.y + 0.8;
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i], cx = typeof c.x === 'number' && c.wx == null ? laneX(c.x) : c.wx;
+      if (pr && c.z - P.z < 14 && c.z - P.z > -1) { c.wx = cx + (P.x - cx) * Math.min(1, dt * 10); c.z += (P.z - c.z) * Math.min(1, dt * 10); c.y += (cy - c.y) * Math.min(1, dt * 10); }
+      const wx = c.wx != null ? c.wx : cx;
+      if (Math.abs(c.z - P.z) < 0.9 && Math.abs(wx - P.x) < 1.0 && Math.abs(c.y - cy) < 1.3) {
+        coins.splice(i, 1); P.coins++; runStats.coins++; bump('coins', 1); P.score += 10 * multBase();
+      }
+    }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (Math.abs(it.z - P.z) < 1 && Math.abs(laneX(it.x) - P.x) < 1.1 && Math.abs(it.y - (P.y + 0.8)) < 1.5) {
+        items.splice(i, 1); P.power[it.k] = powerTime(it.k); runStats.power++; bump('power', 1);
+        toast(POWERS[it.k].ic + ' ' + t[it.k]);
+        if (it.k === 'jetpack') { P.roll = 0; for (let k = 0; k < Math.floor(powerTime('jetpack') * P.v / 2.2); k++) coins.push({ x: Math.floor(k / 14) % 3 === 0 ? 1 : (Math.floor(k / 14) % 3 === 1 ? 0 : 2), z: P.z + 10 + k * 2.2, y: 7.2 }); }
+      }
+    }
+  }
+  function cleanAndGen() {
+    const cut = P.z - 12;
+    objs = objs.filter(o => o.z0 + o.len > cut);
+    coins = coins.filter(c => c.z > cut);
+    items = items.filter(c => c.z > cut);
+    for (const l of spans) for (let i = l.length - 1; i >= 0; i--) if (l[i].b < cut) l.splice(i, 1);
+    while (genZ < P.z + VIEW) genRow();
+  }
+
+  // ---------- missions progress ----------
+  let missions = missionSet(save.mlevel);
+  function bump(kind, n) {
+    if (S.state !== 'play') return;
+    missions.forEach((m, i) => {
+      if (m.k !== kind && !(RUN_TYPES[m.k] && kind === 'tick')) return;
+      if (save.mprog[i] >= m.n) return;
+      save.mprog[i] = RUN_TYPES[m.k] ? save.mprog[i] : save.mprog[i] + n;
+      checkMission(i);
+    });
+  }
+  function checkMission(i) {
+    const m = missions[i];
+    if (RUN_TYPES[m.k]) { const v = m.k === 'score' ? P.score : P.z; if (v > save.mprog[i]) save.mprog[i] = Math.min(m.n, Math.floor(v)); }
+    if (save.mprog[i] >= m.n && !m.told) {
+      m.told = true; save.mprog[i] = m.n; toast('✅ ' + t.missionDone); announce(t.missionDone);
+      if (save.mprog.every((p, j) => p >= missions[j].n)) {
+        save.mlevel++; save.bank += 250; save.mprog = [0, 0, 0]; missions = missionSet(save.mlevel);
+        setTimeout(() => { toast('⭐ ' + t.setDone(multBase())); announce(t.setDone(multBase())); }, 1300);
+      }
+      persist();
+    }
+  }
+
+  // ---------- run flow ----------
+  function startRun(seed) {
+    newWorld(seed == null ? (Math.random() * 1e9) | 0 : seed);
+    runStats = { coins: 0, jump: 0, roll: 0, power: 0, roof: 0, dist: 0, lane: 0 };
+    missions.forEach(m => { m.told = false; });
+    S.state = 'play'; app.classList.remove('menu'); hideAll(); updateHud(); canvas.focus({ preventScroll: true });
+  }
+  function endRun() {
+    S.state = 'over'; updateHud();
+    const score = Math.floor(P.score), isBest = score > save.best;
+    if (isBest) save.best = score;
+    save.bank += P.coins; persist();
+    $('over-title').textContent = P.why === 'caught' ? t.caught : t.crashed;
+    $('medal').textContent = isBest ? '🏆' : P.why === 'caught' ? '🛸' : '💥';
+    $('oScore').textContent = score; $('oCoins').textContent = P.coins; $('oBest').textContent = save.best;
+    $('oDist').textContent = t.dist(Math.floor(P.z));
+    $('newbest').hidden = !isBest;
+    $('over').hidden = false; $('oretry').focus();
+    announce(`${$('over-title').textContent} ${t.score} ${score}`);
+  }
+
+  // ---------- effects ----------
+  let toastT = 0;
+  function toast(s) { const el = $('toast'); el.textContent = s; el.classList.add('show'); toastT = 1.6; }
+  function burst(x, y, z, n) { if (reducedMotion) n = Math.ceil(n / 3); for (let i = 0; i < n; i++) parts.push({ x, y, z, vx: (Math.random() - 0.5) * 6, vy: Math.random() * 6, vz: (Math.random() - 0.3) * 6, life: 0.6 + Math.random() * 0.4 }); }
+
+  // ---------- render ----------
+  function resize() {
+    const r = app.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
+    const w = r.width, h = r.height;
+    // The three tracks fill most of the width on phones; on wide screens the height decides and the sides show the town.
+    const F = Math.min(w * 0.92, h * 0.95) * CAM_D / (LANE * 3.2);
+    const hz = h * (h > w ? 0.34 : 0.36);
+    view = { w, h, F, hz, camH: clamp((h * 0.86 - hz) * CAM_D / F, 2.4, 8), dpr };
+    view.touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    $('help').textContent = view.touch ? t.helpTouch : t.helpKeys;
+    draw();
+  }
+  function proj(x, y, z) { const dz = Math.max(0.3, z - cam.z), s = view.F / dz; return [view.w / 2 + (x - cam.x) * s, view.hz + (cam.y - y) * s, s]; }
+  const SKY = [255, 196, 140];
+  function shade(rgb, z, k = 1) {
+    const f = clamp((z - cam.z - 45) / (VIEW - 45), 0, 1) * 0.85;
+    return `rgb(${(rgb[0] * k * (1 - f) + SKY[0] * f) | 0},${(rgb[1] * k * (1 - f) + SKY[1] * f) | 0},${(rgb[2] * k * (1 - f) + SKY[2] * f) | 0})`;
+  }
+  const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  function quad(pts, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fill(); }
+  function box(x0, x1, y0, y1, z0, z1, rgb) {
+    const near = cam.z + 0.4;
+    if (z1 <= near) return;
+    z0 = Math.max(z0, near);
+    const zc = z0;
+    if (cam.x < x0) quad([proj(x0, y0, z0), proj(x0, y1, z0), proj(x0, y1, z1), proj(x0, y0, z1)], shade(rgb, zc, 0.72));
+    if (cam.x > x1) quad([proj(x1, y0, z0), proj(x1, y1, z0), proj(x1, y1, z1), proj(x1, y0, z1)], shade(rgb, zc, 0.72));
+    if (cam.y > y1) quad([proj(x0, y1, z0), proj(x1, y1, z0), proj(x1, y1, z1), proj(x0, y1, z1)], shade(rgb, zc, 1.12));
+    quad([proj(x0, y0, z0), proj(x1, y0, z0), proj(x1, y1, z0), proj(x0, y1, z0)], shade(rgb, zc, 0.92));
+  }
+  const TRAIN_COL = [hex('#3b6fd8'), hex('#e0493c'), hex('#2fae8f'), hex('#f0a020')];
+  const BUILD_COL = [hex('#7b5ea7'), hex('#5c4b8a'), hex('#a36a8f'), hex('#4f6d9a'), hex('#c07a6a')];
+  function drawTrain(o) {
+    const x = laneX(o.lane), c = TRAIN_COL[o.hue], z1 = o.z0 + o.len;
+    if (o.ramp) {
+      const a = o.z0 - RAMP_L, near = cam.z + 0.4;
+      if (o.z0 > near) {
+        const za = Math.max(a, near), ha = o.top * (za - a) / RAMP_L;
+        const g = hex('#8a6a4a');
+        if (cam.x < x - 1) quad([proj(x - 1, 0, za), proj(x - 1, ha, za), proj(x - 1, o.top, o.z0), proj(x - 1, 0, o.z0)], shade(g, za, 0.7));
+        if (cam.x > x + 1) quad([proj(x + 1, 0, za), proj(x + 1, ha, za), proj(x + 1, o.top, o.z0), proj(x + 1, 0, o.z0)], shade(g, za, 0.7));
+        quad([proj(x - 1, ha, za), proj(x + 1, ha, za), proj(x + 1, o.top, o.z0), proj(x - 1, o.top, o.z0)], shade(g, za, 1.05));
+      }
+    }
+    box(x - 1.05, x + 1.05, 0.25, o.top, o.z0, z1, c);
+    if (o.z0 > cam.z + 0.4) {
+      // windscreen + headlights on the front face
+      const [lx, ty, s] = proj(x - 0.8, o.top - 0.3, o.z0), [rx, by] = proj(x + 0.8, o.top - 1.2, o.z0);
+      ctx.fillStyle = shade(hex('#bfe8ff'), o.z0); ctx.fillRect(lx, ty, rx - lx, by - ty);
+      const [hx1, hy] = proj(x - 0.65, 0.8, o.z0), [hx2] = proj(x + 0.65, 0.8, o.z0);
+      ctx.fillStyle = o.sp ? '#fff6a8' : shade(hex('#ffe9a8'), o.z0);
+      ctx.beginPath(); ctx.arc(hx1, hy, 0.16 * s, 0, 7); ctx.arc(hx2, hy, 0.16 * s, 0, 7); ctx.fill();
+      ctx.fillStyle = shade(hex('#ffffff'), o.z0, 0.9); const [sx1, sy1] = proj(x - 1.05, 1.6, o.z0), [sx2, sy2] = proj(x + 1.05, 1.4, o.z0); ctx.fillRect(sx1, sy1, sx2 - sx1, sy2 - sy1);
+    }
+  }
+  function drawBarrier(o) {
+    const x = laneX(o.lane), red = hex('#ff5a4e'), white = hex('#fff4e6'), post = hex('#5a4a6a');
+    if (o.k === 'low') {
+      box(x - 1.0, x - 0.85, 0, o.top, o.z0, o.z0 + o.len, post); box(x + 0.85, x + 1.0, 0, o.top, o.z0, o.z0 + o.len, post);
+      box(x - 1.0, x + 1.0, 0.55, o.top, o.z0, o.z0 + o.len, red);
+      const [a, b, s] = proj(x - 1, 0.85, o.z0), [c2, d] = proj(x + 1, 0.7, o.z0);
+      ctx.fillStyle = shade(white, o.z0); for (let i = 0; i < 4; i++) ctx.fillRect(a + (c2 - a) * (i / 4 + 0.05), b, (c2 - a) * 0.11, d - b);
+      void s;
+    } else {
+      box(x - 1.0, x - 0.85, 0, o.top, o.z0, o.z0 + o.len, post); box(x + 0.85, x + 1.0, 0, o.top, o.z0, o.z0 + o.len, post);
+      box(x - 1.0, x + 1.0, o.bot, o.top, o.z0, o.z0 + o.len, hex('#ffcf3a'));
+      const [a, b] = proj(x - 1, o.top - 0.2, o.z0), [c2, d] = proj(x + 1, o.bot + 0.2, o.z0);
+      ctx.fillStyle = shade(hex('#2a1840'), o.z0); for (let i = 0; i < 5; i++) ctx.fillRect(a + (c2 - a) * (i / 5 + 0.04), b, (c2 - a) * 0.09, d - b);
+    }
+  }
+  function drawCoin(c) {
+    const wx = c.wx != null ? c.wx : laneX(c.x);
+    const [x, y, s] = proj(wx, c.y, c.z); const r = 0.36 * s;
+    if (r < 0.6) return;
+    const spin = Math.abs(Math.cos(clock * 5 + c.z * 0.3));
+    ctx.fillStyle = shade(hex('#ffcc33'), c.z); ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.5, r * (0.25 + 0.75 * spin)), r, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = shade(hex('#fff2a0'), c.z); ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.3, r * 0.45 * (0.25 + 0.75 * spin)), r * 0.55, 0, 0, 7); ctx.fill();
+  }
+  function drawItem(it) {
+    const [x, y, s] = proj(laneX(it.x), it.y + Math.sin(clock * 4) * 0.15, it.z); const r = 0.55 * s;
+    if (r < 1) return;
+    ctx.fillStyle = '#ffffffcc'; ctx.beginPath(); ctx.arc(x, y, r * 1.15, 0, 7); ctx.fill();
+    ctx.fillStyle = '#20b8a8'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.font = `${Math.round(r * 1.2)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(POWERS[it.k].ic, x, y + r * 0.05);
+  }
+  function drawRunner() {
+    const R = RUNNERS[save.char] || RUNNERS[0], x = P.x, y = P.y, z = P.z;
+    if (P.dead) return;
+    const run = P.ground ? Math.sin(clock * 16) : 0.6;
+    const body = hex(R.body), legs = hex(R.legs), skin = hex('#f2c6a0'), hat = hex(R.hat);
+    if (!P.power.jetpack || true) {
+      const [sx, sy, s] = proj(x, surfaceAt(x, z, y + 0.01), z);
+      ctx.fillStyle = '#0003'; ctx.beginPath(); ctx.ellipse(sx, sy, 0.5 * s, 0.16 * s, 0, 0, 7); ctx.fill();
+    }
+    if (P.roll > 0) { const [cx, cy, s] = proj(x, y + 0.45, z); ctx.fillStyle = shade(body, z); ctx.beginPath(); ctx.arc(cx, cy, 0.48 * s, 0, 7); ctx.fill(); ctx.fillStyle = shade(hat, z); ctx.beginPath(); ctx.arc(cx, cy, 0.48 * s, clock * 14, clock * 14 + 1.4); ctx.lineTo(cx, cy); ctx.fill(); return; }
+    if (P.power.jetpack) { box(x - 0.3, x + 0.3, y + 0.7, y + 1.5, z - 0.5, z - 0.3, hex('#9aa7b8')); const [fx, fy, s] = proj(x, y + 0.55, z - 0.4); ctx.fillStyle = '#ffb43a'; ctx.beginPath(); ctx.moveTo(fx - 0.2 * s, fy); ctx.lineTo(fx + 0.2 * s, fy); ctx.lineTo(fx, fy + (0.8 + Math.random() * 0.4) * s); ctx.fill(); }
+    box(x - 0.3, x - 0.06, y, y + 0.8, z - 0.1 + run * 0.18, z + 0.1 + run * 0.18, legs);
+    box(x + 0.06, x + 0.3, y, y + 0.8, z - 0.1 - run * 0.18, z + 0.1 - run * 0.18, legs);
+    box(x - 0.36, x + 0.36, y + 0.75, y + 1.4, z - 0.18, z + 0.18, body);
+    box(x - 0.24, x + 0.24, y + 1.4, y + 1.85, z - 0.2, z + 0.2, skin);
+    box(x - 0.27, x + 0.27, y + 1.78, y + 1.95, z - 0.24, z + 0.24, hat);
+    if (P.power.sneakers) { const [a, b, s] = proj(x, y + 0.05, z - 0.2); ctx.fillStyle = '#7ef0c8'; ctx.fillRect(a - 0.35 * s, b - 0.1 * s, 0.7 * s, 0.14 * s); }
+  }
+  function drawDrone() {
+    if (!(P.stumbleT > 0) && !(P.dead && P.why === 'caught')) return;
+    const dz = P.dead ? 0.6 : 2.4 + Math.sin(clock * 3) * 0.3;
+    const [x, y, s] = proj(P.x, P.y + 2.6, P.z - dz);
+    ctx.fillStyle = '#2a1840'; ctx.fillRect(x - 0.6 * s, y - 0.18 * s, 1.2 * s, 0.36 * s);
+    ctx.fillStyle = (clock * 4 | 0) % 2 ? '#ff4f4f' : '#4fa3ff'; ctx.beginPath(); ctx.arc(x, y - 0.25 * s, 0.14 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#2a1840'; ctx.lineWidth = Math.max(1, 0.06 * s); ctx.beginPath(); ctx.moveTo(x - 0.9 * s, y - 0.3 * s); ctx.lineTo(x - 0.3 * s, y - 0.3 * s); ctx.moveTo(x + 0.3 * s, y - 0.3 * s); ctx.lineTo(x + 0.9 * s, y - 0.3 * s); ctx.stroke();
+  }
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    const w = view.w, h = view.h;
+    const sky = ctx.createLinearGradient(0, 0, 0, view.hz);
+    sky.addColorStop(0, '#5a3d8f'); sky.addColorStop(0.6, '#e57a8a'); sky.addColorStop(1, `rgb(${SKY.join(',')})`);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, view.hz + 1);
+    ctx.fillStyle = '#ffe2a0'; ctx.beginPath(); ctx.arc(w * 0.72, view.hz - h * 0.04, Math.min(w, h) * 0.08, 0, 7); ctx.fill();
+    if (!P) return;
+    cam.z = P.z - CAM_D;
+    // ground
+    ctx.fillStyle = '#b07a5a'; ctx.fillRect(0, view.hz, w, h - view.hz);
+    const zFar = P.z + VIEW, zNear = cam.z + 0.5;
+    quad([proj(-4, 0, zNear), proj(4, 0, zNear), proj(4, 0, zFar), proj(-4, 0, zFar)], '#8c6a5c');
+    // sleepers and rails
+    const sl = hex('#5b4036');
+    for (let z = Math.ceil(zNear / 1.2) * 1.2; z < P.z + 60; z += 1.2) for (let l = 0; l < 3; l++) {
+      const x = laneX(l); quad([proj(x - 0.95, 0, z), proj(x + 0.95, 0, z), proj(x + 0.95, 0, z + 0.35), proj(x - 0.95, 0, z + 0.35)], shade(sl, z));
+    }
+    for (let l = 0; l < 3; l++) for (const d of [-0.6, 0.6]) {
+      const x = laneX(l) + d;
+      quad([proj(x - 0.06, 0.05, zNear), proj(x + 0.06, 0.05, zNear), proj(x + 0.06, 0.05, zFar), proj(x - 0.06, 0.05, zFar)], '#d9d2e0');
+    }
+    // scene objects, far to near
+    const list = [];
+    const k0 = Math.floor(zNear / 11), k1 = Math.floor(zFar / 11);
+    for (let k = k1; k >= k0; k--) for (const side of [-1, 1]) {
+      const r = rng(k * 2 + (side > 0 ? 1 : 0) + 99);
+      const bw = 3 + r() * 4, bh = 3 + r() * 9, gap = r() * 2;
+      const x0 = side < 0 ? -4.8 - gap - bw : 4.8 + gap, z0 = k * 11 + r() * 2;
+      list.push({ z: z0, f: () => box(x0, x0 + bw, 0, bh, z0, z0 + 8, BUILD_COL[(r() * 5) | 0 || ((k + side) & 3)]) });
+    }
+    for (const o of objs) { if (o.z0 > zFar || o.z0 + o.len < zNear) continue; list.push({ z: o.k === 'train' && o.ramp ? o.z0 - RAMP_L * 0.5 : o.z0, f: () => o.k === 'train' ? drawTrain(o) : drawBarrier(o) }); }
+    for (const c of coins) if (c.z > zNear && c.z < P.z + 90) list.push({ z: c.z, f: () => drawCoin(c) });
+    for (const it of items) if (it.z > zNear && it.z < zFar) list.push({ z: it.z, f: () => drawItem(it) });
+    list.push({ z: P.z, f: drawRunner, me: 1 });
+    list.push({ z: P.z - 2.4, f: drawDrone });
+    // A runner standing on a roof sorts in front of that train.
+    list.sort((a, b) => b.z - a.z || (a.me ? 1 : -1));
+    if (P.y > 0.3) { const i = list.findIndex(e => e.me); const e = list.splice(i, 1)[0]; list.push(e); }
+    for (const e of list) e.f();
+    for (const p of parts) { const [x, y, s] = proj(p.x, p.y, p.z); ctx.fillStyle = '#ffcf3a'; ctx.fillRect(x - 0.1 * s, y - 0.1 * s, 0.2 * s, 0.2 * s); }
+    void W; void H;
+  }
+  function updateHud() {
+    if (!P) return;
+    $('hScore').textContent = Math.floor(P.score);
+    $('hCoins').textContent = P.coins;
+    $('hMult').textContent = '×' + multBase() * (P.power.double ? 2 : 1);
+    const box = $('powers'), keys = Object.keys(P.power);
+    if (box.childElementCount !== keys.length || keys.some((k, i) => box.children[i].dataset.k !== k)) {
+      box.textContent = '';
+      for (const k of keys) { const d = document.createElement('div'); d.className = 'pw'; d.dataset.k = k; d.innerHTML = `<i>${POWERS[k].ic}</i><b><span></span></b>`; box.appendChild(d); }
+    }
+    keys.forEach((k, i) => { box.children[i].querySelector('span').style.width = clamp(P.power[k] / powerTime(k), 0, 1) * 100 + '%'; });
+  }
+
+  // ---------- loop ----------
+  let last = performance.now(), acc = 0, hudT = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (document.hidden) { requestAnimationFrame(frame); return; }
+    if (S.state === 'play' || S.state === 'menu') { acc += dt; while (acc >= STEP) { step(STEP); acc -= STEP; } } else acc = 0;
+    if (S.state === 'menu') clock += dt;
+    if (S.state === 'dying') { S.dieT -= dt; clock += dt; if (S.dieT <= 0) endRun(); }
+    if (S.state !== 'paused') { for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vy -= 12 * dt; p.life -= dt; } parts = parts.filter(p => p.life > 0); }
+    if (P) {
+      cam.x += (P.x * 0.55 - cam.x) * Math.min(1, dt * 6);
+      const ty = view.camH + Math.min(P.y, TRAIN_H) * 0.7;
+      cam.y += (ty - cam.y) * Math.min(1, dt * 5);
+    }
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
+    hudT -= dt; if (hudT <= 0 && S.state === 'play') { updateHud(); hudT = 0.1; missions.forEach((m, i) => { if (RUN_TYPES[m.k]) checkMission(i); }); }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- UI ----------
+  const OVERLAYS = ['menu', 'missions', 'shop', 'paused', 'over'];
+  function hideAll() { for (const id of OVERLAYS) $(id).hidden = true; }
+  function showMenu() {
+    if (S.state !== 'menu') newWorld(12345);
+    S.state = 'menu'; app.classList.add('menu'); hideAll();
+    $('mBest').textContent = save.best; $('mBank').textContent = save.bank; $('mMult').textContent = multBase();
+    $('menu').hidden = false; $('play').focus();
+  }
+  function missionRows(el) {
+    el.textContent = '';
+    missions.forEach((m, i) => {
+      const p = Math.min(m.n, Math.floor(save.mprog[i])), done = p >= m.n;
+      const d = document.createElement('div'); d.className = 'item' + (done ? ' done' : '');
+      d.innerHTML = `<span class="ic">${done ? '✅' : '🎯'}</span><div><b></b><span>${p} / ${m.n}</span><div class="bar"><i style="width:${p / m.n * 100}%"></i></div></div><span></span>`;
+      d.querySelector('b').textContent = t['m_' + m.k](m.n);
+      el.appendChild(d);
+    });
+  }
+  function showMissions() { hideAll(); $('missions').hidden = false; $('msub').textContent = t.setInfo(multBase() + 1); missionRows($('mlist')); $('mback').focus(); }
+  let shopTab = 'runners';
+  function showShop(focusId) {
+    hideAll(); $('shop').hidden = false; $('sBank').textContent = save.bank;
+    $('tabRunners').setAttribute('aria-selected', shopTab === 'runners'); $('tabUpg').setAttribute('aria-selected', shopTab !== 'runners');
+    const el = $('slist'); el.textContent = '';
+    const add = (icHtml, title, sub, label, enabled, onClick, id) => {
+      const d = document.createElement('div'); d.className = 'item';
+      d.innerHTML = `<span class="ic">${icHtml}</span><div><b></b><span class="desc"></span></div><button type="button" class="btn${enabled ? ' primary' : ''}"></button>`;
+      d.querySelector('b').textContent = title; d.querySelector('.desc').textContent = sub;
+      const b = d.querySelector('button'); b.textContent = label; b.disabled = !enabled; b.id = id; b.addEventListener('click', onClick);
+      el.appendChild(d);
+    };
+    if (shopTab === 'runners') RUNNERS.forEach((R, i) => {
+      const owned = save.owned.includes(i), cur = save.char === i;
+      add(`<i class="swatch" style="display:block;background:${R.body};border:4px solid ${R.hat}"></i>`, R.name, owned ? '' : '🪙 ' + R.price,
+        cur ? t.selected : owned ? t.select : t.buy, !cur && (owned || save.bank >= R.price), () => {
+          if (!owned) { save.bank -= R.price; save.owned.push(i); }
+          save.char = i; persist(); showShop('r' + i);
+        }, 'r' + i);
+    });
+    else POWER_KEYS.forEach(k => {
+      const lvl = save.upg[k], maxed = lvl >= 5, cost = maxed ? 0 : upgCost(lvl);
+      add(POWERS[k].ic, t[k], t.level(lvl, powerTime(k)) + (maxed ? '' : ' · 🪙 ' + cost), maxed ? t.max : t.buy, !maxed && save.bank >= cost, () => {
+        save.bank -= cost; save.upg[k]++; persist(); showShop('u' + k);
+      }, 'u' + k);
+    });
+    const f = focusId && $(focusId); (f && !f.disabled ? f : $('sback')).focus();
+  }
+  function pause() { if (S.state !== 'play') return; S.state = 'paused'; missionRows($('plist')); $('paused').hidden = false; $('resume').focus(); }
+  function resume() { if (S.state !== 'paused') return; S.state = 'play'; $('paused').hidden = true; last = performance.now(); canvas.focus({ preventScroll: true }); }
+
+  $('play').addEventListener('click', () => startRun());
+  $('openMissions').addEventListener('click', showMissions);
+  $('openShop').addEventListener('click', () => showShop());
+  $('mback').addEventListener('click', showMenu);
+  $('sback').addEventListener('click', showMenu);
+  $('tabRunners').addEventListener('click', () => { shopTab = 'runners'; showShop('tabRunners'); });
+  $('tabUpg').addEventListener('click', () => { shopTab = 'upg'; showShop('tabUpg'); });
+  $('pause').addEventListener('click', pause);
+  $('resume').addEventListener('click', resume);
+  $('quit').addEventListener('click', () => { persist(); showMenu(); });
+  $('omenu').addEventListener('click', showMenu);
+  $('oretry').addEventListener('click', () => startRun());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', ArrowDown: 'roll', KeyS: 'roll' };
+  addEventListener('keydown', e => {
+    if (e.code === 'KeyP' && (S.state === 'play' || S.state === 'paused')) { S.state === 'play' ? pause() : resume(); e.preventDefault(); return; }
+    const a = KEYS[e.code]; if (!a || S.state !== 'play') return;
+    e.preventDefault(); if (!e.repeat) act(a);
+  });
+
+  // Swipes anywhere on the track; a plain tap jumps.
+  const swipe = new Map();
+  canvas.addEventListener('pointerdown', e => { if (S.state !== 'play') return; swipe.set(e.pointerId, { x: e.clientX, y: e.clientY, done: false }); try { canvas.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+  canvas.addEventListener('pointermove', e => {
+    const s = swipe.get(e.pointerId); if (!s || s.done) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y, th = Math.max(18, Math.min(view.w, view.h) * 0.05);
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < th) return;
+    s.done = true; act(Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'jump' : 'roll'));
+  });
+  const up = e => { const s = swipe.get(e.pointerId); if (s && !s.done && e.type === 'pointerup') act('jump'); swipe.delete(e.pointerId); };
+  canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__railRush = {
+    state: () => ({ state: S.state, p: P && { lane: P.lane, x: P.x, y: P.y, z: P.z, v: P.v, roll: P.roll, ground: P.ground, power: { ...P.power }, stumbleT: P.stumbleT, score: P.score, coins: P.coins, dead: P.dead, why: P.why }, save: JSON.parse(JSON.stringify(save)), missions: missions.map(m => ({ k: m.k, n: m.n })) }),
+    ahead: d => objs.filter(o => o.z0 + o.len > P.z - 1 && o.z0 < P.z + d).map(o => ({ k: o.k, lane: o.lane, z0: o.z0, len: o.len, sp: o.sp, ramp: o.ramp, top: o.top })),
+    coinsAhead: d => coins.filter(c => c.z > P.z && c.z < P.z + d).length,
+    act,
+    give: k => { P.power[k] = powerTime(k); },
+    // Advance the fixed-step simulation synchronously (deterministic bot runs).
+    tick: (sec, policy) => { const n = Math.round(sec / STEP); for (let i = 0; i < n && S.state === 'play'; i++) { if (policy && i % 6 === 0) policy(); step(STEP); } return S.state; },
+    start: seed => startRun(seed),
+  };
+
+  new ResizeObserver(resize).observe(app);
+  newWorld(12345);
+  resize();
+  showMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

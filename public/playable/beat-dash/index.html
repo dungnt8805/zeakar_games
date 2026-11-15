@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beat Dash</title>
+<style>
+:root {
+  --bg: #0d0b1f;
+  --panel: #17143a;
+  --panel-2: #221d52;
+  --line: #3a3380;
+  --ink: #f4f1ff;
+  --muted: #a49fd0;
+  --cyan: #3ef0ff;
+  --pink: #ff4fa8;
+  --lime: #b6ff4a;
+  --gold: #ffd84a;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.app { position: fixed; inset: 0; }
+.view { position: absolute; inset: 0; overflow: hidden; background: #000; touch-action: none; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#game:focus-visible { outline: none; }
+
+.hud { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); pointer-events: none; }
+.app.menu .hud { visibility: hidden; }
+.hbtn { pointer-events: auto; flex: none; width: 40px; height: 36px; border-radius: 10px; background: #0d0b1fb0; box-shadow: inset 0 0 0 2px #ffffff26; display: grid; place-items: center; }
+.hbtn svg { width: 16px; height: 16px; fill: #fff; }
+.hbtn[hidden] { display: none; }
+.prog { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; background: #0d0b1fb0; box-shadow: inset 0 0 0 2px #ffffff26; }
+.bar { flex: 1; height: 8px; border-radius: 4px; background: #ffffff22; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+.pct { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: end; }
+.chip { flex: none; height: 36px; display: flex; align-items: center; padding: 0 10px; border-radius: 10px; background: #0d0b1fb0; box-shadow: inset 0 0 0 2px #ffffff26; font-size: 14px; font-weight: 900; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip.prac { color: var(--lime); }
+.chip[hidden] { display: none; }
+
+.overlay { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: #07061299; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 440px); max-height: calc(100% - 16px); overflow: auto; overscroll-behavior: contain; padding: 18px 16px 16px; border-radius: 18px; background: linear-gradient(#1d1946, var(--panel)); text-align: center; box-shadow: 0 0 0 2px var(--line), 0 0 40px #3ef0ff2a, 0 20px 50px #000a; animation: rise .25s ease-out; }
+@keyframes rise { from { transform: translateY(14px); opacity: 0; } }
+.logo { font-size: clamp(34px, 11vw, 52px); font-weight: 900; line-height: .95; letter-spacing: .02em; text-transform: uppercase; color: var(--cyan); text-shadow: 0 0 18px #3ef0ff88, 3px 3px 0 #0008; }
+.logo span { color: var(--pink); text-shadow: 0 0 18px #ff4fa888, 3px 3px 0 #0008; }
+.tag { margin-top: 8px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--muted); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 12px; padding: 4px; border-radius: 12px; background: #0d0b1f; }
+.seg button { min-height: 38px; border-radius: 9px; font-size: 15px; font-weight: 900; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 0 0 2px var(--cyan); }
+.seg button.pr[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--lime); }
+.levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; list-style: none; padding: 0; }
+.lv { width: 100%; min-height: 64px; display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 8px; align-items: center; padding: 7px 9px; border-radius: 12px; text-align: start; background: var(--panel-2); box-shadow: inset 0 0 0 2px #ffffff14, 0 4px 0 #0007; }
+.lv:active { transform: translateY(2px); }
+.lv .n { grid-row: span 3; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-weight: 900; font-size: 16px; color: #0d0b1f; background: hsl(var(--h) 95% 62%); box-shadow: 0 0 12px hsl(var(--h) 95% 62% / .55); }
+.lv.done .n::after { content: "✓"; }
+.lv.done .n b { display: none; }
+.lv strong { font-size: 14px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lv small { font-size: 11px; font-weight: 800; line-height: 1.35; color: var(--muted); overflow-wrap: anywhere; }
+.lv .mini { height: 5px; margin-top: 3px; border-radius: 3px; background: #ffffff1c; overflow: hidden; }
+.lv .mini i { display: block; height: 100%; width: var(--p, 0%); background: hsl(var(--h) 95% 62%); }
+.row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin-top: 12px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 12px; border-radius: 9px; background: #0d0b1f; font-size: 13px; font-weight: 800; }
+.toggle b { padding: 1px 8px; border-radius: 6px; background: #3a3380; font-size: 12px; }
+.toggle[aria-pressed="true"] b { background: var(--cyan); color: #0d0b1f; }
+.help { margin-top: 10px; font-size: 12px; font-weight: 700; line-height: 1.45; color: var(--muted); }
+.panel h2 { font-size: 26px; font-weight: 900; line-height: 1.15; }
+.panel .sub { margin-top: 4px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
+.stats div { min-width: 0; padding: 7px 2px; border-radius: 10px; background: #0d0b1f; }
+.stats small { display: block; font-size: 11px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats strong { display: block; font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.btn { flex: 1 1 120px; min-height: 46px; padding: 9px 12px; border-radius: 12px; background: var(--panel-2); font-size: 16px; font-weight: 900; box-shadow: inset 0 0 0 2px #ffffff22, 0 4px 0 #0008; }
+.btn.primary { flex-basis: 100%; background: linear-gradient(90deg, #19b8d6, #d6359a); text-shadow: 0 2px 0 #0005; }
+.btn:active { transform: translateY(3px); box-shadow: inset 0 0 0 2px #ffffff22, 0 1px 0 #0008; }
+.btn[hidden] { display: none; }
+.badge { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 9px; background: var(--gold); color: #0d0b1f; font-size: 13px; font-weight: 900; }
+.badge[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (min-aspect-ratio: 5/4) {
+  .title-panel { width: min(100%, 780px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0 20px; align-items: center; }
+  .title-panel .side { grid-row: span 2; }
+  .title-panel .levels { margin-top: 0; }
+}
+@media (max-height: 480px) and (min-aspect-ratio: 5/4) {
+  .panel { padding: 10px 14px; }
+  .logo { font-size: 34px; }
+  .tag { font-size: 12px; margin-top: 4px; }
+  .seg { margin-top: 8px; }
+  .seg button { min-height: 34px; }
+  .lv { min-height: 52px; padding: 5px 8px; }
+  .title-panel .levels { gap: 6px; }
+  .row { margin-top: 8px; }
+  .help { margin-top: 6px; font-size: 11px; }
+  .panel h2 { font-size: 21px; }
+  .stats { margin-top: 8px; }
+  .actions { margin-top: 10px; }
+  .btn { min-height: 40px; padding: 6px 10px; }
+  .hbtn, .prog, .chip { height: 32px; }
+}
+@media (max-height: 350px) and (min-aspect-ratio: 5/4) {
+  .tag, .help { display: none; }
+  .lv { min-height: 44px; grid-template-rows: auto auto; }
+  .lv small { display: none; }
+}
+@media (max-width: 360px) {
+  .panel { padding: 14px 10px 12px; }
+  .chip { padding: 0 7px; font-size: 13px; }
+  .hud { gap: 5px; }
+  .lv { padding: 6px 7px; column-gap: 6px; grid-template-columns: 28px minmax(0, 1fr); }
+  .lv .n { width: 28px; height: 28px; font-size: 14px; }
+}
+@media (max-height: 600px) and (max-aspect-ratio: 5/4) {
+  .logo { font-size: 32px; }
+  .tag { font-size: 12px; margin-top: 4px; }
+  .lv { min-height: 52px; padding: 5px 8px; }
+  .help { display: none; }
+}
+@media (max-height: 520px) and (max-aspect-ratio: 5/4) {
+  .tag { display: none; }
+  .logo { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app menu" id="app">
+  <div class="view" id="view">
+    <canvas id="game" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+    <div class="hud">
+      <button type="button" class="hbtn" id="pause-btn" data-i18n-label="pause"><svg viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1" width="2.6" height="8"/><rect x="5.9" y="1" width="2.6" height="8"/></svg></button>
+      <div class="prog"><div class="bar"><i id="bar"></i></div><span class="pct" id="pct">0%</span></div>
+      <div class="chip" id="att"></div>
+      <div class="chip prac" id="prac-chip" hidden></div>
+      <button type="button" class="hbtn" id="cp-add" data-i18n-label="cpAdd" hidden><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.2 5 5 9.2.8 5z"/></svg></button>
+      <button type="button" class="hbtn" id="cp-del" data-i18n-label="cpDel" hidden><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8" stroke="#fff" stroke-width="1.8" fill="none"/></svg></button>
+    </div>
+
+    <div class="overlay" id="title-ov">
+      <div class="panel title-panel" role="dialog" aria-modal="true" aria-labelledby="game-title">
+        <div class="side">
+          <h1 class="logo" id="game-title">Beat<span>Dash</span></h1>
+          <p class="tag" data-i18n="tagline"></p>
+          <div class="seg" role="group" data-i18n-label="mode">
+            <button type="button" id="m-normal" aria-pressed="true" data-i18n="normal"></button>
+            <button type="button" id="m-practice" class="pr" aria-pressed="false" data-i18n="practice"></button>
+          </div>
+          <div class="row"><button type="button" class="toggle" id="sound-btn" aria-pressed="true"><span data-i18n="sound"></span><b id="sound-state"></b></button></div>
+          <p class="help" id="help"></p>
+        </div>
+        <ul class="levels" id="levels"></ul>
+      </div>
+    </div>
+
+    <div class="overlay" id="pause-ov" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-h">
+        <h2 id="pause-h" data-i18n="paused"></h2>
+        <p class="sub" id="pause-sub"></p>
+        <div class="actions">
+          <button type="button" class="btn primary" id="resume-btn" data-i18n="resume"></button>
+          <button type="button" class="btn" id="restart-btn" data-i18n="restart"></button>
+          <button type="button" class="btn" id="quit-btn" data-i18n="menu"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="done-ov" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="done-h">
+        <h2 id="done-h"></h2>
+        <p class="sub" id="done-sub"></p>
+        <span class="badge" id="done-badge" hidden></span>
+        <div class="stats">
+          <div><small data-i18n="attempts"></small><strong id="d-att">1</strong></div>
+          <div><small data-i18n="jumps"></small><strong id="d-jumps">0</strong></div>
+          <div><small data-i18n="time"></small><strong id="d-time">0</strong></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="next-btn" data-i18n="next"></button>
+          <button type="button" class="btn" id="again-btn" data-i18n="again"></button>
+          <button type="button" class="btn" id="menu-btn" data-i18n="menu"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+<script>
+(() => {
+  'use strict';
+
+  const I18N = {
+    en: {
+      tagline: 'Tap to jump to the beat. Dodge spikes, flip gravity and fly the ship through 8 musical levels.',
+      normal: 'Normal', practice: 'Practice', mode: 'Mode', sound: 'Sound', on: 'On', off: 'Off',
+      helpKeys: 'Space, ↑ or click to jump (hold to keep jumping) · P pause · Practice: Z add checkpoint, X remove',
+      helpTouch: 'Tap to jump, hold to keep jumping or to fly the ship. Practice mode adds checkpoints.',
+      diff: ['Easy', 'Normal', 'Hard', 'Harder', 'Insane'],
+      bestN: n => `Best ${n}%`, levelN: n => `Level ${n}`, attemptN: n => `Attempt ${n}`, attShort: n => `#${n}`,
+      practiceOn: 'Practice', cpN: n => `${n} ◆`,
+      pause: 'Pause', paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Levels', next: 'Next level', again: 'Play again',
+      complete: 'Level complete!', practiceDone: 'Practice run complete!', practiceSub: 'Now try it without checkpoints.',
+      attempts: 'Attempts', jumps: 'Jumps', time: 'Time', newBest: n => `New best: ${n}%`,
+      crashed: n => `Crashed at ${n}%`, canvas: 'Beat Dash play area — tap or press Space to jump', cpAdd: 'Add checkpoint', cpDel: 'Remove checkpoint',
+      allDone: 'You beat every level!',
+    },
+    vi: {
+      tagline: 'Chạm để nhảy theo nhịp. Né gai, đảo trọng lực và lái phi thuyền qua 8 màn nhạc sôi động.',
+      normal: 'Thường', practice: 'Luyện tập', mode: 'Chế độ', sound: 'Âm thanh', on: 'Bật', off: 'Tắt',
+      helpKeys: 'Space, ↑ hoặc nhấp chuột để nhảy (giữ để nhảy liên tục) · P tạm dừng · Luyện tập: Z đặt điểm lưu, X xóa',
+      helpTouch: 'Chạm để nhảy, giữ để nhảy liên tục hoặc bay phi thuyền. Chế độ luyện tập có điểm lưu.',
+      diff: ['Dễ', 'Vừa', 'Khó', 'Rất khó', 'Siêu khó'],
+      bestN: n => `Tốt nhất ${n}%`, levelN: n => `Màn ${n}`, attemptN: n => `Lượt thử ${n}`, attShort: n => `#${n}`,
+      practiceOn: 'Luyện tập', cpN: n => `${n} ◆`,
+      pause: 'Tạm dừng', paused: 'Tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', menu: 'Chọn màn', next: 'Màn tiếp', again: 'Chơi lại',
+      complete: 'Hoàn thành màn!', practiceDone: 'Đã luyện xong cả màn!', practiceSub: 'Giờ hãy thử không dùng điểm lưu nhé.',
+      attempts: 'Lượt thử', jumps: 'Cú nhảy', time: 'Thời gian', newBest: n => `Kỷ lục mới: ${n}%`,
+      crashed: n => `Va chạm ở ${n}%`, canvas: 'Khu vực chơi Beat Dash — chạm hoặc nhấn Space để nhảy', cpAdd: 'Đặt điểm lưu', cpDel: 'Xóa điểm lưu',
+      allDone: 'Bạn đã vượt qua mọi màn!',
+    },
+    zh: {
+      tagline: '跟着节拍点击跳跃。躲开尖刺、翻转重力、驾驶飞船，闯过 8 个音乐关卡。',
+      normal: '普通', practice: '练习', mode: '模式', sound: '声音', on: '开', off: '关',
+      helpKeys: '空格、↑ 或点击跳跃（按住连续跳）· P 暂停 · 练习：Z 放置检查点，X 删除',
+      helpTouch: '点击跳跃，按住可连续跳或驾驶飞船上升。练习模式有检查点。',
+      diff: ['简单', '普通', '困难', '更难', '疯狂'],
+      bestN: n => `最佳 ${n}%`, levelN: n => `第 ${n} 关`, attemptN: n => `第 ${n} 次尝试`, attShort: n => `#${n}`,
+      practiceOn: '练习', cpN: n => `${n} ◆`,
+      pause: '暂停', paused: '已暂停', resume: '继续', restart: '重新开始', menu: '选关', next: '下一关', again: '再玩一次',
+      complete: '关卡完成！', practiceDone: '练习通关！', practiceSub: '现在试试不用检查点吧。',
+      attempts: '尝试', jumps: '跳跃', time: '用时', newBest: n => `新纪录：${n}%`,
+      crashed: n => `在 ${n}% 处撞毁`, canvas: 'Beat Dash 游戏区域——点击或按空格跳跃', cpAdd: '放置检查点', cpDel: '删除检查点',
+      allDone: '所有关卡全部通关！',
+    },
+    fr: {
+      tagline: 'Touchez pour sauter en rythme. Évitez les pics, inversez la gravité et pilotez le vaisseau dans 8 niveaux musicaux.',
+      normal: 'Normal', practice: 'Entraînement', mode: 'Mode', sound: 'Son', on: 'Oui', off: 'Non',
+      helpKeys: 'Espace, ↑ ou clic pour sauter (maintenez pour enchaîner) · P pause · Entraînement : Z pose un point de contrôle, X le retire',
+      helpTouch: 'Touchez pour sauter, maintenez pour enchaîner les sauts ou faire monter le vaisseau. L’entraînement ajoute des points de contrôle.',
+      diff: ['Facile', 'Normal', 'Difficile', 'Très difficile', 'Démentiel'],
+      bestN: n => `Record ${n} %`, levelN: n => `Niveau ${n}`, attemptN: n => `Essai ${n}`, attShort: n => `#${n}`,
+      practiceOn: 'Entraînement', cpN: n => `${n} ◆`,
+      pause: 'Pause', paused: 'Pause', resume: 'Reprendre', restart: 'Recommencer', menu: 'Niveaux', next: 'Niveau suivant', again: 'Rejouer',
+      complete: 'Niveau terminé !', practiceDone: 'Entraînement terminé !', practiceSub: 'Essayez maintenant sans points de contrôle.',
+      attempts: 'Essais', jumps: 'Sauts', time: 'Temps', newBest: n => `Nouveau record : ${n} %`,
+      crashed: n => `Crash à ${n} %`, canvas: 'Zone de jeu de Beat Dash — touchez ou appuyez sur Espace pour sauter', cpAdd: 'Poser un point de contrôle', cpDel: 'Retirer le point de contrôle',
+      allDone: 'Vous avez battu tous les niveaux !',
+    },
+    th: {
+      tagline: 'แตะเพื่อกระโดดตามจังหวะ หลบหนาม กลับแรงโน้มถ่วง และขับยานผ่าน 8 ด่านดนตรี',
+      normal: 'ปกติ', practice: 'ฝึกซ้อม', mode: 'โหมด', sound: 'เสียง', on: 'เปิด', off: 'ปิด',
+      helpKeys: 'Space, ↑ หรือคลิกเพื่อกระโดด (กดค้างเพื่อกระโดดต่อเนื่อง) · P หยุดชั่วคราว · ฝึกซ้อม: Z วางเช็กพอยต์, X ลบ',
+      helpTouch: 'แตะเพื่อกระโดด กดค้างเพื่อกระโดดต่อเนื่องหรือบังคับยานให้ลอยขึ้น โหมดฝึกซ้อมมีเช็กพอยต์',
+      diff: ['ง่าย', 'ปกติ', 'ยาก', 'ยากมาก', 'สุดโหด'],
+      bestN: n => `ดีที่สุด ${n}%`, levelN: n => `ด่าน ${n}`, attemptN: n => `ครั้งที่ ${n}`, attShort: n => `#${n}`,
+      practiceOn: 'ฝึกซ้อม', cpN: n => `${n} ◆`,
+      pause: 'หยุดชั่วคราว', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', menu: 'เลือกด่าน', next: 'ด่านถัดไป', again: 'เล่นอีกครั้ง',
+      complete: 'ผ่านด่านแล้ว!', practiceDone: 'ฝึกซ้อมจนจบด่านแล้ว!', practiceSub: 'ลองเล่นแบบไม่มีเช็กพอยต์ดูสิ',
+      attempts: 'จำนวนครั้ง', jumps: 'กระโดด', time: 'เวลา', newBest: n => `สถิติใหม่: ${n}%`,
+      crashed: n => `ชนที่ ${n}%`, canvas: 'พื้นที่เล่น Beat Dash — แตะหรือกด Space เพื่อกระโดด', cpAdd: 'วางเช็กพอยต์', cpDel: 'ลบเช็กพอยต์',
+      allDone: 'คุณผ่านครบทุกด่านแล้ว!',
+    },
+    ja: {
+      tagline: 'リズムに合わせてタップでジャンプ。トゲをよけ、重力を反転し、宇宙船を操って8つの音楽ステージを駆け抜けよう。',
+      normal: 'ノーマル', practice: '練習', mode: 'モード', sound: 'サウンド', on: 'オン', off: 'オフ',
+      helpKeys: 'スペース・↑・クリックでジャンプ（長押しで連続ジャンプ）· P 一時停止 · 練習：Z でチェックポイント設置、X で削除',
+      helpTouch: 'タップでジャンプ、長押しで連続ジャンプや宇宙船の上昇。練習モードではチェックポイントが使えます。',
+      diff: ['かんたん', 'ふつう', 'むずかしい', 'もっとむずかしい', '鬼'],
+      bestN: n => `ベスト ${n}%`, levelN: n => `ステージ ${n}`, attemptN: n => `挑戦 ${n} 回目`, attShort: n => `#${n}`,
+      practiceOn: '練習', cpN: n => `${n} ◆`,
+      pause: '一時停止', paused: '一時停止中', resume: '再開', restart: 'やり直す', menu: 'ステージ選択', next: '次のステージ', again: 'もう一度',
+      complete: 'ステージクリア！', practiceDone: '練習でゴール！', practiceSub: '次はチェックポイントなしで挑戦しよう。',
+      attempts: '挑戦回数', jumps: 'ジャンプ', time: 'タイム', newBest: n => `ベスト更新：${n}%`,
+      crashed: n => `${n}% でクラッシュ`, canvas: 'Beat Dash のプレイエリア — タップかスペースでジャンプ', cpAdd: 'チェックポイントを置く', cpDel: 'チェックポイントを消す',
+      allDone: '全ステージクリア！',
+    },
+    ko: {
+      tagline: '비트에 맞춰 탭해서 점프! 가시를 피하고 중력을 뒤집고 우주선을 몰아 8개의 음악 레벨을 돌파하세요.',
+      normal: '일반', practice: '연습', mode: '모드', sound: '사운드', on: '켬', off: '끔',
+      helpKeys: '스페이스, ↑ 또는 클릭으로 점프(누르고 있으면 연속 점프) · P 일시정지 · 연습: Z 체크포인트 놓기, X 지우기',
+      helpTouch: '탭하면 점프, 누르고 있으면 연속 점프하거나 우주선이 올라가요. 연습 모드에는 체크포인트가 있어요.',
+      diff: ['쉬움', '보통', '어려움', '매우 어려움', '극악'],
+      bestN: n => `최고 ${n}%`, levelN: n => `레벨 ${n}`, attemptN: n => `도전 ${n}회`, attShort: n => `#${n}`,
+      practiceOn: '연습', cpN: n => `${n} ◆`,
+      pause: '일시정지', paused: '일시정지', resume: '계속하기', restart: '다시 시작', menu: '레벨 선택', next: '다음 레벨', again: '다시 하기',
+      complete: '레벨 클리어!', practiceDone: '연습으로 끝까지 왔어요!', practiceSub: '이제 체크포인트 없이 도전해 보세요.',
+      attempts: '도전 횟수', jumps: '점프', time: '시간', newBest: n => `최고 기록: ${n}%`,
+      crashed: n => `${n}%에서 충돌`, canvas: 'Beat Dash 플레이 영역 — 탭하거나 스페이스를 눌러 점프', cpAdd: '체크포인트 놓기', cpDel: '체크포인트 지우기',
+      allDone: '모든 레벨을 클리어했어요!',
+    },
+  };
+  const LANGS = ['en', 'vi', 'zh', 'fr', 'th', 'ja', 'ko'];
+  const qLang = new URLSearchParams(location.search).get('lang');
+  const lang = LANGS.includes(qLang) ? qLang : 'en';
+  const T = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+
+  /*CORE*/
+  // Deterministic simulation (fixed 120 Hz ticks). Units are tiles and seconds.
+  const H = 9, CEIL = 9, DT = 1 / 120;
+  const G = 86, JV = 19, PADV = 26.5, SHIP_UP = 52, SHIP_G = 40, SHIP_V = 7.5, VMAX = 30;
+  const EMPTY = 0, BLOCK = 1, SPIKE = 2, SPIKE_D = 3, PAD = 4, PAD_D = 5, ORB = 6;
+  const CHARS = { '#': BLOCK, '^': SPIKE, 'v': SPIKE_D, 'p': PAD, 'q': PAD_D, 'o': ORB };
+  const PORTALS = 'GNSC';
+
+  // Chunks: b = rows aligned to the ground (last row is y=0), t = rows aligned to the ceiling (first row is y=8).
+  // Portals (G flip gravity, N normal gravity, S ship, C cube) trigger on their whole column.
+  const CHUNKS = {
+    gap: { b: ['......'] },
+    gap2: { b: ['............'] },
+    s1: { b: ['.......^.......'] },
+    s2: { b: ['.......^^.......'] },
+    s3: { b: ['.......^^^........'] },
+    ss: { b: ['.....^........^........^......'] },
+    sd: { b: ['.....^.......^^.......^.......'] },
+    steps: { b: ['.........##.........', '.....##..##..##.....'] },
+    plat: { b: ['....###^^###^^###^^###......'] },
+    pillar: { b: ['........##........', '......^.##.^......'] },
+    pad: { b: ['....p^^^^^.........'] },
+    padup: { b: ['........######.......', '........######.......', '....p...######.......'] },
+    orb: { b: ['.......o........', '................', '.....^^^^^^.....'] },
+    orb2: { b: ['.......o....o..........', '.....^^^^^^^^^^^.......'] },
+    stair3: { b: ['.............###...............', '....^^.###^^^###^^^###^^^......'] },
+    blocks: { b: ['.......#.....#.....##......', '....#..#..#..#..#..##..#...'] },
+    spikeblk: { b: ['......^#^......^#^.......'] },
+    flip: { t: ['............vv.......vvv.......v.v.........'], b: ['..G..................................N......'] },
+    flip2: { t: ['...........##....##.......##......', '..........................'], b: ['..G...........................N.......'] },
+    flip3: { t: ['............v..vv..vvv...........'], b: ['..G.........^..^^..^^^.......N.......'] },
+    ship: {
+      t: ['......####.......####.......####.........', '......####.......####.......####.........', '......####...............................'],
+      b: ['............####.......####...............', '............####.......####...............', '.S..........####.......####............C..'],
+    },
+    ship2: {
+      t: ['vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv....', '.........###............###...............', '.........###............###...............'],
+      b: ['...................###............###.......', '...................###............###.......', '.S^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^C...'],
+    },
+    ship3: {
+      t: ['..........##########.........##########.........', '..........##########.........##########.........', '..........##########...........................'],
+      b: ['......................##########................', '...........................................', '.S....................##########..............C.'],
+    },
+    padflip: { t: ['..........................'], b: ['....p..G...........vv....N.....'] },
+    triple: { b: ['.......^^^.......^^^.......'] },
+    fast: { b: ['....^.....^.....^.....^.....^......'] },
+    tower: { b: ['............##............', '.......##...##...##.......', '...##^^##^^^##^^^##^^##...'] },
+  };
+
+  const LEVELS = [
+    { key: 'pulse', speed: 9, bpm: 110, hue: 200, seq: ['gap2', 'blocks', 's1', 'ss', 's1', 'gap', 's1', 's2', 'gap', 'ss', 'steps', 's2', 'gap', 'blocks', 's1', 'pad', 's2', 'steps', 'ss', 'gap', 's2', 'plat', 'gap2'] },
+    { key: 'steps', speed: 9.5, bpm: 118, hue: 150, seq: ['gap2', 'sd', 'blocks', 'pad', 's2', 'steps', 'sd', 'pillar', 'plat', 'pad', 's3', 'blocks', 'padup', 'gap', 'spikeblk', 'steps', 'pillar', 'orb', 's3', 'plat', 'gap2'] },
+    { key: 'garden', speed: 10, bpm: 124, hue: 95, seq: ['gap2', 'steps', 'orb', 'sd', 'sd', 'orb', 'pillar', 'pad', 'padup', 's3', 'orb2', 'blocks', 'triple', 'spikeblk', 'pad', 'stair3', 'plat', 'orb', 'gap2'] },
+    { key: 'flip', speed: 10, bpm: 128, hue: 285, seq: ['gap2', 'flip3', 's2', 'steps', 's2', 'flip', 'steps', 's3', 'flip2', 'pillar', 'padflip', 'orb', 'flip3', 'plat', 'gap', 'flip', 'gap2'] },
+    { key: 'sky', speed: 10.5, bpm: 132, hue: 25, seq: ['gap2', 'ship3', 'orb', 'stair3', 'steps', 's3', 'pillar', 'ship', 'gap', 'orb', 'plat', 'ship3', 'pad', 'triple', 'ship', 'gap2'] },
+    { key: 'night', speed: 11, bpm: 138, hue: 330, seq: ['gap2', 'pillar', 'ship', 'triple', 'stair3', 'flip', 'ship2', 'gap', 'orb2', 'spikeblk', 'padflip', 'tower', 'flip3', 'fast', 'gap2'] },
+    { key: 'prism', speed: 11, bpm: 144, hue: 260, seq: ['gap2', 'pad', 'ship', 'fast', 'tower', 'ship3', 'gap', 'flip2', 'orb2', 'stair3', 'ship2', 'gap', 'triple', 'flip3', 'padup', 'gap2'] },
+    { key: 'wave', speed: 11.5, bpm: 150, hue: 0, seq: ['gap2', 'triple', 'tower', 'flip3', 'ship2', 'gap', 'stair3', 'orb2', 'padflip', 'ship3', 'gap', 'fast', 'flip', 'spikeblk', 'ship', 'gap', 'tower', 'gap2'] },
+  ];
+
+  function buildLevel(i) {
+    const def = LEVELS[i];
+    const cols = [];
+    const portal = [];
+    for (const name of def.seq) {
+      const c = CHUNKS[name];
+      const t = c.t || [], b = c.b || [];
+      const w = Math.max(0, ...t.map(r => r.length), ...b.map(r => r.length));
+      for (let x = 0; x < w; x++) {
+        const col = new Array(H).fill(EMPTY);
+        let p = null;
+        const put = (ch, y) => {
+          if (PORTALS.includes(ch)) p = ch;
+          else if (CHARS[ch]) col[y] = CHARS[ch];
+        };
+        t.forEach((r, k) => put(r[x] || '.', H - 1 - k));
+        b.forEach((r, k) => put(r[x] || '.', b.length - 1 - k));
+        cols.push(col);
+        portal.push(p);
+      }
+    }
+    for (let k = 0; k < 14; k++) { cols.push(new Array(H).fill(EMPTY)); portal.push(null); }
+    return { i, def, cols, portal, len: cols.length - 6, speed: def.speed };
+  }
+
+  function cellAt(lv, cx, cy) {
+    if (cx < 0 || cx >= lv.cols.length || cy < 0 || cy >= H) return EMPTY;
+    return lv.cols[cx][cy];
+  }
+
+  function newState(lv) {
+    return { tick: 0, x: 0, y: 0, vy: 0, g: 1, mode: 0, ground: true, dead: false, done: false, pc: 0, orb: -1, jumps: 0 };
+  }
+
+  const ov = (ax0, ay0, ax1, ay1, bx0, by0, bx1, by1) => ax0 < bx1 && ax1 > bx0 && ay0 < by1 && ay1 > by0;
+
+  // One tick. hold = jump/fly input held. Returns an event string or null.
+  function step(lv, s, hold) {
+    if (s.dead || s.done) return null;
+    let ev = null;
+    const gs = s.g;
+    if (s.mode === 0) {
+      if (s.ground && hold) { s.vy = JV * gs; s.ground = false; s.jumps++; ev = 'jump'; }
+      s.vy -= G * gs * DT;
+      if (s.vy > VMAX) s.vy = VMAX; else if (s.vy < -VMAX) s.vy = -VMAX;
+    } else {
+      s.vy += (hold ? SHIP_UP : -SHIP_G) * gs * DT;
+      if (s.vy > SHIP_V) s.vy = SHIP_V; else if (s.vy < -SHIP_V) s.vy = -SHIP_V;
+    }
+    s.x += lv.speed * DT;
+    s.y += s.vy * DT;
+    s.tick++;
+    s.ground = false;
+    if (s.y <= 0) { s.y = 0; if (s.vy * gs <= 0 || s.mode) { s.vy = 0; } if (gs === 1) s.ground = true; }
+    if (s.y + 1 >= CEIL) { s.y = CEIL - 1; if (s.vy * gs >= 0 || s.mode) { s.vy = 0; } if (gs === -1) s.ground = true; }
+
+    // Solid blocks: land on the side facing gravity (ship may slide on both), otherwise crash.
+    const x0 = s.x + 0.04, x1 = s.x + 0.96;
+    const tol = 0.3 + Math.abs(s.vy) * DT;
+    for (let cx = Math.floor(x0); cx <= Math.floor(x1); cx++) {
+      for (let cy = Math.max(0, Math.floor(s.y)); cy <= Math.min(H - 1, Math.floor(s.y + 0.999)); cy++) {
+        if (cellAt(lv, cx, cy) !== BLOCK) continue;
+        if (!ov(x0, s.y, x1, s.y + 1, cx, cy, cx + 1, cy + 1)) continue;
+        const fromTop = cy + 1 - s.y, fromBot = s.y + 1 - cy;
+        if (fromTop <= tol && s.vy <= 0.001 && (gs === 1 || s.mode)) { s.y = cy + 1; s.vy = 0; if (gs === 1) s.ground = true; }
+        else if (fromBot <= tol && s.vy >= -0.001 && (gs === -1 || s.mode)) { s.y = cy - 1; s.vy = 0; if (gs === -1) s.ground = true; }
+        else { s.dead = true; return 'crash'; }
+      }
+    }
+    // Hazards and pads (smaller hitbox).
+    const hx0 = s.x + 0.12, hx1 = s.x + 0.88, hy0 = s.y + 0.12, hy1 = s.y + 0.88;
+    for (let cx = Math.floor(s.x) - 1; cx <= Math.floor(s.x) + 1; cx++) {
+      for (let cy = Math.max(0, Math.floor(s.y) - 1); cy <= Math.min(H - 1, Math.floor(s.y) + 1); cy++) {
+        const c = cellAt(lv, cx, cy);
+        if (c === SPIKE && ov(hx0, hy0, hx1, hy1, cx + 0.32, cy, cx + 0.68, cy + 0.5)) { s.dead = true; return 'spike'; }
+        if (c === SPIKE_D && ov(hx0, hy0, hx1, hy1, cx + 0.32, cy + 0.5, cx + 0.68, cy + 1)) { s.dead = true; return 'spike'; }
+        if (c === PAD && ov(x0, s.y, x1, s.y + 1, cx + 0.1, cy, cx + 0.9, cy + 0.35) && s.vy * s.g <= 1) { s.vy = PADV * s.g; s.ground = false; ev = 'pad'; }
+        if (c === PAD_D && ov(x0, s.y, x1, s.y + 1, cx + 0.1, cy + 0.65, cx + 0.9, cy + 1) && s.vy * s.g <= 1) { s.vy = PADV * s.g; s.ground = false; ev = 'pad'; }
+        if (c === ORB && hold && !s.ground && s.mode === 0 && s.orb !== cx * H + cy && ov(x0, s.y, x1, s.y + 1, cx - 0.15, cy - 0.15, cx + 1.15, cy + 1.15)) {
+          s.vy = JV * s.g; s.orb = cx * H + cy; s.jumps++; ev = 'orb';
+        }
+      }
+    }
+    // Portals trigger when the cube's centre crosses their column.
+    const col = Math.floor(s.x + 0.5);
+    while (s.pc < col) {
+      s.pc++;
+      const p = lv.portal[s.pc];
+      if (!p) continue;
+      if (p === 'G' && s.g === 1) { s.g = -1; s.vy *= 0.4; s.ground = false; ev = 'flip'; }
+      else if (p === 'N' && s.g === -1) { s.g = 1; s.vy *= 0.4; s.ground = false; ev = 'flip'; }
+      else if (p === 'S' && s.mode === 0) { s.mode = 1; s.vy *= 0.3; s.ground = false; ev = 'ship'; }
+      else if (p === 'C' && s.mode === 1) { s.mode = 0; s.vy *= 0.5; ev = 'cube'; }
+    }
+    if (s.x >= lv.len) { s.done = true; return 'done'; }
+    return ev;
+  }
+
+  // Inputs are recorded as [startTick, endTick) hold ranges.
+  function runInputs(lv, ranges, maxTicks) {
+    const s = newState(lv);
+    let k = 0;
+    const lim = maxTicks || 1e6;
+    while (!s.dead && !s.done && s.tick < lim) {
+      while (k < ranges.length && ranges[k][1] <= s.tick) k++;
+      const hold = k < ranges.length && ranges[k][0] <= s.tick;
+      step(lv, s, hold);
+    }
+    return s;
+  }
+  /*END CORE*/
+
+  const NAMES = ['First Pulse', 'Neon Steps', 'Bass Garden', 'Flip Side', 'Sky Engine', 'Night Drive', 'Prism Storm', 'Final Wave'];
+  const DIFF = [0, 0, 1, 1, 2, 2, 3, 4];
+
+  // ---------- storage ----------
+  const KEY = 'milaan.beatDash.';
+  const load = (k, d) => { try { const v = localStorage.getItem(KEY + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
+  const prog = load('progress', {});
+  const pinfo = i => prog[i] || (prog[i] = { best: 0, prac: 0, att: 0, done: false });
+  let soundOn = load('sound', true) !== false;
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const app = $('app'), view = $('view'), cv = $('game'), ctx = cv.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isTouch = matchMedia('(pointer: coarse)').matches;
+  const announce = msg => { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = msg; }, 30); };
+
+  function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T[el.dataset.i18n]; });
+    document.querySelectorAll('[data-i18n-label]').forEach(el => { el.setAttribute('aria-label', T[el.dataset.i18nLabel]); });
+    $('help').textContent = isTouch ? T.helpTouch : T.helpKeys;
+  }
+
+  // ---------- game state ----------
+  let mode = 'menu';           // menu | play | dead | pause | done
+  let practice = false;
+  let lv = null, S = null, cur = 0;
+  let checkpoints = [];
+  let lastAutoCp = 0;
+  let deadT = 0, holdKeys = 0, holdPtr = new Set(), runStart = 0;
+  let autoplay = null, autoK = 0;
+  let parts = [], trail = [], rot = 0, shake = 0, flash = 0;
+
+  const holding = () => holdKeys > 0 || holdPtr.size > 0;
+
+  function renderLevels() {
+    const ul = $('levels');
+    ul.textContent = '';
+    LEVELS.forEach((d, i) => {
+      const p = pinfo(i);
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lv' + (p.done ? ' done' : '');
+      b.style.setProperty('--h', d.hue);
+      b.style.setProperty('--p', (practice ? p.prac : p.best) + '%');
+      const pct = practice ? p.prac : p.best;
+      b.innerHTML = `<span class="n" aria-hidden="true"><b>${i + 1}</b></span><strong></strong><small></small><span class="mini" aria-hidden="true"><i></i></span>`;
+      b.querySelector('strong').textContent = NAMES[i];
+      b.querySelector('small').textContent = `${T.diff[DIFF[i]]} · ${T.bestN(pct)}`;
+      b.setAttribute('aria-label', `${T.levelN(i + 1)}: ${NAMES[i]}, ${T.diff[DIFF[i]]}, ${T.bestN(pct)}`);
+      b.addEventListener('click', () => startLevel(i, practice));
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  function setMode(pr) {
+    practice = pr;
+    $('m-normal').setAttribute('aria-pressed', String(!pr));
+    $('m-practice').setAttribute('aria-pressed', String(pr));
+    renderLevels();
+  }
+
+  function showOverlay(id) {
+    ['title-ov', 'pause-ov', 'done-ov'].forEach(o => { $(o).hidden = o !== id; });
+    app.classList.toggle('menu', id === 'title-ov');
+    const ov = id && $(id);
+    if (ov) { const f = ov.querySelector('.btn.primary, .lv, button'); if (f) f.focus({ preventScroll: true }); }
+  }
+
+  function startLevel(i, pr) {
+    ensureAudio();
+    cur = i; practice = pr;
+    lv = buildLevel(i);
+    checkpoints = [];
+    const p = pinfo(i);
+    if (!pr) { p.att++; save('progress', prog); }
+    $('prac-chip').hidden = !pr;
+    $('cp-add').hidden = $('cp-del').hidden = !pr;
+    spawn(null);
+    showOverlay(null);
+    cv.focus({ preventScroll: true });
+  }
+
+  function spawn(from) {
+    S = from ? { ...from } : newState(lv);
+    lastAutoCp = S.x;
+    parts = []; trail = [];
+    rot = 0;
+    mode = 'play';
+    autoK = 0;
+    runStart = S.tick;
+    if (!from) { S.jumps = 0; }
+    updateHud();
+    startMusic(S.tick * DT);
+  }
+
+  function respawn() {
+    if (practice && checkpoints.length) spawn(checkpoints[checkpoints.length - 1]);
+    else {
+      if (!practice) { pinfo(cur).att++; save('progress', prog); }
+      spawn(null);
+    }
+  }
+
+  const pctOf = s => Math.max(0, Math.min(100, Math.floor(s.x / lv.len * 100)));
+
+  function updateHud() {
+    const p = pctOf(S);
+    $('bar').style.width = p + '%';
+    $('pct').textContent = p + '%';
+    $('att').textContent = practice ? T.cpN(checkpoints.length) : T.attShort(pinfo(cur).att);
+    $('prac-chip').textContent = T.practiceOn;
+  }
+
+  function die(why) {
+    mode = 'dead';
+    deadT = 0.75;
+    shake = reduced ? 0 : 0.35;
+    flash = 1;
+    stopMusic();
+    sfxCrash();
+    const cx = S.x + 0.5, cy = S.y + 0.5;
+    for (let k = 0; k < (reduced ? 10 : 28); k++) {
+      const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 9;
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.7 + Math.random() * 0.4, c: k % 2 ? '#fff' : `hsl(${lv.def.hue} 95% 65%)`, s: 0.12 + Math.random() * 0.2 });
+    }
+    const pct = pctOf(S), p = pinfo(cur);
+    if (practice) { if (pct > p.prac) p.prac = pct; }
+    else if (pct > p.best) { p.best = pct; announce(T.newBest(pct)); }
+    else announce(T.crashed(pct));
+    save('progress', prog);
+  }
+
+  function finish() {
+    mode = 'done';
+    stopMusic();
+    sfxWin();
+    const p = pinfo(cur);
+    const secs = (S.tick - runStart) * DT;
+    if (practice) p.prac = 100;
+    else { p.best = 100; p.done = true; }
+    save('progress', prog);
+    $('done-h').textContent = practice ? T.practiceDone : T.complete;
+    $('done-sub').textContent = practice ? T.practiceSub : `${T.levelN(cur + 1)} · ${NAMES[cur]}`;
+    const all = LEVELS.every((_, i) => pinfo(i).done);
+    $('done-badge').hidden = !(all && !practice);
+    $('done-badge').textContent = T.allDone;
+    $('d-att').textContent = practice ? '—' : p.att;
+    $('d-jumps').textContent = S.jumps;
+    $('d-time').textContent = secs.toFixed(1) + 's';
+    $('next-btn').hidden = cur >= LEVELS.length - 1;
+    showOverlay('done-ov');
+    if ($('next-btn').hidden) $('again-btn').focus({ preventScroll: true });
+    announce(practice ? T.practiceDone : T.complete);
+  }
+
+  function pause() {
+    if (mode !== 'play' && mode !== 'dead') return;
+    if (mode === 'dead') respawn();
+    mode = 'pause';
+    stopMusic();
+    holdKeys = 0; holdPtr.clear();
+    $('pause-sub').textContent = `${T.levelN(cur + 1)} · ${NAMES[cur]} · ${pctOf(S)}%`;
+    showOverlay('pause-ov');
+  }
+  function resume() {
+    if (mode !== 'pause') return;
+    showOverlay(null);
+    mode = 'play';
+    startMusic(S.tick * DT);
+    cv.focus({ preventScroll: true });
+  }
+  function toMenu() {
+    mode = 'menu';
+    stopMusic();
+    renderLevels();
+    showOverlay('title-ov');
+  }
+
+  // Practice checkpoints: only keep auto checkpoints from which the next 1.5 s can be survived.
+  function survivable(st) {
+    const lim = st.tick + 180;
+    const seen = new Set();
+    let n = 0;
+    const go = s => {
+      if (s.done || s.tick >= lim) return true;
+      if (s.dead || ++n > 4000) return false;
+      const k = `${s.tick}|${Math.round(s.y * 20)}|${Math.round(s.vy * 2)}|${s.g}|${s.mode}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      for (const h of [false, true]) { const t = { ...s }; for (let i = 0; i < 6 && !t.dead && !t.done; i++) step(lv, t, h); if (go(t)) return true; }
+      return false;
+    };
+    return go({ ...st });
+  }
+  function addCheckpoint(auto) {
+    if (!practice || mode !== 'play') return;
+    if (auto && !survivable(S)) return;
+    checkpoints.push({ ...S });
+    lastAutoCp = S.x;
+    updateHud();
+    if (!auto) sfxBlip(880);
+  }
+  function delCheckpoint() {
+    if (!practice || !checkpoints.length) return;
+    checkpoints.pop();
+    updateHud();
+    sfxBlip(330);
+  }
+
+  // ---------- music (WebAudio synth, locked to level time) ----------
+  let ac = null, master = null, musicTimer = 0, musicT0 = 0, nextStep = 0, song = null;
+  function ensureAudio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain();
+      master.gain.value = soundOn ? 0.5 : 0;
+      master.connect(ac.destination);
+    } catch (e) { ac = null; }
+  }
+  const SCALES = [[0, 3, 5, 7, 10], [0, 2, 3, 7, 8], [0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 3, 5, 7], [0, 3, 5, 6, 7], [0, 2, 3, 7, 10], [0, 1, 3, 7, 8]];
+  function makeSong(i) {
+    let seed = 1234 + i * 977;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const d = LEVELS[i];
+    const scale = SCALES[i];
+    const root = 45 + (i * 5) % 12;
+    const prog = [0, [3, 2, 4][i % 3], [4, 1, 3][i % 3], [2, 4, 1][i % 3]];
+    const motif = [];
+    for (let k = 0; k < 16; k++) motif.push(rnd() < (k % 2 ? 0.45 : 0.8) ? Math.floor(rnd() * 7) : -1);
+    return { stepDur: 60 / d.bpm / 4, scale, root, prog, motif, i };
+  }
+  const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+  const degNote = (sg, deg, oct) => sg.root + oct * 12 + sg.scale[((deg % 5) + 5) % 5] + 12 * Math.floor(deg / 5);
+  function tone(t, f, dur, type, vol, slide) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  let noiseBuf = null;
+  function noise(t, dur, vol, hp) {
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+    }
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = hp;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.02);
+  }
+  function playStep(n, t) {
+    const sg = song;
+    const bar = Math.floor(n / 16), k = n % 16;
+    const chord = sg.prog[bar % 4];
+    const intro = bar < 1;
+    if (k % 4 === 0) tone(t, 150, 0.16, 'sine', 0.9, 45);
+    if (k % 8 === 4) noise(t, 0.14, 0.35, 1400);
+    if (k % 4 === 2) noise(t, 0.04, 0.18, 7000);
+    if (intro) return;
+    if (k % 2 === 0) tone(t, freq(degNote(sg, chord + (k % 8 === 6 ? 2 : 0), -1) + (k % 4 === 2 ? 12 : 0)), sg.stepDur * 1.8, 'sawtooth', 0.12);
+    const m = sg.motif[(k + (bar % 8 >= 4 ? 4 : 0)) % 16];
+    if (m >= 0 && bar % 2 === 0 || m >= 0 && k < 8) tone(t, freq(degNote(sg, chord + m, 1)), sg.stepDur * 1.6, 'square', 0.07);
+    if (k === 0 && bar % 2 === 1) tone(t, freq(degNote(sg, chord + 4, 1)), sg.stepDur * 6, 'triangle', 0.1);
+  }
+  function startMusic(fromSec) {
+    stopMusic();
+    if (!ac || !soundOn) return;
+    song = makeSong(cur);
+    musicT0 = ac.currentTime + 0.05 - fromSec;
+    nextStep = Math.max(0, Math.ceil(fromSec / song.stepDur));
+    const pump = () => {
+      while (musicT0 + nextStep * song.stepDur < ac.currentTime + 0.12) {
+        const t = musicT0 + nextStep * song.stepDur;
+        if (t >= ac.currentTime - 0.01) playStep(nextStep, t);
+        nextStep++;
+      }
+    };
+    pump();
+    musicTimer = setInterval(pump, 25);
+  }
+  function stopMusic() { if (musicTimer) { clearInterval(musicTimer); musicTimer = 0; } }
+  function sfxCrash() { if (!ac || !soundOn) return; const t = ac.currentTime; noise(t, 0.35, 0.6, 300); tone(t, 220, 0.3, 'sawtooth', 0.2, 55); }
+  function sfxWin() { if (!ac || !soundOn) return; const t = ac.currentTime; [0, 4, 7, 12].forEach((s, k) => tone(t + k * 0.09, freq(64 + s), 0.5, 'triangle', 0.18)); }
+  function sfxBlip(f) { if (!ac || !soundOn) return; tone(ac.currentTime, f, 0.08, 'square', 0.08); }
+  function setSound(on) {
+    soundOn = on;
+    save('sound', on);
+    $('sound-btn').setAttribute('aria-pressed', String(on));
+    $('sound-state').textContent = on ? T.on : T.off;
+    if (master) master.gain.value = on ? 0.5 : 0;
+  }
+
+  // ---------- loop ----------
+  let acc = 0, last = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - (last || now)) / 1000);
+    last = now;
+    if (mode === 'play') {
+      acc += dt;
+      while (acc >= DT && mode === 'play') {
+        acc -= DT;
+        let h = holding();
+        if (autoplay) {
+          while (autoK < autoplay.length && autoplay[autoK][1] <= S.tick) autoK++;
+          h = autoK < autoplay.length && autoplay[autoK][0] <= S.tick;
+        }
+        const ev = step(lv, S, h);
+        if (ev === 'crash' || ev === 'spike') { die(ev); break; }
+        if (ev === 'done') { finish(); break; }
+        if (ev === 'pad' || ev === 'orb' || ev === 'flip' || ev === 'ship' || ev === 'cube') burst(ev);
+        if (practice && S.x - lastAutoCp > lv.speed * 3.5 && (S.ground || S.mode === 1)) addCheckpoint(true);
+      }
+      updateHud();
+    } else acc = 0;
+    if (mode === 'dead') { deadT -= dt; if (deadT <= 0) respawn(); }
+    tickFx(dt);
+    draw(now / 1000);
+    requestAnimationFrame(frame);
+  }
+  function burst(ev) {
+    const col = ev === 'pad' || ev === 'orb' ? '#ffd84a' : ev === 'flip' ? '#3ef0ff' : '#ff4fa8';
+    for (let k = 0; k < (reduced ? 4 : 12); k++) {
+      const a = Math.random() * Math.PI * 2;
+      parts.push({ x: S.x + 0.5, y: S.y + 0.5, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4, life: 0.4, c: col, s: 0.1 });
+    }
+  }
+  function tickFx(dt) {
+    for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 12 * dt; p.life -= dt; }
+    parts = parts.filter(p => p.life > 0);
+    if (shake > 0) shake = Math.max(0, shake - dt);
+    if (flash > 0) flash = Math.max(0, flash - dt * 3);
+    if (S && mode === 'play') {
+      if (S.mode === 0) {
+        if (S.ground) { const tgt = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2); rot += (tgt - rot) * Math.min(1, dt * 20); }
+        else rot += dt * 7.2 * S.g;
+      }
+      if (!reduced) trail.push({ x: S.x + 0.5, y: S.y + 0.5, life: 0.3 });
+    }
+    for (const t of trail) t.life -= dt;
+    trail = trail.filter(t => t.life > 0);
+  }
+
+  // ---------- drawing ----------
+  let W = 0, Hh = 0, dpr = 1, menuLv = null;
+  function resize() {
+    const r = view.getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = r.width; Hh = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr);
+  }
+  new ResizeObserver(resize).observe(view);
+
+  function draw(time) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const lvl = lv || menuLv || (menuLv = buildLevel(0));
+    const hue = lvl.def.hue;
+    const st = S || { x: -4 + (time * 4) % 400, y: 0, g: 1, mode: 0, tick: Math.floor(time * 120) };
+    // Keep the playfield (ceiling to a strip of floor) clear of the HUD row.
+    const hudH = 46;
+    const tile = Math.min((Hh - hudH) / 10.5, W / 15);
+    const top = hudH + Math.max(0, (Hh - hudH - tile * 10.5) / 2) + tile * 0.4;
+    const viewTiles = W / tile;
+    const camX = st.x - Math.min(5, viewTiles * 0.28);
+    const beat = (st.tick * DT) * lvl.def.bpm / 60;
+    const pulse = Math.pow(1 - (beat % 1), 3);
+    let ox = 0, oy = 0;
+    if (shake > 0) { ox = (Math.random() - 0.5) * shake * 30; oy = (Math.random() - 0.5) * shake * 30; }
+    const sx = x => (x - camX) * tile + ox;
+    const sy = y => top + (CEIL - y) * tile + oy;
+    // background
+    const g = ctx.createLinearGradient(0, 0, 0, Hh);
+    g.addColorStop(0, `hsl(${hue} 60% ${12 + pulse * 4}%)`);
+    g.addColorStop(1, `hsl(${hue + 30} 70% 6%)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
+    ctx.fillStyle = `hsl(${hue} 80% 60% / .07)`;
+    for (let k = 0; k < 14; k++) {
+      const s = tile * (1.5 + (k % 4));
+      const px = ((k * 197 - camX * tile * 0.25) % (W + s * 2) + W + s * 2) % (W + s * 2) - s;
+      const py = (k * 131) % Math.max(1, Hh);
+      ctx.fillRect(px, py, s, s);
+    }
+    // ceiling and floor bands
+    ctx.fillStyle = `hsl(${hue} 50% 8%)`;
+    ctx.fillRect(0, sy(0), W, Hh - sy(0));
+    ctx.fillRect(0, 0, W, sy(CEIL));
+    ctx.strokeStyle = `hsl(${hue} 95% ${60 + pulse * 20}%)`;
+    ctx.lineWidth = Math.max(2, tile * 0.07);
+    ctx.beginPath(); ctx.moveTo(0, sy(0)); ctx.lineTo(W, sy(0)); ctx.stroke();
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath(); ctx.moveTo(0, sy(CEIL)); ctx.lineTo(W, sy(CEIL)); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // floor grid
+    ctx.strokeStyle = `hsl(${hue} 90% 60% / .18)`;
+    ctx.lineWidth = 1;
+    for (let x = Math.floor(camX); x < camX + viewTiles + 2; x += 2) {
+      ctx.beginPath(); ctx.moveTo(sx(x), sy(0)); ctx.lineTo(sx(x) - tile * 0.6, Hh); ctx.stroke();
+    }
+    // level cells
+    const c0 = Math.max(0, Math.floor(camX) - 1), c1 = Math.min(lvl.cols.length - 1, Math.ceil(camX + viewTiles) + 1);
+    for (let cx = c0; cx <= c1; cx++) {
+      const col = lvl.cols[cx];
+      const p = lvl.portal[cx];
+      if (p) drawPortal(sx(cx), sy, tile, p, time);
+      for (let cy = 0; cy < H; cy++) {
+        const c = col[cy];
+        if (!c) continue;
+        const x = sx(cx), y = sy(cy + 1);
+        if (c === BLOCK) {
+          ctx.fillStyle = `hsl(${hue} 55% 14%)`;
+          ctx.fillRect(x, y, tile, tile);
+          ctx.strokeStyle = `hsl(${hue} 95% ${62 + pulse * 15}%)`;
+          ctx.lineWidth = Math.max(1.5, tile * 0.06);
+          const up = cellAt(lvl, cx, cy + 1) === BLOCK, dn = cellAt(lvl, cx, cy - 1) === BLOCK, lf = cellAt(lvl, cx - 1, cy) === BLOCK, rt = cellAt(lvl, cx + 1, cy) === BLOCK;
+          ctx.beginPath();
+          if (!up) { ctx.moveTo(x, y); ctx.lineTo(x + tile, y); }
+          if (!dn) { ctx.moveTo(x, y + tile); ctx.lineTo(x + tile, y + tile); }
+          if (!lf) { ctx.moveTo(x, y); ctx.lineTo(x, y + tile); }
+          if (!rt) { ctx.moveTo(x + tile, y); ctx.lineTo(x + tile, y + tile); }
+          ctx.stroke();
+          ctx.fillStyle = `hsl(${hue} 90% 60% / .12)`;
+          ctx.fillRect(x + tile * 0.25, y + tile * 0.25, tile * 0.5, tile * 0.5);
+        } else if (c === SPIKE || c === SPIKE_D) {
+          const d = c === SPIKE;
+          ctx.fillStyle = '#0d0b1f';
+          ctx.strokeStyle = '#f4f1ff';
+          ctx.lineWidth = Math.max(1.5, tile * 0.06);
+          ctx.beginPath();
+          if (d) { ctx.moveTo(x + tile * 0.08, y + tile); ctx.lineTo(x + tile / 2, y + tile * 0.1); ctx.lineTo(x + tile * 0.92, y + tile); }
+          else { ctx.moveTo(x + tile * 0.08, y); ctx.lineTo(x + tile / 2, y + tile * 0.9); ctx.lineTo(x + tile * 0.92, y); }
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        } else if (c === PAD || c === PAD_D) {
+          ctx.fillStyle = '#ffd84a';
+          ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = tile * 0.4;
+          ctx.beginPath();
+          if (c === PAD) ctx.ellipse(x + tile / 2, y + tile, tile * 0.42, tile * 0.22, 0, Math.PI, 0);
+          else ctx.ellipse(x + tile / 2, y, tile * 0.42, tile * 0.22, 0, 0, Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else if (c === ORB) {
+          const r = tile * (0.32 + pulse * 0.05);
+          ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = tile * 0.08;
+          ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = tile * 0.5;
+          ctx.beginPath(); ctx.arc(x + tile / 2, y + tile / 2, r, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = '#ffd84a88';
+          ctx.beginPath(); ctx.arc(x + tile / 2, y + tile / 2, r * 0.55, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+    }
+    // finish line
+    const fx = sx(lvl.len + 0.5);
+    if (fx < W + tile) {
+      for (let k = 0; k < CEIL * 2; k++) {
+        ctx.fillStyle = k % 2 ? '#ffffff' : '#0d0b1f';
+        ctx.fillRect(fx, sy(k / 2 + 0.5), tile * 0.5, tile * 0.5);
+        ctx.fillStyle = k % 2 ? '#0d0b1f' : '#ffffff';
+        ctx.fillRect(fx + tile * 0.5, sy(k / 2 + 0.5), tile * 0.5, tile * 0.5);
+      }
+    }
+    // checkpoints
+    for (const c of checkpoints) {
+      const x = sx(c.x + 0.5), y = sy(c.y + 0.5);
+      ctx.fillStyle = '#b6ff4a';
+      ctx.beginPath(); ctx.moveTo(x, y - tile * 0.35); ctx.lineTo(x + tile * 0.25, y); ctx.lineTo(x, y + tile * 0.35); ctx.lineTo(x - tile * 0.25, y); ctx.fill();
+    }
+    // trail + particles
+    for (const t of trail) {
+      ctx.fillStyle = `hsl(${hue} 95% 70% / ${t.life * 1.6})`;
+      const s = tile * 0.3 * t.life / 0.3;
+      ctx.fillRect(sx(t.x) - s / 2 - tile * 0.4, sy(t.y) - s / 2, s, s);
+    }
+    for (const p of parts) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+      ctx.fillStyle = p.c;
+      ctx.fillRect(sx(p.x) - p.s * tile / 2, sy(p.y) - p.s * tile / 2, p.s * tile, p.s * tile);
+    }
+    ctx.globalAlpha = 1;
+    // player
+    if (S && mode !== 'dead') drawPlayer(sx(S.x + 0.5), sy(S.y + 0.5), tile, hue);
+    else if (!S) drawPlayer(sx(st.x + 0.5), sy(0.5), tile, hue);
+    // attempt label floating at the start
+    if (S && !practice && mode !== 'menu') {
+      const lx = sx(3);
+      if (lx > -W) {
+        ctx.fillStyle = '#ffffffd0';
+        ctx.font = `900 ${Math.round(tile * 0.8)}px ${getComputedStyle(document.body).fontFamily}`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(T.attemptN(pinfo(cur).att), lx, sy(5.5));
+      }
+    }
+    if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.35})`; ctx.fillRect(0, 0, W, Hh); }
+  }
+
+  function drawPortal(x, sy, tile, p, time) {
+    const col = { G: '#ffd84a', N: '#3ef0ff', S: '#ff4fa8', C: '#b6ff4a' }[p];
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = tile * 0.14;
+    ctx.shadowColor = col; ctx.shadowBlur = tile * 0.6;
+    const y0 = sy(CEIL), y1 = sy(0);
+    ctx.beginPath(); ctx.ellipse(x + tile / 2, (y0 + y1) / 2, tile * 0.35, (y1 - y0) / 2 - tile * 0.1, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = col;
+    ctx.font = `900 ${Math.round(tile * 0.7)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const icon = { G: '⇅', N: '⇵', S: '▶', C: '■' }[p];
+    ctx.fillText(icon, x + tile / 2, (y0 + y1) / 2 + Math.sin(time * 4) * tile * 0.3);
+    ctx.textAlign = 'start';
+    ctx.restore();
+  }
+
+  function drawPlayer(x, y, tile, hue) {
+    const s = tile * 0.96;
+    ctx.save();
+    ctx.translate(x, y);
+    const ship = S && S.mode === 1;
+    if (ship) {
+      ctx.rotate(-Math.max(-0.5, Math.min(0.5, S.vy * 0.07)));
+      ctx.fillStyle = '#ff4fa8';
+      ctx.beginPath(); ctx.moveTo(-s * 0.7, s * 0.1); ctx.lineTo(s * 0.75, s * 0.25); ctx.lineTo(-s * 0.6, s * 0.5); ctx.closePath(); ctx.fill();
+      ctx.scale(0.62, 0.62);
+      ctx.translate(-s * 0.1, -s * 0.15);
+    } else ctx.rotate(rot);
+    ctx.shadowColor = `hsl(${hue} 95% 60%)`; ctx.shadowBlur = tile * 0.4;
+    ctx.fillStyle = '#3ef0ff';
+    ctx.fillRect(-s / 2, -s / 2, s, s);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#0d0b1f'; ctx.lineWidth = s * 0.08;
+    ctx.strokeRect(-s / 2 + s * 0.04, -s / 2 + s * 0.04, s * 0.92, s * 0.92);
+    ctx.fillStyle = '#ff4fa8';
+    ctx.fillRect(-s * 0.3, -s * 0.3, s * 0.6, s * 0.6);
+    ctx.fillStyle = '#0d0b1f';
+    const flip = S && S.g < 0 ? -1 : 1;
+    ctx.fillRect(-s * 0.2, -s * 0.14 * flip - s * 0.06, s * 0.12, s * 0.12);
+    ctx.fillRect(s * 0.08, -s * 0.14 * flip - s * 0.06, s * 0.12, s * 0.12);
+    ctx.fillRect(-s * 0.18, s * 0.1 * flip - s * 0.03, s * 0.38, s * 0.06);
+    ctx.restore();
+  }
+
+  // ---------- input ----------
+  const JUMP_KEYS = ['Space', 'ArrowUp', 'KeyW'];
+  const downKeys = new Set();
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') return;
+    if (mode === 'play' || mode === 'dead') {
+      if (JUMP_KEYS.includes(e.code)) {
+        e.preventDefault();
+        if (!downKeys.has(e.code)) { downKeys.add(e.code); holdKeys = downKeys.size; }
+        return;
+      }
+      if (e.code === 'KeyP') { e.preventDefault(); pause(); return; }
+      if (e.code === 'KeyZ') { e.preventDefault(); addCheckpoint(false); return; }
+      if (e.code === 'KeyX') { e.preventDefault(); delCheckpoint(); return; }
+    } else if (mode === 'pause' && e.code === 'KeyP') { e.preventDefault(); resume(); }
+  });
+  window.addEventListener('keyup', e => {
+    if (downKeys.delete(e.code)) holdKeys = downKeys.size;
+  });
+  window.addEventListener('blur', () => { downKeys.clear(); holdKeys = 0; holdPtr.clear(); });
+  view.addEventListener('pointerdown', e => {
+    if (e.target !== cv) return;
+    if (mode !== 'play' && mode !== 'dead') return;
+    e.preventDefault();
+    holdPtr.add(e.pointerId);
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  });
+  const up = e => { holdPtr.delete(e.pointerId); };
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+  cv.addEventListener('lostpointercapture', up);
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  $('m-normal').addEventListener('click', () => setMode(false));
+  $('m-practice').addEventListener('click', () => setMode(true));
+  $('sound-btn').addEventListener('click', () => { ensureAudio(); setSound(!soundOn); });
+  $('pause-btn').addEventListener('click', pause);
+  $('resume-btn').addEventListener('click', resume);
+  $('restart-btn').addEventListener('click', () => { checkpoints = practice ? checkpoints : []; startLevel(cur, practice); });
+  $('quit-btn').addEventListener('click', toMenu);
+  $('menu-btn').addEventListener('click', toMenu);
+  $('again-btn').addEventListener('click', () => startLevel(cur, practice));
+  $('next-btn').addEventListener('click', () => startLevel(Math.min(LEVELS.length - 1, cur + 1), practice));
+  $('cp-add').addEventListener('click', () => addCheckpoint(false));
+  $('cp-del').addEventListener('click', delCheckpoint);
+
+  applyI18n();
+  setSound(soundOn);
+  renderLevels();
+  showOverlay('title-ov');
+  resize();
+  requestAnimationFrame(frame);
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__beatDash = {
+    state: () => ({ mode, practice, level: cur, x: S && S.x, y: S && S.y, g: S && S.g, ship: S && S.mode === 1, tick: S && S.tick, pct: S ? pctOf(S) : 0, checkpoints: checkpoints.length, progress: JSON.parse(JSON.stringify(prog)) }),
+    levels: LEVELS.length,
+    levelLen: i => buildLevel(i).len,
+    simulate: (i, ranges) => { const s = runInputs(buildLevel(i), ranges); return { done: s.done, dead: s.dead, x: s.x, tick: s.tick }; },
+    start: (i, pr) => startLevel(i, !!pr),
+    autoplay: ranges => { autoplay = ranges; autoK = 0; },
+  };
+})();
+</script>
+</body>
+</html>

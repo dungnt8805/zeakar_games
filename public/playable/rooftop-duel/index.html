@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rooftop Duel</title>
+<style>
+:root {
+  --bg: #1b1530;
+  --panel: #2a2145;
+  --text: #fff6ea;
+  --muted: #b8aed0;
+  --p1: #ff7a59;
+  --p1-dark: #b8432a;
+  --p2: #49d3b4;
+  --p2-dark: #1f8a72;
+  --accent: #ffd23f;
+  --accent-dark: #b88d0c;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at 50% 0%, #3d2a5c, transparent 65%), var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  grid-template-columns: 1fr 1fr; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "c0 c1" "stage stage" "b0 b1"; }
+.card-0 { grid-area: c0; } .card-1 { grid-area: c1; }
+.btn-0 { grid-area: b0; } .btn-1 { grid-area: b1; }
+.solo .btn-0 { grid-column: 1 / -1; }
+.solo .btn-1 { display: none; }
+.stage { grid-area: stage; min-height: 0; min-width: 0; position: relative; }
+canvas { display: block; width: 100%; height: 100%; border-radius: 16px; touch-action: none; box-shadow: 0 0 0 2px #0006, 0 14px 36px #0009; }
+.card { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 14px; background: #ffffff10; box-shadow: inset 0 0 0 1px #ffffff1a; }
+.card-1 { flex-direction: row-reverse; text-align: right; }
+.face { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; position: relative; }
+.card-0 .face { background: var(--p1); } .card-1 .face { background: var(--p2); }
+.face::before, .face::after { content: ""; position: absolute; top: 11px; width: 5px; height: 6px; border-radius: 50%; background: #241a33; }
+.face::before { left: 8px; } .face::after { right: 8px; }
+.info { min-width: 0; flex: 1; }
+.name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; color: var(--muted); }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-1 .row { justify-content: flex-end; }
+.pips { display: flex; gap: 3px; flex-wrap: wrap; }
+.pips i { width: 11px; height: 11px; border-radius: 50%; background: #ffffff22; }
+.card-0 .pips i.on { background: var(--p1); box-shadow: 0 0 6px var(--p1); }
+.card-1 .pips i.on { background: var(--p2); box-shadow: 0 0 6px var(--p2); }
+.dmg { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.tools { display: flex; gap: 6px; flex: 0 0 auto; }
+.icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: #ffffff16; font-size: 16px; font-weight: 900; }
+.icon-btn:active { transform: translateY(1px); }
+.tools-float { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; }
+.tools-float .icon-btn { background: #1b1530b0; }
+.act { width: 100%; min-height: 64px; border-radius: 20px; font-size: 17px; font-weight: 900; color: #2a1406; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; }
+.act small { font-size: 12px; font-weight: 800; opacity: .75; }
+.btn-0 { background: var(--p1); box-shadow: 0 6px 0 var(--p1-dark); }
+.btn-1 { background: var(--p2); box-shadow: 0 6px 0 var(--p2-dark); color: #06261f; }
+.act.on { transform: translateY(4px); box-shadow: 0 2px 0 #0007; }
+.banner { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.banner span { padding: 10px 22px; border-radius: 18px; background: #1b1530d0; font-size: clamp(20px, 6vmin, 44px); font-weight: 900; text-align: center; box-shadow: 0 0 0 2px #ffd23f66; max-width: 90%; }
+.banner[hidden] { display: none; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: #0d0a18c4; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 410px); max-height: calc(100% - 8px); overflow-y: auto; background: #2a2145f7; border-radius: 24px; padding: 20px 18px; text-align: center; box-shadow: 0 0 0 1px #ffd23f44, 0 20px 50px #000a; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--accent); }
+.logo { display: flex; justify-content: center; gap: 10px; margin-bottom: 6px; }
+.logo svg { width: 64px; height: 44px; }
+.text { margin-top: 6px; font-size: 14px; color: #ddd3ee; line-height: 1.4; }
+.field { margin-top: 11px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #ffffff12; }
+.seg button { flex: 1; min-width: 0; padding: 8px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #4a3a20; color: var(--text); box-shadow: inset 0 0 0 1px #ffd23f99; }
+.picker { display: flex; align-items: center; gap: 8px; }
+.picker .icon-btn { flex: 0 0 auto; }
+.pick-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 800; text-align: center; line-height: 1.25; }
+.hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.final { margin-top: 8px; font-size: 42px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.final b:first-child { color: var(--p1); } .final b:last-child { color: var(--p2); }
+.cta { margin-top: 16px; width: 100%; padding: 14px; border-radius: 18px; background: var(--accent); color: #2a1f00; font-size: 19px; font-weight: 900; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; background: #ffffff14; font-size: 16px; font-weight: 800; box-shadow: inset 0 0 0 1px #ffffff1c; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Wide frames: rooftops at full height in the middle, each player's card and button in a side column. */
+@media (min-aspect-ratio: 5/4) {
+  .app { grid-template-columns: minmax(120px, 220px) minmax(0, 1fr) minmax(120px, 220px); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "c0 stage c1" "b0 stage b1"; }
+  .solo .btn-0 { grid-column: auto; }
+  .card { flex-direction: column; align-items: stretch; text-align: center; align-self: start; }
+  .card-1 { flex-direction: column; text-align: center; }
+  .face { align-self: center; }
+  .row, .card-1 .row { justify-content: center; }
+  .act { min-height: 0; height: 100%; max-height: 260px; align-self: end; border-radius: 24px; font-size: clamp(15px, 1.6vw, 22px); }
+  .act small { font-size: clamp(11px, 1vw, 14px); }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 430px) {
+  .app { grid-template-columns: minmax(104px, 160px) minmax(0, 1fr) minmax(104px, 160px); gap: 6px; }
+  .card { padding: 4px 6px; gap: 2px; }
+  .face { width: 22px; height: 22px; }
+  .face::before, .face::after { top: 7px; width: 4px; height: 5px; }
+  .face::before { left: 5px; } .face::after { right: 5px; }
+  .act { font-size: 15px; }
+}
+@media (max-aspect-ratio: 5/4) and (max-height: 560px) {
+  .act { min-height: 52px; }
+}
+@media (max-height: 520px) {
+  .panel { padding: 12px 14px; border-radius: 18px; }
+  .panel h2 { font-size: 22px; }
+  .logo { display: none; }
+  .field { margin-top: 7px; }
+  .cta { margin-top: 10px; padding: 10px; font-size: 17px; }
+  .text { font-size: 13px; }
+}
+@media (max-height: 460px) and (min-aspect-ratio: 4/3) {
+  #setup .panel { width: min(100%, 720px); display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; align-content: start; }
+  #setup .panel > :not(.field) { grid-column: 1 / -1; }
+  #setup .text, #record { display: none; }
+  #setup .hint { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app solo" id="app">
+  <section class="card card-0"><span class="face" aria-hidden="true"></span><div class="info"><span class="name" id="name-0"></span><div class="row"><span class="pips" id="pips-0"></span><strong class="dmg" id="dmg-0">0%</strong></div></div></section>
+  <section class="card card-1"><span class="face" aria-hidden="true"></span><div class="info"><span class="name" id="name-1"></span><div class="row"><span class="pips" id="pips-1"></span><strong class="dmg" id="dmg-1">0%</strong></div></div></section>
+  <div class="stage" id="stage">
+    <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+    <div class="tools tools-float"><button type="button" class="icon-btn" id="sound" data-i18n-label="sound">♪</button><button type="button" class="icon-btn" id="menu" data-i18n-label="menu">II</button></div>
+    <div class="banner" id="banner" hidden><span id="banner-text"></span></div>
+  </div>
+  <button type="button" class="act btn-0" id="btn-0"><span data-i18n="action"></span><small id="key-0"></small></button>
+  <button type="button" class="act btn-1" id="btn-1"><span data-i18n="action"></span><small id="key-1"></small></button>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 64 44"><rect x="0" y="30" width="26" height="14" fill="#5b4a86"/><rect x="38" y="30" width="26" height="14" fill="#5b4a86"/><circle cx="12" cy="12" r="7" fill="#ffd9b8"/><rect x="5" y="17" width="14" height="13" rx="5" fill="#ff7a59"/><rect x="16" y="19" width="12" height="4" rx="2" fill="#2d2440"/><circle cx="52" cy="12" r="7" fill="#ffd9b8"/><rect x="45" y="17" width="14" height="13" rx="5" fill="#49d3b4"/><rect x="36" y="19" width="12" height="4" rx="2" fill="#2d2440"/><path d="M5 8h14v-3h-14z" fill="#b8432a"/><path d="M45 8h14v-3h-14z" fill="#1f8a72"/></svg>
+    </div>
+    <h2 id="setup-title">Rooftop <span>Duel</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="cpu" data-i18n="vsCpu"></button><button type="button" data-value="pvp" data-i18n="twoP"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <div class="field"><p class="label" id="target-label" data-i18n="firstTo"></p><div class="seg" role="group" aria-labelledby="target-label" data-key="target"><button type="button" data-value="3"></button><button type="button" data-value="5"></button><button type="button" data-value="7"></button></div></div>
+    <div class="field"><p class="label" data-i18n="weapon"></p><div class="picker"><button type="button" class="icon-btn" id="weapon-prev" data-i18n-label="prev">‹</button><span class="pick-name" id="weapon-name" aria-live="polite"></span><button type="button" class="icon-btn" id="weapon-next" data-i18n-label="next">›</button></div></div>
+    <div class="field"><p class="label" data-i18n="map"></p><div class="picker"><button type="button" class="icon-btn" id="map-prev" data-i18n-label="prev">‹</button><span class="pick-name" id="map-name" aria-live="polite"></span><button type="button" class="icon-btn" id="map-next" data-i18n-label="next">›</button></div></div>
+    <p class="hint" id="hint"></p>
+    <p class="hint" id="record"></p>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused"></h2>
+    <p class="hint" id="pause-hint"></p>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <button type="button" class="ghost-btn" id="quit" data-i18n="change"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <h2 id="result-title"></h2>
+    <p class="final" id="final"><b></b> – <b></b></p>
+    <p class="hint" id="result-record"></p>
+    <button type="button" class="cta" id="rematch" data-i18n="rematch"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'One button each: hop, swing your arm, let go to fire. Knock your rival off the roof!', mode: 'Mode', vsCpu: 'vs Computer', twoP: '2 Players', difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', firstTo: 'First to', points: n => `${n} points`, weapon: 'Weapon', map: 'Rooftop', random: 'Random each round', weapons: { pistol: 'Pop pistol', scatter: 'Scatter blaster', sniper: 'Long shot', bomb: 'Bubble bomb' }, maps: ['Downtown', 'Water tower', 'Icy roofs', 'Windy heights', 'Tiny ledges', 'Window lift', 'Sunset steps'], prev: 'Previous', next: 'Next', start: 'Duel!', help: 'Hold your button to hop — your arm swings while you hold. Let go to shoot. Every hit pushes harder; knock your rival off the roof to score.', keys1: 'Keys: W, Space or ↑', keys2: 'Player 1: W or Space. Player 2: ↑ or Enter. On touch, each player has a big button.', key0: 'W / Space', key1: '↑ / Enter', action: 'Hop & shoot', you: 'You', cpu: 'CPU', p1: 'Player 1', p2: 'Player 2', round: n => `Round ${n}`, go: 'Go!', scoreYou: 'You score!', score: n => `${n} scores!`, draw: 'Both fell — no point', overtime: 'Overtime: double push!', wind: 'Wind', winYou: 'You win!', winCpu: 'CPU wins the duel', winP1: 'Player 1 wins!', winP2: 'Player 2 wins!', record: (w, l) => `Your record on this level: ${w} W · ${l} L`, rematch: 'Rematch', change: 'Change setup', menu: 'Pause', sound: 'Sound on/off', paused: 'Paused', resume: 'Resume', canvas: 'Rooftop Duel arena', hit: n => `${n} got hit`, fell: n => `${n} fell off the roof` },
+    vi: { tagline: 'Mỗi người một nút: nhảy, vung tay, thả ra để bắn. Hất đối thủ khỏi mái nhà!', mode: 'Chế độ', vsCpu: 'Đấu với máy', twoP: '2 người chơi', difficulty: 'Độ khó', easy: 'Dễ', normal: 'Vừa', hard: 'Khó', firstTo: 'Thắng trước', points: n => `${n} điểm`, weapon: 'Vũ khí', map: 'Mái nhà', random: 'Ngẫu nhiên mỗi hiệp', weapons: { pistol: 'Súng bắn bụp', scatter: 'Súng chùm', sniper: 'Súng tầm xa', bomb: 'Bom bong bóng' }, maps: ['Phố trung tâm', 'Tháp nước', 'Mái nhà băng', 'Đỉnh lộng gió', 'Gờ tường hẹp', 'Thang lau kính', 'Bậc thềm hoàng hôn'], prev: 'Trước', next: 'Sau', start: 'Quyết đấu!', help: 'Giữ nút để nhảy — tay cầm súng sẽ vung lên xuống khi bạn giữ. Thả ra để bắn. Mỗi phát trúng đẩy mạnh hơn; hất đối thủ khỏi mái để ghi điểm.', keys1: 'Phím: W, Space hoặc ↑', keys2: 'Người 1: W hoặc Space. Người 2: ↑ hoặc Enter. Trên màn hình cảm ứng, mỗi người có một nút lớn.', key0: 'W / Space', key1: '↑ / Enter', action: 'Nhảy & bắn', you: 'Bạn', cpu: 'Máy', p1: 'Người 1', p2: 'Người 2', round: n => `Hiệp ${n}`, go: 'Bắt đầu!', scoreYou: 'Bạn ghi điểm!', score: n => `${n} ghi điểm!`, draw: 'Cả hai cùng rơi — không ai có điểm', overtime: 'Hiệp phụ: lực đẩy gấp đôi!', wind: 'Gió', winYou: 'Bạn thắng!', winCpu: 'Máy thắng trận', winP1: 'Người 1 thắng!', winP2: 'Người 2 thắng!', record: (w, l) => `Thành tích ở mức này: ${w} thắng · ${l} thua`, rematch: 'Đấu lại', change: 'Đổi thiết lập', menu: 'Tạm dừng', sound: 'Bật/tắt âm thanh', paused: 'Tạm dừng', resume: 'Chơi tiếp', canvas: 'Đấu trường Rooftop Duel', hit: n => `${n} trúng đạn`, fell: n => `${n} rơi khỏi mái nhà` },
+    zh: { tagline: '每人一个按键：跳起、挥动手臂、松开开火。把对手撞下屋顶！', mode: '模式', vsCpu: '人机对战', twoP: '双人对战', difficulty: '难度', easy: '简单', normal: '普通', hard: '困难', firstTo: '先得', points: n => `${n} 分`, weapon: '武器', map: '屋顶', random: '每局随机', weapons: { pistol: '啵啵手枪', scatter: '散射枪', sniper: '远射枪', bomb: '泡泡炸弹' }, maps: ['市中心', '水塔', '冰封屋顶', '大风高楼', '窄窄檐台', '擦窗吊篮', '夕阳台阶'], prev: '上一个', next: '下一个', start: '决斗！', help: '按住按键起跳——按住时手臂会上下摆动，松开即开火。每次命中击退都会更强，把对手撞下屋顶即可得分。', keys1: '按键：W、空格或 ↑', keys2: '玩家 1：W 或空格。玩家 2：↑ 或回车。触屏时每位玩家各有一个大按钮。', key0: 'W / 空格', key1: '↑ / 回车', action: '跳跃并射击', you: '你', cpu: '电脑', p1: '玩家 1', p2: '玩家 2', round: n => `第 ${n} 局`, go: '开始！', scoreYou: '你得分了！', score: n => `${n} 得分！`, draw: '双双坠落，不得分', overtime: '加时：击退翻倍！', wind: '风', winYou: '你赢了！', winCpu: '电脑赢得决斗', winP1: '玩家 1 获胜！', winP2: '玩家 2 获胜！', record: (w, l) => `本难度战绩：${w} 胜 · ${l} 负`, rematch: '再来一局', change: '更改设置', menu: '暂停', sound: '声音开关', paused: '已暂停', resume: '继续', canvas: 'Rooftop Duel 战场', hit: n => `${n} 被击中`, fell: n => `${n} 掉下了屋顶` },
+    fr: { tagline: 'Un bouton chacun : sautez, balancez le bras, relâchez pour tirer. Faites tomber votre rival du toit !', mode: 'Mode', vsCpu: 'Contre l’ordi', twoP: '2 joueurs', difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile', firstTo: 'Premier à', points: n => `${n} points`, weapon: 'Arme', map: 'Toit', random: 'Au hasard à chaque manche', weapons: { pistol: 'Pistolet pop', scatter: 'Tromblon', sniper: 'Tir longue portée', bomb: 'Bombe à bulles' }, maps: ['Centre-ville', 'Château d’eau', 'Toits gelés', 'Hauteurs venteuses', 'Corniches étroites', 'Nacelle de laveur', 'Marches au couchant'], prev: 'Précédent', next: 'Suivant', start: 'En garde !', help: 'Maintenez votre bouton pour sauter : votre bras se balance tant que vous appuyez. Relâchez pour tirer. Chaque coup pousse plus fort ; faites tomber votre rival du toit pour marquer.', keys1: 'Touches : W, Espace ou ↑', keys2: 'Joueur 1 : W ou Espace. Joueur 2 : ↑ ou Entrée. Sur écran tactile, chacun a un grand bouton.', key0: 'W / Espace', key1: '↑ / Entrée', action: 'Saut & tir', you: 'Vous', cpu: 'Ordi', p1: 'Joueur 1', p2: 'Joueur 2', round: n => `Manche ${n}`, go: 'Partez !', scoreYou: 'Vous marquez !', score: n => `${n} marque !`, draw: 'Chute des deux, aucun point', overtime: 'Prolongation : poussée doublée !', wind: 'Vent', winYou: 'Victoire !', winCpu: 'L’ordi gagne le duel', winP1: 'Le joueur 1 gagne !', winP2: 'Le joueur 2 gagne !', record: (w, l) => `Votre bilan à ce niveau : ${w} V · ${l} D`, rematch: 'Revanche', change: 'Modifier', menu: 'Pause', sound: 'Son activé/coupé', paused: 'Pause', resume: 'Reprendre', canvas: 'Arène de Rooftop Duel', hit: n => `${n} est touché`, fell: n => `${n} est tombé du toit` },
+    th: { tagline: 'คนละหนึ่งปุ่ม: กระโดด แกว่งแขน ปล่อยเพื่อยิง ผลักคู่แข่งให้ตกหลังคา!', mode: 'โหมด', vsCpu: 'เล่นกับคอม', twoP: '2 ผู้เล่น', difficulty: 'ระดับ', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก', firstTo: 'ใครถึงก่อน', points: n => `${n} แต้ม`, weapon: 'อาวุธ', map: 'หลังคา', random: 'สุ่มทุกยก', weapons: { pistol: 'ปืนป๊อป', scatter: 'ปืนลูกปราย', sniper: 'ปืนยิงไกล', bomb: 'ระเบิดฟองสบู่' }, maps: ['ใจกลางเมือง', 'หอเก็บน้ำ', 'หลังคาน้ำแข็ง', 'ยอดตึกลมแรง', 'ขอบตึกแคบ', 'กระเช้าเช็ดกระจก', 'ขั้นบันไดยามเย็น'], prev: 'ก่อนหน้า', next: 'ถัดไป', start: 'ดวลกัน!', help: 'กดปุ่มค้างเพื่อกระโดด แขนจะแกว่งขึ้นลงขณะกดค้าง ปล่อยเพื่อยิง ยิ่งโดนยิงยิ่งกระเด็นแรง ผลักคู่แข่งตกหลังคาเพื่อทำแต้ม', keys1: 'ปุ่ม: W, Space หรือ ↑', keys2: 'ผู้เล่น 1: W หรือ Space ผู้เล่น 2: ↑ หรือ Enter บนจอสัมผัส แต่ละคนมีปุ่มใหญ่ของตัวเอง', key0: 'W / Space', key1: '↑ / Enter', action: 'กระโดดและยิง', you: 'คุณ', cpu: 'คอม', p1: 'ผู้เล่น 1', p2: 'ผู้เล่น 2', round: n => `ยกที่ ${n}`, go: 'เริ่ม!', scoreYou: 'คุณได้แต้ม!', score: n => `${n} ได้แต้ม!`, draw: 'ตกทั้งคู่ ไม่มีใครได้แต้ม', overtime: 'ต่อเวลา: แรงผลักสองเท่า!', wind: 'ลม', winYou: 'คุณชนะ!', winCpu: 'คอมชนะการดวล', winP1: 'ผู้เล่น 1 ชนะ!', winP2: 'ผู้เล่น 2 ชนะ!', record: (w, l) => `สถิติในระดับนี้: ชนะ ${w} · แพ้ ${l}`, rematch: 'ดวลอีกรอบ', change: 'เปลี่ยนการตั้งค่า', menu: 'พัก', sound: 'เปิด/ปิดเสียง', paused: 'พักเกม', resume: 'เล่นต่อ', canvas: 'สนามดวล Rooftop Duel', hit: n => `${n} โดนยิง`, fell: n => `${n} ตกหลังคา` },
+    ja: { tagline: 'ボタンはひとり1つ。ジャンプして腕を振り、離して発射。ライバルを屋上から落とそう！', mode: 'モード', vsCpu: 'CPU対戦', twoP: '2人対戦', difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', firstTo: '先取', points: n => `${n}ポイント`, weapon: '武器', map: '屋上', random: 'ラウンドごとにランダム', weapons: { pistol: 'ポップピストル', scatter: '散弾ブラスター', sniper: 'ロングショット', bomb: 'バブルボム' }, maps: ['ダウンタウン', '給水塔', '凍った屋根', '強風の屋上', 'せまい足場', '窓ふきゴンドラ', '夕焼けの段差'], prev: '前へ', next: '次へ', start: '勝負！', help: 'ボタンを押すとジャンプ、押している間は腕が上下に振れます。離すと発射。当たるたびに吹っ飛びが大きくなり、相手を屋上から落とせば得点です。', keys1: 'キー：W・スペース・↑', keys2: 'プレイヤー1：W かスペース。プレイヤー2：↑ かEnter。タッチ操作ではそれぞれに大きなボタンがあります。', key0: 'W / スペース', key1: '↑ / Enter', action: 'ジャンプ＆発射', you: 'あなた', cpu: 'CPU', p1: 'プレイヤー1', p2: 'プレイヤー2', round: n => `ラウンド${n}`, go: 'スタート！', scoreYou: 'あなたの得点！', score: n => `${n}の得点！`, draw: '両者落下（得点なし）', overtime: '延長戦：吹っ飛び2倍！', wind: '風', winYou: 'あなたの勝ち！', winCpu: 'CPUの勝ち', winP1: 'プレイヤー1の勝ち！', winP2: 'プレイヤー2の勝ち！', record: (w, l) => `この難易度の戦績：${w}勝 ${l}敗`, rematch: '再戦', change: '設定を変える', menu: '一時停止', sound: 'サウンド切替', paused: '一時停止中', resume: '再開', canvas: 'Rooftop Duel のステージ', hit: n => `${n}に命中`, fell: n => `${n}が屋上から落ちた` },
+    ko: { tagline: '버튼은 한 사람당 하나: 점프하고 팔을 흔들다 떼면 발사. 라이벌을 옥상에서 떨어뜨리세요!', mode: '모드', vsCpu: '컴퓨터 대전', twoP: '2인 대전', difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', firstTo: '선취', points: n => `${n}점`, weapon: '무기', map: '옥상', random: '라운드마다 무작위', weapons: { pistol: '뽁뽁 권총', scatter: '산탄 블래스터', sniper: '롱샷', bomb: '버블 폭탄' }, maps: ['도심', '급수탑', '얼음 지붕', '바람 부는 옥상', '좁은 난간', '창문 청소 곤돌라', '노을 계단'], prev: '이전', next: '다음', start: '대결!', help: '버튼을 누르면 점프하고, 누르고 있는 동안 팔이 위아래로 흔들립니다. 떼면 발사! 맞을수록 더 멀리 밀려나니 라이벌을 옥상에서 떨어뜨려 점수를 얻으세요.', keys1: '키: W, 스페이스 또는 ↑', keys2: '플레이어 1: W 또는 스페이스. 플레이어 2: ↑ 또는 Enter. 터치 화면에서는 각자 큰 버튼이 있습니다.', key0: 'W / 스페이스', key1: '↑ / Enter', action: '점프 & 발사', you: '나', cpu: 'CPU', p1: '플레이어 1', p2: '플레이어 2', round: n => `${n}라운드`, go: '시작!', scoreYou: '득점!', score: n => `${n} 득점!`, draw: '둘 다 떨어짐 — 점수 없음', overtime: '연장전: 밀어내기 두 배!', wind: '바람', winYou: '승리!', winCpu: 'CPU 승리', winP1: '플레이어 1 승리!', winP2: '플레이어 2 승리!', record: (w, l) => `이 난이도 전적: ${w}승 ${l}패`, rematch: '재대결', change: '설정 변경', menu: '일시정지', sound: '소리 켜기/끄기', paused: '일시정지', resume: '계속하기', canvas: 'Rooftop Duel 경기장', hit: n => `${n} 피격`, fell: n => `${n} 옥상에서 추락` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+  for (const b of document.querySelectorAll('[data-key="target"] button')) b.textContent = t.points(b.dataset.value);
+
+  // World units: rooftops are laid out in a 960×540 scene; the camera always shows the duel box and fills the rest with sky/buildings.
+  const BOX = { x0: 120, x1: 840, y0: 110, y1: 520 };
+  const GRAVITY = 1500, JUMP_V = 560, FALL_Y = 760, STEP = 1 / 120;
+  const ARM_MIN = -1.25, ARM_MAX = 0.75, ARM_SPEED = 2.4;
+  const OVERTIME = 35;
+  const WEAPON_IDS = ['pistol', 'scatter', 'sniper', 'bomb'];
+  // knock: push speed; cd: seconds between shots; pellets/spread for the scatter blaster; g: bullet gravity.
+  const WEAPONS = {
+    pistol: { speed: 950, knock: 260, dmg: 12, cd: 0.45, pellets: 1, spread: 0, life: 1.2, g: 0, recoil: 30, r: 4, color: '#ffd23f' },
+    scatter: { speed: 780, knock: 120, dmg: 6, cd: 0.8, pellets: 5, spread: 0.22, life: 0.75, g: 0, recoil: 50, r: 3.2, color: '#ff9bd2' },
+    sniper: { speed: 1700, knock: 420, dmg: 20, cd: 1.15, pellets: 1, spread: 0, life: 0.9, g: 0, recoil: 40, r: 3.5, color: '#9be7ff' },
+    bomb: { speed: 600, knock: 360, dmg: 16, cd: 1.0, pellets: 1, spread: 0, life: 2.2, g: 700, recoil: 40, r: 9, color: '#b78bff', blast: 80 },
+  };
+  // Platforms: { x, y, w, h } (h omitted = building down to the street); lift: { x0, x1? , y0, y1, period }.
+  const MAPS = [
+    { theme: 'night', friction: 12, plats: [{ x: 130, y: 380, w: 260 }, { x: 570, y: 380, w: 260 }], spawn: [250, 710] },
+    { theme: 'day', friction: 12, plats: [{ x: 130, y: 395, w: 265 }, { x: 565, y: 395, w: 265 }, { x: 456, y: 345, w: 48, tower: true }], spawn: [250, 710] },
+    { theme: 'snow', friction: 3, plats: [{ x: 150, y: 370, w: 250 }, { x: 560, y: 370, w: 250 }], spawn: [265, 695] },
+    { theme: 'dusk', friction: 12, wind: 260, plats: [{ x: 130, y: 400, w: 250 }, { x: 580, y: 400, w: 250 }], spawn: [245, 715] },
+    { theme: 'night', friction: 12, plats: [{ x: 185, y: 360, w: 150 }, { x: 625, y: 360, w: 150 }, { x: 425, y: 455, w: 110, h: 18, ledge: true }], spawn: [255, 705] },
+    { theme: 'day', friction: 12, plats: [{ x: 130, y: 390, w: 250 }, { x: 580, y: 390, w: 250 }, { x: 435, y: 300, w: 90, h: 14, lift: { y0: 270, y1: 460, period: 5 } }], spawn: [245, 715] },
+    { theme: 'sunset', friction: 12, plats: [{ x: 110, y: 425, w: 150 }, { x: 250, y: 365, w: 150 }, { x: 560, y: 365, w: 150 }, { x: 700, y: 425, w: 150 }], spawn: [320, 640] },
+  ];
+  const THEMES = {
+    night: { sky: ['#1a1440', '#3b2a6b', '#6b4a8c'], far: '#2a2152', wall: '#3d3466', wall2: '#2f2852', win: '#ffd86b', ledge: '#5c5090', star: true },
+    day: { sky: ['#6cc4ff', '#a9e0ff', '#e6f7ff'], far: '#9cc3dd', wall: '#c98a6b', wall2: '#b07558', win: '#7fd0ff', ledge: '#8f5a43', star: false },
+    snow: { sky: ['#8fb3d9', '#c5dbef', '#eef5fb'], far: '#a9bfd6', wall: '#7f8fae', wall2: '#6d7c99', win: '#ffe9a8', ledge: '#f4f8ff', star: false, snow: true },
+    dusk: { sky: ['#2d3a6b', '#6a5a9e', '#e09a8a'], far: '#4b4a7e', wall: '#5a4d7d', wall2: '#4a3f68', win: '#ffcf7a', ledge: '#7c6aa6', star: true },
+    sunset: { sky: ['#ff9a5a', '#ffc27a', '#ffe7a8'], far: '#d98a6a', wall: '#8a4f6b', wall2: '#733f59', win: '#ffe08a', ledge: '#5c3248', star: false },
+  };
+  // react: delay before acting on a decision; skip: chance to ignore a good shot; tol: aim slack (world units); wait: pause between hops; dodge: hops over incoming shots.
+  const AI = {
+    easy: { react: 0.18, skip: 0.3, tol: 8, wait: [0.9, 1.8], dodge: 0, hold: 2.2 },
+    normal: { react: 0.06, skip: 0.1, tol: 10, wait: [0.45, 1.0], dodge: 0.35, hold: 2.4 },
+    hard: { react: 0, skip: 0, tol: 14, wait: [0.15, 0.45], dodge: 0.9, hold: 2.6 },
+  };
+  const KEY = 'milaan.rooftopDuel.';
+  const COLORS = ['#ff7a59', '#49d3b4'], DARKS = ['#b8432a', '#1f8a72'];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(KEY + key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(KEY + key, JSON.stringify(value)); } catch {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  const settings = Object.assign({ mode: 'cpu', level: 'normal', target: '5', weapon: -1, map: -1, sound: true }, read('settings', {}));
+  if (!AI[settings.level]) settings.level = 'normal';
+  if (settings.mode !== 'pvp') settings.mode = 'cpu';
+  settings.target = String(settings.target);
+  if (!['3', '5', '7'].includes(settings.target)) settings.target = '5';
+  if (!(settings.weapon >= -1 && settings.weapon < WEAPON_IDS.length)) settings.weapon = -1;
+  if (!(settings.map >= -1 && settings.map < MAPS.length)) settings.map = -1;
+  const stats = Object.assign({ easy: { w: 0, l: 0 }, normal: { w: 0, l: 0 }, hard: { w: 0, l: 0 } }, read('stats', {}));
+
+  const game = { state: 'menu', round: 0, score: [0, 0], target: 5, map: null, mapIndex: 0, weapon: 'pistol', players: [], bullets: [], fx: [], flakes: [], time: 0, roundTime: 0, wind: 0, windTimer: 0, overtime: false, endTimer: 0, firstOut: -1, outAt: 0, timer: 0, lastMap: -1 };
+  const autopilot = [null, null];
+  let view = { s: 1, ox: 0, oy: 0, w: 960, h: 540 }, dpr = 1;
+  let audio = null;
+
+  // ---------- Players ----------
+  function makePlayer(i, x, y) {
+    return { i, x, y, vx: 0, vy: 0, a: 0, va: 0, ground: null, face: i ? -1 : 1, hold: false, arm: 0.15, armDir: -1, cd: 0.3, dmg: 0, out: false, squash: 0, hitT: 0, blink: rand(1, 4) };
+  }
+  const up = p => ({ x: Math.sin(p.a), y: -Math.cos(p.a) });
+  const bodyPt = (p, d) => { const u = up(p); return { x: p.x + u.x * d, y: p.y + u.y * d }; };
+  function aimAngle(p) { return p.face > 0 ? p.arm + p.a : Math.PI - p.arm + p.a; }
+  function muzzle(p) { const s = bodyPt(p, 34), ang = aimAngle(p); return { x: s.x + Math.cos(ang) * 30, y: s.y + Math.sin(ang) * 30, ang }; }
+  function platY(pl) { return pl.lift ? pl.lift.y0 + (pl.lift.y1 - pl.lift.y0) * (0.5 - 0.5 * Math.cos(game.time * 2 * Math.PI / pl.lift.period)) : pl.y; }
+  function platH(pl) { return pl.h || 2000; }
+  function solidAt(x, y) {
+    for (const pl of game.map.plats) { const py = platY(pl); if (x >= pl.x && x <= pl.x + pl.w && y >= py && y <= py + platH(pl)) return true; }
+    return false;
+  }
+
+  function press(i) {
+    const p = game.players[i];
+    if (!p || p.out || p.hold || game.state !== 'play') return;
+    p.hold = true; p.arm = 0; p.armDir = 1;
+    if (p.ground) {
+      p.vy = -JUMP_V; p.vx += Math.sin(p.a) * 100; p.va -= p.a * 4; p.ground = null; p.squash = 1;
+      sfx(380, 0.1, 'triangle', 0.05);
+    }
+  }
+  function release(i) {
+    const p = game.players[i];
+    if (!p || !p.hold) return;
+    p.hold = false;
+    if (game.state === 'play' && !p.out && p.cd <= 0) fire(p);
+  }
+  function fire(p) {
+    const W = WEAPONS[game.weapon], m = muzzle(p);
+    for (let k = 0; k < W.pellets; k++) {
+      const ang = m.ang + (W.pellets > 1 ? (k / (W.pellets - 1) - 0.5) * 2 * W.spread : 0);
+      game.bullets.push({ x: m.x, y: m.y, vx: Math.cos(ang) * W.speed, vy: Math.sin(ang) * W.speed, owner: p.i, life: W.life });
+    }
+    p.cd = W.cd;
+    p.vx -= Math.cos(m.ang) * W.recoil;
+    p.va -= p.face * 0.35;
+    puff(m.x, m.y, '#fff3b0', 5);
+    sfx(game.weapon === 'sniper' ? 900 : game.weapon === 'bomb' ? 220 : 620, 0.12, 'square', 0.04);
+  }
+
+  function hitPlayer(p, dir, W, mult, head) {
+    const power = W.knock * (1 + p.dmg / 50) * mult * (game.overtime ? 2 : 1) * (head ? 1.35 : 1);
+    p.vx += dir.x * power;
+    p.vy += Math.min(dir.y * power, 0) * 0.5 - power * 0.45 - 110;
+    p.va += Math.sign(dir.x || 1) * power / 90;
+    p.dmg += W.dmg * (head ? 1.5 : 1);
+    p.ground = null; p.hitT = 0.4;
+    const b = bodyPt(p, head ? 46 : 24);
+    game.fx.push({ kind: 'pow', x: b.x, y: b.y - 10, t: 0, life: 0.6, text: head ? 'BONK!' : 'POW!' });
+    stars(b.x, b.y);
+    sfx(head ? 180 : 140, 0.18, 'sawtooth', 0.06);
+    announce(t.hit(nameOf(p.i)));
+  }
+  function explode(x, y, owner) {
+    const W = WEAPONS.bomb;
+    game.fx.push({ kind: 'ring', x, y, t: 0, life: 0.4, r: W.blast });
+    for (let k = 0; k < 12; k++) game.fx.push({ kind: 'bubble', x, y, vx: rand(-160, 160), vy: rand(-200, 60), t: 0, life: rand(0.4, 0.8), r: rand(3, 7) });
+    sfx(90, 0.3, 'triangle', 0.08);
+    for (const p of game.players) {
+      if (p.out) continue;
+      const c = bodyPt(p, 26), dx = c.x - x, dy = c.y - y, d = Math.hypot(dx, dy);
+      if (d > W.blast + 14) continue;
+      const f = 1 - d / (W.blast + 14);
+      hitPlayer(p, { x: dx / (d || 1), y: dy / (d || 1) }, W, (p.i === owner ? 0.5 : 1) * (0.4 + f), false);
+    }
+  }
+
+  // ---------- Simulation ----------
+  function stepPlayer(p, dt) {
+    if (p.out) return;
+    const m = game.map;
+    p.cd = Math.max(0, p.cd - dt);
+    p.hitT = Math.max(0, p.hitT - dt);
+    p.squash = Math.max(0, p.squash - dt * 4);
+    const foe = game.players[1 - p.i];
+    if (foe && !foe.out && Math.abs(foe.x - p.x) > 4) p.face = foe.x > p.x ? 1 : -1;
+    if (p.hold) {
+      p.arm += p.armDir * ARM_SPEED * dt;
+      if (p.arm < ARM_MIN) { p.arm = ARM_MIN; p.armDir = 1; }
+      if (p.arm > ARM_MAX) { p.arm = ARM_MAX; p.armDir = -1; }
+    } else p.arm += (0.15 - p.arm) * Math.min(1, dt * 8);
+
+    const prevY = p.y;
+    if (p.ground) {
+      const gy = platY(p.ground);
+      p.y = gy;
+      p.vx *= Math.exp(-m.friction * dt);
+      // Wobble: a tilted body slides the feet the way it leans, and the spring pulls it back upright.
+      p.vx += Math.sin(p.a) * 180 * dt;
+      p.va += (-p.a * 34 - p.va * 5) * dt;
+      // Idle fighters shuffle back towards their home spot, so recoil alone never walks anyone off.
+      if (!p.hold && Math.abs(p.a) < 0.3 && Math.abs(p.vx) < 60 && p.home !== undefined && Math.abs(p.home - p.x) > 4) p.x += Math.sign(p.home - p.x) * 38 * dt;
+      p.x += p.vx * dt;
+      if (p.x < p.ground.x - 6 || p.x > p.ground.x + p.ground.w + 6) p.ground = null;
+    } else {
+      p.vy += GRAVITY * dt;
+      p.vx += (game.wind * 0.25) * dt;
+      p.vx *= Math.exp(-0.25 * dt);
+      p.va += (-p.a * 7 - p.va * 0.8) * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    p.a += p.va * dt;
+    if (p.a > Math.PI) p.a -= 2 * Math.PI;
+    if (p.a < -Math.PI) p.a += 2 * Math.PI;
+
+    for (const pl of m.plats) {
+      const py = platY(pl), x0 = pl.x, x1 = pl.x + pl.w, bottom = py + platH(pl);
+      if (!p.ground && p.vy >= 0 && p.x >= x0 - 6 && p.x <= x1 + 6) {
+        const prevTop = pl.lift ? py - 8 : py;
+        if (prevY <= prevTop + 1 && p.y >= py) {
+          p.y = py; p.ground = pl;
+          if (p.vy > 420) { p.squash = 1; p.va += (Math.random() - 0.5) * 0.8; }
+          p.vy = 0;
+          continue;
+        }
+      }
+      // Side walls of buildings (and the underside of thin ledges).
+      if (p.ground !== pl && p.y > py + 2 && p.y - 50 < bottom && p.x > x0 - 9 && p.x < x1 + 9) {
+        if (pl.h && p.vy < 0 && prevY - 50 >= bottom - 2) { p.vy = 0; p.y = bottom + 50; continue; }
+        if (p.x < (x0 + x1) / 2) { p.x = x0 - 9; if (p.vx > 0) p.vx *= -0.3; } else { p.x = x1 + 9; if (p.vx < 0) p.vx *= -0.3; }
+      }
+    }
+    if (p.y > FALL_Y || p.x < -200 || p.x > 1160) knockOut(p);
+  }
+
+  function stepBullets(dt) {
+    const W = WEAPONS[game.weapon];
+    for (let k = game.bullets.length - 1; k >= 0; k--) {
+      const b = game.bullets[k];
+      b.vy += W.g * dt;
+      b.vx += game.wind * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.life -= dt;
+      let gone = b.life <= 0 || b.y > FALL_Y || b.x < -100 || b.x > 1060;
+      if (!gone && solidAt(b.x, b.y)) {
+        gone = true;
+        if (W.blast) explode(b.x, b.y, b.owner); else puff(b.x, b.y, '#ffffff', 4);
+      }
+      if (!gone) for (const p of game.players) {
+        if (p.out || p.i === b.owner) continue;
+        const head = bodyPt(p, 46), body = bodyPt(p, 24);
+        const hh = Math.hypot(b.x - head.x, b.y - head.y) < 12 + W.r, hb = Math.hypot(b.x - body.x, b.y - body.y) < 16 + W.r;
+        if (!hh && !hb) continue;
+        gone = true;
+        if (W.blast) explode(b.x, b.y, b.owner);
+        else { const sp = Math.hypot(b.vx, b.vy) || 1; hitPlayer(p, { x: b.vx / sp, y: b.vy / sp }, W, 1, hh && !hb ? true : hh && b.y < head.y + 4); }
+        break;
+      }
+      if (gone) game.bullets.splice(k, 1);
+    }
+  }
+
+  function knockOut(p) {
+    p.out = true; p.hold = false;
+    announce(t.fell(nameOf(p.i)));
+    sfx(700, 0.6, 'sine', 0.05);
+    if (game.state !== 'play' && game.state !== 'roundEnd') return;
+    if (game.firstOut < 0) {
+      game.firstOut = p.i; game.outAt = game.roundTime;
+      game.state = 'roundEnd'; game.endTimer = 1.6;
+      const winner = 1 - p.i;
+      game.score[winner]++;
+      showBanner(winner === 0 && settings.mode === 'cpu' ? t.scoreYou : t.score(nameOf(winner)));
+      updateHud();
+    } else if (game.roundTime - game.outAt < 0.35) {
+      game.score[1 - game.firstOut]--;
+      showBanner(t.draw);
+      updateHud();
+    }
+  }
+
+  function step(dt) {
+    game.time += dt;
+    if (game.state === 'intro') {
+      game.timer -= dt;
+      if (game.timer <= 0) { game.state = 'play'; showBanner(t.go, 0.6); }
+    }
+    if (game.state === 'play' || game.state === 'roundEnd') game.roundTime += dt;
+    if (game.state === 'play' && !game.overtime && game.roundTime > OVERTIME) { game.overtime = true; showBanner(t.overtime, 1.4); announce(t.overtime); }
+    if (game.map.wind) {
+      game.windTimer -= dt;
+      if (game.windTimer <= 0) { game.windTimer = rand(4, 7); game.windTarget = rand(-1, 1) * game.map.wind; }
+      game.wind += ((game.windTarget || 0) - game.wind) * Math.min(1, dt * 1.5);
+    }
+    if (game.state === 'play') for (let i = 0; i < 2; i++) if (autopilot[i] || (i === 1 && settings.mode === 'cpu')) runAi(i, autopilot[i] || settings.level, dt);
+    for (const p of game.players) stepPlayer(p, dt);
+    stepBullets(dt);
+    stepFx(dt);
+    if (game.state === 'roundEnd') {
+      game.endTimer -= dt;
+      if (game.endTimer <= 0) endRound();
+    }
+  }
+
+  // ---------- Computer opponent: it only sees positions, velocities and the arm angle, exactly like a human watching the screen ----------
+  const aiState = [{ wait: 1, holdT: 0, fireAt: -1 }, { wait: 1, holdT: 0, fireAt: -1 }];
+  function predictHit(p, foe) {
+    const W = WEAPONS[game.weapon], m = muzzle(p);
+    let x = m.x, y = m.y, vx = Math.cos(m.ang) * W.speed, vy = Math.sin(m.ang) * W.speed;
+    const dt = 1 / 90, tol = AI_TOL;
+    // Lead the target by its current velocity.
+    for (let s = 0; s < W.life; s += dt) {
+      vy += W.g * dt; vx += game.wind * dt; x += vx * dt; y += vy * dt;
+      if (solidAt(x, y)) return W.blast ? Math.hypot(x - foe.x, y - foe.y + 26) < W.blast * 0.6 : false;
+      const fx = foe.x + foe.vx * s, fy = foe.y + (foe.ground ? 0 : foe.vy * s + 0.5 * GRAVITY * s * s);
+      const u = up(foe);
+      for (const d of [46, 24]) if (Math.hypot(x - (fx + u.x * d), y - (fy + u.y * d)) < (d > 30 ? 10 : 14) + tol) return true;
+    }
+    return false;
+  }
+  let AI_TOL = 8;
+  function edgeDist(p, dir) {
+    const pl = p.ground || game.map.plats.find(q => !q.lift && p.x >= q.x && p.x <= q.x + q.w && q.y >= p.y - 10);
+    if (!pl) return 0;
+    // Adjacent rooftops at the same or lower height (sunset steps) count as safe ground.
+    let x1 = pl.x + pl.w, x0 = pl.x;
+    for (const q of game.map.plats) { if (q.lift || q.h) continue; if (Math.abs(q.x - x1) < 2) x1 = q.x + q.w; if (Math.abs(q.x + q.w - x0) < 2) x0 = q.x; }
+    return dir > 0 ? x1 - p.x : p.x - x0;
+  }
+  function runAi(i, level, dt) {
+    const cfg = AI[level], st = aiState[i], p = game.players[i], foe = game.players[1 - i];
+    if (p.out || foe.out) { if (p.hold) release(i); return; }
+    AI_TOL = cfg.tol;
+    if (!p.hold) {
+      st.wait -= dt;
+      // Hop over a shot that is about to land.
+      if (cfg.dodge && p.ground && game.bullets.some(b => b.owner !== i && Math.abs(b.x - p.x) < 150 && Math.sign(p.x - b.x) === Math.sign(b.vx) && Math.abs(b.y - (p.y - 30)) < 40) && Math.random() < cfg.dodge * dt * 30) { press(i); st.holdT = 0; st.fireAt = -1; return; }
+      // Don't hop while tilting or sliding towards a nearby edge: that would launch us off the roof.
+      if (st.wait <= 0 && p.ground) {
+        const drift = Math.sin(p.a) * 100 + p.vx, dir = Math.sign(drift) || 1;
+        const unsafe = (level !== 'easy' && Math.abs(p.a) > 0.3) || edgeDist(p, dir) < 15 + Math.abs(drift) * (level === 'easy' ? 0.4 : 0.8);
+        if (unsafe && st.wait > -1.5) return;
+        press(i); st.holdT = 0; st.fireAt = -1;
+      } else if (st.wait <= 0 && !p.ground && level === 'hard') { press(i); st.holdT = 0; st.fireAt = -1; }
+      return;
+    }
+    st.holdT += dt;
+    if (st.fireAt >= 0) {
+      st.fireAt -= dt;
+      if (st.fireAt <= 0) { release(i); st.wait = rand(...cfg.wait); }
+      return;
+    }
+    // Careful levels never fire when the recoil would shove them off a nearby edge.
+    const kick = -Math.cos(muzzle(p).ang), risky = level !== 'easy' && edgeDist(p, Math.sign(kick)) < 12 + (WEAPONS[game.weapon].recoil + Math.max(0, p.vx * Math.sign(kick))) * 1.5 / game.map.friction;
+    if (p.cd <= 0 && st.holdT > 0.12 && !risky && predictHit(p, foe)) {
+      if (Math.random() < cfg.skip * dt * 20) return;
+      if (cfg.react > 0) st.fireAt = cfg.react * rand(0.6, 1.4); else { release(i); st.wait = rand(...cfg.wait); }
+      return;
+    }
+    if (st.holdT > cfg.hold) { release(i); st.wait = rand(...cfg.wait); }
+  }
+
+  // ---------- Effects ----------
+  function puff(x, y, color, n) { if (reducedMotion.matches) n = Math.min(n, 2); for (let k = 0; k < n; k++) game.fx.push({ kind: 'dot', x, y, vx: rand(-90, 90), vy: rand(-90, 60), t: 0, life: rand(0.2, 0.4), r: rand(2, 4), color }); }
+  function stars(x, y) { const n = reducedMotion.matches ? 3 : 8; for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; game.fx.push({ kind: 'star', x, y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, t: 0, life: 0.5, r: 6 }); } }
+  function stepFx(dt) {
+    for (let k = game.fx.length - 1; k >= 0; k--) {
+      const f = game.fx[k];
+      f.t += dt;
+      if (f.vx !== undefined) { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 300 * dt; f.vx *= 0.97; }
+      if (f.t >= f.life) game.fx.splice(k, 1);
+    }
+    if (game.theme && game.theme.snow) for (const s of game.flakes) { s.y += s.v * dt; s.x += (Math.sin(game.time + s.p) * 20 + game.wind * 0.1) * dt; if (s.y > view.h) { s.y = -10; s.x = Math.random() * view.w; } }
+  }
+
+  // ---------- Rounds ----------
+  function nameOf(i) { return settings.mode === 'cpu' ? (i ? t.cpu : t.you) : (i ? t.p2 : t.p1); }
+  function startMatch() {
+    write('settings', settings);
+    game.target = +settings.target;
+    game.score = [0, 0]; game.round = 0; game.lastMap = -1;
+    $('app').classList.toggle('solo', settings.mode === 'cpu');
+    for (let i = 0; i < 2; i++) $(`name-${i}`).textContent = nameOf(i);
+    hideOverlays();
+    startRound();
+    canvas.focus({ preventScroll: true });
+  }
+  function startRound() {
+    game.round++;
+    let mi = settings.map;
+    if (mi < 0) { do mi = Math.floor(Math.random() * MAPS.length); while (mi === game.lastMap && MAPS.length > 1); }
+    game.mapIndex = mi; game.lastMap = mi; game.map = MAPS[mi]; game.theme = THEMES[game.map.theme];
+    game.weapon = settings.weapon < 0 ? WEAPON_IDS[Math.floor(Math.random() * WEAPON_IDS.length)] : WEAPON_IDS[settings.weapon];
+    game.time = 0; game.roundTime = 0; game.overtime = false; game.wind = 0; game.windTarget = 0; game.windTimer = 2;
+    game.bullets = []; game.fx = []; game.firstOut = -1;
+    const top = x => { let y = 9999; for (const pl of game.map.plats) if (!pl.lift && x >= pl.x && x <= pl.x + pl.w) y = Math.min(y, pl.y); return y; };
+    game.players = [0, 1].map(i => { const x = game.map.spawn[i]; const p = makePlayer(i, x, top(x)); p.home = x; p.ground = game.map.plats.find(pl => !pl.lift && x >= pl.x && x <= pl.x + pl.w && pl.y === p.y); return p; });
+    for (const st of aiState) { st.wait = rand(0.6, 1.2); st.holdT = 0; st.fireAt = -1; }
+    game.flakes = Array.from({ length: game.theme.snow ? 50 : 0 }, () => ({ x: Math.random() * view.w, y: Math.random() * view.h, v: rand(30, 70), p: Math.random() * 6 }));
+    game.state = 'intro'; game.timer = 1.1;
+    showBanner(`${t.round(game.round)} · ${t.weapons[game.weapon]}`, 1.1);
+    announce(`${t.round(game.round)}. ${t.maps[mi]}. ${t.weapons[game.weapon]}`);
+    updateHud();
+  }
+  function endRound() {
+    if (game.score[0] >= game.target || game.score[1] >= game.target) return endMatch();
+    startRound();
+  }
+  function endMatch() {
+    game.state = 'over';
+    const w = game.score[0] > game.score[1] ? 0 : 1;
+    let title;
+    if (settings.mode === 'cpu') {
+      title = w === 0 ? t.winYou : t.winCpu;
+      stats[settings.level][w === 0 ? 'w' : 'l']++;
+      write('stats', stats);
+      $('result-record').textContent = t.record(stats[settings.level].w, stats[settings.level].l);
+      sfx(w === 0 ? 660 : 200, 0.4, 'triangle', 0.06);
+    } else { title = w === 0 ? t.winP1 : t.winP2; $('result-record').textContent = ''; sfx(660, 0.4, 'triangle', 0.06); }
+    $('result-title').textContent = title;
+    const fin = $('final').children; fin[0].textContent = game.score[0]; fin[1].textContent = game.score[1];
+    announce(`${title} ${game.score[0]} – ${game.score[1]}`);
+    $('result').hidden = false;
+    $('rematch').focus({ preventScroll: true });
+  }
+
+  // ---------- HUD / overlays ----------
+  let bannerTimer = 0;
+  function showBanner(text, secs = 1.4) { $('banner-text').textContent = text; $('banner').hidden = false; bannerTimer = secs; }
+  function announce(msg) { $('announcer').textContent = msg; }
+  function updateHud() {
+    for (let i = 0; i < 2; i++) {
+      const pips = $(`pips-${i}`);
+      if (pips.children.length !== game.target) pips.innerHTML = '<i></i>'.repeat(game.target);
+      [...pips.children].forEach((el, k) => el.classList.toggle('on', k < game.score[i]));
+      pips.setAttribute('aria-label', `${game.score[i]} / ${game.target}`);
+      const p = game.players[i];
+      $(`dmg-${i}`).textContent = `${Math.round(p ? p.dmg : 0)}%`;
+    }
+  }
+  function hideOverlays() { $('setup').hidden = true; $('pause').hidden = true; $('result').hidden = true; }
+  function refreshSetup() {
+    for (const seg of document.querySelectorAll('.seg')) for (const b of seg.children) b.setAttribute('aria-pressed', String(String(settings[seg.dataset.key]) === b.dataset.value));
+    $('level-field').hidden = settings.mode !== 'cpu';
+    $('weapon-name').textContent = settings.weapon < 0 ? t.random : t.weapons[WEAPON_IDS[settings.weapon]];
+    $('map-name').textContent = settings.map < 0 ? t.random : `${settings.map + 1} · ${t.maps[settings.map]}`;
+    $('hint').textContent = `${t.help} ${settings.mode === 'cpu' ? t.keys1 : t.keys2}`;
+    $('record').textContent = settings.mode === 'cpu' ? t.record(stats[settings.level].w, stats[settings.level].l) : '';
+    $('key-0').textContent = settings.mode === 'cpu' ? t.keys1.replace(/^[^:：]*[:：]\s*/, '') : t.key0;
+    $('key-1').textContent = t.key1;
+  }
+  function openSetup() { game.state = 'menu'; releaseAll(); hideOverlays(); refreshSetup(); $('setup').hidden = false; $('start').focus({ preventScroll: true }); }
+  function pauseGame() {
+    if (!['play', 'intro', 'roundEnd'].includes(game.state)) return;
+    game.resumeState = game.state; game.state = 'paused'; releaseAll();
+    $('pause-hint').textContent = `${t.maps[game.mapIndex]} · ${t.weapons[game.weapon]} · ${game.score[0]} – ${game.score[1]}`;
+    $('pause').hidden = false; $('resume').focus({ preventScroll: true });
+  }
+  function resumeGame() { if (game.state !== 'paused') return; game.state = game.resumeState; $('pause').hidden = true; canvas.focus({ preventScroll: true }); }
+  function releaseAll() { for (let i = 0; i < 2; i++) { if (game.players[i]) game.players[i].hold = false; $(`btn-${i}`).classList.remove('on'); } held.clear(); }
+
+  for (const seg of document.querySelectorAll('.seg')) seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    settings[seg.dataset.key] = b.dataset.value; refreshSetup();
+  });
+  const cycle = (key, n, d) => { settings[key] = ((settings[key] + 1 + d + n + 1) % (n + 1)) - 1; refreshSetup(); };
+  $('weapon-prev').addEventListener('click', () => cycle('weapon', WEAPON_IDS.length, -1));
+  $('weapon-next').addEventListener('click', () => cycle('weapon', WEAPON_IDS.length, 1));
+  $('map-prev').addEventListener('click', () => cycle('map', MAPS.length, -1));
+  $('map-next').addEventListener('click', () => cycle('map', MAPS.length, 1));
+  $('start').addEventListener('click', startMatch);
+  $('rematch').addEventListener('click', startMatch);
+  $('change').addEventListener('click', openSetup);
+  $('quit').addEventListener('click', openSetup);
+  $('resume').addEventListener('click', resumeGame);
+  $('menu').addEventListener('click', pauseGame);
+  $('sound').addEventListener('click', () => { settings.sound = !settings.sound; write('settings', settings); refreshSound(); });
+
+  // ---------- Input: one button per player (keys, big buttons, or tapping your half of the rooftops) ----------
+  const held = new Map();
+  function down(src, i) { if (held.has(src)) return; held.set(src, i); $(`btn-${i}`).classList.add('on'); press(i); }
+  function up_(src) {
+    if (!held.has(src)) return;
+    const i = held.get(src); held.delete(src);
+    if (![...held.values()].includes(i)) { $(`btn-${i}`).classList.remove('on'); release(i); }
+  }
+  const humanIndex = i => (settings.mode === 'cpu' ? 0 : i);
+  const KEYS0 = ['KeyW', 'Space', 'KeyF'], KEYS1 = ['ArrowUp', 'Enter', 'KeyL', 'Numpad0'];
+  function keyPlayer(code) {
+    if (KEYS0.includes(code)) return 0;
+    if (KEYS1.includes(code)) return settings.mode === 'cpu' ? 0 : 1;
+    return -1;
+  }
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') return;
+    if (game.state === 'menu' || game.state === 'over' || game.state === 'paused') return;
+    if (e.code === 'KeyP') { pauseGame(); e.preventDefault(); return; }
+    const i = keyPlayer(e.code);
+    if (i < 0) return;
+    if (e.target.closest && e.target.closest('.tools')) return;
+    e.preventDefault();
+    if (!e.repeat) down('k' + e.code, i);
+  });
+  addEventListener('keyup', e => { if (keyPlayer(e.code) >= 0) { up_('k' + e.code); } });
+  addEventListener('blur', releaseAll);
+  for (let i = 0; i < 2; i++) {
+    const b = $(`btn-${i}`);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch {} down('p' + e.pointerId, humanIndex(i)); });
+    b.addEventListener('pointerup', e => up_('p' + e.pointerId));
+    b.addEventListener('pointercancel', e => up_('p' + e.pointerId));
+    b.addEventListener('click', e => e.preventDefault());
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  canvas.addEventListener('pointerdown', e => {
+    if (game.state === 'menu') return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    const r = canvas.getBoundingClientRect();
+    down('p' + e.pointerId, settings.mode === 'cpu' ? 0 : (e.clientX - r.left < r.width / 2 ? 0 : 1));
+  });
+  canvas.addEventListener('pointerup', e => up_('p' + e.pointerId));
+  canvas.addEventListener('pointercancel', e => up_('p' + e.pointerId));
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); pauseGame(); } });
+
+  // ---------- Sound ----------
+  function sfx(freq, dur, type, vol) {
+    if (!settings.sound) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const o = audio.createOscillator(), g = audio.createGain(), now = audio.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, now); o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * 0.5), now + dur);
+      g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      o.connect(g).connect(audio.destination); o.start(now); o.stop(now + dur + 0.02);
+    } catch {}
+  }
+  function refreshSound() { $('sound').textContent = settings.sound ? '♪' : '×'; $('sound').setAttribute('aria-pressed', String(settings.sound)); }
+
+  // ---------- Rendering ----------
+  function resize() {
+    const r = $('stage').getBoundingClientRect();
+    const cw = Math.max(50, r.width), ch = Math.max(50, r.height);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    const s = Math.min(cw / (BOX.x1 - BOX.x0), ch / (BOX.y1 - BOX.y0));
+    const w = cw / s, h = ch / s;
+    // Centre horizontally; vertically keep the rooftops low in the frame so extra height becomes sky.
+    view = { s, w, h, ox: (BOX.x0 + BOX.x1) / 2 - w / 2, oy: BOX.y1 + 20 - h * 0.98 };
+    if (view.oy > BOX.y0) view.oy = BOX.y0;
+    draw();
+  }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+  function draw() {
+    const th = game.theme || THEMES.night, m = game.map || MAPS[0];
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, -view.ox * dpr * view.s, -view.oy * dpr * view.s);
+    const L = view.ox, T = view.oy, R = view.ox + view.w, B = view.oy + view.h;
+    const g = ctx.createLinearGradient(0, T, 0, B);
+    g.addColorStop(0, th.sky[0]); g.addColorStop(0.6, th.sky[1]); g.addColorStop(1, th.sky[2]);
+    ctx.fillStyle = g; ctx.fillRect(L, T, R - L, B - T);
+    if (th.star) { ctx.fillStyle = '#ffffffaa'; for (let k = 0; k < 40; k++) { const x = L + ((k * 97.3) % 1) * 0 + ((k * 211) % 1000) / 1000 * (R - L), y = T + ((k * 137) % 700) / 1000 * (B - T) * 0.6; ctx.fillRect(x, y, 2, 2); } }
+    // Moon or sun
+    ctx.fillStyle = th.star ? '#fff4c8' : '#fff7d6'; ctx.beginPath(); ctx.arc(R - 110, T + 90, 34, 0, 7); ctx.fill();
+    // Far skyline
+    ctx.fillStyle = th.far;
+    for (let x = Math.floor(L / 60) * 60 - 60; x < R + 60; x += 60) { const hgt = 120 + ((x * 7919) % 130 + 130) % 130; ctx.fillRect(x, 470 - hgt + 160, 52, B); }
+    // Buildings
+    for (const pl of m.plats) drawPlat(pl, th, B);
+    // Wind meter
+    if (m.wind) {
+      const cx = (BOX.x0 + BOX.x1) / 2, cy = T + 70, len = game.wind / m.wind * 50;
+      ctx.fillStyle = '#00000044'; roundRect(cx - 70, cy - 16, 140, 32, 16); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - len, cy); ctx.lineTo(cx + len, cy); ctx.stroke();
+      if (Math.abs(len) > 4) { const d = Math.sign(len); ctx.beginPath(); ctx.moveTo(cx + len, cy); ctx.lineTo(cx + len - d * 10, cy - 8); ctx.moveTo(cx + len, cy); ctx.lineTo(cx + len - d * 10, cy + 8); ctx.stroke(); }
+    }
+    if (game.overtime && game.state !== 'menu') { ctx.fillStyle = '#ffd23f'; ctx.font = '900 20px ' + getComputedStyle(document.body).fontFamily; ctx.textAlign = 'center'; ctx.fillText('×2', (BOX.x0 + BOX.x1) / 2, T + 110); }
+    for (const p of game.players) if (!p.out) drawPlayer(p);
+    const W = WEAPONS[game.weapon];
+    for (const b of game.bullets) {
+      ctx.fillStyle = W.color;
+      if (W.blast) { ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(b.x, b.y, W.r, 0, 7); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = '#ffffffaa'; ctx.beginPath(); ctx.arc(b.x - 3, b.y - 3, 3, 0, 7); ctx.fill(); }
+      else { const sp = Math.hypot(b.vx, b.vy); ctx.strokeStyle = W.color; ctx.lineWidth = W.r * 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx / sp * 14, b.y - b.vy / sp * 14); ctx.stroke(); }
+    }
+    drawFx();
+    if (th.snow) { ctx.fillStyle = '#ffffffcc'; for (const s of game.flakes) ctx.fillRect(L + s.x - 1.5, T + s.y - 1.5, 3, 3); }
+  }
+  function drawPlat(pl, th, B) {
+    const y = platY(pl), h = pl.h ? pl.h : B - y + 10;
+    if (pl.lift) {
+      ctx.strokeStyle = '#33334488'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pl.x + 8, view.oy); ctx.lineTo(pl.x + 8, y); ctx.moveTo(pl.x + pl.w - 8, view.oy); ctx.lineTo(pl.x + pl.w - 8, y); ctx.stroke();
+      ctx.fillStyle = '#e8b13a'; roundRect(pl.x, y, pl.w, h, 4); ctx.fill(); ctx.fillStyle = '#9b6e12'; ctx.fillRect(pl.x, y + h - 4, pl.w, 4);
+      return;
+    }
+    if (pl.ledge) { ctx.fillStyle = th.ledge; roundRect(pl.x, y, pl.w, h, 5); ctx.fill(); ctx.fillStyle = '#00000033'; ctx.fillRect(pl.x, y + h - 5, pl.w, 5); return; }
+    if (pl.tower) {
+      ctx.fillStyle = '#6b4a35'; ctx.fillRect(pl.x + 8, y + 40, 8, B - y); ctx.fillRect(pl.x + pl.w - 16, y + 40, 8, B - y);
+      ctx.fillStyle = '#9b6b4a'; roundRect(pl.x, y, pl.w, 60, 10); ctx.fill();
+      ctx.fillStyle = '#7d5338'; for (let k = 1; k < 4; k++) ctx.fillRect(pl.x, y + k * 15, pl.w, 2);
+      ctx.fillStyle = '#5a3a28'; ctx.fillRect(pl.x + 14, y + 60, pl.w - 28, B - y);
+      return;
+    }
+    ctx.fillStyle = th.wall; ctx.fillRect(pl.x, y, pl.w, h);
+    ctx.fillStyle = th.wall2; ctx.fillRect(pl.x + pl.w - 14, y, 14, h);
+    ctx.fillStyle = th.win;
+    for (let wy = y + 34; wy < y + h; wy += 46) for (let wx = pl.x + 18; wx < pl.x + pl.w - 34; wx += 40) {
+      const lit = ((wx * 31 + wy * 17) % 7) > 2;
+      ctx.globalAlpha = lit ? 0.9 : 0.25; ctx.fillRect(wx, wy, 20, 24);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = th.ledge; ctx.fillRect(pl.x - 6, y - 4, pl.w + 12, 12);
+    ctx.fillStyle = '#00000033'; ctx.fillRect(pl.x - 6, y + 6, pl.w + 12, 3);
+    // A rooftop prop: vent or antenna.
+    ctx.fillStyle = '#00000040';
+    if (pl.w > 200) { ctx.fillRect(pl.x + pl.w / 2 - 14 + (pl.x > 480 ? 40 : -40), y - 18, 28, 14); }
+  }
+  function drawPlayer(p) {
+    const col = COLORS[p.i], dark = DARKS[p.i];
+    const sq = 1 - p.squash * 0.18;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a);
+    // Legs
+    ctx.strokeStyle = '#2d2440'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    const spread = p.ground ? 6 : 9 + Math.sin(game.time * 20) * 3;
+    ctx.beginPath(); ctx.moveTo(-4, -14 * sq); ctx.lineTo(-spread, 0); ctx.moveTo(4, -14 * sq); ctx.lineTo(spread, 0); ctx.stroke();
+    ctx.scale(1 / sq * (p.squash ? 1.05 : 1), sq);
+    // Body
+    ctx.fillStyle = col; roundRect(-12, -38, 24, 26, 9); ctx.fill();
+    ctx.fillStyle = dark; ctx.fillRect(-12, -18, 24, 4);
+    // Head
+    ctx.fillStyle = '#ffd9b8'; ctx.beginPath(); ctx.arc(0, -48, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(0, -50, 11, Math.PI, 0); ctx.fill();
+    ctx.fillRect(p.face > 0 ? 0 : -16, -52, 16, 3);
+    // Eyes (dizzy X after a hit)
+    const ex = p.face * 4;
+    ctx.strokeStyle = '#241a33'; ctx.fillStyle = '#241a33'; ctx.lineWidth = 2;
+    if (p.hitT > 0) { for (const dx of [-3, 4]) { ctx.beginPath(); ctx.moveTo(ex + dx - 2, -48); ctx.lineTo(ex + dx + 2, -44); ctx.moveTo(ex + dx + 2, -48); ctx.lineTo(ex + dx - 2, -44); ctx.stroke(); } }
+    else { ctx.beginPath(); ctx.arc(ex - 3, -46, 1.8, 0, 7); ctx.arc(ex + 4, -46, 1.8, 0, 7); ctx.fill(); }
+    ctx.restore();
+    // Arm + gun in world space
+    const s = bodyPt(p, 34), ang = aimAngle(p), W = WEAPONS[game.weapon];
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(ang);
+    ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(16, 0); ctx.stroke();
+    ctx.fillStyle = '#2d2440';
+    const gl = game.weapon === 'sniper' ? 30 : game.weapon === 'scatter' ? 20 : 16;
+    roundRect(12, -4, gl, game.weapon === 'bomb' ? 10 : 7, 3); ctx.fill();
+    ctx.fillStyle = W.color; ctx.fillRect(12 + gl - 5, -4, 4, game.weapon === 'bomb' ? 10 : 7);
+    if (p.hold) { ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 2; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(32 + gl, 0); ctx.lineTo(90 + gl, 0); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.restore();
+    // Cooldown ring above the head
+    if (p.cd > 0) { const h = bodyPt(p, 70); ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(h.x, h.y, 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - p.cd / W.cd)); ctx.stroke(); }
+  }
+  function drawFx() {
+    const font = getComputedStyle(document.body).fontFamily;
+    for (const f of game.fx) {
+      const k = 1 - f.t / f.life;
+      ctx.globalAlpha = Math.max(0, k);
+      if (f.kind === 'dot') { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill(); }
+      else if (f.kind === 'bubble') { ctx.strokeStyle = '#d8c4ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.stroke(); }
+      else if (f.kind === 'star') { ctx.fillStyle = '#ffe66b'; drawStar(f.x, f.y, f.r); }
+      else if (f.kind === 'ring') { ctx.strokeStyle = '#d8c4ff'; ctx.lineWidth = 6 * k; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 - k * 0.7), 0, 7); ctx.stroke(); }
+      else if (f.kind === 'pow') {
+        ctx.font = `900 ${20 + (1 - k) * 8}px ${font}`; ctx.textAlign = 'center';
+        ctx.lineWidth = 5; ctx.strokeStyle = '#241a33'; ctx.strokeText(f.text, f.x, f.y - (1 - k) * 20);
+        ctx.fillStyle = '#ffe66b'; ctx.fillText(f.text, f.x, f.y - (1 - k) * 20);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawStar(x, y, r) { ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5 - Math.PI / 2, rr = k % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); ctx.fill(); }
+
+  let last = performance.now(), acc = 0, hudT = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!document.hidden && game.state !== 'paused' && game.state !== 'menu' && game.state !== 'over') {
+      acc += dt;
+      while (acc >= STEP) { step(STEP); acc -= STEP; }
+    } else acc = 0;
+    if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('banner').hidden = true; }
+    hudT -= dt; if (hudT <= 0) { hudT = 0.1; if (game.players.length) updateHud(); }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__rooftopDuel = {
+    get state() { return { state: game.state, round: game.round, score: [...game.score], target: game.target, map: game.mapIndex, weapon: game.weapon, overtime: game.overtime, wind: game.wind,
+      players: game.players.map(p => ({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, a: p.a, arm: p.arm, hold: p.hold, ground: !!p.ground, dmg: p.dmg, out: p.out, cd: p.cd })), bullets: game.bullets.length }; },
+    press, release,
+    autopilot(i, level) { autopilot[i] = level || null; },
+    step(seconds) { const n = Math.round(seconds / STEP); for (let k = 0; k < n && game.state !== 'over' && game.state !== 'paused' && game.state !== 'menu'; k++) step(STEP); },
+    push(i, vx, vy) { const p = game.players[i]; p.vx += vx; p.vy += vy; p.ground = null; },
+    predict: i => predictHit(game.players[i], game.players[1 - i]),
+  };
+
+  refreshSound();
+  refreshSetup();
+  game.map = MAPS[0]; game.theme = THEMES.night;
+  game.players = [0, 1].map(i => { const p = makePlayer(i, MAPS[0].spawn[i], 380); p.ground = MAPS[0].plats[i]; return p; });
+  new ResizeObserver(resize).observe($('stage'));
+  resize();
+  updateHud();
+  $('start').focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
