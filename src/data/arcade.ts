@@ -132,6 +132,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('archery', 'Archery', 'sports'),
 	game('darts', 'Darts', 'sports'),
 	game('ski-slope', 'Ski Slope', 'sports'),
+	game('table-tennis', 'Table Tennis', 'sports'),
 	game('billiards', 'Billiards', 'sports'),
 	game('hoop-shot', 'Hoop Shot', 'sports'),
 	game('penalty-kick', 'Penalty Kick', 'sports'),

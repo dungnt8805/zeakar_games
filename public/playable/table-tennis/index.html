@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Table Tennis</title>
+<style>
+:root {
+  --bg: #1a1430;
+  --panel: #251d44;
+  --text: #fbf6ff;
+  --muted: #b7acd6;
+  --you: #ff6b4a;
+  --cpu: #4ad0ff;
+  --accent: #ffd23f;
+  --accent-dark: #d3a612;
+  --paper: #fff8ec;
+  --ink: #2a2140;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(120% 90% at 50% 20%, #33285e, var(--bg) 70%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 6px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.hud { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; width: 100%; max-width: 560px; margin: 0 auto; }
+.board { display: grid; gap: 3px; padding: 6px 10px; border-radius: 14px; background: #ffffff10; box-shadow: inset 0 0 0 1px #ffffff18; min-width: 0; }
+.row { display: grid; grid-template-columns: 12px 1fr auto 34px; align-items: center; gap: 8px; min-width: 0; }
+.row .srv { width: 10px; height: 10px; border-radius: 50%; background: transparent; }
+.row.serving .srv { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.row .nm { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row.you .nm { color: var(--you); }
+.row.cpu .nm { color: var(--cpu); }
+.row .gm { display: flex; gap: 3px; }
+.row .gm i { width: 9px; height: 9px; border-radius: 50%; background: #ffffff26; }
+.row .gm i.on { background: var(--accent); }
+.row .pt { font-size: 20px; font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.side-info { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.info { font-size: 11px; font-weight: 800; color: var(--muted); text-align: right; max-width: 120px; line-height: 1.2; }
+.icon-btn { width: 40px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: #ffffff18; font-size: 18px; font-weight: 900; }
+.help { display: none; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.stage { position: relative; min-height: 0; min-width: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; border-radius: 16px; }
+canvas:focus-visible { outline: 2px solid #ffd23f55; outline-offset: -2px; }
+.toast { position: absolute; left: 50%; top: 14%; transform: translate(-50%, 0); padding: 7px 16px; border-radius: 99px; background: #0d0a1ccc; font-size: 16px; font-weight: 900; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .2s; max-width: 94%; overflow: hidden; text-overflow: ellipsis; }
+.toast.show { opacity: 1; }
+.cue { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); padding: 5px 12px; border-radius: 10px; background: #0d0a1c99; color: var(--text); font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; max-width: 94%; }
+.cue[hidden] { display: none; }
+
+@media (min-aspect-ratio: 5/4) {
+  .app { grid-template-columns: minmax(170px, 250px) 1fr; grid-template-rows: 1fr; gap: 10px; }
+  .hud { grid-template-columns: 1fr; align-content: center; max-width: none; gap: 10px; }
+  .row { grid-template-columns: 12px 1fr 36px; grid-template-areas: "s n p" ". g g"; row-gap: 2px; }
+  .row .srv { grid-area: s; } .row .nm { grid-area: n; font-size: 15px; } .row .pt { grid-area: p; font-size: 26px; } .row .gm { grid-area: g; }
+  .board { padding: 10px 12px; gap: 8px; }
+  .side-info { flex-direction: row; justify-content: space-between; align-items: center; }
+  .info { text-align: left; max-width: none; font-size: 13px; }
+  .help { display: block; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 420px) {
+  .app { grid-template-columns: minmax(150px, 200px) 1fr; }
+  .hud { gap: 6px; }
+  .board { padding: 6px 10px; gap: 4px; }
+  .row .pt { font-size: 20px; }
+  .help { display: none; }
+}
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 8px; background: #0b0818b0; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 380px); max-height: calc(100% - 16px); overflow-y: auto; background: var(--paper); color: var(--ink); border-radius: 24px; padding: 18px 18px; text-align: center; box-shadow: 0 20px 50px #0009; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--you); }
+.logo { font-size: 36px; line-height: 1.1; }
+.text { margin-top: 6px; font-size: 14px; color: #64587f; line-height: 1.45; }
+.field { margin-top: 12px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #75698f; margin-bottom: 5px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #efe4d2; }
+.seg button { flex: 1; min-width: 0; min-height: 34px; padding: 7px 3px; border-radius: 10px; font-size: 13px; font-weight: 800; color: #75698f; line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #dccdb3; }
+.hint { margin-top: 10px; font-size: 12px; color: #75698f; line-height: 1.45; }
+.final { margin-top: 8px; font-size: 36px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.final b:first-child { color: var(--you); }
+.final b:last-child { color: #1c9fd0; }
+.badge { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 99px; background: var(--accent); color: #433400; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 14px; width: 100%; padding: 13px; border-radius: 18px; background: var(--accent); color: #3d3000; font-size: 18px; font-weight: 900; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; background: #efe4d2; font-size: 15px; font-weight: 800; box-shadow: 0 4px 0 #dccdb3; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 520px) {
+  .panel { padding: 10px 14px; border-radius: 18px; }
+  .logo { display: none; }
+  .panel h2 { font-size: 20px; }
+  .text { font-size: 12px; margin-top: 2px; }
+  .field { margin-top: 6px; }
+  .label { margin-bottom: 3px; }
+  .seg button { min-height: 32px; padding: 5px 3px; }
+  .hint { margin-top: 6px; }
+  .cta { margin-top: 8px; padding: 9px; font-size: 16px; }
+  .ghost-btn { margin-top: 6px; padding: 8px; }
+  .final { font-size: 28px; margin-top: 2px; }
+}
+@media (max-height: 420px) and (min-aspect-ratio: 4/3) {
+  .panel.wide { width: min(100%, 640px); display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; text-align: left; }
+  .panel.wide .head, .panel.wide .cta, .panel.wide .hint { grid-column: 1 / -1; }
+  .panel.wide .head { text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="hud">
+    <div class="board" aria-live="off">
+      <div class="row you" id="row-0"><i class="srv" aria-hidden="true"></i><span class="nm" id="name-0"></span><span class="gm" id="games-0"></span><strong class="pt" id="pts-0">0</strong></div>
+      <div class="row cpu" id="row-1"><i class="srv" aria-hidden="true"></i><span class="nm" id="name-1"></span><span class="gm" id="games-1"></span><strong class="pt" id="pts-1">0</strong></div>
+    </div>
+    <div class="side-info"><p class="info" id="info"></p><button type="button" class="icon-btn" id="menu" data-i18n-label="menu">≡</button></div>
+    <p class="help" id="help" data-i18n="controls"></p>
+  </section>
+  <div class="stage" id="stage">
+    <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+    <p class="cue" id="cue" hidden></p>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="head">
+      <div class="logo" aria-hidden="true">🏓</div>
+      <h2 id="setup-title">Table <span>Tennis</span></h2>
+      <p class="text" data-i18n="tagline"></p>
+    </div>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="match" data-i18n="match"></button><button type="button" data-value="train" data-i18n="training"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="level"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="0" data-i18n="l0"></button><button type="button" data-value="1" data-i18n="l1"></button><button type="button" data-value="2" data-i18n="l2"></button><button type="button" data-value="3" data-i18n="l3"></button></div></div>
+    <div class="field" id="bo-field"><p class="label" id="bo-label" data-i18n="bestOf"></p><div class="seg" role="group" aria-labelledby="bo-label" data-key="bo"><button type="button" data-value="1">1</button><button type="button" data-value="3">3</button><button type="button" data-value="5">5</button></div></div>
+    <div class="field" id="drill-field" hidden><p class="label" id="drill-label" data-i18n="drill"></p><div class="seg" role="group" aria-labelledby="drill-label" data-key="drill"><button type="button" data-value="0" data-i18n="d0"></button><button type="button" data-value="1" data-i18n="d1"></button><button type="button" data-value="2" data-i18n="d2"></button></div></div>
+    <p class="hint" id="setup-hint"></p>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused"></h2>
+    <p class="text" data-i18n="controls"></p>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <button type="button" class="ghost-btn" id="quit" data-i18n="quit"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="logo" id="result-emoji" aria-hidden="true">🏆</div>
+    <h2 id="result-title"></h2>
+    <p class="final" id="final"><b></b> – <b></b></p>
+    <p class="text" id="result-detail"></p>
+    <p class="badge" id="new-record" data-i18n="newRecord" hidden></p>
+    <p class="hint" id="result-record"></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Spin, place and smash your way through real 11-point games.', mode: 'Mode', match: 'Match', training: 'Training', level: 'Opponent', l0: 'Rookie', l1: 'Club', l2: 'Pro', l3: 'Master', bestOf: 'Best of (games)', drill: 'Drill', d0: 'Rally', d1: 'Targets', d2: 'Spin', drillHint: ['Return 30 machine balls — keep your streak alive.', 'Hit the glowing target: 3 points inside, 1 on the table.', 'Read topspin (orange) and backspin (blue): swipe up hard against topspin, gently against backspin.'], matchHint: n => `Games to 11, win by 2. Best of ${n}.`, start: 'Play', controls: 'Move the paddle with mouse, finger or ← → ↑ ↓. Swipe up through the ball for topspin and power, move gently for a backspin push, swipe sideways to aim. Keys: hold X to drive, Z to chop, Space to serve.', you: 'You', cpu: 'CPU', machine: 'Machine', game: n => `Game ${n}`, bo: n => `Best of ${n}`, serveHint: 'Swipe up or press Space to serve', yourServe: 'Your serve', cpuServe: 'CPU serves', pointYou: 'Your point!', pointCpu: 'CPU’s point', rNet: 'Net', rOut: 'Out', rLong: 'Long', rMiss: 'Missed', rDouble: 'Double bounce', rOwn: 'Own side', deuce: 'Deuce', gamePoint: 'Game point', matchPoint: 'Match point!', gameYou: n => `You take game ${n}!`, gameCpu: n => `CPU takes game ${n}`, winYou: 'You win the match!', winCpu: 'CPU wins the match', games: 'Games', detail: (a, b) => `Points won ${a} – ${b}`, record: (w, l) => `Record vs this opponent: ${w} W · ${l} L`, newRecord: 'New best!', again: 'Play again', change: 'Change mode', menu: 'Menu', paused: 'Paused', resume: 'Resume', quit: 'Quit to menu', canvas: 'Table tennis table', ball: (n, m) => `Ball ${n} / ${m}`, score: n => `Score ${n}`, streak: n => `Streak ${n}`, drillOver: 'Drill complete', drillScore: n => `Score: ${n}`, drillBest: n => `Best: ${n}`, drillDetail: (a, b) => `Good returns ${a} · best streak ${b}`, topspin: 'Topspin!', backspin: 'Backspin', smash: 'Smash!', target: 'Target! +3', onTable: 'In! +1' },
+    vi: { tagline: 'Xoáy bóng, đặt điểm rơi và đập mạnh trong những ván 11 điểm thật sự.', mode: 'Chế độ', match: 'Thi đấu', training: 'Luyện tập', level: 'Đối thủ', l0: 'Tập sự', l1: 'CLB', l2: 'Chuyên', l3: 'Cao thủ', bestOf: 'Số ván (thắng quá nửa)', drill: 'Bài tập', d0: 'Đôi công', d1: 'Mục tiêu', d2: 'Xoáy', drillHint: ['Đỡ 30 quả từ máy bắn bóng — giữ chuỗi càng dài càng tốt.', 'Đánh vào vòng sáng: trúng vòng 3 điểm, trúng bàn 1 điểm.', 'Đọc bóng xoáy lên (cam) và xoáy xuống (xanh): vuốt mạnh lên khi gặp xoáy lên, nhẹ tay khi gặp xoáy xuống.'], matchHint: n => `Mỗi ván 11 điểm, hơn 2 điểm mới thắng. Đánh ${n} ván.`, start: 'Chơi', controls: 'Di chuyển vợt bằng chuột, ngón tay hoặc ← → ↑ ↓. Vuốt lên xuyên qua bóng để tạo xoáy lên và lực, di nhẹ để cắt bóng, vuốt ngang để chọn hướng. Phím: giữ X để tấn công, Z để cắt, Space để giao bóng.', you: 'Bạn', cpu: 'Máy', machine: 'Máy bắn', game: n => `Ván ${n}`, bo: n => `${n} ván`, serveHint: 'Vuốt lên hoặc nhấn Space để giao bóng', yourServe: 'Bạn giao bóng', cpuServe: 'Máy giao bóng', pointYou: 'Bạn ghi điểm!', pointCpu: 'Máy ghi điểm', rNet: 'Chạm lưới', rOut: 'Ra ngoài', rLong: 'Bóng dài', rMiss: 'Trượt bóng', rDouble: 'Nảy hai lần', rOwn: 'Nảy bên mình', deuce: 'Hòa 10', gamePoint: 'Điểm quyết định ván', matchPoint: 'Điểm quyết định trận!', gameYou: n => `Bạn thắng ván ${n}!`, gameCpu: n => `Máy thắng ván ${n}`, winYou: 'Bạn thắng trận!', winCpu: 'Máy thắng trận', games: 'Ván', detail: (a, b) => `Tổng điểm ${a} – ${b}`, record: (w, l) => `Thành tích với đối thủ này: ${w} thắng · ${l} thua`, newRecord: 'Kỷ lục mới!', again: 'Chơi lại', change: 'Đổi chế độ', menu: 'Menu', paused: 'Tạm dừng', resume: 'Tiếp tục', quit: 'Về menu', canvas: 'Bàn bóng bàn', ball: (n, m) => `Quả ${n} / ${m}`, score: n => `Điểm ${n}`, streak: n => `Chuỗi ${n}`, drillOver: 'Hoàn thành bài tập', drillScore: n => `Điểm: ${n}`, drillBest: n => `Cao nhất: ${n}`, drillDetail: (a, b) => `Đỡ tốt ${a} quả · chuỗi dài nhất ${b}`, topspin: 'Xoáy lên!', backspin: 'Xoáy xuống', smash: 'Đập bóng!', target: 'Trúng đích! +3', onTable: 'Vào bàn! +1' },
+    zh: { tagline: '旋转、落点、扣杀——打一场真正的 11 分制比赛。', mode: '模式', match: '比赛', training: '训练', level: '对手', l0: '新手', l1: '业余', l2: '职业', l3: '大师', bestOf: '局数（多局制）', drill: '训练项目', d0: '对攻', d1: '打靶', d2: '旋转', drillHint: ['回击发球机的 30 个球，尽量保持连续回球。', '瞄准发光靶区：命中得 3 分，上台得 1 分。', '判断上旋（橙色）和下旋（蓝色）：遇上旋用力向上挥拍，遇下旋轻轻搓球。'], matchHint: n => `每局 11 分，须领先 2 分。${n} 局制。`, start: '开始', controls: '用鼠标、手指或 ← → ↑ ↓ 移动球拍。向上挥过球体可打出上旋和力量，轻推为下旋搓球，横向挥拍控制方向。按键：按住 X 拉球，Z 削球，空格发球。', you: '你', cpu: '电脑', machine: '发球机', game: n => `第 ${n} 局`, bo: n => `${n} 局制`, serveHint: '向上滑动或按空格发球', yourServe: '你发球', cpuServe: '电脑发球', pointYou: '你得分！', pointCpu: '电脑得分', rNet: '下网', rOut: '出界', rLong: '出台', rMiss: '漏接', rDouble: '两跳', rOwn: '落在本方', deuce: '平分', gamePoint: '局点', matchPoint: '赛点！', gameYou: n => `你赢下第 ${n} 局！`, gameCpu: n => `电脑赢下第 ${n} 局`, winYou: '你赢得比赛！', winCpu: '电脑赢得比赛', games: '局', detail: (a, b) => `总得分 ${a} – ${b}`, record: (w, l) => `对该对手战绩：${w} 胜 · ${l} 负`, newRecord: '新纪录！', again: '再来一局', change: '更换模式', menu: '菜单', paused: '已暂停', resume: '继续', quit: '返回菜单', canvas: '乒乓球台', ball: (n, m) => `第 ${n} / ${m} 球`, score: n => `得分 ${n}`, streak: n => `连续 ${n}`, drillOver: '训练完成', drillScore: n => `得分：${n}`, drillBest: n => `最佳：${n}`, drillDetail: (a, b) => `成功回球 ${a} 个 · 最长连续 ${b}`, topspin: '上旋！', backspin: '下旋', smash: '扣杀！', target: '命中！+3', onTable: '上台！+1' },
+    fr: { tagline: 'Effets, placement et smashs dans de vraies manches en 11 points.', mode: 'Mode', match: 'Match', training: 'Entraînement', level: 'Adversaire', l0: 'Débutant', l1: 'Club', l2: 'Pro', l3: 'Maître', bestOf: 'Nombre de manches', drill: 'Exercice', d0: 'Échanges', d1: 'Cibles', d2: 'Effets', drillHint: ['Renvoyez 30 balles du robot sans casser votre série.', 'Visez la cible lumineuse : 3 points dedans, 1 sur la table.', 'Lisez le lift (orange) et le coupé (bleu) : frappez fort vers le haut contre le lift, en douceur contre le coupé.'], matchHint: n => `Manches en 11 points, 2 points d’écart. Au meilleur des ${n}.`, start: 'Jouer', controls: 'Déplacez la raquette à la souris, au doigt ou avec ← → ↑ ↓. Balayez vers le haut à travers la balle pour du lift et de la puissance, bougez doucement pour une poussette coupée, balayez sur le côté pour viser. Touches : X pour attaquer, Z pour couper, Espace pour servir.', you: 'Vous', cpu: 'Ordi', machine: 'Robot', game: n => `Manche ${n}`, bo: n => `Au meilleur des ${n}`, serveHint: 'Balayez vers le haut ou appuyez sur Espace pour servir', yourServe: 'À vous de servir', cpuServe: 'L’ordi sert', pointYou: 'Point pour vous !', pointCpu: 'Point pour l’ordi', rNet: 'Filet', rOut: 'Faute', rLong: 'Trop long', rMiss: 'Raté', rDouble: 'Double rebond', rOwn: 'Votre côté', deuce: 'Égalité', gamePoint: 'Balle de manche', matchPoint: 'Balle de match !', gameYou: n => `Vous gagnez la manche ${n} !`, gameCpu: n => `L’ordi gagne la manche ${n}`, winYou: 'Vous gagnez le match !', winCpu: 'L’ordi gagne le match', games: 'Manches', detail: (a, b) => `Points gagnés ${a} – ${b}`, record: (w, l) => `Bilan contre cet adversaire : ${w} V · ${l} D`, newRecord: 'Nouveau record !', again: 'Rejouer', change: 'Changer de mode', menu: 'Menu', paused: 'Pause', resume: 'Reprendre', quit: 'Retour au menu', canvas: 'Table de tennis de table', ball: (n, m) => `Balle ${n} / ${m}`, score: n => `Score ${n}`, streak: n => `Série ${n}`, drillOver: 'Exercice terminé', drillScore: n => `Score : ${n}`, drillBest: n => `Record : ${n}`, drillDetail: (a, b) => `Bons retours ${a} · meilleure série ${b}`, topspin: 'Lift !', backspin: 'Coupé', smash: 'Smash !', target: 'Cible ! +3', onTable: 'Dedans ! +1' },
+    th: { tagline: 'ตีหมุน วางลูก และตบแรง ในเกม 11 แต้มแบบของจริง', mode: 'โหมด', match: 'แข่งขัน', training: 'ฝึกซ้อม', level: 'คู่แข่ง', l0: 'มือใหม่', l1: 'ชมรม', l2: 'มือโปร', l3: 'เซียน', bestOf: 'จำนวนเกม', drill: 'แบบฝึก', d0: 'ตีโต้', d1: 'เป้า', d2: 'ลูกหมุน', drillHint: ['รับลูกจากเครื่องยิง 30 ลูก รักษาสถิติตีต่อเนื่องไว้', 'ตีให้ลงเป้าเรืองแสง: ในเป้า 3 แต้ม ลงโต๊ะ 1 แต้ม', 'อ่านลูกท็อปสปิน (ส้ม) และแบ็กสปิน (ฟ้า): เจอท็อปสปินให้ปัดขึ้นแรง เจอแบ็กสปินให้ตีเบาๆ'], matchHint: n => `เกมละ 11 แต้ม ต้องนำ 2 แต้ม แข่ง ${n} เกม`, start: 'เล่น', controls: 'เลื่อนไม้ด้วยเมาส์ นิ้ว หรือ ← → ↑ ↓ ปัดขึ้นผ่านลูกเพื่อตีท็อปสปินและเพิ่มแรง ขยับเบาๆ เพื่อเขี่ยแบ็กสปิน ปัดไปด้านข้างเพื่อเล็งทิศ ปุ่ม: กด X ค้างเพื่อตีบุก Z เพื่อตัด Space เพื่อเสิร์ฟ', you: 'คุณ', cpu: 'คอม', machine: 'เครื่องยิง', game: n => `เกม ${n}`, bo: n => `แข่ง ${n} เกม`, serveHint: 'ปัดขึ้นหรือกด Space เพื่อเสิร์ฟ', yourServe: 'คุณเสิร์ฟ', cpuServe: 'คอมเสิร์ฟ', pointYou: 'คุณได้แต้ม!', pointCpu: 'คอมได้แต้ม', rNet: 'ติดเน็ต', rOut: 'ออก', rLong: 'ยาวเกิน', rMiss: 'รับพลาด', rDouble: 'กระดอนสองครั้ง', rOwn: 'ลงฝั่งตัวเอง', deuce: 'ดิวส์', gamePoint: 'เกมพอยต์', matchPoint: 'แมตช์พอยต์!', gameYou: n => `คุณชนะเกม ${n}!`, gameCpu: n => `คอมชนะเกม ${n}`, winYou: 'คุณชนะการแข่งขัน!', winCpu: 'คอมชนะการแข่งขัน', games: 'เกม', detail: (a, b) => `แต้มรวม ${a} – ${b}`, record: (w, l) => `สถิติกับคู่แข่งนี้: ชนะ ${w} · แพ้ ${l}`, newRecord: 'สถิติใหม่!', again: 'เล่นอีกครั้ง', change: 'เปลี่ยนโหมด', menu: 'เมนู', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', quit: 'กลับเมนู', canvas: 'โต๊ะปิงปอง', ball: (n, m) => `ลูกที่ ${n} / ${m}`, score: n => `คะแนน ${n}`, streak: n => `ต่อเนื่อง ${n}`, drillOver: 'จบแบบฝึก', drillScore: n => `คะแนน: ${n}`, drillBest: n => `ดีที่สุด: ${n}`, drillDetail: (a, b) => `รับดี ${a} ลูก · ต่อเนื่องสูงสุด ${b}`, topspin: 'ท็อปสปิน!', backspin: 'แบ็กสปิน', smash: 'ตบ!', target: 'เข้าเป้า! +3', onTable: 'ลงโต๊ะ! +1' },
+    ja: { tagline: '回転とコースを操り、スマッシュを決める本格11点マッチ。', mode: 'モード', match: '試合', training: '練習', level: '対戦相手', l0: '初心者', l1: 'クラブ', l2: 'プロ', l3: '達人', bestOf: 'ゲーム数', drill: 'メニュー', d0: 'ラリー', d1: 'ターゲット', d2: '回転', drillHint: ['マシンの球を30球返球。連続記録をつなごう。', '光るターゲットを狙おう：中なら3点、台に入れば1点。', '上回転（オレンジ）と下回転（青）を見極めよう。上回転には強く振り上げ、下回転にはやさしく。'], matchHint: n => `1ゲーム11点、2点差がつくまで。${n}ゲームマッチ。`, start: 'プレイ', controls: 'マウス・指・← → ↑ ↓ でラケットを移動。ボールに向かって上にスワイプすると上回転とパワー、そっと動かすと下回転のツッツキ、横にスワイプでコースを狙えます。キー：X長押しでドライブ、Zでカット、スペースでサーブ。', you: 'あなた', cpu: 'CPU', machine: 'マシン', game: n => `第${n}ゲーム`, bo: n => `${n}ゲームマッチ`, serveHint: '上スワイプかスペースでサーブ', yourServe: 'あなたのサーブ', cpuServe: 'CPUのサーブ', pointYou: 'あなたの得点！', pointCpu: 'CPUの得点', rNet: 'ネット', rOut: 'アウト', rLong: 'オーバー', rMiss: '空振り', rDouble: 'ツーバウンド', rOwn: '自コート', deuce: 'デュース', gamePoint: 'ゲームポイント', matchPoint: 'マッチポイント！', gameYou: n => `第${n}ゲームを取った！`, gameCpu: n => `第${n}ゲームはCPU`, winYou: 'あなたの勝ち！', winCpu: 'CPUの勝ち', games: 'ゲーム', detail: (a, b) => `総得点 ${a} – ${b}`, record: (w, l) => `この相手との戦績：${w}勝 ${l}敗`, newRecord: '自己ベスト！', again: 'もう一度', change: 'モード変更', menu: 'メニュー', paused: '一時停止', resume: '再開', quit: 'メニューへ', canvas: '卓球台', ball: (n, m) => `${n} / ${m}球`, score: n => `スコア ${n}`, streak: n => `連続 ${n}`, drillOver: '練習終了', drillScore: n => `スコア：${n}`, drillBest: n => `ベスト：${n}`, drillDetail: (a, b) => `返球成功 ${a} · 最長連続 ${b}`, topspin: 'ドライブ！', backspin: '下回転', smash: 'スマッシュ！', target: '命中！+3', onTable: 'イン！+1' },
+    ko: { tagline: '회전과 코스, 스매시로 펼치는 진짜 11점 경기.', mode: '모드', match: '경기', training: '연습', level: '상대', l0: '초보', l1: '동호회', l2: '프로', l3: '마스터', bestOf: '게임 수', drill: '훈련', d0: '랠리', d1: '과녁', d2: '회전', drillHint: ['탁구 머신의 공 30개를 받아 연속 기록을 이어 가세요.', '빛나는 과녁을 노리세요: 안에 넣으면 3점, 테이블에 넣으면 1점.', '탑스핀(주황)과 백스핀(파랑)을 읽으세요. 탑스핀엔 세게 올려 치고, 백스핀엔 부드럽게.'], matchHint: n => `한 게임 11점, 2점 차로 이겨야 해요. ${n}게임 경기.`, start: '플레이', controls: '마우스, 손가락 또는 ← → ↑ ↓ 로 라켓을 움직이세요. 공을 향해 위로 스와이프하면 탑스핀과 파워, 살짝 움직이면 백스핀 푸시, 옆으로 스와이프하면 코스를 노립니다. 키: X 누르고 있으면 드라이브, Z는 커트, 스페이스는 서브.', you: '나', cpu: 'CPU', machine: '머신', game: n => `${n}게임`, bo: n => `${n}게임 경기`, serveHint: '위로 스와이프하거나 스페이스로 서브', yourServe: '내 서브', cpuServe: 'CPU 서브', pointYou: '득점!', pointCpu: 'CPU 득점', rNet: '네트', rOut: '아웃', rLong: '오버', rMiss: '놓침', rDouble: '투 바운드', rOwn: '내 코트', deuce: '듀스', gamePoint: '게임 포인트', matchPoint: '매치 포인트!', gameYou: n => `${n}게임 승리!`, gameCpu: n => `${n}게임은 CPU 승리`, winYou: '경기 승리!', winCpu: 'CPU 경기 승리', games: '게임', detail: (a, b) => `총 득점 ${a} – ${b}`, record: (w, l) => `이 상대 전적: ${w}승 ${l}패`, newRecord: '최고 기록!', again: '다시 하기', change: '모드 변경', menu: '메뉴', paused: '일시 정지', resume: '계속', quit: '메뉴로', canvas: '탁구대', ball: (n, m) => `${n} / ${m}구`, score: n => `점수 ${n}`, streak: n => `연속 ${n}`, drillOver: '훈련 완료', drillScore: n => `점수: ${n}`, drillBest: n => `최고: ${n}`, drillDetail: (a, b) => `좋은 리턴 ${a} · 최장 연속 ${b}`, topspin: '탑스핀!', backspin: '백스핀', smash: '스매시!', target: '명중! +3', onTable: '인! +1' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  const $ = id => document.getElementById(id);
+  const KEY = 'milaan.tableTennis.';
+  const read = (k, f) => { try { const v = JSON.parse(localStorage.getItem(KEY + k)); return v ?? f; } catch { return f; } };
+  const write = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} };
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // World in metres: x across, y along the table (player end negative), z height above the table top.
+  const TW = 1.525, TL = 2.74, HW = TW / 2, HL = TL / 2, NET_H = 0.1525, R = 0.02, FLOOR = -0.76;
+  const G = 9.8, E = 0.88, TOPK = 0.4, SIDEA = 1.6, STEP = 1 / 240;
+  const REACH = 0.26;
+  // reaction s, move speed m/s, aim error m, power, chance of going for a corner, how well incoming spin is read,
+  // blunder: base chance per ball of a misjudged swing (grows with ball speed, spin and wide placement)
+  const AI = [
+    { react: 0.34, speed: 1.5, err: 0.26, power: 0.35, corner: 0.05, read: 0.25, spin: 0.25, slow: 0.62, blunder: 0.2 },
+    { react: 0.24, speed: 2.1, err: 0.17, power: 0.52, corner: 0.3, read: 0.55, spin: 0.5, slow: 0.68, blunder: 0.11 },
+    { react: 0.16, speed: 2.8, err: 0.11, power: 0.7, corner: 0.6, read: 0.82, spin: 0.75, slow: 0.72, blunder: 0.055 },
+    { react: 0.1, speed: 3.6, err: 0.07, power: 0.85, corner: 0.85, read: 0.95, spin: 0.9, slow: 0.76, blunder: 0.025 },
+  ];
+  const DRILL_BALLS = [30, 20, 20];
+
+  const canvas = $('canvas'), ctx = canvas.getContext('2d');
+  const settings = { mode: read('mode', 'match'), level: String(read('level', 1)), bo: String(read('bo', 3)), drill: String(read('drill', 0)) };
+  let cw = 0, ch = 0, dpr = 1, F = 1, cx = 0, cy = 0;
+  const CAM = { y: -HL - 2.9, z: 1.75, pitch: 0.52 };
+  const cosP = Math.cos(CAM.pitch), sinP = Math.sin(CAM.pitch);
+
+  function camSpace(x, y, z) {
+    const ry = y - CAM.y, rz = z - CAM.z;
+    return [x, ry * cosP - rz * sinP, ry * sinP + rz * cosP];
+  }
+  function project(x, y, z) {
+    const [px, d, u] = camSpace(x, y, z);
+    return [cx + F * px / d, cy - F * u / d, F / d];
+  }
+  // Pointer to world point on the horizontal plane z = h.
+  function unproject(sx, sy, h) {
+    const dx = (sx - cx) / F, du = (cy - sy) / F;
+    // direction in world: right=(1,0,0), forward=(0,cos,-sin), up=(0,sin,cos)
+    const wy = cosP + du * sinP, wz = -sinP + du * cosP;
+    const tt = (h - CAM.z) / wz;
+    return [dx * tt, CAM.y + wy * tt];
+  }
+  function fit() {
+    const r = canvas.getBoundingClientRect();
+    dpr = Math.min(2, devicePixelRatio || 1);
+    cw = Math.max(1, r.width); ch = Math.max(1, r.height);
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    const m = cw < ch ? 0.12 : 0.3;
+    const pts = [[-HW - m, -HL - 0.45, 0.1], [HW + m, -HL - 0.45, 0.1], [-HW - m, HL + 0.6, 0.45], [HW + m, HL + 0.6, 0.45], [0, -HL - 0.5, -0.12]];
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    for (const [x, y, z] of pts) { const [px, d, u] = camSpace(x, y, z); const sx = px / d, sy = -u / d; minX = Math.min(minX, sx); maxX = Math.max(maxX, sx); minY = Math.min(minY, sy); maxY = Math.max(maxY, sy); }
+    F = Math.min(cw * 0.96 / (maxX - minX), ch * 0.9 / (maxY - minY));
+    cx = cw / 2 - F * (minX + maxX) / 2;
+    cy = ch / 2 - F * (minY + maxY) / 2 + ch * 0.02;
+  }
+  new ResizeObserver(() => { fit(); draw(); }).observe($('stage'));
+
+  // ---------- state ----------
+  const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, top: 0, side: 0, pendTop: 0, pendSide: 0, hitter: 0, bounced: false, serving: false, serveB1: false, live: false, netted: false, onFloor: false };
+  const trail = [];
+  const pad = [{ x: 0, y: -HL - 0.35, z: 0.2, tilt: 0, swing: 0 }, { x: 0, y: HL + 0.35, z: 0.2, tilt: 0, swing: 0 }];
+  const ai = { tx: 0, ty: HL + 0.35, plane: HL + 0.35, wait: 0, plan: null };
+  const game = { phase: 'menu', mode: 'match', level: 1, bo: 3, pts: [0, 0], games: [0, 0], gameNo: 1, server: 0, firstServer: 0, total: [0, 0], deadT: 0, serveT: 0, toss: 0, paused: false, timeScale: 0.7, hitCount: 0 };
+  const drill = { type: 0, n: 0, score: 0, good: 0, streak: 0, bestStreak: 0, target: null, feedT: 0, waiting: false };
+  const ptr = { active: false, hist: [], sx: 0, sy: 0, used: false };
+  const keys = new Set();
+  let toastT = 0, effects = [];
+
+  // ---------- physics ----------
+  function stepBall(dt) {
+    const py = ball.y, pz = ball.z;
+    ball.vx += ball.side * SIDEA * dt;
+    ball.vz -= G * (1 + TOPK * ball.top) * dt;
+    ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.z += ball.vz * dt;
+    if (!ball.netted && Math.sign(py) !== Math.sign(ball.y) && Math.abs(ball.x) < HW + 0.15 && ball.z < NET_H + R && ball.z > -0.05) {
+      ball.netted = true; ball.y = Math.sign(py) * 0.03; ball.vy *= -0.15; ball.vx *= 0.3; ball.vz = Math.min(ball.vz, 0) * 0.3;
+    }
+    if (ball.z <= 0 && pz > 0 && Math.abs(ball.x) <= HW && Math.abs(ball.y) <= HL) {
+      ball.z = 0;
+      const first = ball.serving && !ball.serveB1;
+      ball.vz = -ball.vz * E * (first ? 1 : (1 - 0.15 * ball.top));
+      if (!first) {
+        ball.vy *= 1 + 0.18 * ball.top; ball.vx += ball.side * 0.3;
+        ball.top *= 0.6; ball.side *= 0.6;
+      }
+      return { ev: 'bounce', side: ball.y < 0 ? 0 : 1 };
+    }
+    if (ball.z < 0 && pz >= 0 && !(Math.abs(ball.x) <= HW && Math.abs(ball.y) <= HL)) return { ev: 'out' };
+    if (ball.z <= FLOOR) { ball.z = FLOOR; ball.vz = -ball.vz * 0.6; ball.vx *= 0.8; ball.vy *= 0.8; return { ev: 'floor' }; }
+    if (Math.abs(ball.y) > HL + 3 || Math.abs(ball.x) > 4) return { ev: 'out' };
+    return null;
+  }
+
+  // Velocity that lands the ball at (tx, ty) on the table after T seconds with the given spin.
+  function solveShot(x0, y0, z0, tx, ty, speed, top, side, lift) {
+    const dist = Math.hypot(tx - x0, ty - y0);
+    let T = Math.max(0.18, dist / speed);
+    const gz = G * (1 + TOPK * top), ax = side * SIDEA;
+    let vy, vz;
+    for (let i = 0; i < 14; i++) {
+      vy = (ty - y0) / T; vz = (-z0 + 0.5 * gz * T * T) / T;
+      if (!lift) break;
+      const tn = (0 - y0) / vy;
+      if (tn <= 0 || tn >= T) break;
+      const zn = z0 + vz * tn - 0.5 * gz * tn * tn;
+      if (zn > NET_H + 0.05) break;
+      T *= 1.07;
+    }
+    const vx = (tx - x0 - 0.5 * ax * T * T) / T;
+    return { vx, vy, vz };
+  }
+
+  function launch(s, v, top, side) {
+    ball.vx = v.vx; ball.vy = v.vy; ball.vz = v.vz; ball.top = top; ball.side = side;
+    ball.hitter = s; ball.bounced = false; ball.netted = false; ball.live = true; ball.onFloor = false;
+  }
+
+  function serveBall(s, aimX, depth, spin, speed) {
+    const dir = s === 0 ? 1 : -1;
+    const y0 = -dir * (HL + 0.08), b1 = -dir * HL * 0.45, y2 = dir * HL * depth;
+    const vy = dir * speed, t1 = (b1 - y0) / vy, t2 = (y2 - b1) / vy;
+    const vz2 = 0.5 * G * t2, a = vz2 / E;
+    const z0 = Math.max(0.06, a * t1 - 0.5 * G * t1 * t1);
+    const x0 = pad[s].x;
+    ball.x = x0; ball.y = y0; ball.z = z0;
+    launch(s, { vx: (aimX - x0) / (t1 + t2), vy, vz: G * t1 - a }, 0, 0);
+    ball.serving = true; ball.serveB1 = false; ball.pendTop = spin; ball.pendSide = 0;
+    pad[s].swing = 1;
+  }
+
+  // ---------- rules ----------
+  function onEvent(e) {
+    if (!e || game.phase !== 'rally') return;
+    const h = ball.hitter;
+    if (e.ev === 'bounce') {
+      if (ball.serving && !ball.serveB1) {
+        if (e.side === h) { ball.serveB1 = true; return; }
+        return pointTo(1 - h, 'rOwn');
+      }
+      if (ball.serving) { ball.top = ball.pendTop; ball.serving = false; }
+      if (e.side === h) return pointTo(1 - h, ball.netted ? 'rNet' : 'rOwn');
+      if (ball.bounced) return pointTo(h, 'rDouble');
+      ball.bounced = true;
+      if (game.mode === 'train') return drillLanded();
+      addEffect(ball.x, ball.y);
+    } else if (e.ev === 'out' || e.ev === 'floor') {
+      if (!ball.bounced) return pointTo(1 - h, ball.netted ? 'rNet' : (Math.abs(ball.y) > HL ? 'rLong' : 'rOut'));
+      return pointTo(h, 'rMiss');
+    }
+  }
+
+  function tryHit(s) {
+    const p = pad[s];
+    // relative crossing, so a paddle swept forward through the ball also counts
+    const rel = (ball.y - p.y) * (s === 0 ? 1 : -1), prev = p.rel ?? rel;
+    p.rel = rel;
+    if (ball.hitter === s || !ball.bounced || ball.serving) return false;
+    if (!(prev > 0 && rel <= 0)) return false;
+    if (Math.abs(ball.x - p.x) > REACH || ball.z < -0.35 || ball.z > 1.0) return false;
+    if (s === 0) playerShot(); else aiShot();
+    return true;
+  }
+
+  // Player's shot from swipe velocity (in screen heights per second) or keys.
+  function playerShot() {
+    const v = swipe();
+    let up = v.up, lat = v.lat;
+    if (!ptr.used || keys.size) {
+      up = keys.has('x') ? 3.2 : keys.has('z') ? -1.2 : 1.6;
+      lat = (keys.has('arrowright') || keys.has('d') ? 1.1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1.1 : 0);
+    }
+    const power = Math.max(0.15, Math.min(1.4, 0.38 + up * 0.21));
+    let top = Math.max(-0.9, Math.min(1, up * 0.3 - 0.25));
+    const side = Math.max(-1, Math.min(1, lat * 0.35));
+    const off = (ball.x - pad[0].x) / REACH;
+    let tx = HW * Math.max(-1.35, Math.min(1.35, lat * 0.32 + off * 0.45 + ball.x * 0.2));
+    let ty = HL * (0.25 + 0.62 * power);
+    // misreading incoming spin pushes the ball long (topspin) or into the net (backspin)
+    const inTop = ball.top;
+    const counter = Math.sign(inTop) === Math.sign(top) ? Math.min(1, Math.abs(top) * 1.3) : 0;
+    ty += inTop * 0.55 * (1 - counter);
+    if (ball.z > 0.32 && up > 2.4) { top = Math.min(top, 0.5); flash(t.smash); } else if (top > 0.55) flash(t.topspin); else if (top < -0.3) flash(t.backspin);
+    const lift = ty > 0.15;
+    if (!lift) ty = 0.05;
+    const speed = 4.2 + 7 * power;
+    const v2 = solveShot(ball.x, ball.y, ball.z, tx, ty, speed, top, side, lift);
+    launch(0, v2, top, side);
+    pad[0].swing = 1; pad[0].tilt = lat;
+    game.hitCount++;
+    aiPlanSoon();
+  }
+
+  function gauss() { return (Math.random() + Math.random() + Math.random() - 1.5) / 1.5; }
+
+  function aiShot() {
+    const L = AI[game.level];
+    const inTop = ball.top;
+    const top = (Math.random() < L.spin ? 1 : 0.4) * (Math.random() < 0.7 ? 0.7 : -0.6) * (0.6 + Math.random() * 0.4);
+    let tx;
+    if (Math.random() < L.corner) tx = (pad[0].x > 0 ? -1 : 1) * HW * (0.65 + Math.random() * 0.25);
+    else tx = (Math.random() * 2 - 1) * HW * 0.5;
+    let ty = -HL * (0.55 + Math.random() * 0.35);
+    const pw = L.power * (0.75 + Math.random() * 0.4) * (ball.z > 0.3 ? 1.2 : 1);
+    tx += gauss() * L.err * 1.4; ty += gauss() * L.err * 1.6;
+    if (ai.bad) { if (Math.random() < 0.5) ty = -0.05; else ty -= 0.45 + Math.random() * 0.3; }
+    const counter = Math.sign(inTop) === Math.sign(top) ? Math.abs(top) : 0;
+    ty -= inTop * 0.5 * (1 - L.read) * (1 - counter);
+    const side = gauss() * L.spin * 0.6;
+    const lift = ty < -0.15;
+    if (!lift) ty = -0.05;
+    launch(1, solveShot(ball.x, ball.y, ball.z, tx, ty, 4 + 7 * pw, top, side, lift), top, side);
+    pad[1].swing = 1;
+    ai.plan = null; ai.bad = false; ai.tx = 0; ai.ty = HL + 0.4;
+  }
+
+  // Simulate a copy of the ball to see where it will cross a comfortable hitting depth.
+  function predict(s) {
+    const save = { ...ball };
+    let res = null, bounced = ball.bounced, t = 0;
+    const dir = s === 0 ? -1 : 1;
+    for (let i = 0; i < 900; i++) {
+      const e = stepBall(STEP); t += STEP;
+      if (e && e.ev === 'bounce') { if (e.side !== s || bounced) break; bounced = true; continue; }
+      if (e && e.ev !== 'bounce') break;
+      if (bounced && ball.vy * dir > 0 && ((ball.vz < 0 && ball.z < 0.3 && ball.y * dir > HL - 0.2) || ball.y * dir > HL + 0.75)) { res = { x: ball.x, y: ball.y, z: ball.z, t }; break; }
+    }
+    Object.assign(ball, save);
+    return res;
+  }
+  function aiPlanSoon() { ai.wait = AI[game.level].react; ai.plan = null; }
+
+  function planAI(L) {
+    const pr = predict(1);
+    ai.bad = false;
+    if (!pr) { ai.plan = { x: 0, y: HL + 0.4 }; }
+    else {
+      const spd = Math.hypot(ball.vx, ball.vy);
+      const risk = L.blunder * (0.5 + spd / 6 + Math.abs(ball.serving ? ball.pendTop : ball.top) * 0.8 + (Math.abs(pr.x) > HW * 0.7 ? 0.5 : 0));
+      let x = pr.x + gauss() * L.err * 0.55;
+      if (Math.random() < risk) { if (Math.random() < 0.5) x += (Math.random() < 0.5 ? -1 : 1) * (REACH + 0.05 + Math.random() * 0.2); else ai.bad = true; }
+      ai.plan = { x, y: pr.y };
+    }
+    ai.tx = ai.plan.x; ai.ty = ai.plan.y;
+  }
+  function updateAI(dt) {
+    const L = AI[game.level];
+    const p = pad[1];
+    if (game.phase === 'rally' && ball.hitter === 0 && !ai.plan && !ball.serving) {
+      ai.wait -= dt;
+      if (ai.wait <= 0) {
+        planAI(L);
+      }
+    } else if (game.phase === 'rally' && ball.serving && ball.hitter === 0 && !ai.plan) {
+      ai.wait -= dt;
+      if (ai.wait <= 0 && ball.serveB1) planAI(L);
+    }
+    const mv = L.speed * dt;
+    p.x += Math.max(-mv, Math.min(mv, ai.tx - p.x));
+    p.y += Math.max(-mv, Math.min(mv, Math.max(HL + 0.12, Math.min(HL + 0.9, ai.ty)) - p.y));
+  }
+
+  // ---------- player input ----------
+  function swipe() {
+    const now = performance.now();
+    let i = ptr.hist.findIndex(q => now - q.t < 110);
+    if (i < 0) return { up: 0, lat: 0 };
+    const h = ptr.hist.slice(Math.max(0, i - 1)).filter(q => now - q.t < 220);
+    if (h.length < 2) return { up: 0, lat: 0 };
+    const a = h[0], b = h[h.length - 1], dt = Math.max(0.016, (b.t - a.t) / 1000);
+    return { up: -(b.y - a.y) / ch / dt, lat: (b.x - a.x) / ch / dt };
+  }
+  function setPaddleFromScreen(sx, sy) {
+    const lift = ptr.touch ? ch * 0.06 : 0;
+    const [x, y] = unproject(sx, sy - lift, 0.15);
+    pad[0].x = Math.max(-HW - 0.7, Math.min(HW + 0.7, x));
+    pad[0].y = Math.max(-HL - 0.75, Math.min(-HL + 0.05, y));
+  }
+  function localXY(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  canvas.addEventListener('pointerdown', e => {
+    canvas.focus({ preventScroll: true });
+    ptr.active = true; ptr.touch = e.pointerType !== 'mouse'; ptr.used = true; keys.clear();
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    const [x, y] = localXY(e); ptr.hist = [{ x, y, t: performance.now() }];
+    if (!ptr.touch) setPaddleFromScreen(x, y);
+  });
+  canvas.addEventListener('pointermove', e => {
+    const [x, y] = localXY(e);
+    if (e.pointerType === 'mouse' || ptr.active) {
+      ptr.used = true; if (e.pointerType === 'mouse') { ptr.touch = false; }
+      ptr.hist.push({ x, y, t: performance.now() }); if (ptr.hist.length > 20) ptr.hist.shift();
+      setPaddleFromScreen(x, y);
+      if (game.phase === 'serve' && game.server === 0 && swipe().up > 1.0) playerServe();
+    }
+  });
+  const end = () => { ptr.active = false; };
+  canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+
+  const USED = new Set(['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'x', 'z', 'a', 'd', 'w', 's']);
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (!USED.has(k) || game.phase === 'menu' || game.paused || !$('result').hidden) return;
+    if (e.target.closest && e.target.closest('button') && (k === ' ')) return;
+    e.preventDefault();
+    keys.add(k); ptr.used = false;
+    if (k === ' ' && game.phase === 'serve' && game.server === 0) playerServe();
+  });
+  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  function keyMove(dt) {
+    if (ptr.used) return;
+    const sp = 2.2 * dt;
+    if (keys.has('arrowleft') || keys.has('a')) pad[0].x -= sp;
+    if (keys.has('arrowright') || keys.has('d')) pad[0].x += sp;
+    if (keys.has('arrowup') || keys.has('w')) pad[0].y += sp * 0.6;
+    if (keys.has('arrowdown') || keys.has('s')) pad[0].y -= sp * 0.6;
+    pad[0].x = Math.max(-HW - 0.7, Math.min(HW + 0.7, pad[0].x));
+    pad[0].y = Math.max(-HL - 0.75, Math.min(-HL + 0.05, pad[0].y));
+  }
+
+  function playerServe() {
+    if (game.phase !== 'serve' || game.server !== 0 || game.toss < 0.35) return;
+    const v = swipe();
+    let up = v.up, lat = v.lat;
+    if (!ptr.used || keys.size) { up = keys.has('x') ? 3 : keys.has('z') ? 0.8 : 2; lat = (keys.has('arrowright') ? 1 : 0) - (keys.has('arrowleft') ? 1 : 0); }
+    const depth = Math.max(0.35, Math.min(1.1, 0.4 + up * 0.15));
+    const aim = Math.max(-HW * 1.2, Math.min(HW * 1.2, pad[0].x * 0.4 + lat * 0.35));
+    const spin = Math.max(-0.9, Math.min(0.9, up * 0.35 - 0.6));
+    game.phase = 'rally';
+    serveBall(0, aim, depth, spin, 2.6 + up * 0.35);
+    $('cue').hidden = true;
+    aiPlanSoon();
+  }
+  function aiServe() {
+    const L = AI[game.level];
+    const aim = (Math.random() * 2 - 1) * HW * (0.3 + 0.5 * L.corner) + gauss() * L.err * 0.4;
+    const depth = Math.min(0.97, 0.55 + Math.random() * 0.35 + gauss() * L.err * 0.25);
+    const spin = (Math.random() < 0.5 ? 1 : -1) * L.spin * (0.5 + Math.random() * 0.5);
+    game.phase = 'rally';
+    serveBall(1, aim, depth, spin, 2.6 + L.power * 1.2);
+  }
+
+  // ---------- flow ----------
+  function startMatch() {
+    game.mode = settings.mode; game.level = +settings.level; game.bo = +settings.bo;
+    game.pts = [0, 0]; game.games = [0, 0]; game.gameNo = 1; game.total = [0, 0];
+    game.firstServer = 0; game.server = 0; game.timeScale = AI[game.level].slow;
+    drill.type = +settings.drill; drill.n = 0; drill.score = 0; drill.good = 0; drill.streak = 0; drill.bestStreak = 0;
+    if (game.mode === 'train') game.timeScale = 0.66;
+    $('setup').hidden = true; $('result').hidden = true;
+    pad[1].x = 0; pad[1].y = HL + 0.35;
+    renderHud();
+    if (game.mode === 'train') nextFeed(); else newPoint();
+  }
+  function newPoint() {
+    ball.live = false; ball.serving = false; trail.length = 0;
+    const tot = game.pts[0] + game.pts[1];
+    const per = game.pts[0] >= 10 && game.pts[1] >= 10 ? 1 : 2;
+    const swaps = per === 1 ? 10 + (tot - 20) : Math.floor(tot / 2);
+    game.server = (game.firstServer + swaps) % 2;
+    game.phase = 'serve'; game.toss = 0; game.serveT = 0;
+    ai.tx = 0; ai.ty = HL + 0.4; ai.plan = null;
+    if (game.server === 0) { $('cue').textContent = t.serveHint; $('cue').hidden = false; }
+    else $('cue').hidden = true;
+    renderHud();
+    const call = callout();
+    if (call) flash(call);
+  }
+  function callout() {
+    const [a, b] = game.pts;
+    if (a >= 10 && b >= 10 && a === b) return t.deuce;
+    const need = Math.floor(game.bo / 2) + 1;
+    for (let s = 0; s < 2; s++) {
+      const me = game.pts[s], op = game.pts[1 - s];
+      if (me >= 10 && me - op >= 1) return game.games[s] + 1 >= need ? t.matchPoint : t.gamePoint;
+    }
+    return '';
+  }
+  function pointTo(s, reason) {
+    if (game.mode === 'train') return drillMiss(reason);
+    game.phase = 'dead'; game.deadT = 1.3;
+    game.pts[s]++; game.total[s]++;
+    flash(`${s === 0 ? t.pointYou : t.pointCpu} · ${t[reason]}`);
+    announce(`${s === 0 ? t.pointYou : t.pointCpu} ${game.pts[0]} – ${game.pts[1]}`);
+    const [a, b] = game.pts;
+    if ((a >= 11 || b >= 11) && Math.abs(a - b) >= 2) {
+      const w = a > b ? 0 : 1;
+      game.games[w]++;
+      const need = Math.floor(game.bo / 2) + 1;
+      if (game.games[w] >= need) { game.deadT = 1.4; game.ending = w; }
+      else { game.deadT = 2; flash(w === 0 ? t.gameYou(game.gameNo) : t.gameCpu(game.gameNo)); announce(w === 0 ? t.gameYou(game.gameNo) : t.gameCpu(game.gameNo)); game.nextGame = true; }
+    }
+    renderHud();
+  }
+  function afterDead() {
+    if (game.ending !== undefined) { const w = game.ending; game.ending = undefined; return finishMatch(w); }
+    if (game.nextGame) { game.nextGame = false; game.pts = [0, 0]; game.gameNo++; game.firstServer = 1 - game.firstServer; }
+    newPoint();
+  }
+  function finishMatch(w) {
+    game.phase = 'over'; ball.live = false;
+    const rec = read('rec' + game.level, { w: 0, l: 0 });
+    if (w === 0) rec.w++; else rec.l++;
+    write('rec' + game.level, rec);
+    $('result-emoji').textContent = w === 0 ? '🏆' : '🏓';
+    $('result-title').textContent = w === 0 ? t.winYou : t.winCpu;
+    const f = $('final').children; f[0].textContent = game.games[0]; f[1].textContent = game.games[1];
+    $('final').hidden = false;
+    $('result-detail').textContent = t.detail(game.total[0], game.total[1]);
+    $('new-record').hidden = true;
+    $('result-record').textContent = t.record(rec.w, rec.l);
+    $('result').hidden = false; $('again').focus();
+    announce(w === 0 ? t.winYou : t.winCpu);
+  }
+
+  // ---------- training ----------
+  function nextFeed() {
+    if (drill.n >= DRILL_BALLS[drill.type]) return finishDrill();
+    drill.n++;
+    game.phase = 'rally'; trail.length = 0;
+    const mx = (Math.random() * 2 - 1) * HW * 0.6;
+    pad[1].x = mx; pad[1].y = HL + 0.3;
+    ball.x = mx; ball.y = HL + 0.3; ball.z = 0.3;
+    let top = (Math.random() * 2 - 1) * 0.3;
+    if (drill.type === 2) top = (Math.random() < 0.5 ? 0.9 : -0.85);
+    const tx = (Math.random() * 2 - 1) * HW * (drill.type === 0 ? 0.6 : 0.4);
+    const ty = -HL * (0.5 + Math.random() * 0.35);
+    launch(1, solveShot(ball.x, ball.y, ball.z, tx, ty, 4.5 + Math.random() * 1.5 + drill.n * 0.05, top, (Math.random() * 2 - 1) * 0.3, true), top, ball.side);
+    ball.side = (Math.random() * 2 - 1) * 0.3;
+    if (drill.type === 1) drill.target = { x: (Math.random() * 2 - 1) * HW * 0.65, y: HL * (0.35 + Math.random() * 0.5), r: 0.24 };
+    else drill.target = null;
+    renderHud();
+  }
+  function drillLanded() {
+    // the player's return landed on the far half
+    let gain = 1;
+    if (drill.target && Math.hypot(ball.x - drill.target.x, ball.y - drill.target.y) < drill.target.r) { gain = 3; flash(t.target); }
+    else if (drill.type === 1) flash(t.onTable);
+    drill.score += gain; drill.good++; drill.streak++; drill.bestStreak = Math.max(drill.bestStreak, drill.streak);
+    addEffect(ball.x, ball.y);
+    game.phase = 'dead'; game.deadT = 0.9;
+    renderHud();
+  }
+  function drillMiss(reason) {
+    drill.streak = 0; flash(t[reason]);
+    game.phase = 'dead'; game.deadT = 0.9;
+    renderHud();
+  }
+  function finishDrill() {
+    game.phase = 'over'; ball.live = false;
+    const best = read('drill' + drill.type, 0);
+    const isNew = drill.score > best;
+    if (isNew) write('drill' + drill.type, drill.score);
+    $('result-emoji').textContent = '🎯';
+    $('result-title').textContent = t.drillOver;
+    $('final').hidden = true;
+    $('result-detail').textContent = `${t.drillScore(drill.score)} · ${t.drillDetail(drill.good, drill.bestStreak)}`;
+    $('new-record').hidden = !isNew;
+    $('result-record').textContent = t.drillBest(Math.max(best, drill.score));
+    $('result').hidden = false; $('again').focus();
+    announce(t.drillScore(drill.score));
+  }
+
+  // ---------- HUD ----------
+  function renderHud() {
+    const train = game.mode === 'train';
+    $('name-0').textContent = t.you;
+    $('name-1').textContent = train ? t.machine : `${t.cpu} · ${t['l' + game.level]}`;
+    const need = Math.floor(game.bo / 2) + 1;
+    for (let s = 0; s < 2; s++) {
+      $('pts-' + s).textContent = train ? (s === 0 ? drill.score : '') : game.pts[s];
+      const g = $('games-' + s);
+      g.innerHTML = train ? '' : Array.from({ length: need }, (_, i) => `<i class="${i < game.games[s] ? 'on' : ''}"></i>`).join('');
+      g.setAttribute('aria-label', `${t.games}: ${game.games[s]}`);
+      $('row-' + s).classList.toggle('serving', !train && game.server === s && game.phase !== 'menu');
+    }
+    $('info').textContent = train ? `${t['d' + drill.type]} · ${t.ball(drill.n, DRILL_BALLS[drill.type])} · ${t.streak(drill.streak)}` : `${t.game(game.gameNo)} · ${t.bo(game.bo)}`;
+  }
+  function flash(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); toastT = 1.3; }
+  function announce(msg) { $('announcer').textContent = msg; }
+  function addEffect(x, y) { if (!reduced) effects.push({ x, y, t: 0 }); }
+
+  // ---------- loop ----------
+  let last = performance.now(), acc = 0, speedMul = 1;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!game.paused && !document.hidden) update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  function update(dt) {
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
+    keyMove(dt);
+    for (const p of pad) { p.swing = Math.max(0, p.swing - dt * 4); p.tilt *= 0.9; }
+    for (const ef of effects) ef.t += dt;
+    effects = effects.filter(ef => ef.t < 0.6);
+    if (game.phase === 'menu' || game.phase === 'over') return;
+    const wdt = dt * game.timeScale * speedMul;
+    if (game.phase === 'serve') {
+      game.toss = Math.min(1, game.toss + dt * 1.3);
+      const s = game.server;
+      ball.x = pad[s].x; ball.y = pad[s].y + (s === 0 ? 0.08 : -0.08);
+      ball.z = 0.15 + 0.25 * Math.abs(Math.sin(game.toss * Math.PI * 1.5));
+      if (s === 1) {
+        ai.tx = pad[1].x; updateAI(dt);
+        game.serveT += dt; if (game.serveT > 1.1) aiServe();
+      } else if (game.mode === 'match') { ai.tx = 0; updateAI(dt); }
+      return;
+    }
+    if (game.mode === 'match') updateAI(wdt);
+    if (game.phase === 'dead') {
+      game.deadT -= dt;
+      if (ball.live) simulate(wdt, false);
+      if (game.deadT <= 0) { if (game.mode === 'train') nextFeed(); else afterDead(); }
+      return;
+    }
+    if (game.phase === 'rally') simulate(wdt, true);
+  }
+  function simulate(wdt, rules) {
+    acc += wdt;
+    while (acc >= STEP) {
+      acc -= STEP;
+      const e = stepBall(STEP);
+      if (rules) {
+        if (game.phase !== 'rally') { continue; }
+        if (tryHit(0)) continue;
+        if (game.mode === 'match' && tryHit(1)) continue;
+        onEvent(e);
+      }
+    }
+    trail.push([ball.x, ball.y, ball.z]); if (trail.length > 10) trail.shift();
+    if (!rules && Math.abs(ball.y) > HL + 3) ball.live = false;
+  }
+
+  // ---------- drawing ----------
+  const P = (x, y, z) => project(x, y, z);
+  function quad(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); }
+  function line(a, b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+  function draw() {
+    if (!cw) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    // floor
+    const hz = P(0, HL + 5, FLOOR)[1];
+    const g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, '#221a40'); g.addColorStop(Math.max(0, Math.min(1, hz / ch)), '#33285e'); g.addColorStop(1, '#5a3f7e');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+    ctx.strokeStyle = '#ffffff10'; ctx.lineWidth = 1;
+    for (let i = -6; i <= 6; i++) line(P(i * 0.8, -HL - 3, FLOOR), P(i * 0.8, HL + 5, FLOOR));
+    // table legs + side
+    ctx.fillStyle = '#120d24';
+    for (const [x, y] of [[-HW + 0.2, -HL + 0.3], [HW - 0.2, -HL + 0.3], [-HW + 0.2, HL - 0.3], [HW - 0.2, HL - 0.3]]) {
+      const a = P(x, y, -0.03), b = P(x, y, FLOOR); ctx.fillRect(a[0] - 2, a[1], 4, b[1] - a[1]);
+    }
+    const c = [P(-HW, -HL, 0), P(HW, -HL, 0), P(HW, HL, 0), P(-HW, HL, 0)];
+    ctx.fillStyle = '#0c3d5e'; quad(c[0], c[1], P(HW, -HL, -0.04), P(-HW, -HL, -0.04)); ctx.fill();
+    // shadow of table on floor
+    ctx.fillStyle = '#00000030'; quad(P(-HW, -HL, FLOOR), P(HW, -HL, FLOOR), P(HW, HL, FLOOR), P(-HW, HL, FLOOR)); ctx.fill();
+    const tg = ctx.createLinearGradient(0, c[2][1], 0, c[0][1]);
+    tg.addColorStop(0, '#1a6fa8'); tg.addColorStop(1, '#2186c4');
+    ctx.fillStyle = tg; quad(...c); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, F * 0.0045);
+    quad(...c); ctx.stroke();
+    ctx.lineWidth = Math.max(1, F * 0.0025); line(P(0, -HL, 0), P(0, HL, 0));
+    // training target
+    if (drill.target && game.mode === 'train' && game.phase !== 'over') {
+      ctx.beginPath();
+      for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2; const q = P(drill.target.x + Math.cos(a) * drill.target.r, drill.target.y + Math.sin(a) * drill.target.r, 0); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+      ctx.fillStyle = '#ffd23f55'; ctx.fill(); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    for (const ef of effects) {
+      const k = ef.t / 0.6; ctx.beginPath();
+      for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI * 2; const q = P(ef.x + Math.cos(a) * 0.12 * (0.3 + k), ef.y + Math.sin(a) * 0.12 * (0.3 + k), 0); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+      ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 2; ctx.stroke();
+    }
+    const showBall = ball.live || game.phase === 'serve';
+    if (showBall && ball.y >= 0) drawBall();
+    if (game.mode === 'match' || game.mode === 'train') drawPaddle(1);
+    drawNet();
+    if (showBall && ball.y < 0) drawBall();
+    if (game.phase !== 'menu') drawPaddle(0);
+  }
+  function drawNet() {
+    const a = P(-HW - 0.15, 0, 0), b = P(HW + 0.15, 0, 0), c2 = P(HW + 0.15, 0, NET_H), d = P(-HW - 0.15, 0, NET_H);
+    ctx.fillStyle = '#ffffff30'; quad(a, b, c2, d); ctx.fill();
+    ctx.strokeStyle = '#ffffff22'; ctx.lineWidth = 1;
+    for (let i = 1; i < 24; i++) { const x = -HW - 0.15 + (TW + 0.3) * i / 24; line(P(x, 0, 0), P(x, 0, NET_H)); }
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(2, F * 0.004); line(d, c2);
+    ctx.fillStyle = '#222'; for (const q of [[a, d], [b, c2]]) { ctx.fillRect(q[0][0] - 2, q[1][1], 4, q[0][1] - q[1][1]); }
+  }
+  function drawBall() {
+    const over = Math.abs(ball.x) <= HW && Math.abs(ball.y) <= HL && ball.z >= 0;
+    const sh = P(ball.x, ball.y, over ? 0 : FLOOR);
+    ctx.fillStyle = '#00000055';
+    ctx.beginPath(); ctx.ellipse(sh[0], sh[1], Math.max(2, R * sh[2] * 1.3), Math.max(1, R * sh[2] * 0.6), 0, 0, Math.PI * 2); ctx.fill();
+    if (!reduced) {
+      for (let i = 0; i < trail.length - 1; i++) {
+        const q = P(...trail[i]); ctx.fillStyle = `rgba(255,240,200,${0.05 + i * 0.03})`;
+        ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(1.5, R * q[2] * (0.4 + i * 0.05)), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    const q = P(ball.x, ball.y, ball.z), r = Math.max(3, R * q[2]);
+    ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, Math.PI * 2); ctx.fill();
+    const spin = ball.serving ? ball.pendTop : ball.top;
+    if (Math.abs(spin) > 0.25) {
+      ctx.strokeStyle = spin > 0 ? '#ff8a2b' : '#3aa8ff'; ctx.lineWidth = Math.max(1.5, r * 0.4);
+      const a0 = performance.now() / 1000 * 18 * Math.sign(spin);
+      ctx.beginPath(); ctx.arc(q[0], q[1], r * 0.62, a0, a0 + 2.2); ctx.stroke();
+    }
+  }
+  function drawPaddle(s) {
+    const p = pad[s];
+    const z = s === 0 ? (ball.live && ball.y < -HL + 0.6 ? Math.max(-0.2, Math.min(0.7, ball.z)) : 0.2) : (ball.live && ball.y > HL - 0.6 ? Math.max(-0.2, Math.min(0.7, ball.z)) : 0.2);
+    p.z += (z - p.z) * 0.3;
+    const q = P(p.x, p.y, p.z), k = q[2];
+    const rw = 0.085 * k, rh = 0.09 * k;
+    const ang = (s === 0 ? -1 : 1) * (0.35 + p.tilt * 0.3) - p.swing * 0.6 * (s === 0 ? 1 : -1);
+    ctx.save(); ctx.translate(q[0], q[1]); ctx.rotate(ang);
+    ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-rw * 0.18, rh * 0.8, rw * 0.36, rh * 1.1);
+    ctx.fillStyle = s === 0 ? '#ff6b4a' : '#4ad0ff';
+    ctx.beginPath(); ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#00000055'; ctx.lineWidth = Math.max(1, k * 0.008); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- menus ----------
+  function syncSeg() {
+    for (const seg of document.querySelectorAll('.seg')) for (const b of seg.children) b.setAttribute('aria-pressed', String(settings[seg.dataset.key] === b.dataset.value));
+    const train = settings.mode === 'train';
+    $('level-field').hidden = train; $('bo-field').hidden = train; $('drill-field').hidden = !train;
+    $('setup-hint').textContent = train ? t.drillHint[+settings.drill] : `${t.matchHint(settings.bo)} ${(r => t.record(r.w, r.l))(read('rec' + settings.level, { w: 0, l: 0 }))}`;
+  }
+  for (const seg of document.querySelectorAll('.seg')) seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    settings[seg.dataset.key] = b.dataset.value;
+    write(seg.dataset.key, seg.dataset.key === 'mode' ? b.dataset.value : +b.dataset.value);
+    syncSeg();
+  });
+  $('start').addEventListener('click', startMatch);
+  $('again').addEventListener('click', startMatch);
+  $('change').addEventListener('click', toMenu);
+  $('menu').addEventListener('click', () => { if (game.phase === 'menu') return; game.paused = true; $('pause').hidden = false; $('resume').focus(); });
+  $('resume').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; });
+  $('quit').addEventListener('click', () => { game.paused = false; $('pause').hidden = true; toMenu(); });
+  function toMenu() { game.phase = 'menu'; ball.live = false; $('result').hidden = true; $('cue').hidden = true; $('setup').hidden = false; syncSeg(); renderHud(); $('start').focus(); }
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+  syncSeg(); renderHud(); fit();
+  requestAnimationFrame(frame);
+
+  if (navigator.webdriver) window.__tableTennis = {
+    state: () => ({ phase: game.phase, mode: game.mode, pts: [...game.pts], games: [...game.games], server: game.server, gameNo: game.gameNo, ball: { ...ball }, pad: pad.map(p => ({ x: p.x, y: p.y })), drill: { ...drill } }),
+    // screen (client) coordinates of a world point
+    screen: (x, y, z) => { const r = canvas.getBoundingClientRect(); const q = project(x, y, z); return [r.left + q[0], r.top + q[1]]; },
+    predictPlayer: () => predict(0),
+    setSpeed: k => { speedMul = k; },
+  };
+})();
+</script>
+</body>
+</html>
