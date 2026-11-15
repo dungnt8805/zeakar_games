@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tap Tiles</title>
+<style>
+:root {
+  --bg: #1b1430;
+  --bg-2: #2a1f4a;
+  --panel: #2b2150;
+  --panel-2: #3a2d68;
+  --text: #fbf7ff;
+  --muted: #b7acd9;
+  --lane: #f6f0e6;
+  --ink: #1c1a2e;
+  --coral: #ff6f61;
+  --mint: #4fe0b6;
+  --gold: #ffc94a;
+  --sky: #7ab8ff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(120% 90% at 50% 10%, var(--bg-2), var(--bg) 70%); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "l" "r" "stage"; gap: 6px; max-width: 560px; margin: auto; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.side { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.side.l { grid-area: l; }
+.side.r { grid-area: r; }
+.stage { grid-area: stage; position: relative; min-height: 0; border-radius: 18px; overflow: hidden; background: var(--lane); box-shadow: 0 10px 30px #0008, inset 0 0 0 2px #ffffff22; touch-action: none; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.song-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 3px 10px; border-radius: 12px; background: var(--panel); }
+.stat b { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat small { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.stat.score b { color: var(--gold); }
+.hearts { font-size: 18px; letter-spacing: 1px; white-space: nowrap; }
+.hearts .off { opacity: .25; filter: grayscale(1); }
+.prog { flex: 1; min-width: 40px; height: 8px; border-radius: 99px; background: var(--panel); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), var(--sky)); border-radius: inherit; }
+.speed { font-size: 13px; font-weight: 900; color: var(--mint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.icon-btn { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: var(--panel-2); font-size: 17px; font-weight: 900; box-shadow: 0 3px 0 #120d24; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #120d24; }
+.keys, .big-title, .acc-line { display: none; }
+.keys { gap: 6px; }
+.keys kbd { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); font: inherit; font-weight: 900; box-shadow: 0 3px 0 #120d24; }
+
+/* wide: lanes take full height in the centre, HUD lives in the side columns */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; grid-template-columns: minmax(0, 1fr) min(64vw, calc((100dvh - 16px) * .66)) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "l stage r"; gap: clamp(8px, 2vw, 28px); }
+  .side { flex-direction: column; align-items: stretch; justify-content: center; gap: clamp(6px, 1.6vh, 14px); max-width: 320px; overflow: hidden; }
+  .side.l { justify-self: end; width: 100%; }
+  .side.r { justify-self: start; width: 100%; }
+  .big-title { display: block; font-size: clamp(18px, 3.4vh, 30px); font-weight: 900; letter-spacing: -.02em; line-height: 1; }
+  .big-title span { color: var(--coral); }
+  .song-name { flex: 0 0 auto; white-space: normal; font-size: clamp(13px, 2.4vh, 18px); line-height: 1.25; }
+  .stat { flex-direction: row; justify-content: space-between; gap: 8px; padding: clamp(4px, 1.2vh, 10px) 14px; border-radius: 14px; }
+  .stat b { font-size: clamp(18px, 4vh, 32px); }
+  .stat small { font-size: clamp(10px, 1.7vh, 13px); }
+  .prog { flex: 0 0 auto; height: 10px; }
+  .acc-line { display: block; font-size: clamp(11px, 2vh, 14px); font-weight: 800; color: var(--muted); }
+  .hearts { font-size: clamp(18px, 4vh, 30px); }
+  .keys { display: flex; flex-wrap: wrap; align-items: center; }
+  .keys span { width: 100%; font-size: clamp(10px, 1.8vh, 13px); color: var(--muted); font-weight: 700; }
+  .btn-row { display: flex; gap: 8px; }
+  .speed { font-size: clamp(13px, 2.4vh, 18px); }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 420px) { .keys { display: none; } .acc-line { display: none; } .stat { padding: 2px 10px; } }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 10px; background: #120c22d9; }
+.panel { width: min(100%, 420px); max-height: calc(100% - 8px); overflow-y: auto; background: var(--panel); border-radius: 26px; padding: 20px 18px 18px; text-align: center; box-shadow: 0 20px 50px #0009, inset 0 0 0 1px #ffffff14; animation: rise .28s ease-out; }
+.panel.wide { width: min(100%, 860px); }
+@keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+.logo { font-size: clamp(34px, 10vw, 46px); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.logo span { color: var(--coral); }
+.mini-tiles { display: flex; justify-content: center; gap: 5px; margin: 10px 0 4px; }
+.mini-tiles i { width: 16px; height: 26px; border-radius: 4px; background: var(--lane); }
+.mini-tiles i:nth-child(2n) { background: var(--ink); box-shadow: 0 0 0 2px var(--lane); transform: translateY(-6px); }
+.tagline { margin-top: 6px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.panel h2 { font-size: 22px; font-weight: 900; }
+.panel p { margin-top: 6px; font-size: 14px; color: var(--muted); line-height: 1.4; }
+.cta { display: block; margin-top: 14px; width: 100%; padding: 13px; border-radius: 18px; background: var(--coral); color: #2b0d09; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 #b8473c; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8473c; }
+.ghost { display: block; margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; background: var(--panel-2); font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #120d24; }
+.ghost:active { transform: translateY(2px); box-shadow: 0 2px 0 #120d24; }
+.ghost small, .cta small { display: block; font-size: 12px; font-weight: 700; opacity: .8; }
+.row2 { display: flex; gap: 10px; } .row2 > * { flex: 1; }
+.toggle { margin-top: 12px; font-size: 14px; font-weight: 800; color: var(--muted); padding: 6px 12px; border-radius: 99px; background: #ffffff10; }
+.list-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.list-head h2 { flex: 1; text-align: left; }
+.list-head .total { font-size: 14px; font-weight: 900; color: var(--gold); white-space: nowrap; }
+.songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.song { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 9px 11px; border-radius: 14px; background: var(--panel-2); text-align: left; box-shadow: 0 3px 0 #120d24; }
+.song:active { transform: translateY(2px); box-shadow: 0 1px 0 #120d24; }
+.song .n { font-size: 11px; font-weight: 900; color: var(--muted); }
+.song strong { font-size: 14px; font-weight: 800; line-height: 1.2; }
+.song .meta { display: flex; justify-content: space-between; width: 100%; font-size: 13px; }
+.song .st { color: var(--gold); letter-spacing: 1px; }
+.song .st .off { color: #ffffff30; }
+.song .dots { color: var(--mint); font-size: 10px; letter-spacing: 1px; align-self: center; }
+.song.locked { opacity: .5; }
+.song.locked strong::before { content: "🔒 "; }
+.res-stars { margin-top: 6px; font-size: 44px; letter-spacing: 4px; color: var(--gold); line-height: 1.1; }
+.res-stars .off { color: #ffffff26; }
+.res-score { margin-top: 2px; font-size: clamp(38px, 11vw, 52px); font-weight: 900; letter-spacing: -.03em; color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1.05; }
+.res-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.res-grid div { padding: 6px 2px; border-radius: 12px; background: #ffffff0d; }
+.res-grid b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+.res-grid small { font-size: 11px; font-weight: 800; color: var(--muted); }
+.badge { display: inline-block; margin-top: 8px; padding: 5px 14px; border-radius: 99px; background: var(--gold); color: #2b2200; font-size: 14px; font-weight: 900; }
+@media (max-height: 560px) { .panel { padding: 14px 14px; } .mini-tiles { display: none; } .cta { margin-top: 10px; padding: 10px; } .ghost { margin-top: 8px; padding: 9px; } .res-stars { font-size: 34px; } .res-score { font-size: 36px; } .tagline { font-size: 13px; } }
+@media (max-height: 420px) { .panel { border-radius: 20px; padding: 10px 14px; } .logo { font-size: 30px; } .res-grid { margin-top: 6px; } .res-grid b { font-size: 15px; } .song { min-height: 52px; padding: 6px 9px; } .row2.land-split { } .panel.result { width: min(100%, 560px); } }
+@media (max-height: 420px) and (min-aspect-ratio: 4/3) { .panel.start { width: min(100%, 560px); } .start .row2 .cta, .start .row2 .ghost { margin-top: 10px; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="side l">
+    <div class="big-title">Tap <span>Tiles</span></div>
+    <button class="icon-btn" id="pause-btn" type="button" data-i18n-label="pause">❚❚</button>
+    <div class="song-name" id="song-name"></div>
+    <div class="stat score"><small data-i18n="score"></small><b id="score">0</b></div>
+    <div class="stat"><small data-i18n="combo"></small><b id="combo">0</b></div>
+    <div class="acc-line" id="acc-line"></div>
+  </div>
+  <div class="side r">
+    <div class="hearts" id="hearts" role="img"></div>
+    <div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="prog"><i id="prog-bar"></i></div>
+    <div class="speed" id="speed">×1.0</div>
+    <div class="stat"><small data-i18n="best"></small><b id="best">0</b></div>
+    <div class="keys" aria-hidden="true"><span data-i18n="keysHint"></span><kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd></div>
+    <button class="icon-btn" id="mute-btn" type="button" data-i18n-label="sound">🔊</button>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv" role="img"></canvas></div>
+</div>
+
+<div class="overlay" id="ov-start">
+  <div class="panel start">
+    <div class="logo">Tap <span>Tiles</span></div>
+    <div class="mini-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="tagline" data-i18n="tagline"></p>
+    <div class="row2">
+      <button class="cta" id="btn-songs" type="button"><span data-i18n="songs"></span><small id="stars-total"></small></button>
+      <button class="ghost cta-alt" id="btn-endless" type="button" style="margin-top:14px"><span data-i18n="endless"></span><small id="endless-best"></small></button>
+    </div>
+    <button class="toggle" id="btn-sound" type="button"></button>
+  </div>
+</div>
+
+<div class="overlay" id="ov-songs" hidden>
+  <div class="panel wide">
+    <div class="list-head">
+      <button class="icon-btn" id="songs-back" type="button" data-i18n-label="back">←</button>
+      <h2 data-i18n="songs"></h2>
+      <span class="total" id="songs-total"></span>
+    </div>
+    <div class="songs" id="song-list"></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-pause" hidden>
+  <div class="panel">
+    <h2 data-i18n="paused"></h2>
+    <button class="cta" id="btn-resume" type="button" data-i18n="resume"></button>
+    <button class="ghost" id="btn-restart" type="button" data-i18n="retry"></button>
+    <button class="ghost" id="btn-quit" type="button" data-i18n="quit"></button>
+  </div>
+</div>
+
+<div class="overlay" id="ov-result" hidden>
+  <div class="panel result">
+    <h2 id="res-title"></h2>
+    <div class="res-stars" id="res-stars"></div>
+    <div class="res-score" id="res-score">0</div>
+    <div id="res-badge" class="badge" hidden data-i18n="newBest"></div>
+    <div class="res-grid" id="res-grid"></div>
+    <p id="res-sub"></p>
+    <div class="row2">
+      <button class="ghost" id="res-retry" type="button" data-i18n="retry"></button>
+      <button class="cta" id="res-next" type="button" data-i18n="next"></button>
+    </div>
+    <button class="ghost" id="res-menu" type="button" data-i18n="menu"></button>
+  </div>
+</div>
+<p class="sr-only" id="announcer" aria-live="polite"></p>
+
+<script>
+(() => {
+  'use strict';
+  const I18N = {
+    en: {
+      tagline: 'Tap the dark tiles as they reach the line — every tap plays the next note of the tune. Hold the long ones!',
+      songs: 'Songs', endless: 'Endless', back: 'Back', score: 'Score', combo: 'Combo', best: 'Best', pause: 'Pause', sound: 'Sound',
+      soundOn: '🔊 Sound on', soundOff: '🔇 Sound off', paused: 'Paused', resume: 'Resume', retry: 'Retry', quit: 'Quit', menu: 'Menu', next: 'Next song',
+      keysHint: 'Keys for the 4 lanes', tapStart: 'Tap to start', perfect: 'Perfect', great: 'Great', good: 'Good', miss: 'Miss',
+      cleared: 'Song cleared!', failed: 'Out of hearts', endlessOver: 'Endless run over', newBest: 'New best!', accuracy: 'Accuracy', tiles: 'Tiles', maxCombo: 'Max combo',
+      starsN: n => `★ ${n} stars`, bestN: n => `Best: ${n} tiles`, accN: n => `Accuracy ${n}%`, lockedHint: 'Clear the previous song to unlock this one.',
+      starHint: '2★ at 75% accuracy, 3★ at 90% without losing a heart.', endlessHint: n => `Songs played: ${n}`, unlocked: name => `Unlocked: ${name}`,
+      canvas: 'Four lanes of falling tiles. Tap a lane or press D, F, J or K.', heartsN: n => `${n} hearts left`, songN: (i, name) => `Song ${i}: ${name}`, starsGot: n => `${n} of 3 stars`
+    },
+    vi: {
+      tagline: 'Chạm các ô đen khi chúng tới vạch — mỗi lần chạm vang lên nốt tiếp theo của giai điệu. Giữ các ô dài!',
+      songs: 'Bài hát', endless: 'Vô tận', back: 'Quay lại', score: 'Điểm', combo: 'Chuỗi', best: 'Kỷ lục', pause: 'Tạm dừng', sound: 'Âm thanh',
+      soundOn: '🔊 Bật âm thanh', soundOff: '🔇 Tắt âm thanh', paused: 'Tạm dừng', resume: 'Tiếp tục', retry: 'Chơi lại', quit: 'Thoát', menu: 'Menu', next: 'Bài tiếp',
+      keysHint: 'Phím cho 4 làn', tapStart: 'Chạm để bắt đầu', perfect: 'Hoàn hảo', great: 'Tuyệt', good: 'Tốt', miss: 'Trượt',
+      cleared: 'Hoàn thành bài!', failed: 'Hết tim rồi', endlessOver: 'Kết thúc lượt vô tận', newBest: 'Kỷ lục mới!', accuracy: 'Chính xác', tiles: 'Số ô', maxCombo: 'Chuỗi dài nhất',
+      starsN: n => `★ ${n} sao`, bestN: n => `Kỷ lục: ${n} ô`, accN: n => `Chính xác ${n}%`, lockedHint: 'Hoàn thành bài trước để mở khóa bài này.',
+      starHint: '2★ khi chính xác 75%, 3★ khi đạt 90% và không mất tim.', endlessHint: n => `Số bài đã chơi: ${n}`, unlocked: name => `Đã mở khóa: ${name}`,
+      canvas: 'Bốn làn ô rơi. Chạm vào làn hoặc nhấn D, F, J, K.', heartsN: n => `Còn ${n} tim`, songN: (i, name) => `Bài ${i}: ${name}`, starsGot: n => `${n} trên 3 sao`
+    },
+    zh: {
+      tagline: '黑色方块到达线时点击它——每次点击都会奏出旋律的下一个音。长方块要按住！',
+      songs: '曲目', endless: '无尽模式', back: '返回', score: '得分', combo: '连击', best: '最佳', pause: '暂停', sound: '声音',
+      soundOn: '🔊 声音开', soundOff: '🔇 声音关', paused: '已暂停', resume: '继续', retry: '重来', quit: '退出', menu: '菜单', next: '下一首',
+      keysHint: '4 条轨道的按键', tapStart: '点击开始', perfect: '完美', great: '很棒', good: '不错', miss: '失误',
+      cleared: '曲目完成！', failed: '红心用完了', endlessOver: '无尽模式结束', newBest: '新纪录！', accuracy: '准确率', tiles: '方块', maxCombo: '最高连击',
+      starsN: n => `★ ${n} 颗星`, bestN: n => `最佳：${n} 块`, accN: n => `准确率 ${n}%`, lockedHint: '完成上一首曲目即可解锁。',
+      starHint: '准确率 75% 得 2★，90% 且不丢红心得 3★。', endlessHint: n => `已演奏曲目：${n}`, unlocked: name => `已解锁：${name}`,
+      canvas: '四条轨道上的下落方块。点击轨道或按 D、F、J、K。', heartsN: n => `剩余 ${n} 颗红心`, songN: (i, name) => `第 ${i} 首：${name}`, starsGot: n => `获得 ${n}/3 颗星`
+    },
+    fr: {
+      tagline: 'Touchez les tuiles sombres quand elles atteignent la ligne : chaque touche joue la note suivante. Maintenez les longues !',
+      songs: 'Morceaux', endless: 'Sans fin', back: 'Retour', score: 'Score', combo: 'Combo', best: 'Record', pause: 'Pause', sound: 'Son',
+      soundOn: '🔊 Son activé', soundOff: '🔇 Son coupé', paused: 'Pause', resume: 'Reprendre', retry: 'Rejouer', quit: 'Quitter', menu: 'Menu', next: 'Morceau suivant',
+      keysHint: 'Touches des 4 pistes', tapStart: 'Touchez pour jouer', perfect: 'Parfait', great: 'Super', good: 'Bien', miss: 'Raté',
+      cleared: 'Morceau réussi !', failed: 'Plus de cœurs', endlessOver: 'Partie sans fin terminée', newBest: 'Nouveau record !', accuracy: 'Précision', tiles: 'Tuiles', maxCombo: 'Combo max',
+      starsN: n => `★ ${n} étoiles`, bestN: n => `Record : ${n} tuiles`, accN: n => `Précision ${n} %`, lockedHint: 'Réussissez le morceau précédent pour débloquer celui-ci.',
+      starHint: '2★ à 75 % de précision, 3★ à 90 % sans perdre de cœur.', endlessHint: n => `Morceaux joués : ${n}`, unlocked: name => `Débloqué : ${name}`,
+      canvas: 'Quatre pistes de tuiles qui tombent. Touchez une piste ou appuyez sur D, F, J ou K.', heartsN: n => `${n} cœurs restants`, songN: (i, name) => `Morceau ${i} : ${name}`, starsGot: n => `${n} étoiles sur 3`
+    },
+    th: {
+      tagline: 'แตะแผ่นสีเข้มเมื่อมาถึงเส้น ทุกครั้งที่แตะจะเล่นโน้ตถัดไปของเพลง แผ่นยาวต้องกดค้างไว้!',
+      songs: 'เพลง', endless: 'ไม่รู้จบ', back: 'กลับ', score: 'คะแนน', combo: 'คอมโบ', best: 'สถิติ', pause: 'หยุดชั่วคราว', sound: 'เสียง',
+      soundOn: '🔊 เปิดเสียง', soundOff: '🔇 ปิดเสียง', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', retry: 'เล่นใหม่', quit: 'ออก', menu: 'เมนู', next: 'เพลงถัดไป',
+      keysHint: 'ปุ่มสำหรับ 4 ช่อง', tapStart: 'แตะเพื่อเริ่ม', perfect: 'เพอร์เฟกต์', great: 'เยี่ยม', good: 'ดี', miss: 'พลาด',
+      cleared: 'ผ่านเพลงแล้ว!', failed: 'หัวใจหมดแล้ว', endlessOver: 'จบรอบไม่รู้จบ', newBest: 'สถิติใหม่!', accuracy: 'ความแม่นยำ', tiles: 'แผ่น', maxCombo: 'คอมโบสูงสุด',
+      starsN: n => `★ ${n} ดาว`, bestN: n => `สถิติ: ${n} แผ่น`, accN: n => `ความแม่นยำ ${n}%`, lockedHint: 'ผ่านเพลงก่อนหน้าเพื่อปลดล็อกเพลงนี้',
+      starHint: '2★ เมื่อแม่นยำ 75% และ 3★ เมื่อได้ 90% โดยไม่เสียหัวใจ', endlessHint: n => `เล่นไปแล้ว ${n} เพลง`, unlocked: name => `ปลดล็อกแล้ว: ${name}`,
+      canvas: 'แผ่นตกลงมาใน 4 ช่อง แตะที่ช่องหรือกด D, F, J, K', heartsN: n => `เหลือหัวใจ ${n} ดวง`, songN: (i, name) => `เพลงที่ ${i}: ${name}`, starsGot: n => `ได้ ${n} จาก 3 ดาว`
+    },
+    ja: {
+      tagline: '黒いタイルがラインに来たらタップ。タップするたびにメロディの次の音が鳴ります。長いタイルは長押し！',
+      songs: '曲', endless: 'エンドレス', back: '戻る', score: 'スコア', combo: 'コンボ', best: 'ベスト', pause: '一時停止', sound: 'サウンド',
+      soundOn: '🔊 サウンドオン', soundOff: '🔇 サウンドオフ', paused: '一時停止中', resume: '再開', retry: 'もう一度', quit: 'やめる', menu: 'メニュー', next: '次の曲',
+      keysHint: '4レーンのキー', tapStart: 'タップでスタート', perfect: 'パーフェクト', great: 'グレート', good: 'グッド', miss: 'ミス',
+      cleared: 'クリア！', failed: 'ハートがなくなった', endlessOver: 'エンドレス終了', newBest: '自己ベスト！', accuracy: '精度', tiles: 'タイル', maxCombo: '最大コンボ',
+      starsN: n => `★ ${n} 個`, bestN: n => `ベスト：${n} タイル`, accN: n => `精度 ${n}%`, lockedHint: '前の曲をクリアすると解放されます。',
+      starHint: '精度75%で2★、90%でハートを失わなければ3★。', endlessHint: n => `演奏した曲：${n}`, unlocked: name => `解放：${name}`,
+      canvas: '4つのレーンをタイルが落ちてきます。レーンをタップするか D・F・J・K キー。', heartsN: n => `ハート残り ${n}`, songN: (i, name) => `${i}曲目：${name}`, starsGot: n => `星 ${n}/3`
+    },
+    ko: {
+      tagline: '검은 타일이 선에 닿을 때 탭하세요. 탭할 때마다 멜로디의 다음 음이 울립니다. 긴 타일은 꾹 누르세요!',
+      songs: '노래', endless: '무한 모드', back: '뒤로', score: '점수', combo: '콤보', best: '최고', pause: '일시정지', sound: '소리',
+      soundOn: '🔊 소리 켬', soundOff: '🔇 소리 끔', paused: '일시정지', resume: '계속', retry: '다시 하기', quit: '그만하기', menu: '메뉴', next: '다음 곡',
+      keysHint: '4개 레인 키', tapStart: '탭하여 시작', perfect: '퍼펙트', great: '그레이트', good: '굿', miss: '미스',
+      cleared: '곡 완료!', failed: '하트를 모두 잃었어요', endlessOver: '무한 모드 종료', newBest: '최고 기록!', accuracy: '정확도', tiles: '타일', maxCombo: '최대 콤보',
+      starsN: n => `★ ${n}개`, bestN: n => `최고: 타일 ${n}개`, accN: n => `정확도 ${n}%`, lockedHint: '이전 곡을 완료하면 열립니다.',
+      starHint: '정확도 75%면 2★, 90%에 하트를 잃지 않으면 3★.', endlessHint: n => `연주한 곡: ${n}`, unlocked: name => `잠금 해제: ${name}`,
+      canvas: '4개 레인에 타일이 떨어집니다. 레인을 탭하거나 D, F, J, K를 누르세요.', heartsN: n => `하트 ${n}개 남음`, songN: (i, name) => `${i}번 곡: ${name}`, starsGot: n => `별 ${n}/3`
+    }
+  };
+  const SONG_NAMES = {
+    en: ['Twinkle Twinkle Little Star', 'Mary Had a Little Lamb', 'Frère Jacques', 'Row, Row, Row Your Boat', 'Au Clair de la Lune', 'London Bridge', 'Ode to Joy', "Brahms' Lullaby", 'Amazing Grace', 'Sakura Sakura', 'Jingle Bells', 'Arirang', 'Scarborough Fair', 'Greensleeves', 'Minuet in G', 'Swan Lake', 'Morning Mood', 'Canon in D', 'Eine kleine Nachtmusik', 'Can-Can', 'Für Elise', 'In the Hall of the Mountain King', 'Turkish March', 'William Tell Overture'],
+    vi: ['Ngôi sao lấp lánh', 'Mary có chú cừu non', 'Kìa con bướm vàng', 'Chèo thuyền nhẹ nhàng', 'Dưới ánh trăng', 'Cầu London', 'Khúc hoan ca', 'Khúc hát ru của Brahms', 'Ân điển diệu kỳ', 'Sakura Sakura', 'Jingle Bells', 'Arirang', 'Hội chợ Scarborough', 'Greensleeves', 'Minuet giọng Sol', 'Hồ thiên nga', 'Buổi sáng', 'Canon giọng Rê', 'Tiểu dạ khúc', 'Can-Can', 'Für Elise', 'Trong cung điện vua núi', 'Hành khúc Thổ Nhĩ Kỳ', 'Overture William Tell'],
+    zh: ['小星星', '玛丽有只小羊羔', '两只老虎', '划船歌', '在月光下', '伦敦桥', '欢乐颂', '勃拉姆斯摇篮曲', '奇异恩典', '樱花', '铃儿响叮当', '阿里郎', '斯卡布罗集市', '绿袖子', 'G大调小步舞曲', '天鹅湖', '晨景', 'D大调卡农', '弦乐小夜曲', '康康舞曲', '致爱丽丝', '山魔王的宫殿', '土耳其进行曲', '威廉·退尔序曲'],
+    fr: ['Ah ! vous dirai-je, maman', 'Marie avait un petit agneau', 'Frère Jacques', 'Rame, rame, rame doucement', 'Au clair de la lune', 'Le pont de Londres', 'Hymne à la joie', 'Berceuse de Brahms', 'Amazing Grace', 'Sakura Sakura', 'Vive le vent', 'Arirang', 'Scarborough Fair', 'Greensleeves', 'Menuet en sol', 'Le Lac des cygnes', 'Au matin', 'Canon en ré', 'Petite musique de nuit', 'French cancan', 'La Lettre à Élise', "Dans l'antre du roi de la montagne", 'Marche turque', 'Guillaume Tell'],
+    th: ['ดาวน้อยระยิบระยับ', 'แมรีมีลูกแกะ', 'แฟร์ ฌัก', 'พายเรือเล่น', 'ใต้แสงจันทร์', 'สะพานลอนดอน', 'บทเพลงแห่งความปีติ', 'เพลงกล่อมของบราห์มส์', 'พระคุณอันยิ่งใหญ่', 'ซากุระ ซากุระ', 'จิงเกิลเบลส์', 'อารีรัง', 'สการ์โบโรแฟร์', 'กรีนสลีฟส์', 'มินูเอ็ตในบันไดเสียง G', 'ทะเลสาบหงส์', 'ยามเช้า', 'แคนนอนในบันไดเสียง D', 'ไอเนอ ไคลเนอ นาคท์มูซิก', 'แคน-แคน', 'เพลงแด่เอลีเซ', 'ในท้องพระโรงราชาแห่งขุนเขา', 'มาร์ชตุรกี', 'วิลเลียม เทลล์'],
+    ja: ['きらきら星', 'メリーさんのひつじ', 'フレール・ジャック', 'こげこげボート', '月の光に', 'ロンドン橋', '歓喜の歌', 'ブラームスの子守歌', 'アメイジング・グレイス', 'さくらさくら', 'ジングルベル', 'アリラン', 'スカボロー・フェア', 'グリーンスリーブス', 'ト長調のメヌエット', '白鳥の湖', '朝', 'カノン', 'アイネ・クライネ・ナハトムジーク', '天国と地獄', 'エリーゼのために', '山の魔王の宮殿にて', 'トルコ行進曲', 'ウィリアム・テル序曲'],
+    ko: ['반짝반짝 작은 별', '메리의 어린 양', '프레르 자크', '노를 저어라', '달빛 아래서', '런던 다리', '환희의 송가', '브람스의 자장가', '어메이징 그레이스', '사쿠라 사쿠라', '징글벨', '아리랑', '스카버러의 시장', '그린슬리브스', 'G장조 미뉴에트', '백조의 호수', '아침의 기분', 'D장조 캐논', '아이네 클라이네 나흐트무지크', '캉캉', '엘리제를 위하여', '산속 마왕의 궁전에서', '터키 행진곡', '윌리엄 텔 서곡']
+  };
+
+  // Melodies as note data: NOTE[octave][:duration]; duration in the song's grid units (u = default); r = rest.
+  // sp = rows per second at the start, ramp = extra speed reached by the end, o = octave shift, dbl = octave-doubled tiles on long notes.
+  const SONGS = [
+    { sp: 1.6, ramp: .15, u: 2, o: 1, n: 'C4 C4 G4 G4 A4 A4 G4:4 F4 F4 E4 E4 D4 D4 C4:4 G4 G4 F4 F4 E4 E4 D4:4 G4 G4 F4 F4 E4 E4 D4:4 C4 C4 G4 G4 A4 A4 G4:4 F4 F4 E4 E4 D4 D4 C4:4' },
+    { sp: 1.7, ramp: .15, u: 2, o: 1, n: 'E4 D4 C4 D4 E4 E4 E4:4 D4 D4 D4:4 E4 G4 G4:4 E4 D4 C4 D4 E4 E4 E4 E4 D4 D4 E4 D4 C4:8' },
+    { sp: 1.8, ramp: .18, u: 2, o: 1, n: 'C4 D4 E4 C4 C4 D4 E4 C4 E4 F4 G4:4 E4 F4 G4:4 G4:1 A4:1 G4:1 F4:1 E4 C4 G4:1 A4:1 G4:1 F4:1 E4 C4 C4 G3 C4:4 C4 G3 C4:4' },
+    { sp: 2.0, ramp: .18, u: 1, o: 1, n: 'C4:3 C4:3 C4:2 D4 E4:3 E4:2 D4 E4:2 F4 G4:6 C5 C5 C5 G4 G4 G4 E4 E4 E4 C4 C4 C4 G4:2 F4 E4:2 D4 C4:6' },
+    { sp: 1.8, ramp: .18, u: 2, o: 1, n: 'C4 C4 C4 D4 E4:4 D4:4 C4 E4 D4 D4 C4:8 C4 C4 C4 D4 E4:4 D4:4 C4 E4 D4 D4 C4:8 D4 D4 D4 D4 A3:4 A3:4 D4 C4 B3 A3 G3:8 C4 C4 C4 D4 E4:4 D4:4 C4 E4 D4 D4 C4:8' },
+    { sp: 1.9, ramp: .2, u: 2, o: 1, n: 'G4:3 A4:1 G4 F4 E4 F4 G4:4 D4 E4 F4:4 E4 F4 G4:4 G4:3 A4:1 G4 F4 E4 F4 G4:4 D4:4 G4 E4 C4:4 G4:3 A4:1 G4 F4 E4 F4 G4:4 D4 E4 F4:4 E4 F4 G4:4 G4:3 A4:1 G4 F4 E4 F4 G4:4 D4:4 G4 E4 C4:4' },
+    { sp: 2.0, ramp: .2, u: 2, o: 1, n: 'E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 E4:3 D4:1 D4:4 E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 D4:3 C4:1 C4:4 D4 D4 E4 C4 D4 E4:1 F4:1 E4 C4 D4 E4:1 F4:1 E4 D4 C4 D4 G3:4 E4 E4 F4 G4 G4 F4 E4 D4 C4 C4 D4 E4 D4:3 C4:1 C4:4' },
+    { sp: 2.0, ramp: .18, u: 1, o: 1, n: 'E4 E4 G4:4 E4 E4 G4:4 E4 G4 C5:2 B4:3 A4 A4:2 G4:2 D4 E4 F4:2 D4:2 D4 E4 F4:4 D4 F4 B4 A4 G4:2 B4:2 C5:4 C4 C4 C5:4 A4 F4 G4:4 E4 C4 F4:2 G4:2 A4:2 G4:4 C4 C4 C5:4 A4 F4 G4:4 E4 C4 F4:2 E4 D4 C4:6' },
+    { sp: 2.1, ramp: .2, u: 2, o: 1, n: 'G3 C4:4 E4:1 C4:1 E4:4 D4 C4:4 A3 G3:4 G3 C4:4 E4:1 C4:1 E4:4 D4:1 E4:1 G4:6 E4 G4:3 E4:1 G4:1 E4:1 C4:4 G3 A3:3 C4:1 C4:1 A3:1 G3:4 G3 C4:4 E4:1 C4:1 E4:4 D4 C4:6' },
+    { sp: 2.1, ramp: .2, u: 2, o: 0, n: 'A4 A4 B4:4 A4 A4 B4:4 A4 B4 C5 B4 A4 B4:1 A4:1 F4:4 E4 C4 E4 F4 E4 E4:1 C4:1 B3:4 A4 B4 C5 B4 A4 B4:1 A4:1 F4:4 E4 C4 E4 F4 E4 E4:1 C4:1 B3:4 A4 A4 B4:4 A4 A4 B4:4 E4 F4 B4:1 A4:1 F4 E4:8' },
+    { sp: 2.3, ramp: .22, u: 2, o: 1, n: 'E4 E4 E4:4 E4 E4 E4:4 E4 G4 C4:3 D4:1 E4:8 F4 F4 F4:3 F4:1 F4 E4 E4 E4:1 E4:1 E4 D4 D4 E4 D4:4 G4:4 E4 E4 E4:4 E4 E4 E4:4 E4 G4 C4:3 D4:1 E4:8 F4 F4 F4:3 F4:1 F4 E4 E4 E4:1 E4:1 G4 G4 F4 D4 C4:8' },
+    { sp: 2.2, ramp: .2, u: 2, o: 0, n: 'G4:3 A4:1 G4 C5:3 D5:1 C5 D5 E5 D5:1 C5:1 A4 G4:1 A4:1 C5:3 D5:1 C5 D5:1 E5:1 D5:1 C5:1 A4 G4:3 A4:1 G4 G4:3 A4:1 G4:1 E4:1 D4 E4 D4:1 C4:1 D4 E4:1 G4:1 A4 G4:1 E4:1 D4 E4:1 D4:1 C4:6' },
+    { sp: 2.3, ramp: .2, u: 2, o: 0, n: 'D4:4 D4 A4:4 A4 E4:3 F4:1 E4 D4:6 A4 C5:4 D5 C5:4 A4 B4 G4 A4:6 D5:4 D5 D5:4 C5 A4 A4 G4 F4 E4 C4 D4:4 A4 G4:4 F4 E4 D4 C4 D4:6' },
+    { sp: 2.4, ramp: .2, u: 2, o: 0, n: 'A4 C5:4 D5 E5:3 F5:1 E5 D5:4 B4 G4:3 A4:1 B4 C5:4 A4 A4:3 G#4:1 A4 B4:4 G#4 E4:4 A4 C5:4 D5 E5:3 F5:1 E5 D5:4 B4 G4:3 A4:1 B4 C5:3 B4:1 A4 G#4:3 F#4:1 G#4 A4:6' },
+    { sp: 2.6, ramp: .2, u: 1, o: 0, n: 'D5:2 G4 A4 B4 C5 D5:2 G4:2 G4:2 E5:2 C5 D5 E5 F#5 G5:2 G4:2 G4:2 C5:2 D5 C5 B4 A4 B4:2 C5 B4 A4 G4 F#4:2 G4 A4 B4 G4 A4:6 D5:2 G4 A4 B4 C5 D5:2 G4:2 G4:2 E5:2 C5 D5 E5 F#5 G5:2 G4:2 G4:2 C5:2 D5 C5 B4 A4 B4:2 C5 B4 A4 G4 A4:2 B4 A4 G4 F#4 G4:6' },
+    { sp: 2.5, ramp: .22, u: 2, o: 1, dbl: 1, n: 'F#4:8 B3 C#4 D4 E4 F#4:6 D4 F#4:6 D4 F#4:6 B3 D4 B3 G3 D4 B3:8 F#4:8 B3 C#4 D4 E4 F#4:6 D4 F#4:6 D4 F#4:6 B3 D4 B3 G3 D4 B3:8' },
+    { sp: 2.6, ramp: .2, u: 1, o: 0, n: 'B4 G#4 F#4 E4 F#4 G#4 B4 G#4 F#4 E4 F#4 G#4 F#4 G#4 B4:2 G#4 B4 C#5:2 G#4 C#5 B4:2 G#4 F#4 E4:6 B4 G#4 F#4 E4 F#4 G#4 B4 G#4 F#4 E4 F#4 G#4 F#4 G#4 B4:2 G#4 B4 C#5:2 G#4 C#5 E5:2 C#5 B4 G#4:6' },
+    { sp: 2.6, ramp: .22, u: 4, o: 0, dbl: 1, n: 'F#5 E5 D5 C#5 B4 A4 B4 C#5 D5:2 C#5:2 B4:2 A4:2 G4:2 F#4:2 G4:2 E4:2 D4:1 F#4:1 A4:1 G4:1 F#4:1 D4:1 F#4:1 E4:1 D4:1 B3:1 D4:1 A4:1 G4:1 B4:1 A4:1 G4:1 F#4:1 D4:1 E4:1 C#5:1 D5:1 F#5:1 A5:1 A4:1 B4:1 G4:1 A4:1 F#4:1 D4:1 D5:1 D5:3 C#5:1 D5' },
+    { sp: 2.8, ramp: .22, u: 2, o: 1, n: 'G4 r:1 D4:1 G4 r:1 D4:1 G4:1 D4:1 G4:1 B4:1 D5:4 C5 r:1 A4:1 C5 r:1 A4:1 C5:1 A4:1 F#4:1 A4:1 D4:4 G4:4 G4:3 B4:1 A4:1 G4:1 G4:1 F#4:1 F#4:4 A4:3 C5:1 F#4:1 A4:1 G4:4 G4 r:1 D4:1 G4 r:1 D4:1 G4:1 D4:1 G4:1 B4:1 D5:4 C5 r:1 A4:1 C5 r:1 A4:1 C5:1 A4:1 F#4:1 A4:1 G4:4' },
+    { sp: 3.0, ramp: .25, u: 1, o: 1, n: 'C4:4 D4 F4 E4 D4 G4:2 G4:2 G4 A4 E4 F4 D4:2 D4:2 D4 F4 E4 D4 C4 C5 B4 A4 G4 F4 E4 D4 C4:4 D4 F4 E4 D4 G4:2 G4:2 G4 A4 E4 F4 D4:2 D4 G4 D4 E4 C4:4' },
+    { sp: 3.0, ramp: .25, u: 1, o: 0, n: 'E5 D#5 E5 D#5 E5 B4 D5 C5 A4:3 C4 E4 A4 B4:3 E4 G#4 B4 C5:3 E4 E5 D#5 E5 D#5 E5 B4 D5 C5 A4:3 C4 E4 A4 B4:3 E4 C5 B4 A4:4 E5 D#5 E5 D#5 E5 B4 D5 C5 A4:3 C4 E4 A4 B4:3 E4 G#4 B4 C5:3 E4 E5 D#5 E5 D#5 E5 B4 D5 C5 A4:3 C4 E4 A4 B4:3 E4 C5 B4 A4:6' },
+    { sp: 2.6, ramp: .6, u: 1, o: 1, n: 'B3 C#4 D4 E4 F#4 D4 F#4:2 F4 C#4 F4:2 E4 C4 E4:2 B3 C#4 D4 E4 F#4 D4 F#4 B4 A4 F#4 D4 F#4 A4:4 B3 C#4 D4 E4 F#4 D4 F#4:2 F4 C#4 F4:2 E4 C4 E4:2 B3 C#4 D4 E4 F#4 D4 F#4 B4 A4 F#4 D4 F#4 A4:4 B3 C#4 D4 E4 F#4 D4 F#4:2 F4 C#4 F4:2 E4 C4 E4:2 B3 C#4 D4 E4 F#4 D4 F#4 B4 A4 F#4 D4 F#4 B4:4' },
+    { sp: 3.2, ramp: .22, u: 1, o: 0, n: 'B4 A4 G#4 A4 C5:4 D5 C5 B4 C5 E5:4 F5 E5 D#5 E5 B5 A5 G#5 A5 B5 A5 G#5 A5 C6:4 A5:2 C6:2 B5:2 A5:2 G5:2 A5:2 B5:2 A5:2 G5:2 A5:2 B5:2 A5:2 G5:2 F#5:2 E5:4 B4 A4 G#4 A4 C5:4 D5 C5 B4 C5 E5:4 F5 E5 D#5 E5 B5 A5 G#5 A5 B5 A5 G#5 A5 C6:4 A5:2 B5:2 C6:2 B5:2 A5:2 G#5:2 A5:2 E5:2 F5:2 D5:2 C5:4 B4:4 A4:4' },
+    { sp: 3.4, ramp: .25, u: 1, o: 0, dbl: 1, n: 'E4 E4 E4:2 E4 E4 E4:2 E4 E4 A4:2 B4:2 C#5:2 E4 E4 E4:2 E4 E4 E4:2 E4 E4 A4:2 C#5:2 B4:2 E4 E4 E4:2 E4 E4 E4:2 E4 E4 A4:2 B4:2 C#5:2 A4:2 C#5:2 E5:6 E4 E4 E4:2 E4 E4 E4:2 E4 E4 A4:2 B4:2 C#5:2 E4 E4 E4:2 E4 E4 E4:2 E4 E4 A4:2 C#5:2 B4:2 E5:2 D5:2 C#5:2 B4:2 A4:6' }
+  ];
+
+  const LANES = 4;
+  const LINE = .8; // hit line as a fraction of the lane height
+  const ROWS_VISIBLE = 4.6;
+  const EARLY_MS = 420, LATE_MS = 200;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('milaan.tapTiles.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('milaan.tapTiles.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
+  };
+
+  const params = new URLSearchParams(location.search);
+  const lang = Object.prototype.hasOwnProperty.call(I18N, params.get('lang')) ? params.get('lang') : 'en';
+  const t = I18N[lang];
+  const names = SONG_NAMES[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t[el.dataset.i18n]; });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => { el.setAttribute('aria-label', t[el.dataset.i18nLabel]); el.title = t[el.dataset.i18nLabel]; });
+
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d'), stage = $('stage');
+  cv.setAttribute('aria-label', t.canvas);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let stars = store.get('stars', []);
+  if (!Array.isArray(stars)) stars = [];
+  let bests = store.get('best', {});
+  if (!bests || typeof bests !== 'object') bests = {};
+  let endlessBest = +store.get('endlessBest', 0) || 0;
+  let soundOn = store.get('sound', true) !== false;
+
+  // ---------- audio ----------
+  let ac = null, master = null;
+  function audio() {
+    if (!soundOn) return null;
+    if (!ac) {
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = .5; master.connect(ac.destination);
+      } catch (e) { ac = null; return null; }
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+  // Soft piano-like voice; returns a release function for hold tiles.
+  function playNote(midi, vol = .5, sustain = false) {
+    const a = audio(); if (!a) return () => {};
+    const now = a.currentTime, f = freq(midi);
+    const g = a.createGain();
+    const o1 = a.createOscillator(), o2 = a.createOscillator(), g2 = a.createGain();
+    o1.type = 'triangle'; o1.frequency.value = f;
+    o2.type = 'sine'; o2.frequency.value = f * 2; g2.gain.value = .25;
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(vol, now + .006);
+    if (sustain) g.gain.exponentialRampToValueAtTime(vol * .45, now + .35);
+    else g.gain.exponentialRampToValueAtTime(.0008, now + 1.1);
+    o1.start(now); o2.start(now);
+    const stopAt = t2 => { o1.stop(t2); o2.stop(t2); };
+    if (!sustain) { stopAt(now + 1.2); return () => {}; }
+    let done = false;
+    const safety = setTimeout(() => release(), 8000);
+    function release() {
+      if (done) return; done = true; clearTimeout(safety);
+      const n = a.currentTime;
+      g.gain.cancelScheduledValues(n); g.gain.setValueAtTime(Math.max(g.gain.value, .001), n);
+      g.gain.exponentialRampToValueAtTime(.0008, n + .3); stopAt(n + .35);
+    }
+    return release;
+  }
+  function buzz() {
+    const a = audio(); if (!a) return;
+    const now = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + .25);
+    g.gain.setValueAtTime(.18, now); g.gain.exponentialRampToValueAtTime(.001, now + .3);
+    o.connect(g); g.connect(master); o.start(now); o.stop(now + .32);
+  }
+
+  // ---------- charts ----------
+  const NOTE_IDX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function parseSong(s) {
+    const ev = [];
+    let pos = 0;
+    for (const tok of s.n.trim().split(/\s+/)) {
+      const m = /^([A-Gr])(#|b)?(\d)?(?::(\d+))?$/.exec(tok);
+      if (!m) continue;
+      const d = m[4] ? +m[4] : s.u;
+      if (m[1] !== 'r') {
+        const midi = 12 * (+m[3] + 1 + (s.o || 0)) + NOTE_IDX[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+        ev.push({ t: pos, d, midi });
+      }
+      pos += d;
+    }
+    return ev;
+  }
+  function rng(seed) { let x = seed * 2654435761 >>> 0 || 1; return () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }
+  function mostCommon(arr) { const c = {}; let best = arr[0], bc = 0; for (const v of arr) { c[v] = (c[v] || 0) + 1; if (c[v] > bc) { bc = c[v]; best = v; } } return best; }
+
+  // Turn a song into rows of tiles. Positions are in "rows": one row = the song's most common note length.
+  function buildChart(idx, offset, seed) {
+    const s = SONGS[idx], ev = parseSong(s);
+    const base = mostCommon(ev.map(e => e.d));
+    const r = rng(seed);
+    const rows = [];
+    let lane = Math.floor(r() * LANES), prev = null, lastDbl = false;
+    for (const e of ev) {
+      if (prev) {
+        const diff = e.midi - prev.midi;
+        if (diff === 0) { let n; do { n = Math.floor(r() * LANES); } while (n === lane); lane = n; }
+        else {
+          const step = Math.abs(diff) > 4 ? 2 : 1;
+          let n = lane + Math.sign(diff) * step;
+          if (n < 0 || n >= LANES) n = lane - Math.sign(diff) * step;
+          lane = Math.max(0, Math.min(LANES - 1, n));
+        }
+      }
+      const d = e.d / base, tStart = offset + e.t / base;
+      const hold = d >= 3;
+      const row = { t: tStart, d, tiles: [], song: idx, acc: e.t % (s.u * 2) === 0 };
+      row.tiles.push({ lane, t: tStart, d, midi: e.midi, hold, state: 0 });
+      if (s.dbl && !hold && d >= 2 && !lastDbl) {
+        let l2; do { l2 = Math.floor(r() * LANES); } while (l2 === lane);
+        row.tiles.push({ lane: l2, t: tStart, d, midi: e.midi - 12, hold: false, state: 0 });
+        lastDbl = true;
+      } else lastDbl = false;
+      row.tiles.forEach(tl => { tl.row = row; });
+      rows.push(row);
+      prev = e;
+    }
+    const end = offset + ev.reduce((m, e) => Math.max(m, e.t + e.d), 0) / base;
+    return { rows, end };
+  }
+  function songLevel(i) { const s = SONGS[i]; return Math.min(4, Math.max(1, Math.round((s.sp - 1.3) / .55) + (s.dbl ? 1 : 0))); }
+
+  // ---------- game state ----------
+  let G = null;
+  let screen = 'start';
+  let auto = false, timeScale = 1;
+  const holds = new Map(); // input id -> tile
+  const fx = []; // ripples and judgement pops
+  let flash = null; // {lane, t}
+
+  function newGame(mode, songIdx) {
+    closeOverlays();
+    holds.clear(); fx.length = 0; flash = null;
+    G = { mode, songIdx, rows: [], end: 0, pos: 0, cursor: 0, started: false, paused: false, over: false, hearts: 3, lost: 0,
+      score: 0, combo: 0, maxCombo: 0, pts: 0, maxPts: 0, hit: 0, counts: { perfect: 0, great: 0, good: 0, miss: 0 },
+      endlessSongs: 0, endlessIdx: 0, endTimer: 0, lastTap: [] };
+    if (mode === 'song') {
+      const c = buildChart(songIdx, 0, songIdx + 7);
+      G.rows = c.rows; G.end = c.end;
+    } else {
+      G.order = shuffle(SONGS.map((_, i) => i));
+      appendEndless();
+    }
+    G.pos = G.rows[0].t;
+    screen = 'play';
+    updateHud();
+    $('song-name').textContent = mode === 'song' ? names[songIdx] : `∞ ${t.endless}`;
+    announce(mode === 'song' ? t.songN(songIdx + 1, names[songIdx]) : t.endless);
+    stage.focus?.();
+  }
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function appendEndless() {
+    const idx = G.order[G.endlessIdx % G.order.length];
+    const off = G.rows.length ? G.end + 1 : 0;
+    const c = buildChart(idx, off, G.endlessIdx * 31 + 5);
+    const k = G.endlessIdx;
+    c.rows.forEach(r => { r.endlessK = k; });
+    G.rows.push(...c.rows); G.end = c.end; G.endlessIdx++;
+  }
+  // rows per second at a song position
+  function speedAt(pos) {
+    if (!G) return 1;
+    if (G.mode === 'song') { const s = SONGS[G.songIdx]; return s.sp * (1 + s.ramp * Math.min(1, Math.max(0, pos / G.end))); }
+    const row = G.rows[Math.min(G.cursor, G.rows.length - 1)];
+    const k = row ? row.endlessK : 0;
+    return Math.min(4.6, 1.9 * (1 + .09 * k));
+  }
+  function currentRow() { return G.rows[G.cursor]; }
+  function msTo(tile) { return (tile.t - G.pos) / speedAt(G.pos) * 1000; }
+
+  // ---------- input ----------
+  function tapLane(lane, id) {
+    if (!G || screen !== 'play' || G.paused || G.over) return;
+    audio();
+    const row = currentRow();
+    if (!row) return;
+    const tile = row.tiles.find(tl => tl.lane === lane && tl.state === 0);
+    if (!G.started) {
+      if (tile) { G.started = true; hitTile(tile, 0, id); }
+      return;
+    }
+    if (tile) {
+      const ms = msTo(tile);
+      if (ms <= EARLY_MS) hitTile(tile, ms, id);
+      return;
+    }
+    // ignore re-taps of a tile just played and lanes that are busy holding
+    const now = performance.now();
+    if (G.lastTap[lane] && now - G.lastTap[lane] < 160) return;
+    for (const h of holds.values()) if (h.lane === lane) return;
+    const ms = (row.t - G.pos) / speedAt(G.pos) * 1000;
+    if (ms <= EARLY_MS) wrongTap(lane);
+  }
+  function release(id) {
+    const tile = holds.get(id);
+    if (!tile) return;
+    holds.delete(id);
+    if (tile.state === 1) finishHold(tile, Math.min(1, Math.max(0, (G.pos - tile.t) / tile.d)));
+  }
+  function hitTile(tile, ms, id) {
+    const a = Math.abs(ms);
+    const j = a <= 70 ? 'perfect' : a <= 140 ? 'great' : 'good';
+    const p = j === 'perfect' ? 3 : j === 'great' ? 2 : 1;
+    tile.judge = j; tile.hitAt = G.pos;
+    G.counts[j]++; G.pts += p; G.maxPts += 3; G.hit++;
+    G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
+    G.score += p * 10 + Math.min(20, Math.floor(G.combo / 10)) * 2;
+    G.lastTap[tile.lane] = performance.now();
+    if (tile.hold) {
+      tile.state = 1; G.maxPts += 2;
+      tile.release = playNote(tile.midi, .5, true);
+      holds.set(id, tile);
+    } else {
+      tile.state = 2;
+      playNote(tile.midi, tile.row.tiles.length > 1 && tile !== tile.row.tiles[0] ? .32 : .5);
+    }
+    if (tile.row.acc && tile === tile.row.tiles[0]) playNote(tile.midi - 12, .16);
+    addFx(tile.lane, j);
+    advanceCursor();
+    if (G.combo > 0 && G.combo % 50 === 0) announce(`${t.combo} ${G.combo}`);
+    updateHud();
+  }
+  function finishHold(tile, frac) {
+    tile.state = 2; tile.holdFrac = frac;
+    if (tile.release) tile.release();
+    const bonus = frac >= .9 ? 2 : frac >= .5 ? 1 : 0;
+    G.pts += bonus; G.score += bonus * 10;
+    for (const [k, v] of holds) if (v === tile) holds.delete(k);
+    updateHud();
+  }
+  function wrongTap(lane) {
+    flash = { lane, t: performance.now(), wrong: true };
+    loseHeart();
+  }
+  function missTile(tile) {
+    tile.state = 3; G.counts.miss++; G.maxPts += tile.hold ? 5 : 3;
+    flash = { lane: tile.lane, t: performance.now(), tile };
+    loseHeart();
+  }
+  function loseHeart() {
+    buzz();
+    G.combo = 0; G.hearts--; G.lost++;
+    addFx(flash ? flash.lane : 0, 'miss');
+    if (G.hearts <= 0) { G.over = true; G.overAt = performance.now(); announce(G.mode === 'endless' ? t.endlessOver : t.failed); }
+    else announce(t.heartsN(G.hearts));
+    updateHud();
+  }
+  function advanceCursor() {
+    while (G.cursor < G.rows.length && G.rows[G.cursor].tiles.every(tl => tl.state !== 0)) G.cursor++;
+  }
+  function laneAt(clientX) {
+    const r = cv.getBoundingClientRect(), L = layout();
+    const x = clientX - r.left - L.x;
+    if (x < 0 || x > L.w) return -1;
+    return Math.min(LANES - 1, Math.floor(x / (L.w / LANES)));
+  }
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const lane = laneAt(e.clientX);
+    if (lane < 0) return;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    tapLane(lane, 'p' + e.pointerId);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(n => cv.addEventListener(n, e => release('p' + e.pointerId)));
+  const KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, ArrowLeft: 0, ArrowDown: 1, ArrowUp: 2, ArrowRight: 3 };
+  addEventListener('keydown', e => {
+    if (screen === 'play' && e.code in KEYS && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      if (!e.repeat) tapLane(KEYS[e.code], 'k' + e.code);
+    } else if (screen === 'play' && e.code === 'KeyP') { e.preventDefault(); togglePause(); }
+  });
+  addEventListener('keyup', e => { if (e.code in KEYS) release('k' + e.code); });
+
+  // ---------- update ----------
+  function update(dt) {
+    if (!G || screen !== 'play' || G.paused) return;
+    if (G.over) {
+      if (performance.now() - G.overAt > 900) endGame(false);
+      return;
+    }
+    if (!G.started) {
+      if (auto) tapLane(G.rows[0].tiles[0].lane, 'auto');
+      return;
+    }
+    G.pos += dt * speedAt(G.pos);
+    if (auto) autoPlay();
+    // holds
+    for (const tile of new Set(holds.values())) {
+      if (tile.state === 1 && G.pos >= tile.t + tile.d) finishHold(tile, 1);
+    }
+    // misses
+    for (let i = G.cursor; i < G.rows.length; i++) {
+      const row = G.rows[i];
+      if ((G.pos - row.t) / speedAt(G.pos) * 1000 <= LATE_MS) break;
+      for (const tl of row.tiles) if (tl.state === 0) { missTile(tl); if (G.over) return; }
+    }
+    advanceCursor();
+    if (G.mode === 'endless') {
+      if (G.rows.length - G.cursor < 40) appendEndless();
+      const k = currentRow() ? currentRow().endlessK : 0;
+      if (k > G.endlessSongs) { G.endlessSongs = k; announce(t.endlessHint(k)); }
+      if (G.cursor > 400) { G.rows.splice(0, 200); G.cursor -= 200; }
+    } else if (G.cursor >= G.rows.length && holds.size === 0) {
+      G.endTimer += dt;
+      if (G.endTimer > .6) endGame(true);
+    }
+  }
+  function autoPlay() {
+    const row = currentRow();
+    if (!row) return;
+    for (const tl of row.tiles) if (tl.state === 0 && tl.t <= G.pos) tapLane(tl.lane, 'auto' + tl.lane);
+  }
+
+  // ---------- end / results ----------
+  function computeStars() {
+    const acc = G.maxPts ? G.pts / G.maxPts : 0;
+    if (G.over) return { n: 0, acc };
+    let n = 1;
+    if (acc >= .75) n = 2;
+    if (acc >= .9 && G.lost === 0) n = 3;
+    return { n, acc };
+  }
+  function endGame(cleared) {
+    if (screen !== 'play') return;
+    for (const tile of holds.values()) if (tile.release) tile.release();
+    holds.clear();
+    screen = 'result';
+    const { n, acc } = computeStars();
+    let isBest = false, unlockedName = '';
+    if (G.mode === 'song') {
+      const i = G.songIdx;
+      const wasLocked = i + 1 < SONGS.length && !isUnlocked(i + 1);
+      if (cleared && n > (stars[i] || 0)) { stars[i] = n; store.set('stars', stars); }
+      if (cleared && G.score > (bests[i] || 0)) { isBest = true; bests[i] = G.score; store.set('best', bests); }
+      if (wasLocked && isUnlocked(i + 1)) unlockedName = names[i + 1];
+    } else if (G.hit > endlessBest) { endlessBest = G.hit; store.set('endlessBest', endlessBest); isBest = true; }
+    G.result = { cleared, stars: n, acc, isBest };
+    $('res-title').textContent = G.mode === 'endless' ? t.endlessOver : cleared ? t.cleared : t.failed;
+    $('res-stars').hidden = G.mode !== 'song';
+    $('res-stars').innerHTML = [0, 1, 2].map(k => `<span class="${k < n ? '' : 'off'}">★</span>`).join('');
+    $('res-stars').setAttribute('aria-label', t.starsGot(n));
+    $('res-score').textContent = G.mode === 'endless' ? G.hit : G.score;
+    $('res-badge').hidden = !isBest;
+    const cells = G.mode === 'endless'
+      ? [[t.score, G.score], [t.tiles, G.hit], [t.maxCombo, G.maxCombo], [t.accuracy, Math.round(acc * 100) + '%']]
+      : [[t.perfect, G.counts.perfect], [t.great, G.counts.great], [t.good, G.counts.good], [t.miss, G.counts.miss]];
+    $('res-grid').innerHTML = cells.map(([k, v]) => `<div><b>${v}</b><small>${k}</small></div>`).join('');
+    $('res-sub').textContent = G.mode === 'endless' ? `${t.endlessHint(G.endlessSongs)} · ${t.bestN(endlessBest)}`
+      : (unlockedName ? t.unlocked(unlockedName) + ' · ' : '') + `${t.accN(Math.round(acc * 100))} · ${t.maxCombo} ${G.maxCombo}` + (n < 3 && cleared ? ` — ${t.starHint}` : '');
+    const canNext = G.mode === 'song' && G.songIdx + 1 < SONGS.length && isUnlocked(G.songIdx + 1);
+    $('res-next').hidden = !canNext;
+    show('ov-result');
+    ($('res-next').hidden ? $('res-retry') : $('res-next')).focus();
+    announce(`${$('res-title').textContent} ${G.mode === 'song' ? t.starsGot(n) : t.bestN(endlessBest)}`);
+    updateMenu();
+  }
+  function isUnlocked(i) { return i < 4 || (stars[i - 1] || 0) > 0; }
+
+  // ---------- HUD / menus ----------
+  function updateHud() {
+    if (!G) return;
+    $('score').textContent = G.mode === 'endless' ? G.hit : G.score;
+    $('combo').textContent = G.combo;
+    const h = Math.max(0, G.hearts);
+    $('hearts').innerHTML = [0, 1, 2].map(k => `<span class="${k < h ? '' : 'off'}">❤️</span>`).join('');
+    $('hearts').setAttribute('aria-label', t.heartsN(h));
+    const p = G.mode === 'song' ? Math.min(1, Math.max(0, (G.pos - G.rows[0].t) / Math.max(1, G.end - G.rows[0].t))) : 0;
+    $('prog-bar').style.width = (p * 100).toFixed(1) + '%';
+    $('prog').setAttribute('aria-valuenow', Math.round(p * 100));
+    $('prog').hidden = G.mode !== 'song';
+    $('best').textContent = G.mode === 'endless' ? endlessBest : (bests[G.songIdx] || 0);
+    const base = G.mode === 'song' ? SONGS[G.songIdx].sp : 1.9;
+    $('speed').textContent = '×' + (speedAt(G.pos) / base).toFixed(2);
+    $('acc-line').textContent = G.maxPts ? t.accN(Math.round(G.pts / G.maxPts * 100)) : '';
+  }
+  function updateMenu() {
+    const total = stars.reduce((a, b) => a + (b || 0), 0);
+    $('stars-total').textContent = `${t.starsN(total)} / ${SONGS.length * 3}`;
+    $('songs-total').textContent = `★ ${total} / ${SONGS.length * 3}`;
+    $('endless-best').textContent = t.bestN(endlessBest);
+    $('btn-sound').textContent = soundOn ? t.soundOn : t.soundOff;
+    $('mute-btn').textContent = soundOn ? '🔊' : '🔇';
+    $('song-list').innerHTML = SONGS.map((s, i) => {
+      const un = isUnlocked(i), st = stars[i] || 0, lv = songLevel(i);
+      return `<button type="button" class="song${un ? '' : ' locked'}" data-i="${i}" aria-label="${t.songN(i + 1, names[i])}${un ? ', ' + t.starsGot(st) : ', ' + t.lockedHint}"${un ? '' : ' aria-disabled="true"'}>`
+        + `<span class="n">${i + 1}</span><strong>${names[i]}</strong>`
+        + `<span class="meta"><span class="st">${[0, 1, 2].map(k => `<span class="${k < st ? '' : 'off'}">★</span>`).join('')}</span><span class="dots" aria-hidden="true">${'●'.repeat(lv)}${'○'.repeat(4 - lv)}</span></span></button>`;
+    }).join('');
+  }
+  function closeOverlays() { document.querySelectorAll('.overlay').forEach(o => { o.hidden = true; }); }
+  function show(id) { closeOverlays(); $(id).hidden = false; }
+  function toMenu() {
+    if (G) for (const tile of holds.values()) if (tile.release) tile.release();
+    holds.clear(); G = null; screen = 'start'; show('ov-start'); updateMenu(); $('btn-songs').focus();
+  }
+  function togglePause(force) {
+    if (!G || screen !== 'play' || G.over) return;
+    const p = force === undefined ? !G.paused : force;
+    if (p === G.paused) return;
+    G.paused = p;
+    if (p) {
+      for (const [id] of holds) release(id);
+      show('ov-pause'); $('btn-resume').focus();
+    } else closeOverlays();
+  }
+  function announce(s) { $('announcer').textContent = s; }
+
+  $('btn-songs').addEventListener('click', () => { updateMenu(); screen = 'songs'; show('ov-songs'); const f = $('song-list').querySelector('.song:not(.locked)'); if (f) f.focus(); });
+  $('btn-endless').addEventListener('click', () => newGame('endless'));
+  $('songs-back').addEventListener('click', toMenu);
+  $('song-list').addEventListener('click', e => {
+    const b = e.target.closest('.song'); if (!b) return;
+    const i = +b.dataset.i;
+    if (!isUnlocked(i)) { announce(t.lockedHint); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); return; }
+    newGame('song', i);
+  });
+  $('btn-sound').addEventListener('click', toggleSound);
+  $('mute-btn').addEventListener('click', toggleSound);
+  function toggleSound() { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && ac) ac.suspend(); updateMenu(); }
+  $('pause-btn').addEventListener('click', () => togglePause());
+  $('btn-resume').addEventListener('click', () => togglePause(false));
+  $('btn-restart').addEventListener('click', () => newGame(G.mode, G.songIdx));
+  $('btn-quit').addEventListener('click', toMenu);
+  $('res-retry').addEventListener('click', () => newGame(G.mode, G.songIdx));
+  $('res-next').addEventListener('click', () => newGame('song', G.songIdx + 1));
+  $('res-menu').addEventListener('click', () => { if (G && G.mode === 'song') { G = null; updateMenu(); screen = 'songs'; show('ov-songs'); } else toMenu(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) togglePause(true); });
+
+  // ---------- render ----------
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    W = Math.max(1, r.width); H = Math.max(1, r.height);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+  function layout() {
+    const w = Math.min(W, H * .72);
+    return { x: (W - w) / 2, w, rowH: H / ROWS_VISIBLE, lineY: H * LINE };
+  }
+  function addFx(lane, j) { fx.push({ lane, j, t: performance.now() }); if (fx.length > 24) fx.shift(); }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const L = layout(), lw = L.w / LANES, now = performance.now();
+    ctx.fillStyle = '#e9e0d2'; ctx.fillRect(0, 0, W, H);
+    // lanes
+    ctx.fillStyle = '#f6f0e6'; ctx.fillRect(L.x, 0, L.w, H);
+    if (flash && now - flash.t < 260) {
+      ctx.fillStyle = `rgba(255,111,97,${.35 * (1 - (now - flash.t) / 260)})`;
+      ctx.fillRect(L.x + flash.lane * lw, 0, lw, H);
+    }
+    ctx.fillStyle = '#d8ccbb';
+    for (let i = 1; i < LANES; i++) ctx.fillRect(Math.round(L.x + i * lw) - .5, 0, 1, H);
+    // hit zone + line
+    const zg = ctx.createLinearGradient(0, L.lineY - L.rowH * .6, 0, L.lineY + L.rowH * .3);
+    zg.addColorStop(0, 'rgba(79,224,182,0)'); zg.addColorStop(1, 'rgba(79,224,182,.22)');
+    ctx.fillStyle = zg; ctx.fillRect(L.x, L.lineY - L.rowH * .6, L.w, L.rowH * .9);
+    ctx.fillStyle = '#ff6f61'; ctx.fillRect(L.x, L.lineY - 1.5, L.w, 3);
+    if (G) drawTiles(L, lw, now);
+    // effects
+    for (const f of fx) {
+      const age = (now - f.t) / 520;
+      if (age > 1) continue;
+      const cx = L.x + (f.lane + .5) * lw;
+      if (f.j !== 'miss' && !reduced) {
+        ctx.strokeStyle = `rgba(79,224,182,${1 - age})`; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, L.lineY, lw * .2 + age * lw * .45, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1 - age;
+      ctx.fillStyle = f.j === 'perfect' ? '#d98a00' : f.j === 'great' ? '#1e9e7a' : f.j === 'good' ? '#3d6fd1' : '#e2483b';
+      ctx.font = `900 ${Math.max(12, Math.min(20, lw * .2))}px ${getComputedStyle(document.body).fontFamily}`;
+      ctx.textAlign = 'center';
+      const tw = ctx.measureText(t[f.j]).width / 2 + 4;
+      ctx.fillText(t[f.j], Math.max(L.x + tw, Math.min(L.x + L.w - tw, cx)), L.lineY + L.rowH * .45 - (reduced ? 0 : age * 18));
+      ctx.globalAlpha = 1;
+    }
+    if (G && !G.started && screen === 'play') {
+      const tile = G.rows[0].tiles[0];
+      const cx = L.x + (tile.lane + .5) * lw;
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+      ctx.font = `900 ${Math.max(11, Math.min(17, lw * .17))}px ${getComputedStyle(document.body).fontFamily}`;
+      const y = L.lineY - Math.min(tile.d, 2.2) * L.rowH / 2;
+      wrapText(t.tapStart, cx, y, lw * .86);
+    }
+  }
+  function wrapText(s, x, y, maxW) {
+    const words = s.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) { const n = cur ? cur + ' ' + w : w; if (ctx.measureText(n).width > maxW && cur) { lines.push(cur); cur = w; } else cur = n; }
+    lines.push(cur);
+    const lh = parseInt(ctx.font.match(/(\d+)px/)[1], 10) * 1.15;
+    lines.forEach((l, i) => ctx.fillText(l, x, y + (i - (lines.length - 1) / 2) * lh + lh * .35));
+  }
+  function drawTiles(L, lw, now) {
+    const pos = G.pos;
+    const from = Math.max(0, G.cursor - 6);
+    for (let i = from; i < G.rows.length; i++) {
+      const row = G.rows[i];
+      const bottom = L.lineY - (row.t - pos) * L.rowH;
+      if (bottom < -2) break;
+      const h = row.d * L.rowH;
+      const top = bottom - h;
+      if (top > H) continue;
+      for (const tl of row.tiles) {
+        const x = L.x + tl.lane * lw + 1.5, w = lw - 3, y = top + 1.5, hh = h - 3;
+        if (tl.state === 2 && !tl.hold) {
+          const age = Math.min(1, (pos - tl.hitAt) * 3);
+          ctx.fillStyle = `rgba(28,26,46,${.16 * (1 - age)})`;
+          if (age < 1) { roundRect(x, y, w, hh, 6); ctx.fill(); }
+          continue;
+        }
+        if (tl.state === 3) {
+          const blink = flash && flash.tile === tl && Math.floor((now - flash.t) / 120) % 2 === 0;
+          ctx.fillStyle = blink ? '#ff6f61' : 'rgba(226,72,59,.55)';
+          roundRect(x, y, w, hh, 6); ctx.fill();
+          continue;
+        }
+        const g = ctx.createLinearGradient(0, y, 0, y + hh);
+        g.addColorStop(0, '#34304f'); g.addColorStop(1, '#16142a');
+        ctx.fillStyle = g; roundRect(x, y, w, hh, 6); ctx.fill();
+        if (tl.hold) {
+          // centre line, then the filled part of a hold in mint
+          ctx.fillStyle = 'rgba(122,184,255,.65)'; ctx.fillRect(x + w / 2 - 2, y + 8, 4, Math.max(0, hh - 16));
+          ctx.beginPath(); ctx.arc(x + w / 2, y + hh - 12, 6, 0, Math.PI * 2); ctx.fill();
+          if (tl.state >= 1) {
+            const frac = tl.state === 2 ? (tl.holdFrac ?? 1) : Math.min(1, Math.max(0, (pos - tl.t) / tl.d));
+            const fh = hh * frac;
+            const mg = ctx.createLinearGradient(0, y + hh - fh, 0, y + hh);
+            mg.addColorStop(0, '#9af5d9'); mg.addColorStop(1, '#4fe0b6');
+            ctx.fillStyle = mg; roundRect(x, y + hh - fh, w, fh, 6); ctx.fill();
+          }
+        }
+        if (!G.started && tl === G.rows[0].tiles[0]) {
+          ctx.fillStyle = '#ff6f61'; roundRect(x, y, w, hh, 6); ctx.fill();
+        }
+      }
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000) * timeScale;
+    last = now;
+    update(dt);
+    draw();
+    if (G && screen === 'play' && G.started && (now | 0) % 3 === 0) updateHud();
+    requestAnimationFrame(frame);
+  }
+
+  updateMenu();
+  $('btn-songs').focus();
+  requestAnimationFrame(frame);
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__tapTiles = {
+    state: () => ({ screen, mode: G && G.mode, song: G && G.songIdx, started: G && G.started, paused: G && G.paused, over: G && G.over, pos: G && G.pos, speed: G && speedAt(G.pos),
+      hearts: G && G.hearts, score: G && G.score, combo: G && G.combo, hit: G && G.hit, cursor: G && G.cursor, rows: G && G.rows.length, counts: G && { ...G.counts }, result: G && G.result,
+      stars: stars.slice(), endlessBest, songs: SONGS.length, holds: holds.size }),
+    current: () => { const row = G && currentRow(); return row ? row.tiles.map(tl => ({ lane: tl.lane, hold: tl.hold, d: tl.d, state: tl.state, ms: msTo(tl) })) : []; },
+    lanePoint: lane => { const r = cv.getBoundingClientRect(), L = layout(); return { x: r.left + L.x + (lane + .5) * L.w / LANES, y: r.top + L.lineY - 10 }; },
+    setAuto: v => { auto = !!v; },
+    setTimeScale: k => { timeScale = k; },
+    unlockAll: () => { stars = SONGS.map((_, i) => Math.max(1, stars[i] || 0)); updateMenu(); }
+  };
+})();
+</script>
+</body>
+</html>

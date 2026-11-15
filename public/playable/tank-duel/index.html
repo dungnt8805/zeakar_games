@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tank Duel</title>
+<style>
+:root {
+  --bg: #12151c;
+  --panel: #1d222d;
+  --text: #f4efe2;
+  --muted: #a3a89a;
+  --p1: #ffb627;
+  --p2: #4fd1e8;
+  --accent: #ffb627;
+  --accent-dark: #b9730a;
+  --danger: #ff5d5d;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: radial-gradient(ellipse at 50% 0%, #2b2f1f, transparent 65%), radial-gradient(ellipse at 50% 100%, #10283a, transparent 60%), var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--p2); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "top" "stage" "bottom"; }
+.side-0 { grid-area: bottom; }
+.side-1 { grid-area: top; }
+.stage { grid-area: stage; min-height: 0; min-width: 0; position: relative; display: grid; place-items: center; }
+.side { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.rot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.flip .rot { transform: rotate(180deg); }
+.card { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 14px; background: #ffffff0d; box-shadow: inset 0 0 0 1px #ffffff17; }
+.card .swatch { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; }
+.side-0 .swatch { background: var(--p1); box-shadow: 0 0 12px #ffb62766; }
+.side-1 .swatch { background: var(--p2); box-shadow: 0 0 12px #4fd1e866; }
+.swatch::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #0007; }
+.card .info { min-width: 0; flex: 1; }
+.card .name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; color: var(--muted); }
+.card .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hp { display: flex; gap: 3px; }
+.hp i { width: 12px; height: 12px; border-radius: 3px; background: #ffffff1c; }
+.hp i.on { background: var(--danger); box-shadow: 0 0 6px #ff5d5d88; }
+.wins { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.pu { font-size: 11px; font-weight: 800; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tools { display: flex; gap: 6px; flex: 0 0 auto; }
+.icon-btn { width: 38px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: #ffffff14; font-size: 17px; font-weight: 900; }
+.icon-btn:active { transform: translateY(1px); }
+.pads { display: none; align-items: center; gap: 10px; }
+.touch .pads { display: flex; }
+.pads:empty { display: none !important; }
+.stick { position: relative; width: 104px; height: 104px; flex: 0 0 auto; border-radius: 50%; background: radial-gradient(circle, #ffffff10 0 55%, #ffffff1c 56% 100%); box-shadow: inset 0 0 0 2px #ffffff22; touch-action: none; }
+.stick b { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: #ffffff38; box-shadow: 0 3px 10px #0006; pointer-events: none; }
+.p1 .stick b, .fire.p1 { background: var(--p1); }
+.p2 .stick b, .fire.p2 { background: var(--p2); }
+.fire { width: 76px; height: 76px; flex: 0 0 auto; border-radius: 50%; color: #1a1406; font-size: 13px; font-weight: 900; box-shadow: 0 5px 0 #0007, inset 0 -4px 0 #0003; touch-action: none; }
+.fire.on { transform: translateY(3px); box-shadow: 0 2px 0 #0007; }
+canvas { display: block; border-radius: 14px; touch-action: none; box-shadow: 0 0 0 2px #00000066, 0 16px 40px #000a; }
+canvas:focus-visible { outline: 2px solid #4fd1e840; outline-offset: 3px; }
+.banner { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.banner span { padding: 10px 22px; border-radius: 18px; background: #12151ccc; font-size: clamp(22px, 6vmin, 44px); font-weight: 900; text-align: center; box-shadow: 0 0 0 2px #ffb62755; }
+.banner[hidden] { display: none; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: #07090dc0; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 8px); overflow-y: auto; background: #1d222df5; border-radius: 24px; padding: 20px 18px; text-align: center; box-shadow: 0 0 0 1px #ffb62744, 0 20px 50px #000a; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 30px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.panel h2 span { color: var(--p1); }
+.logo { display: flex; justify-content: center; gap: 14px; margin-bottom: 6px; }
+.logo svg { width: 44px; height: 44px; }
+.text { margin-top: 6px; font-size: 14px; color: #d4d0c2; line-height: 1.4; }
+.field { margin-top: 12px; text-align: left; }
+.field[hidden] { display: none; }
+.label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #ffffff10; }
+.seg button { flex: 1; min-width: 0; padding: 8px 4px; border-radius: 10px; font-size: 14px; font-weight: 800; color: var(--muted); line-height: 1.2; }
+.seg button[aria-pressed="true"] { background: #3a3220; color: var(--text); box-shadow: inset 0 0 0 1px #ffb62788; }
+.mapsel { display: flex; align-items: center; gap: 8px; }
+.mapsel .icon-btn { flex: 0 0 auto; }
+.mapsel canvas { flex: 0 0 auto; width: 84px; height: 52px; border-radius: 8px; box-shadow: 0 0 0 1px #ffffff22; }
+.mapname { flex: 1; min-width: 0; font-size: 14px; font-weight: 800; text-align: center; line-height: 1.25; }
+.hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.final { margin-top: 8px; font-size: 42px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.final b:first-child { color: var(--p1); }
+.final b:last-child { color: var(--p2); }
+.cta { margin-top: 16px; width: 100%; padding: 14px; border-radius: 18px; background: var(--accent); color: #2a1a00; font-size: 19px; font-weight: 900; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; background: #ffffff12; font-size: 16px; font-weight: 800; box-shadow: inset 0 0 0 1px #ffffff1c; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Wide frames: arena at full height in the middle, players' cards and pads in side columns. */
+@media (min-aspect-ratio: 1/1) {
+  .app { grid-template-columns: minmax(118px, 230px) minmax(0, 1fr) minmax(118px, 230px); grid-template-rows: minmax(0, 1fr); grid-template-areas: "left stage right"; }
+  .side-0 { grid-area: left; }
+  .side-1 { grid-area: right; }
+  .side { flex-direction: column; align-items: stretch; justify-content: space-between; max-width: 260px; width: 100%; justify-self: center; }
+  .side-0 .tools { display: none; }
+  .rot { flex-direction: column; align-items: stretch; justify-content: space-between; flex: 1; }
+  .flip .rot { transform: none; }
+  .side-1 .tools { order: -1; justify-content: flex-end; }
+  .card { flex: 0 0 auto; }
+  .pads { flex-wrap: wrap; justify-content: center; }
+}
+@media (min-aspect-ratio: 1/1) and (max-height: 430px) {
+  .app { grid-template-columns: minmax(110px, 180px) minmax(0, 1fr) minmax(110px, 180px); }
+  .stick { width: 92px; height: 92px; }
+  .fire { width: 64px; height: 64px; }
+  .card { padding: 4px 8px; }
+  .wins { font-size: 16px; }
+}
+@media (max-aspect-ratio: 1/1) and (max-width: 360px) {
+  .stick { width: 92px; height: 92px; }
+  .fire { width: 66px; height: 66px; }
+}
+@media (max-height: 520px) {
+  .panel { padding: 12px 14px; border-radius: 18px; }
+  .panel h2 { font-size: 22px; }
+  .logo { display: none; }
+  .field { margin-top: 8px; }
+  .cta { margin-top: 10px; padding: 10px; font-size: 17px; }
+  .text { font-size: 13px; }
+}
+@media (max-height: 460px) and (min-aspect-ratio: 4/3) {
+  #setup .panel { width: min(100%, 720px); display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; align-content: start; }
+  #setup .panel > :not(.field) { grid-column: 1 / -1; }
+  #setup .hint { margin-top: 6px; }
+  #setup .text, #record { display: none; }
+  .mapsel canvas { width: 64px; height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <section class="side side-1" id="side-1">
+    <div class="rot">
+      <div class="card"><span class="swatch" aria-hidden="true"></span><div class="info"><span class="name" id="name-1"></span><div class="row"><span class="hp" id="hp-1"></span><strong class="wins" id="wins-1">0</strong></div><div class="pu" id="pu-1"></div></div></div>
+      <div class="pads p2" id="pads-1"></div>
+    </div>
+    <div class="tools"><button type="button" class="icon-btn" id="sound" data-i18n-label="sound">♪</button><button type="button" class="icon-btn" id="menu" data-i18n-label="menu">II</button></div>
+  </section>
+  <div class="stage" id="stage">
+    <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+    <div class="banner" id="banner" hidden><span id="banner-text"></span></div>
+  </div>
+  <section class="side side-0" id="side-0">
+    <div class="rot">
+      <div class="card"><span class="swatch" aria-hidden="true"></span><div class="info"><span class="name" id="name-0"></span><div class="row"><span class="hp" id="hp-0"></span><strong class="wins" id="wins-0">0</strong></div><div class="pu" id="pu-0"></div></div></div>
+      <div class="pads p1" id="pads-0"></div>
+    </div>
+    <div class="tools"></div>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="setup">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 44 44"><rect x="6" y="9" width="32" height="26" rx="6" fill="#ffb627"/><rect x="4" y="7" width="36" height="7" rx="3" fill="#8a5a08"/><rect x="4" y="30" width="36" height="7" rx="3" fill="#8a5a08"/><circle cx="22" cy="22" r="8" fill="#d9900f"/><rect x="21" y="0" width="5" height="18" rx="2" fill="#d9900f"/></svg>
+      <svg viewBox="0 0 44 44"><rect x="6" y="9" width="32" height="26" rx="6" fill="#4fd1e8"/><rect x="4" y="7" width="36" height="7" rx="3" fill="#1d6f80"/><rect x="4" y="30" width="36" height="7" rx="3" fill="#1d6f80"/><circle cx="22" cy="22" r="8" fill="#2ba7bf"/><rect x="18" y="26" width="5" height="18" rx="2" fill="#2ba7bf"/></svg>
+    </div>
+    <h2 id="setup-title">Tank <span>Duel</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <div class="field"><p class="label" id="mode-label" data-i18n="mode"></p><div class="seg" role="group" aria-labelledby="mode-label" data-key="mode"><button type="button" data-value="cpu" data-i18n="vsCpu"></button><button type="button" data-value="pvp" data-i18n="twoP"></button></div></div>
+    <div class="field" id="level-field"><p class="label" id="level-label" data-i18n="difficulty"></p><div class="seg" role="group" aria-labelledby="level-label" data-key="level"><button type="button" data-value="easy" data-i18n="easy"></button><button type="button" data-value="normal" data-i18n="normal"></button><button type="button" data-value="hard" data-i18n="hard"></button></div></div>
+    <div class="field"><p class="label" id="rounds-label" data-i18n="match"></p><div class="seg" role="group" aria-labelledby="rounds-label" data-key="bestOf"><button type="button" data-value="3"></button><button type="button" data-value="5"></button><button type="button" data-value="7"></button></div></div>
+    <div class="field"><p class="label" data-i18n="map"></p><div class="mapsel"><button type="button" class="icon-btn" id="map-prev" data-i18n-label="prevMap">‹</button><canvas id="preview" width="168" height="104" aria-hidden="true"></canvas><span class="mapname" id="map-name" aria-live="polite"></span><button type="button" class="icon-btn" id="map-next" data-i18n-label="nextMap">›</button></div></div>
+    <p class="hint" id="hint"></p>
+    <p class="hint" id="record"></p>
+    <button type="button" class="cta" id="start" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused"></h2>
+    <p class="hint" id="pause-hint"></p>
+    <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+    <button type="button" class="ghost-btn" id="quit" data-i18n="change"></button>
+  </div>
+</div>
+
+<div class="overlay" id="result" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <h2 id="result-title"></h2>
+    <p class="final" id="final"><b></b> – <b></b></p>
+    <p class="hint" id="result-record"></p>
+    <button type="button" class="cta" id="rematch" data-i18n="rematch"></button>
+    <button type="button" class="ghost-btn" id="change" data-i18n="change"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Bounce shells off steel, blast through bricks and outgun your rival.', mode: 'Mode', vsCpu: 'vs Computer', twoP: '2 Players', difficulty: 'Difficulty', easy: 'Easy', normal: 'Normal', hard: 'Hard', match: 'Match', bestOf: n => `Best of ${n}`, map: 'Arena', random: 'Random arenas', mapName: (n, th) => `Arena ${n} · ${th}`, themes: ['Desert', 'Forest', 'Snow', 'Night'], prevMap: 'Previous arena', nextMap: 'Next arena', start: 'Roll out', controlsCpu: 'W/S or ↑/↓ drive, A/D or ←/→ turn, Space or Enter fires. Shells bounce once off steel; bricks crumble.', controls2p: 'Player 1: WASD + Space (or F). Player 2: arrow keys + Enter (or /). On touch, each player gets a stick and a fire button.', controlsTouch: 'Push the stick to drive, tap Fire to shoot. Shells bounce once off steel; bricks crumble.', you: 'You', cpu: 'CPU', p1: 'Player 1', p2: 'Player 2', round: n => `Round ${n}`, fight: 'Fire!', roundWin: n => n === 'You' ? 'You take the round' : `${n} takes the round`, roundDraw: 'Draw — no point', winYou: 'Victory!', winCpu: 'CPU wins the match', winP1: 'Player 1 wins!', winP2: 'Player 2 wins!', record: (w, l) => `Your record on this level: ${w} W · ${l} L`, rematch: 'Rematch', change: 'Change setup', menu: 'Pause', sound: 'Sound on/off', paused: 'Paused', resume: 'Resume', canvas: 'Tank Duel arena', fire: 'Fire', stick: 'Drive stick', pu: { rapid: 'Rapid fire', spread: 'Triple shot', shield: 'Shield', speed: 'Turbo', repair: 'Repair', bomb: 'Bomb shells' }, picked: (n, p) => `${n}: ${p}`, hit: n => `${n} hit` },
+    vi: { tagline: 'Bắn đạn dội tường thép, phá gạch và hạ gục đối thủ.', mode: 'Chế độ', vsCpu: 'Đấu với máy', twoP: '2 người chơi', difficulty: 'Độ khó', easy: 'Dễ', normal: 'Vừa', hard: 'Khó', match: 'Trận đấu', bestOf: n => `${n} hiệp`, map: 'Đấu trường', random: 'Đấu trường ngẫu nhiên', mapName: (n, th) => `Đấu trường ${n} · ${th}`, themes: ['Sa mạc', 'Rừng', 'Tuyết', 'Đêm'], prevMap: 'Đấu trường trước', nextMap: 'Đấu trường sau', start: 'Xuất kích', controlsCpu: 'W/S hoặc ↑/↓ để tiến lùi, A/D hoặc ←/→ để xoay, Space hoặc Enter để bắn. Đạn dội thép một lần, gạch thì vỡ.', controls2p: 'Người 1: WASD + Space (hoặc F). Người 2: phím mũi tên + Enter (hoặc /). Trên màn hình cảm ứng, mỗi người có cần điều khiển và nút bắn riêng.', controlsTouch: 'Đẩy cần điều khiển để chạy, chạm Bắn để khai hỏa. Đạn dội thép một lần, gạch thì vỡ.', you: 'Bạn', cpu: 'Máy', p1: 'Người 1', p2: 'Người 2', round: n => `Hiệp ${n}`, fight: 'Khai hỏa!', roundWin: n => `${n} thắng hiệp`, roundDraw: 'Hòa — không ai có điểm', winYou: 'Chiến thắng!', winCpu: 'Máy thắng trận', winP1: 'Người 1 thắng!', winP2: 'Người 2 thắng!', record: (w, l) => `Thành tích ở mức này: ${w} thắng · ${l} thua`, rematch: 'Đấu lại', change: 'Đổi thiết lập', menu: 'Tạm dừng', sound: 'Bật/tắt âm thanh', paused: 'Tạm dừng', resume: 'Chơi tiếp', canvas: 'Đấu trường Tank Duel', fire: 'Bắn', stick: 'Cần điều khiển', pu: { rapid: 'Bắn nhanh', spread: 'Bắn ba tia', shield: 'Khiên', speed: 'Tăng tốc', repair: 'Sửa xe', bomb: 'Đạn nổ' }, picked: (n, p) => `${n}: ${p}`, hit: n => `${n} trúng đạn` },
+    zh: { tagline: '让炮弹在钢墙上反弹，轰开砖墙，击败你的对手。', mode: '模式', vsCpu: '人机对战', twoP: '双人对战', difficulty: '难度', easy: '简单', normal: '普通', hard: '困难', match: '比赛', bestOf: n => `${n} 局`, map: '战场', random: '随机战场', mapName: (n, th) => `战场 ${n} · ${th}`, themes: ['沙漠', '森林', '雪原', '夜晚'], prevMap: '上一个战场', nextMap: '下一个战场', start: '出发', controlsCpu: 'W/S 或 ↑/↓ 前进后退，A/D 或 ←/→ 转向，空格或回车开炮。炮弹可在钢墙上反弹一次，砖墙会被击碎。', controls2p: '玩家 1：WASD + 空格（或 F）。玩家 2：方向键 + 回车（或 /）。触屏时每位玩家各有摇杆和开火键。', controlsTouch: '推动摇杆行驶，点击开火键射击。炮弹可在钢墙上反弹一次，砖墙会被击碎。', you: '你', cpu: '电脑', p1: '玩家 1', p2: '玩家 2', round: n => `第 ${n} 局`, fight: '开火！', roundWin: n => `${n} 赢下本局`, roundDraw: '平局，双方不得分', winYou: '胜利！', winCpu: '电脑赢得比赛', winP1: '玩家 1 获胜！', winP2: '玩家 2 获胜！', record: (w, l) => `本难度战绩：${w} 胜 · ${l} 负`, rematch: '再来一场', change: '更改设置', menu: '暂停', sound: '声音开关', paused: '已暂停', resume: '继续', canvas: 'Tank Duel 战场', fire: '开火', stick: '摇杆', pu: { rapid: '速射', spread: '三连发', shield: '护盾', speed: '加速', repair: '修理', bomb: '爆破弹' }, picked: (n, p) => `${n}：${p}`, hit: n => `${n} 被击中` },
+    fr: { tagline: 'Faites ricocher vos obus sur l’acier, pulvérisez les briques et dominez votre rival.', mode: 'Mode', vsCpu: 'Contre l’ordi', twoP: '2 joueurs', difficulty: 'Difficulté', easy: 'Facile', normal: 'Normal', hard: 'Difficile', match: 'Match', bestOf: n => `En ${n} manches`, map: 'Arène', random: 'Arènes au hasard', mapName: (n, th) => `Arène ${n} · ${th}`, themes: ['Désert', 'Forêt', 'Neige', 'Nuit'], prevMap: 'Arène précédente', nextMap: 'Arène suivante', start: 'En avant', controlsCpu: 'W/S ou ↑/↓ pour avancer, A/D ou ←/→ pour tourner, Espace ou Entrée pour tirer. Les obus rebondissent une fois sur l’acier ; les briques cèdent.', controls2p: 'Joueur 1 : WASD + Espace (ou F). Joueur 2 : flèches + Entrée (ou /). Sur écran tactile, chacun a son joystick et son bouton de tir.', controlsTouch: 'Poussez le joystick pour rouler, touchez Feu pour tirer. Les obus rebondissent une fois sur l’acier ; les briques cèdent.', you: 'Vous', cpu: 'Ordi', p1: 'Joueur 1', p2: 'Joueur 2', round: n => `Manche ${n}`, fight: 'Feu !', roundWin: n => `${n} remporte la manche`, roundDraw: 'Égalité, aucun point', winYou: 'Victoire !', winCpu: 'L’ordi gagne le match', winP1: 'Le joueur 1 gagne !', winP2: 'Le joueur 2 gagne !', record: (w, l) => `Votre bilan à ce niveau : ${w} V · ${l} D`, rematch: 'Revanche', change: 'Modifier', menu: 'Pause', sound: 'Son activé/coupé', paused: 'Pause', resume: 'Reprendre', canvas: 'Arène de Tank Duel', fire: 'Feu', stick: 'Joystick', pu: { rapid: 'Tir rapide', spread: 'Triple tir', shield: 'Bouclier', speed: 'Turbo', repair: 'Réparation', bomb: 'Obus explosifs' }, picked: (n, p) => `${n} : ${p}`, hit: n => `${n} est touché` },
+    th: { tagline: 'ยิงกระสุนสะท้อนกำแพงเหล็ก ทลายกำแพงอิฐ แล้วถล่มคู่แข่งให้ราบ', mode: 'โหมด', vsCpu: 'เล่นกับคอม', twoP: '2 ผู้เล่น', difficulty: 'ระดับ', easy: 'ง่าย', normal: 'ปานกลาง', hard: 'ยาก', match: 'การแข่งขัน', bestOf: n => `${n} ยก`, map: 'สนามรบ', random: 'สนามแบบสุ่ม', mapName: (n, th) => `สนาม ${n} · ${th}`, themes: ['ทะเลทราย', 'ป่า', 'หิมะ', 'กลางคืน'], prevMap: 'สนามก่อนหน้า', nextMap: 'สนามถัดไป', start: 'ออกรบ', controlsCpu: 'W/S หรือ ↑/↓ เดินหน้าถอยหลัง A/D หรือ ←/→ หมุน Space หรือ Enter ยิง กระสุนสะท้อนเหล็กได้ 1 ครั้ง ส่วนอิฐจะแตก', controls2p: 'ผู้เล่น 1: WASD + Space (หรือ F) ผู้เล่น 2: ปุ่มลูกศร + Enter (หรือ /) บนจอสัมผัส แต่ละคนมีจอยและปุ่มยิงของตัวเอง', controlsTouch: 'ดันจอยเพื่อขับ แตะปุ่มยิงเพื่อยิง กระสุนสะท้อนเหล็กได้ 1 ครั้ง ส่วนอิฐจะแตก', you: 'คุณ', cpu: 'คอม', p1: 'ผู้เล่น 1', p2: 'ผู้เล่น 2', round: n => `ยกที่ ${n}`, fight: 'ยิง!', roundWin: n => `${n} ชนะยกนี้`, roundDraw: 'เสมอ ไม่มีใครได้แต้ม', winYou: 'ชนะแล้ว!', winCpu: 'คอมชนะการแข่งขัน', winP1: 'ผู้เล่น 1 ชนะ!', winP2: 'ผู้เล่น 2 ชนะ!', record: (w, l) => `สถิติในระดับนี้: ชนะ ${w} · แพ้ ${l}`, rematch: 'แข่งอีกรอบ', change: 'เปลี่ยนการตั้งค่า', menu: 'พัก', sound: 'เปิด/ปิดเสียง', paused: 'พักเกม', resume: 'เล่นต่อ', canvas: 'สนามรบ Tank Duel', fire: 'ยิง', stick: 'จอยบังคับ', pu: { rapid: 'ยิงรัว', spread: 'ยิงสามทาง', shield: 'โล่', speed: 'เทอร์โบ', repair: 'ซ่อมรถ', bomb: 'กระสุนระเบิด' }, picked: (n, p) => `${n}: ${p}`, hit: n => `${n} โดนยิง` },
+    ja: { tagline: '砲弾を鉄の壁で跳ね返し、レンガを砕いてライバルを撃破しよう。', mode: 'モード', vsCpu: 'CPU対戦', twoP: '2人対戦', difficulty: '難易度', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', match: '試合', bestOf: n => `${n}ラウンド制`, map: 'ステージ', random: 'ランダムステージ', mapName: (n, th) => `ステージ${n} · ${th}`, themes: ['砂漠', '森', '雪原', '夜'], prevMap: '前のステージ', nextMap: '次のステージ', start: '出撃', controlsCpu: 'W/S か ↑/↓ で前進・後退、A/D か ←/→ で旋回、スペースかEnterで発射。砲弾は鉄の壁で1回跳ね返り、レンガは壊れます。', controls2p: 'プレイヤー1：WASD＋スペース（またはF）。プレイヤー2：矢印キー＋Enter（または /）。タッチ操作ではそれぞれにスティックと発射ボタンがあります。', controlsTouch: 'スティックで走行、発射ボタンで砲撃。砲弾は鉄の壁で1回跳ね返り、レンガは壊れます。', you: 'あなた', cpu: 'CPU', p1: 'プレイヤー1', p2: 'プレイヤー2', round: n => `ラウンド${n}`, fight: '撃て！', roundWin: n => `${n}がラウンド獲得`, roundDraw: '相打ち（ポイントなし）', winYou: '勝利！', winCpu: 'CPUの勝ち', winP1: 'プレイヤー1の勝ち！', winP2: 'プレイヤー2の勝ち！', record: (w, l) => `この難易度の戦績：${w}勝 ${l}敗`, rematch: '再戦', change: '設定を変える', menu: '一時停止', sound: 'サウンド切替', paused: '一時停止中', resume: '再開', canvas: 'Tank Duel のステージ', fire: '発射', stick: '操作スティック', pu: { rapid: '連射', spread: '3方向弾', shield: 'シールド', speed: 'ターボ', repair: '修理', bomb: '爆裂弾' }, picked: (n, p) => `${n}：${p}`, hit: n => `${n}に命中` },
+    ko: { tagline: '포탄을 강철 벽에 튕기고 벽돌을 부수며 라이벌을 제압하세요.', mode: '모드', vsCpu: '컴퓨터 대전', twoP: '2인 대전', difficulty: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', match: '경기', bestOf: n => `${n}판 승부`, map: '전장', random: '무작위 전장', mapName: (n, th) => `전장 ${n} · ${th}`, themes: ['사막', '숲', '설원', '밤'], prevMap: '이전 전장', nextMap: '다음 전장', start: '출격', controlsCpu: 'W/S 또는 ↑/↓로 전진·후진, A/D 또는 ←/→로 회전, 스페이스나 Enter로 발사. 포탄은 강철에 한 번 튕기고 벽돌은 부서집니다.', controls2p: '플레이어 1: WASD + 스페이스(또는 F). 플레이어 2: 방향키 + Enter(또는 /). 터치 화면에서는 각자 스틱과 발사 버튼이 있습니다.', controlsTouch: '스틱을 밀어 주행하고 발사 버튼으로 쏘세요. 포탄은 강철에 한 번 튕기고 벽돌은 부서집니다.', you: '나', cpu: 'CPU', p1: '플레이어 1', p2: '플레이어 2', round: n => `${n}라운드`, fight: '발사!', roundWin: n => `${n} 라운드 승리`, roundDraw: '무승부, 점수 없음', winYou: '승리!', winCpu: 'CPU 승리', winP1: '플레이어 1 승리!', winP2: '플레이어 2 승리!', record: (w, l) => `이 난이도 전적: ${w}승 ${l}패`, rematch: '재대결', change: '설정 변경', menu: '일시정지', sound: '소리 켜기/끄기', paused: '일시정지', resume: '계속하기', canvas: 'Tank Duel 전장', fire: '발사', stick: '조종 스틱', pu: { rapid: '속사', spread: '3연발', shield: '보호막', speed: '터보', repair: '수리', bomb: '폭발탄' }, picked: (n, p) => `${n}: ${p}`, hit: n => `${n} 피격` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+  for (const b of document.querySelectorAll('[data-key="bestOf"] button')) b.textContent = t.bestOf(b.dataset.value);
+
+  // Arenas are designed on a 21×13 grid of 32px tiles (landscape); on portrait stages the grid is rotated 90°.
+  const COLS = 21, ROWS = 13, T = 32, MAP_COUNT = 24;
+  const EMPTY = 0, BRICK = 1, STEEL = 2;
+  const TANK_R = 11, BULLET_R = 3.2, BULLET_SPEED = 250, BULLET_LIFE = 4;
+  const MOVE_SPEED = 92, TURN_SPEED = 3.3, MAX_HP = 3, BRICK_HP = 2;
+  const PU_TYPES = ['rapid', 'spread', 'shield', 'speed', 'repair', 'bomb'];
+  const PU_TIME = 9, PU_EVERY = 7, PU_LIFE = 13;
+  const COLORS = ['#ffb627', '#4fd1e8'];
+  const DARK = ['#8a5a08', '#1d6f80'];
+  const THEMES = [
+    { floor: '#c9a66b', floor2: '#bf9b5f', brick: '#b5532f', brickHi: '#d77349', steel: '#6d7480', steelHi: '#9aa2ad' },
+    { floor: '#4f7a3a', floor2: '#4a7336', brick: '#a0522d', brickHi: '#c46f45', steel: '#5d6670', steelHi: '#8c96a0' },
+    { floor: '#dfe8ef', floor2: '#d4dfe8', brick: '#9a5a4a', brickHi: '#bf7a68', steel: '#5f7286', steelHi: '#90a4b8' },
+    { floor: '#25304a', floor2: '#222c44', brick: '#8b3f5c', brickHi: '#b45a7c', steel: '#4b5672', steelHi: '#7884a6' },
+  ];
+  // speed/turn: multipliers; react: seconds between decisions; aimErr: radians of aim noise; bank: tries ricochet shots; dodge: chance to react to incoming shells.
+  const AI = {
+    easy: { speed: 0.72, turn: 0.6, react: 0.55, aimErr: 0.2, tol: 0.2, bank: false, dodge: 0, lead: 0, cool: 0.9, pickups: false },
+    normal: { speed: 0.9, turn: 0.85, react: 0.25, aimErr: 0.06, tol: 0.1, bank: false, dodge: 0.5, lead: 0.5, cool: 0.45, pickups: true },
+    hard: { speed: 1, turn: 1, react: 0.1, aimErr: 0.015, tol: 0.05, bank: true, dodge: 1, lead: 1, cool: 0, pickups: true },
+  };
+  const KEY = 'milaan.tankDuel.';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+  const floorCanvas = document.createElement('canvas');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(KEY + key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, value) => { try { localStorage.setItem(KEY + key, JSON.stringify(value)); } catch {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const wrapAngle = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+
+  const settings = Object.assign({ mode: 'cpu', level: 'normal', bestOf: '3', map: -1, sound: true }, read('settings', {}));
+  if (!AI[settings.level]) settings.level = 'normal';
+  if (settings.mode !== 'pvp') settings.mode = 'cpu';
+  if (!['3', '5', '7'].includes(String(settings.bestOf))) settings.bestOf = '3';
+  settings.bestOf = String(settings.bestOf);
+  if (!(settings.map >= -1 && settings.map < MAP_COUNT)) settings.map = -1;
+  const stats = Object.assign({ easy: { w: 0, l: 0 }, normal: { w: 0, l: 0 }, hard: { w: 0, l: 0 } }, read('stats', {}));
+
+  // ---------- Arena generation (seeded, point-symmetric so both spawns are equal) ----------
+  function rng(seed) {
+    let s = seed >>> 0;
+    return () => { s = (s + 0x6d2b79f5) >>> 0; let x = s; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+  const SPAWNS = [{ x: 1, y: 6 }, { x: COLS - 2, y: ROWS - 7 }];
+
+  function symmetrize(g) {
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const mx = COLS - 1 - x, my = ROWS - 1 - y;
+      if (y * COLS + x < my * COLS + mx) g[my][mx] = g[y][x];
+    }
+  }
+  function connected(g) {
+    const seen = new Set([SPAWNS[0].y * COLS + SPAWNS[0].x]);
+    const queue = [SPAWNS[0]];
+    while (queue.length) {
+      const c = queue.pop();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = c.x + dx, y = c.y + dy;
+        if (x < 0 || y < 0 || x >= COLS || y >= ROWS || g[y][x] === STEEL || seen.has(y * COLS + x)) continue;
+        seen.add(y * COLS + x); queue.push({ x, y });
+      }
+    }
+    return seen.has(SPAWNS[1].y * COLS + SPAWNS[1].x);
+  }
+  function generateMap(index) {
+    const r = rng(9173 + index * 7919);
+    const style = index % 4;
+    const g = Array.from({ length: ROWS }, () => new Array(COLS).fill(EMPTY));
+    const put = (x, y, v) => { if (x >= 0 && y >= 0 && x < COLS && y < ROWS) g[y][x] = v; };
+    if (style === 0) {
+      // Pillars: a steel lattice with brick fill.
+      const step = 2 + (index % 3 === 0 ? 1 : 0);
+      for (let y = 1; y < ROWS - 1; y++) for (let x = 2; x < COLS - 2; x++) {
+        if (x % step === 0 && y % step === 0) put(x, y, STEEL);
+        else if (r() < 0.24 + (index % 5) * 0.03) put(x, y, BRICK);
+      }
+    } else if (style === 1) {
+      // Maze: carve a perfect maze on odd cells, then knock out walls to add loops.
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) g[y][x] = r() < 0.55 ? BRICK : STEEL;
+      const stack = [[1, 1]]; g[1][1] = EMPTY;
+      while (stack.length) {
+        const [cx, cy] = stack[stack.length - 1];
+        const opts = [[2, 0], [-2, 0], [0, 2], [0, -2]].filter(([dx, dy]) => { const nx = cx + dx, ny = cy + dy; return nx > 0 && ny > 0 && nx < COLS - 1 && ny < ROWS - 1 && g[ny][nx] !== EMPTY; });
+        if (!opts.length) { stack.pop(); continue; }
+        const [dx, dy] = opts[Math.floor(r() * opts.length)];
+        g[cy + dy / 2][cx + dx / 2] = EMPTY; g[cy + dy][cx + dx] = EMPTY; stack.push([cx + dx, cy + dy]);
+      }
+      const open = 0.35 + (index % 3) * 0.1;
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (g[y][x] !== EMPTY && r() < open) g[y][x] = r() < 0.6 ? EMPTY : BRICK;
+      for (let x = 0; x < COLS; x++) { if (g[0][x] === STEEL) g[0][x] = EMPTY; if (g[ROWS - 1][x] === STEEL) g[ROWS - 1][x] = EMPTY; }
+    } else if (style === 2) {
+      // Rooms: steel walls split the arena into chambers joined by brick doors.
+      const vx = [5 + (index % 2), 10, 15 - (index % 2)], hy = [4, 8];
+      for (const x of vx) for (let y = 0; y < ROWS; y++) put(x, y, (y % 4 === 2) ? BRICK : STEEL);
+      for (const y of hy) for (let x = 0; x < COLS; x++) if (g[y][x] === EMPTY) put(x, y, (x % 5 === 2 || x % 5 === 3) ? BRICK : STEEL);
+      for (let i = 0; i < 18; i++) put(Math.floor(r() * COLS), Math.floor(r() * ROWS), BRICK);
+      for (let i = 0; i < 6; i++) { const x = vx[Math.floor(r() * 3)], y = 1 + Math.floor(r() * (ROWS - 2)); put(x, y, EMPTY); }
+    } else {
+      // Fields: brick clusters and a few steel blocks around a contested centre.
+      const clusters = 7 + (index % 4);
+      for (let i = 0; i < clusters; i++) {
+        const cx = 3 + Math.floor(r() * (COLS - 6)), cy = 1 + Math.floor(r() * (ROWS - 2)), w = 1 + Math.floor(r() * 3), h = 1 + Math.floor(r() * 3);
+        for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) put(x, y, BRICK);
+      }
+      for (let i = 0; i < 6; i++) put(3 + Math.floor(r() * (COLS - 6)), 1 + Math.floor(r() * (ROWS - 2)), STEEL);
+      put(10, 6, STEEL); put(10, 5, BRICK); put(10, 7, BRICK); put(9, 6, BRICK); put(11, 6, BRICK);
+    }
+    symmetrize(g);
+    for (const s of SPAWNS) for (let y = s.y - 1; y <= s.y + 1; y++) for (let x = s.x - 1; x <= s.x + 1; x++) put(x, y, EMPTY);
+    // Guarantee a steel-free route between the spawns (bricks can be shot away).
+    let guard = 0;
+    while (!connected(g) && guard++ < 400) {
+      const x = Math.floor(r() * COLS), y = Math.floor(r() * ROWS);
+      if (g[y][x] === STEEL) { g[y][x] = BRICK; g[ROWS - 1 - y][COLS - 1 - x] = BRICK; }
+    }
+    return g;
+  }
+  const MAPS = Array.from({ length: MAP_COUNT }, (_, i) => generateMap(i));
+  const themeOf = i => Math.floor(i / 6) % 4;
+
+  // ---------- State ----------
+  let scale = 1, dpr = 1, portrait = false;
+  let game = newGame();
+  const keys = new Set();
+  const touchCtl = [newTouch(), newTouch()];
+  let autopilot = [null, null];
+
+  function newTouch() { return { angle: 0, mag: 0, fire: false, id: null }; }
+  function newGame() {
+    return { mode: settings.mode, level: settings.level, need: (Number(settings.bestOf) + 1) / 2, wins: [0, 0], round: 0, mapIndex: 0, state: 'menu', timer: 0,
+      grid: null, cols: COLS, rows: ROWS, rotated: false, tanks: [], bullets: [], particles: [], pickups: [], puTimer: 0, shake: 0, roundWinner: -1 };
+  }
+
+  const names = () => (game.mode === 'cpu' ? [t.you, t.cpu] : [t.p1, t.p2]);
+
+  function buildRound() {
+    const src = MAPS[game.mapIndex];
+    game.rotated = portrait;
+    // Rotating 90° counter-clockwise keeps player 1 (left spawn) at the bottom on portrait stages.
+    if (game.rotated) {
+      game.cols = ROWS; game.rows = COLS;
+      game.grid = Array.from({ length: COLS }, (_, y) => Array.from({ length: ROWS }, (_, x) => ({ v: src[x][COLS - 1 - y], hp: BRICK_HP })));
+    } else {
+      game.cols = COLS; game.rows = ROWS;
+      game.grid = src.map(row => row.map(v => ({ v, hp: BRICK_HP })));
+    }
+    const centre = { x: game.cols * T / 2, y: game.rows * T / 2 };
+    game.tanks = SPAWNS.map((s, i) => {
+      const gx = game.rotated ? s.y : s.x, gy = game.rotated ? COLS - 1 - s.x : s.y;
+      const x = (gx + 0.5) * T, y = (gy + 0.5) * T;
+      const a = Math.round(Math.atan2(centre.y - y, centre.x - x) / (Math.PI / 2)) * (Math.PI / 2);
+      return { i, x, y, a, hp: MAX_HP, alive: true, cool: 0, power: null, powerT: 0, shield: 0, bombs: 0, flash: 0, ai: newAiState() };
+    });
+    game.bullets = []; game.particles = []; game.pickups = []; game.puTimer = PU_EVERY * 0.6;
+    game.theme = THEMES[themeOf(game.mapIndex)];
+    resize();
+  }
+  function newAiState() { return { timer: 0, path: [], pathT: 0, shot: null, dodge: 0, dodgeDir: 1, stuck: 0, lastX: 0, lastY: 0, unstick: 0, fireWait: 0 }; }
+
+  // ---------- Grid helpers ----------
+  const cellAt = (px, py) => {
+    const x = Math.floor(px / T), y = Math.floor(py / T);
+    if (x < 0 || y < 0 || x >= game.cols || y >= game.rows) return null;
+    return game.grid[y][x];
+  };
+  const solidAt = (px, py) => { const c = cellAt(px, py); return !c || c.v !== EMPTY; };
+
+  function collideCircle(o, r) {
+    const x0 = Math.floor((o.x - r) / T), x1 = Math.floor((o.x + r) / T), y0 = Math.floor((o.y - r) / T), y1 = Math.floor((o.y + r) / T);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const out = x < 0 || y < 0 || x >= game.cols || y >= game.rows;
+      if (!out && game.grid[y][x].v === EMPTY) continue;
+      const nx = clamp(o.x, x * T, x * T + T), ny = clamp(o.y, y * T, y * T + T);
+      let dx = o.x - nx, dy = o.y - ny;
+      const d = Math.hypot(dx, dy);
+      if (d >= r) continue;
+      if (d < 1e-6) { dx = 0; dy = -1; } else { dx /= d; dy /= d; }
+      o.x += dx * (r - d); o.y += dy * (r - d);
+    }
+  }
+
+  // ---------- Controls ----------
+  const KEYMAP = {
+    one: { up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], fire: ['Space', 'Enter', 'KeyF', 'NumpadEnter'] },
+    p1: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], fire: ['Space', 'KeyF'] },
+    p2: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], fire: ['Enter', 'Slash', 'Numpad0', 'NumpadEnter'] },
+  };
+  const USED = new Set(Object.values(KEYMAP).flatMap(m => Object.values(m).flat()).concat(['KeyP']));
+  const anyKey = list => list.some(k => keys.has(k));
+
+  function controlFor(i) {
+    if (autopilot[i]) return aiControl(game.tanks[i], game.tanks[1 - i], AI[autopilot[i]]);
+    if (i === 1 && game.mode === 'cpu') return aiControl(game.tanks[1], game.tanks[0], AI[game.level]);
+    const m = game.mode === 'cpu' ? KEYMAP.one : (i === 0 ? KEYMAP.p1 : KEYMAP.p2);
+    const tc = touchCtl[i];
+    const c = { turn: 0, move: 0, angle: null, mag: 0, fire: anyKey(m.fire) || tc.fire };
+    if (tc.mag > 0.25) { c.angle = tc.angle; c.mag = tc.mag; return c; }
+    c.turn = (anyKey(m.right) ? 1 : 0) - (anyKey(m.left) ? 1 : 0);
+    c.move = (anyKey(m.up) ? 1 : 0) - (anyKey(m.down) ? 1 : 0);
+    return c;
+  }
+
+  // ---------- AI ----------
+  // Dijkstra over tiles: bricks cost extra because they must be shot first; steel is impassable.
+  function findPath(from, to) {
+    const C = game.cols, R = game.rows, N = C * R;
+    const dist = new Float32Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), done = new Uint8Array(N);
+    const s = from.y * C + from.x, goal = to.y * C + to.x;
+    dist[s] = 0;
+    for (;;) {
+      let u = -1, best = Infinity;
+      for (let k = 0; k < N; k++) if (!done[k] && dist[k] < best) { best = dist[k]; u = k; }
+      if (u < 0 || u === goal) break;
+      done[u] = 1;
+      const ux = u % C, uy = (u / C) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = ux + dx, y = uy + dy;
+        if (x < 0 || y < 0 || x >= C || y >= R) continue;
+        const c = game.grid[y][x];
+        if (c.v === STEEL) continue;
+        const v = y * C + x, nd = best + (c.v === BRICK ? 4 : 1);
+        if (nd < dist[v]) { dist[v] = nd; prev[v] = u; }
+      }
+    }
+    if (prev[goal] < 0 && goal !== s) return [];
+    const path = [];
+    for (let k = goal; k !== s && k >= 0; k = prev[k]) path.push({ x: k % C, y: (k / C) | 0 });
+    return path.reverse();
+  }
+  const tileOf = o => ({ x: clamp(Math.floor(o.x / T), 0, game.cols - 1), y: clamp(Math.floor(o.y / T), 0, game.rows - 1) });
+
+  // Traces a shell from (x,y) at angle a with the real bounce rules; returns how close it passes to the target before dying.
+  function traceShot(x, y, a, target, self, maxBounce) {
+    let vx = Math.cos(a) * 6, vy = Math.sin(a) * 6, bounces = maxBounce, best = Infinity, steps = 0;
+    x += Math.cos(a) * (TANK_R + 6); y += Math.sin(a) * (TANK_R + 6);
+    if (solidAt(x, y)) { const c = cellAt(x, y); return { miss: Infinity, brick: c && c.v === BRICK }; }
+    while (steps++ < 150) {
+      const nx = x + vx, ny = y + vy;
+      if (solidAt(nx, ny)) {
+        const c = cellAt(nx, ny);
+        if (c && c.v === BRICK) return { miss: best, brick: true, bounced: bounces < maxBounce };
+        if (bounces <= 0) break;
+        bounces--;
+        if (solidAt(nx, y)) vx = -vx;
+        if (solidAt(x, ny)) vy = -vy;
+        if (!solidAt(nx, y) && !solidAt(x, ny)) { vx = -vx; vy = -vy; }
+        continue;
+      }
+      x = nx; y = ny;
+      const d = Math.hypot(x - target.x, y - target.y);
+      if (d < best) best = d;
+      if (d < TANK_R) return { miss: d, bounced: bounces < maxBounce };
+      if (bounces < maxBounce && Math.hypot(x - self.x, y - self.y) < TANK_R + 2) return { miss: Infinity, self: true };
+    }
+    return { miss: best, bounced: bounces < maxBounce };
+  }
+
+  function aiDecide(me, foe, cfg) {
+    const st = me.ai;
+    const lead = cfg.lead * 0.35;
+    const target = { x: foe.x, y: foe.y };
+    // Rough lead: assume the foe keeps moving the way it has been.
+    if (foe.vx !== undefined) { target.x += foe.vx * lead; target.y += foe.vy * lead; }
+    st.shot = null;
+    const direct = Math.atan2(target.y - me.y, target.x - me.x);
+    const dr = traceShot(me.x, me.y, direct, target, me, 0);
+    if (dr.miss < TANK_R) st.shot = direct;
+    else if (cfg.bank) {
+      let best = null;
+      for (let k = 0; k < 90; k++) {
+        const a = k * Math.PI / 45;
+        const tr = traceShot(me.x, me.y, a, target, me, 1);
+        if (tr.miss < TANK_R - 2 && !tr.self) { const diff = Math.abs(wrapAngle(a - me.a)); if (!best || diff < best.diff) best = { a, diff }; }
+      }
+      if (best) st.shot = best.a;
+    }
+    if (st.shot !== null) st.shot += (Math.random() * 2 - 1) * cfg.aimErr;
+    // Route: towards a nearby power-up (if this level cares) or the foe.
+    let goalObj = foe;
+    if (cfg.pickups && game.pickups.length) {
+      const near = game.pickups.map(p => ({ p, d: Math.hypot(p.x - me.x, p.y - me.y) })).sort((a, b) => a.d - b.d)[0];
+      if (near.d < Math.hypot(foe.x - me.x, foe.y - me.y) * 0.8 && near.d < 8 * T) goalObj = near.p;
+    }
+    st.path = findPath(tileOf(me), tileOf(goalObj));
+  }
+
+  function incomingThreat(me) {
+    for (const b of game.bullets) {
+      if (b.owner === me.i && !b.bounced) continue;
+      const rx = me.x - b.x, ry = me.y - b.y;
+      const sp = Math.hypot(b.vx, b.vy), ux = b.vx / sp, uy = b.vy / sp;
+      const along = rx * ux + ry * uy;
+      if (along < 0 || along > 150) continue;
+      const side = rx * uy - ry * ux;
+      if (Math.abs(side) < TANK_R + 6) return { ux, uy, side };
+    }
+    return null;
+  }
+
+  function aiControl(me, foe, cfg) {
+    const c = { turn: 0, move: 0, angle: null, mag: 0, fire: false };
+    if (!me.alive || !foe) return c;
+    const st = me.ai;
+    st.timer -= game.dt;
+    if (st.timer <= 0) { st.timer = cfg.react * (0.8 + Math.random() * 0.4); aiDecide(me, foe, cfg); }
+    const turnTo = (a, move) => { const d = wrapAngle(a - me.a); c.turn = clamp(d * 4, -1, 1) * cfg.turn; c.move = move; return Math.abs(d); };
+    if (st.dodge > 0) { st.dodge -= game.dt; c.move = st.dodgeDir * cfg.speed; return c; }
+    if (cfg.dodge && Math.random() < cfg.dodge * game.dt * 8) {
+      const th = incomingThreat(me);
+      if (th) {
+        // Driving forward or backward, whichever takes the hull away from the shell's line.
+        const fx = Math.cos(me.a), fy = Math.sin(me.a);
+        const perp = fx * th.uy - fy * th.ux;
+        st.dodgeDir = (perp * th.side >= 0 ? 1 : -1);
+        if (Math.abs(perp) < 0.3) st.dodgeDir = 0;
+        if (st.dodgeDir) { st.dodge = 0.35; c.move = st.dodgeDir; return c; }
+      }
+    }
+    if (st.unstick > 0) { st.unstick -= game.dt; c.move = -0.8; c.turn = 0.8; return c; }
+    if (st.shot !== null) {
+      const diff = turnTo(st.shot, 0);
+      if (diff < cfg.tol && me.cool <= 0 && st.fireWait <= 0) { c.fire = true; st.fireWait = cfg.cool + Math.random() * 0.25; }
+      st.fireWait = (st.fireWait || 0) - game.dt;
+      return c;
+    }
+    st.fireWait = (st.fireWait || 0) - game.dt;
+    const step = st.path[0];
+    if (!step) { turnTo(Math.atan2(foe.y - me.y, foe.x - me.x), 0); return c; }
+    const here = tileOf(me);
+    if (step.x === here.x && step.y === here.y) { st.path.shift(); return c; }
+    const cell = game.grid[step.y][step.x];
+    const tx = (step.x + 0.5) * T, ty = (step.y + 0.5) * T;
+    const a = Math.atan2(ty - me.y, tx - me.x);
+    if (cell.v === BRICK) {
+      const diff = turnTo(a, 0);
+      if (diff < 0.12 && me.cool <= 0) c.fire = true;
+      return c;
+    }
+    // Aiming at the next tile's centre also pulls the hull back onto the corridor's centre line.
+    const diff = turnTo(a, 0);
+    c.move = diff < 0.5 ? cfg.speed : 0;
+    // Stuck detection: barely moved while trying to drive.
+    if (c.move) {
+      const moved = Math.hypot(me.x - st.lastX, me.y - st.lastY);
+      st.stuck = moved < 0.2 ? st.stuck + game.dt : 0;
+      if (st.stuck > 0.8) { st.stuck = 0; st.unstick = 0.3; st.timer = 0; }
+    }
+    st.lastX = me.x; st.lastY = me.y;
+    return c;
+  }
+
+  // ---------- Simulation ----------
+  function fire(tk) {
+    const own = game.bullets.filter(b => b.owner === tk.i).length;
+    const limit = tk.power === 'rapid' ? 5 : tk.power === 'spread' ? 6 : 3;
+    if (own >= limit) return;
+    const angles = tk.power === 'spread' ? [-0.22, 0, 0.22] : [0];
+    const bomb = tk.bombs > 0;
+    if (bomb) tk.bombs--;
+    for (const da of angles) {
+      const a = tk.a + da;
+      const bx = tk.x + Math.cos(a) * (TANK_R + 5), by = tk.y + Math.sin(a) * (TANK_R + 5);
+      if (solidAt(bx, by)) { hitCell(bx, by, bomb, tk.i); continue; }
+      game.bullets.push({ x: bx, y: by, vx: Math.cos(a) * BULLET_SPEED, vy: Math.sin(a) * BULLET_SPEED, owner: tk.i, life: BULLET_LIFE, bounced: false, bomb, age: 0 });
+    }
+    tk.cool = tk.power === 'rapid' ? 0.13 : 0.38;
+    tk.flash = 0.08;
+    sfx(bomb ? 120 : 220, 0.07, 'square', 0.05);
+  }
+
+  function hitCell(px, py, bomb, owner) {
+    const c = cellAt(px, py);
+    if (bomb) return explode(px, py, owner);
+    if (c && c.v === BRICK) {
+      c.hp--;
+      burst(px, py, game.theme.brick, 5);
+      if (c.hp <= 0) { c.v = EMPTY; burst(Math.floor(px / T) * T + T / 2, Math.floor(py / T) * T + T / 2, game.theme.brickHi, 10); sfx(90, 0.12, 'sawtooth', 0.05); }
+      else sfx(160, 0.05, 'triangle', 0.04);
+    } else burst(px, py, '#ffffff', 3);
+  }
+
+  function explode(px, py, owner) {
+    const cx = Math.floor(px / T), cy = Math.floor(py / T);
+    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
+      if (x < 0 || y < 0 || x >= game.cols || y >= game.rows) continue;
+      if (game.grid[y][x].v === BRICK) game.grid[y][x].v = EMPTY;
+    }
+    for (const tk of game.tanks) if (tk.alive && Math.hypot(tk.x - px, tk.y - py) < 44) damage(tk, owner);
+    burst(px, py, '#ffd166', 26, 160);
+    burst(px, py, '#ff6b35', 16, 110);
+    game.shake = 0.35;
+    sfx(60, 0.3, 'sawtooth', 0.08);
+  }
+
+  function damage(tk, owner) {
+    if (game.state !== 'play') return;
+    if (tk.shield > 0) { tk.shield = 0; if (tk.power === 'shield') tk.power = null; burst(tk.x, tk.y, '#9ef0ff', 14); sfx(600, 0.1, 'sine', 0.05); return; }
+    tk.hp--; tk.flash = 0.25; game.shake = Math.max(game.shake, 0.2);
+    burst(tk.x, tk.y, COLORS[tk.i], 12);
+    sfx(140, 0.15, 'square', 0.06);
+    if (tk.hp <= 0) {
+      tk.alive = false;
+      burst(tk.x, tk.y, '#ffd166', 30, 170); burst(tk.x, tk.y, '#555', 20, 90);
+      game.shake = 0.5;
+      sfx(50, 0.45, 'sawtooth', 0.09);
+    }
+    updateHud();
+  }
+
+  function burst(x, y, color, n, speed = 90) {
+    if (reducedMotion.matches) n = Math.ceil(n / 3);
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random());
+      game.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.4 + Math.random() * 0.4, max: 0.8, color, size: 2 + Math.random() * 3 });
+    }
+  }
+
+  function steer(tk, c, dt) {
+    const sp = MOVE_SPEED * (tk.power === 'speed' ? 1.45 : 1), tr = TURN_SPEED * (tk.power === 'speed' ? 1.3 : 1);
+    let move = c.move;
+    if (c.angle !== null) {
+      // Touch stick: turn towards the stick direction; pulling back reverses instead of spinning round.
+      let goal = c.angle, dir = 1;
+      if (Math.abs(wrapAngle(goal - tk.a)) > Math.PI * 0.72) { goal += Math.PI; dir = -1; }
+      const d = wrapAngle(goal - tk.a);
+      tk.a = wrapAngle(tk.a + clamp(d, -tr * dt, tr * dt));
+      move = Math.abs(d) < 1.1 ? dir * c.mag * Math.cos(Math.abs(d) * 0.8) : 0;
+    } else tk.a = wrapAngle(tk.a + c.turn * tr * dt);
+    const ox = tk.x, oy = tk.y;
+    tk.x += Math.cos(tk.a) * move * sp * dt;
+    tk.y += Math.sin(tk.a) * move * sp * dt;
+    collideCircle(tk, TANK_R);
+    tk.vx = (tk.x - ox) / Math.max(dt, 1e-3); tk.vy = (tk.y - oy) / Math.max(dt, 1e-3);
+  }
+
+  function updateBullets(dt) {
+    for (const b of game.bullets) {
+      b.life -= dt; b.age += dt;
+      const steps = 3;
+      for (let s = 0; s < steps && b.life > 0; s++) {
+        const nx = b.x + b.vx * dt / steps, ny = b.y + b.vy * dt / steps;
+        if (solidAt(nx, ny)) {
+          const c = cellAt(nx, ny);
+          if (b.bomb || (c && c.v === BRICK)) { hitCell(nx, ny, b.bomb, b.owner); b.life = 0; break; }
+          if (b.bounced) { burst(b.x, b.y, '#ffffff', 3); b.life = 0; break; }
+          b.bounced = true;
+          const hx = solidAt(nx, b.y), hy = solidAt(b.x, ny);
+          if (hx) b.vx = -b.vx;
+          if (hy) b.vy = -b.vy;
+          if (!hx && !hy) { b.vx = -b.vx; b.vy = -b.vy; }
+          sfx(700, 0.03, 'sine', 0.03);
+          continue;
+        }
+        b.x = nx; b.y = ny;
+        for (const tk of game.tanks) {
+          if (!tk.alive) continue;
+          if (tk.i === b.owner && !b.bounced && b.age < 0.6) continue;
+          if (Math.hypot(tk.x - b.x, tk.y - b.y) < TANK_R + BULLET_R) {
+            b.life = 0;
+            if (b.bomb) explode(b.x, b.y, b.owner); else damage(tk, b.owner);
+            break;
+          }
+        }
+      }
+    }
+    game.bullets = game.bullets.filter(b => b.life > 0);
+  }
+
+  function spawnPickup() {
+    if (game.pickups.length >= 2) return;
+    const free = [];
+    for (let y = 0; y < game.rows; y++) for (let x = 0; x < game.cols; x++) {
+      if (game.grid[y][x].v !== EMPTY) continue;
+      const px = (x + 0.5) * T, py = (y + 0.5) * T;
+      if (game.tanks.every(tk => Math.hypot(tk.x - px, tk.y - py) > 3 * T) && !game.pickups.some(p => p.x === px && p.y === py)) free.push({ x: px, y: py });
+    }
+    if (!free.length) return;
+    const spot = free[Math.floor(Math.random() * free.length)];
+    let type = PU_TYPES[Math.floor(Math.random() * PU_TYPES.length)];
+    if (type === 'repair' && game.tanks.every(tk => tk.hp >= MAX_HP)) type = 'shield';
+    game.pickups.push({ ...spot, type, life: PU_LIFE });
+  }
+
+  function takePickup(tk, p) {
+    if (p.type === 'repair') tk.hp = Math.min(MAX_HP, tk.hp + 1);
+    else if (p.type === 'bomb') tk.bombs = 3;
+    else { tk.power = p.type; tk.powerT = PU_TIME; if (p.type === 'shield') tk.shield = 1; }
+    burst(p.x, p.y, '#ffffff', 10);
+    sfx(880, 0.12, 'triangle', 0.05);
+    announce(t.picked(names()[tk.i], t.pu[p.type]));
+    updateHud();
+  }
+
+  function step(dt) {
+    game.dt = dt;
+    if (game.shake > 0) game.shake = Math.max(0, game.shake - dt);
+    for (const p of game.particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; }
+    game.particles = game.particles.filter(p => p.life > 0);
+    if (game.state === 'countdown') {
+      game.timer -= dt;
+      if (game.timer <= 0.5 && $('banner-text').textContent !== t.fight) showBanner(t.fight);
+      if (game.timer <= 0) { game.state = 'play'; hideBanner(); }
+      return;
+    }
+    if (game.state === 'roundEnd') {
+      game.timer -= dt;
+      updateBullets(dt);
+      if (game.timer <= 0) nextRoundOrEnd();
+      return;
+    }
+    if (game.state !== 'play') return;
+    for (const tk of game.tanks) {
+      if (!tk.alive) continue;
+      tk.cool -= dt; tk.flash = Math.max(0, tk.flash - dt);
+      if (tk.power) { tk.powerT -= dt; if (tk.powerT <= 0) { if (tk.power === 'shield') tk.shield = 0; tk.power = null; updateHud(); } }
+      const c = controlFor(tk.i);
+      steer(tk, c, dt);
+      if (c.fire && tk.cool <= 0) fire(tk);
+    }
+    // Tanks push each other apart.
+    const [a, b] = game.tanks;
+    if (a.alive && b.alive) {
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+      if (d < TANK_R * 2) { const push = (TANK_R * 2 - d) / 2; a.x -= dx / d * push; a.y -= dy / d * push; b.x += dx / d * push; b.y += dy / d * push; collideCircle(a, TANK_R); collideCircle(b, TANK_R); }
+    }
+    updateBullets(dt);
+    game.puTimer -= dt;
+    if (game.puTimer <= 0) { game.puTimer = PU_EVERY; spawnPickup(); }
+    for (const p of game.pickups) {
+      p.life -= dt;
+      for (const tk of game.tanks) if (tk.alive && p.life > 0 && Math.hypot(tk.x - p.x, tk.y - p.y) < TANK_R + 10) { takePickup(tk, p); p.life = 0; }
+    }
+    game.pickups = game.pickups.filter(p => p.life > 0);
+    const alive = game.tanks.filter(tk => tk.alive);
+    if (alive.length < 2) endRound(alive.length === 1 ? alive[0].i : -1);
+    if (game.state === 'play' || game.state === 'roundEnd') updatePowerLabels();
+  }
+
+  // ---------- Round & match flow ----------
+  function startMatch() {
+    game = newGame();
+    write('settings', settings);
+    for (const id of ['setup', 'result', 'pause']) $(id).hidden = true;
+    game.mapIndex = settings.map >= 0 ? settings.map : Math.floor(Math.random() * MAP_COUNT);
+    placePads();
+    startRound();
+    canvas.focus({ preventScroll: true });
+  }
+  function startRound() {
+    game.round++;
+    buildRound();
+    game.state = 'countdown'; game.timer = 1.6;
+    showBanner(t.round(game.round));
+    announce(t.round(game.round));
+    updateHud();
+  }
+  function endRound(winner) {
+    game.state = 'roundEnd'; game.timer = 2; game.roundWinner = winner;
+    if (winner >= 0) game.wins[winner]++;
+    const msg = winner >= 0 ? t.roundWin(names()[winner]) : t.roundDraw;
+    showBanner(msg); announce(msg); updateHud();
+  }
+  function nextRoundOrEnd() {
+    hideBanner();
+    if (game.wins[0] >= game.need || game.wins[1] >= game.need) return endMatch(game.wins[0] >= game.need ? 0 : 1);
+    game.mapIndex = settings.map >= 0 ? (game.mapIndex + 1) % MAP_COUNT : Math.floor(Math.random() * MAP_COUNT);
+    startRound();
+  }
+  function endMatch(winner) {
+    game.state = 'over';
+    let title;
+    if (game.mode === 'cpu') {
+      title = winner === 0 ? t.winYou : t.winCpu;
+      if (!autopilot[0]) {
+        stats[game.level][winner === 0 ? 'w' : 'l']++;
+        write('stats', stats);
+      }
+      $('result-record').textContent = t.record(stats[game.level].w, stats[game.level].l);
+    } else { title = winner === 0 ? t.winP1 : t.winP2; $('result-record').textContent = ''; }
+    $('result-title').textContent = title;
+    const [b0, b1] = $('final').querySelectorAll('b');
+    b0.textContent = game.wins[0]; b1.textContent = game.wins[1];
+    $('result').hidden = false;
+    announce(title);
+    sfx(winner === 0 || game.mode === 'pvp' ? 520 : 200, 0.4, 'triangle', 0.06);
+    setTimeout(() => $('rematch').focus({ preventScroll: true }), 50);
+  }
+  function openSetup() {
+    game.state = 'menu';
+    hideBanner();
+    for (const id of ['result', 'pause']) $(id).hidden = true;
+    $('setup').hidden = false;
+    refreshSetup();
+    $('start').focus({ preventScroll: true });
+  }
+  function pause() {
+    if (game.state !== 'play' && game.state !== 'countdown' && game.state !== 'roundEnd') return;
+    game.paused = game.state; game.state = 'paused';
+    $('pause-hint').textContent = game.mode === 'cpu' ? controlsText() : t.controls2p;
+    $('pause').hidden = false;
+    $('resume').focus({ preventScroll: true });
+  }
+  function resume() {
+    if (game.state !== 'paused') return;
+    game.state = game.paused; $('pause').hidden = true;
+    keys.clear();
+    canvas.focus({ preventScroll: true });
+  }
+
+  // ---------- HUD ----------
+  function updateHud() {
+    const n = names();
+    for (const i of [0, 1]) {
+      $(`name-${i}`).textContent = n[i];
+      $(`wins-${i}`).textContent = String(game.wins[i]);
+      const tk = game.tanks[i];
+      const hp = tk ? tk.hp : MAX_HP;
+      const el = $(`hp-${i}`);
+      if (el.children.length !== MAX_HP) el.innerHTML = '<i></i>'.repeat(MAX_HP);
+      [...el.children].forEach((c, k) => c.classList.toggle('on', k < hp));
+      el.setAttribute('aria-label', `${hp}/${MAX_HP}`);
+    }
+    updatePowerLabels();
+  }
+  function updatePowerLabels() {
+    for (const i of [0, 1]) {
+      const tk = game.tanks[i];
+      let txt = '';
+      if (tk && tk.alive) {
+        const parts = [];
+        if (tk.power) parts.push(`${t.pu[tk.power]} ${Math.ceil(tk.powerT)}`);
+        if (tk.bombs) parts.push(`${t.pu.bomb} ×${tk.bombs}`);
+        txt = parts.join(' · ');
+      }
+      const el = $(`pu-${i}`);
+      if (el.textContent !== txt) el.textContent = txt;
+    }
+  }
+  function showBanner(text) { $('banner-text').textContent = text; $('banner').hidden = false; }
+  function hideBanner() { $('banner').hidden = true; }
+  function announce(text) { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = text; }, 30); }
+
+  // ---------- Sound ----------
+  let audio = null;
+  function sfx(freq, dur, type, vol) {
+    if (!settings.sound) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const o = audio.createOscillator(), g = audio.createGain(), now = audio.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, now); o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * 0.5), now + dur);
+      g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      o.connect(g).connect(audio.destination); o.start(now); o.stop(now + dur + 0.02);
+    } catch {}
+  }
+  function refreshSound() { $('sound').textContent = settings.sound ? '♪' : '×'; $('sound').setAttribute('aria-pressed', String(settings.sound)); }
+
+  // ---------- Rendering ----------
+  function resize() {
+    const stage = $('stage').getBoundingClientRect();
+    const wasPortrait = portrait;
+    // Pick whichever orientation of the arena gives the bigger tiles.
+    portrait = Math.min(stage.width / (ROWS * T), stage.height / (COLS * T)) > Math.min(stage.width / (COLS * T), stage.height / (ROWS * T)) * 1.04;
+    if (game.state === 'menu' && wasPortrait !== portrait) placePads();
+    const cols = game.grid ? game.cols : (portrait ? ROWS : COLS), rows = game.grid ? game.rows : (portrait ? COLS : ROWS);
+    const W = cols * T, H = rows * T;
+    scale = Math.max(0.1, Math.min(stage.width / W, stage.height / H));
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = `${Math.floor(W * scale)}px`;
+    canvas.style.height = `${Math.floor(H * scale)}px`;
+    canvas.width = floorCanvas.width = Math.round(W * scale * dpr);
+    canvas.height = floorCanvas.height = Math.round(H * scale * dpr);
+    drawFloor();
+    draw();
+  }
+
+  function drawFloor() {
+    const f = floorCanvas.getContext('2d');
+    const th = game.theme || THEMES[0];
+    f.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    const cols = canvas.width / (scale * dpr) / T, rows = canvas.height / (scale * dpr) / T;
+    f.fillStyle = th.floor; f.fillRect(0, 0, cols * T, rows * T);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if ((x + y) % 2) { f.fillStyle = th.floor2; f.fillRect(x * T, y * T, T, T); }
+    const r = rng(42);
+    f.fillStyle = '#00000014';
+    for (let k = 0; k < cols * rows / 2; k++) { f.beginPath(); f.arc(r() * cols * T, r() * rows * T, 1 + r() * 3, 0, Math.PI * 2); f.fill(); }
+  }
+
+  function drawWall(c, x, y, th) {
+    const px = x * T, py = y * T;
+    if (c.v === STEEL) {
+      ctx.fillStyle = th.steel; ctx.fillRect(px, py, T, T);
+      ctx.fillStyle = th.steelHi; ctx.fillRect(px + 3, py + 3, T - 6, T - 6);
+      ctx.fillStyle = th.steel; ctx.fillRect(px + 7, py + 7, T - 14, T - 14);
+      ctx.fillStyle = '#ffffff55';
+      for (const [ox, oy] of [[5, 5], [T - 7, 5], [5, T - 7], [T - 7, T - 7]]) ctx.fillRect(px + ox, py + oy, 2, 2);
+    } else {
+      ctx.fillStyle = th.brick; ctx.fillRect(px, py, T, T);
+      ctx.fillStyle = th.brickHi;
+      for (let row = 0; row < 4; row++) {
+        const off = row % 2 ? 8 : 0;
+        for (let k = -1; k < 2; k++) {
+          const bx = px + off + k * 16 + 1, w = 14;
+          const x0 = Math.max(bx, px), x1 = Math.min(bx + w, px + T);
+          if (x1 > x0) ctx.fillRect(x0, py + row * 8 + 1, x1 - x0, 6);
+        }
+      }
+      if (c.hp < BRICK_HP) { ctx.strokeStyle = '#000a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px + 6, py + 4); ctx.lineTo(px + 15, py + 15); ctx.lineTo(px + 11, py + 22); ctx.lineTo(px + 22, py + 29); ctx.moveTo(px + 15, py + 15); ctx.lineTo(px + 26, py + 10); ctx.stroke(); }
+    }
+  }
+
+  function drawTank(tk) {
+    ctx.save();
+    ctx.translate(tk.x, tk.y);
+    ctx.rotate(tk.a);
+    ctx.fillStyle = '#0005'; ctx.fillRect(-12, -10, 26, 22);
+    ctx.fillStyle = DARK[tk.i];
+    ctx.fillRect(-13, -12, 26, 6); ctx.fillRect(-13, 6, 26, 6);
+    ctx.fillStyle = '#0004';
+    for (let k = -12; k < 13; k += 5) { ctx.fillRect(k, -12, 2, 6); ctx.fillRect(k, 6, 2, 6); }
+    ctx.fillStyle = tk.flash > 0 && Math.floor(tk.flash * 30) % 2 ? '#ffffff' : COLORS[tk.i];
+    ctx.beginPath(); ctx.roundRect(-11, -8, 22, 16, 4); ctx.fill();
+    ctx.fillStyle = DARK[tk.i];
+    ctx.fillRect(2, -2.5, 15, 5);
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COLORS[tk.i]; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (tk.shield > 0) {
+      ctx.strokeStyle = '#9ef0ffcc'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(tk.x, tk.y, TANK_R + 6 + Math.sin(performance.now() / 120) * 1.2, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  const PU_ICON = { rapid: '»', spread: '⋔', shield: '◯', speed: '➤', repair: '+', bomb: '✹' };
+  const PU_COLOR = { rapid: '#ff7b54', spread: '#c77dff', shield: '#7ee3ff', speed: '#80ed99', repair: '#ff5d8f', bomb: '#ffd166' };
+
+  function draw() {
+    const th = game.theme || THEMES[0];
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(floorCanvas, 0, 0);
+    let sx = 0, sy = 0;
+    if (game.shake > 0 && !reducedMotion.matches) { sx = (Math.random() - 0.5) * game.shake * 14; sy = (Math.random() - 0.5) * game.shake * 14; }
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, sx * scale * dpr, sy * scale * dpr);
+    if (!game.grid) return;
+    for (let y = 0; y < game.rows; y++) for (let x = 0; x < game.cols; x++) { const c = game.grid[y][x]; if (c.v !== EMPTY) drawWall(c, x, y, th); }
+    const now = performance.now();
+    for (const p of game.pickups) {
+      const blink = p.life < 3 && Math.floor(now / 150) % 2;
+      if (blink) continue;
+      const bob = Math.sin(now / 250 + p.x) * 1.5;
+      ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.arc(p.x, p.y + 3, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = PU_COLOR[p.type]; ctx.beginPath(); ctx.arc(p.x, p.y + bob, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#1a1406'; ctx.font = '900 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(PU_ICON[p.type], p.x, p.y + bob + 1);
+    }
+    for (const tk of game.tanks) if (tk.alive) drawTank(tk);
+    for (const b of game.bullets) {
+      ctx.fillStyle = b.bomb ? '#ff6b35' : '#1b1b1b';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.bomb ? 4.5 : BULLET_R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = COLORS[b.owner]; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    for (const p of game.particles) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color; ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPreview() {
+    const pc = $('preview'), p = pc.getContext('2d');
+    const idx = settings.map;
+    p.clearRect(0, 0, pc.width, pc.height);
+    if (idx < 0) {
+      p.fillStyle = '#2a2f3a'; p.fillRect(0, 0, pc.width, pc.height);
+      p.fillStyle = '#ffb627'; p.font = '900 54px system-ui, sans-serif'; p.textAlign = 'center'; p.textBaseline = 'middle';
+      p.fillText('?', pc.width / 2, pc.height / 2 + 3);
+      $('map-name').textContent = t.random;
+      return;
+    }
+    const th = THEMES[themeOf(idx)], s = pc.width / COLS;
+    p.fillStyle = th.floor; p.fillRect(0, 0, pc.width, pc.height);
+    MAPS[idx].forEach((row, y) => row.forEach((v, x) => { if (v) { p.fillStyle = v === STEEL ? th.steelHi : th.brick; p.fillRect(x * s, y * s, s, s); } }));
+    SPAWNS.forEach((sp, i) => { p.fillStyle = COLORS[i]; p.beginPath(); p.arc((sp.x + 0.5) * s, (sp.y + 0.5) * s, s * 0.6, 0, Math.PI * 2); p.fill(); });
+    $('map-name').textContent = t.mapName(idx + 1, t.themes[themeOf(idx)]);
+  }
+
+  // ---------- Touch pads ----------
+  const isTouch = () => document.body.classList.contains('touch');
+  function makeStick(i) {
+    const el = document.createElement('div');
+    el.className = 'stick'; el.setAttribute('role', 'application'); el.setAttribute('aria-label', `${t.stick} (${names()[i]})`);
+    el.innerHTML = '<b></b>';
+    const knob = el.firstChild, tc = touchCtl[i];
+    const update = e => {
+      const r = el.getBoundingClientRect();
+      let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+      const max = r.width * 0.42, d = Math.hypot(dx, dy);
+      if (d > max) { dx *= max / d; dy *= max / d; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // The top pad is rotated 180° on portrait 2-player screens, so its directions flip back into arena space.
+      const flip = el.closest('.flip') && !matchMedia('(min-aspect-ratio: 1/1)').matches ? -1 : 1;
+      tc.angle = Math.atan2(dy * flip, dx * flip); tc.mag = Math.min(1, d / max);
+    };
+    el.addEventListener('pointerdown', e => { e.preventDefault(); tc.id = e.pointerId; try { el.setPointerCapture(e.pointerId); } catch {} update(e); });
+    el.addEventListener('pointermove', e => { if (tc.id === e.pointerId) update(e); });
+    const end = e => { if (tc.id !== e.pointerId) return; tc.id = null; tc.mag = 0; knob.style.transform = ''; };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    return el;
+  }
+  function makeFire(i) {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = `fire p${i + 1}`; el.textContent = t.fire;
+    el.setAttribute('aria-label', `${t.fire} (${names()[i]})`);
+    const tc = touchCtl[i];
+    el.addEventListener('pointerdown', e => { e.preventDefault(); tc.fire = true; el.classList.add('on'); try { el.setPointerCapture(e.pointerId); } catch {} });
+    const up = () => { tc.fire = false; el.classList.remove('on'); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    return el;
+  }
+  // Pads go next to each player: in 1-player landscape the fire button sits in the right column for the right thumb.
+  function placePads() {
+    const p0 = $('pads-0'), p1 = $('pads-1');
+    p0.replaceChildren(); p1.replaceChildren();
+    touchCtl.forEach(tc => { tc.mag = 0; tc.fire = false; tc.id = null; });
+    const wide = matchMedia('(min-aspect-ratio: 1/1)').matches;
+    $('side-1').classList.toggle('flip', settings.mode === 'pvp');
+    if (settings.mode === 'pvp') {
+      p0.append(makeStick(0), makeFire(0));
+      p1.append(makeStick(1), makeFire(1));
+    } else if (wide) {
+      p0.append(makeStick(0));
+      p1.append(makeFire(0));
+    } else {
+      p0.append(makeStick(0), makeFire(0));
+    }
+  }
+
+  // ---------- Setup panel ----------
+  function controlsText() { return isTouch() ? t.controlsTouch : t.controlsCpu; }
+  function refreshSetup() {
+    for (const group of document.querySelectorAll('.seg[data-key]')) {
+      for (const b of group.querySelectorAll('button')) b.setAttribute('aria-pressed', String(String(settings[group.dataset.key]) === b.dataset.value));
+    }
+    $('level-field').hidden = settings.mode !== 'cpu';
+    $('hint').textContent = settings.mode === 'cpu' ? controlsText() : t.controls2p;
+    $('record').textContent = settings.mode === 'cpu' ? t.record(stats[settings.level].w, stats[settings.level].l) : '';
+    drawPreview();
+    game.mode = settings.mode;
+    updateHud();
+  }
+  for (const group of document.querySelectorAll('.seg[data-key]')) {
+    group.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      settings[group.dataset.key] = b.dataset.value;
+      write('settings', settings);
+      refreshSetup();
+    });
+  }
+  $('map-prev').addEventListener('click', () => { settings.map = settings.map <= -1 ? MAP_COUNT - 1 : settings.map - 1; write('settings', settings); drawPreview(); });
+  $('map-next').addEventListener('click', () => { settings.map = settings.map >= MAP_COUNT - 1 ? -1 : settings.map + 1; write('settings', settings); drawPreview(); });
+  $('start').addEventListener('click', startMatch);
+  $('rematch').addEventListener('click', startMatch);
+  $('change').addEventListener('click', openSetup);
+  $('quit').addEventListener('click', openSetup);
+  $('resume').addEventListener('click', resume);
+  $('menu').addEventListener('click', () => (game.state === 'paused' ? resume() : pause()));
+  $('sound').addEventListener('click', () => { settings.sound = !settings.sound; write('settings', settings); refreshSound(); });
+
+  // ---------- Input ----------
+  addEventListener('keydown', e => {
+    if (e.code === 'Escape') return;
+    if (e.code === 'KeyP' && !e.repeat) { if (game.state === 'paused') resume(); else pause(); e.preventDefault(); return; }
+    const playing = game.state === 'play' || game.state === 'countdown' || game.state === 'roundEnd';
+    if (!playing || !USED.has(e.code)) return;
+    keys.add(e.code);
+    e.preventDefault();
+  });
+  addEventListener('keyup', e => keys.delete(e.code));
+  addEventListener('blur', () => keys.clear());
+  const markTouch = () => {
+    if (isTouch()) return;
+    document.body.classList.add('touch');
+    if (!$('setup').hidden) refreshSetup();
+    resize();
+  };
+  addEventListener('touchstart', markTouch, { passive: true });
+  addEventListener('pointerdown', e => { if (e.pointerType === 'touch') markTouch(); });
+  if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { keys.clear(); pause(); } });
+
+  // ---------- Loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (!document.hidden && game.state !== 'paused') {
+      // Fixed sub-steps keep shells from tunnelling through tiles on slow frames.
+      const n = Math.ceil(dt / (1 / 120));
+      for (let k = 0; k < n; k++) step(dt / n);
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // Test hook: automated browsers only (navigator.webdriver), so players cannot script the game from the console.
+  if (navigator.webdriver) window.__tankDuel = {
+    get state() { return { state: game.state, round: game.round, wins: [...game.wins], need: game.need, map: game.mapIndex, rotated: game.rotated, cols: game.cols, rows: game.rows,
+      tanks: game.tanks.map(tk => ({ x: tk.x, y: tk.y, a: tk.a, hp: tk.hp, alive: tk.alive, power: tk.power, shield: tk.shield, bombs: tk.bombs })),
+      bullets: game.bullets.length, pickups: game.pickups.map(p => ({ ...p })) }; },
+    maps: () => MAPS.map(m => m.map(r => r.join('')).join('\n')),
+    connected: () => MAPS.map(m => connected(m)),
+    toScreen(x, y) { const r = canvas.getBoundingClientRect(); return { x: r.left + x * scale, y: r.top + y * scale }; },
+    autopilot(i, level) { autopilot[i] = level || null; },
+    traceShot: (a, maxBounce) => { const [me, foe] = game.tanks; return traceShot(me.x, me.y, a, foe, me, maxBounce); },
+  };
+
+  refreshSound();
+  new ResizeObserver(resize).observe($('stage'));
+  addEventListener('resize', () => { if (game.state !== 'menu') placePadsIfOrientationChanged(); });
+  let lastWide = matchMedia('(min-aspect-ratio: 1/1)').matches;
+  function placePadsIfOrientationChanged() {
+    const wide = matchMedia('(min-aspect-ratio: 1/1)').matches;
+    if (wide !== lastWide) { lastWide = wide; placePads(); }
+  }
+  placePads();
+  refreshSetup();
+  resize();
+  $('start').focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

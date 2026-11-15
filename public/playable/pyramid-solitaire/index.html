@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pyramid Solitaire</title>
+<style>
+:root {
+  --night: #142a52;
+  --night-hi: #24467f;
+  --night-dark: #08142c;
+  --text: #fbf5e6;
+  --muted: #b9c6e4;
+  --gold: #f4c34f;
+  --gold-dark: #b8861c;
+  --sand: #ead7a8;
+  --coral: #ef6f4f;
+  --coral-dark: #a8402a;
+  --mint: #74e3c4;
+  --red: #d8323f;
+  --black: #1b2238;
+  --paper: #fffcf4;
+  --chip: #00000036;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--night);
+  background-image: radial-gradient(#ffffff14 1px, transparent 1.6px), radial-gradient(120% 90% at 50% 0%, var(--night-hi), var(--night) 50%, var(--night-dark));
+  background-size: 23px 19px, 100% 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+.sr { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app {
+  height: 100%; max-width: 720px; margin: auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "hud" "table" "tools";
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+.top { grid-area: top; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { flex: 0 0 auto; width: 38px; height: 38px; }
+.title { flex: 1; min-width: 0; }
+h1 { font-size: clamp(19px, 6vw, 27px); font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+h1 span { color: var(--gold); }
+.sub { margin-top: 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub b { color: var(--gold); }
+.hud { grid-area: hud; display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 4px 4px 5px; border-radius: 12px; background: var(--chip); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+
+.table { grid-area: table; min-height: 0; min-width: 0; position: relative; isolation: isolate; touch-action: manipulation; }
+.slot, .card { position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); border-radius: var(--r); }
+.slot { display: grid; place-items: center; background: #0000002e; box-shadow: inset 0 0 0 1.5px #f4c34f40; color: #f4c34f88; font-size: calc(var(--cw) * .36); font-weight: 900; }
+.slot.stock { cursor: pointer; }
+.slot small { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: 11px; line-height: 14px; color: var(--muted); font-weight: 800; white-space: nowrap; }
+.card { padding: 0; background: var(--paper); color: var(--black); box-shadow: 0 1px 2px #00000080, 0 0 0 .5px #00000030; transition: transform .25s cubic-bezier(.25, .8, .35, 1), opacity .25s, box-shadow .15s; will-change: transform; overflow: hidden; cursor: default; }
+.card.red { color: var(--red); }
+.card.live { cursor: pointer; }
+.idx { position: absolute; left: 7%; top: 2%; display: flex; flex-direction: column; align-items: center; font-size: calc(var(--cw) * .36); font-weight: 900; line-height: 1.02; letter-spacing: -.06em; }
+.idx svg { width: calc(var(--cw) * .26); height: calc(var(--cw) * .26); }
+.big { position: absolute; right: 8%; bottom: 7%; width: 52%; height: auto; }
+.face .big { width: 40%; right: 6%; bottom: 5%; }
+.face .letter { position: absolute; left: 30%; top: 22%; font-family: Georgia, "Times New Roman", serif; font-size: calc(var(--cw) * .62); font-weight: 700; line-height: 1; }
+.back { position: absolute; inset: 0; display: none; border-radius: inherit; background: repeating-linear-gradient(45deg, #ef6f4f 0 3px, #d65a3c 3px 6px); box-shadow: inset 0 0 0 calc(var(--cw) * .06) #fffcf4; }
+.back::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46%; aspect-ratio: 1; translate: -50% -50%; background: var(--gold); clip-path: polygon(50% 8%, 96% 88%, 4% 88%); opacity: .9; }
+.card.down .back { display: block; }
+.card.sel { box-shadow: 0 0 0 3px var(--gold), 0 8px 18px #000a; }
+.card.hint, .slot.hint { box-shadow: 0 0 0 3px var(--mint), 0 0 18px var(--mint); }
+.card.gone { opacity: 0; pointer-events: none; }
+.card.shake { animation: shake .3s; }
+@keyframes shake { 20%, 60% { translate: -4px 0; } 40%, 80% { translate: 4px 0; } }
+.table.instant .card { transition: none; }
+.toast { position: absolute; left: 50%; top: 4px; z-index: 3100; translate: -50% 0; max-width: 92%; padding: 7px 14px; border-radius: 99px; background: #000000c0; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+.toast.big { color: var(--gold); font-size: 15px; }
+
+.tools { grid-area: tools; display: flex; gap: 6px; }
+.tool { flex: 1; min-width: 0; min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 5px 4px 6px; border-radius: 12px; background: var(--chip); font-size: 11.5px; font-weight: 800; }
+.tool > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool .icon { font-size: 18px; line-height: 1.15; }
+.tool:disabled { opacity: .4; cursor: default; }
+.tool:active:not(:disabled) { transform: translateY(2px); }
+.tool.hint-btn { background: #74e3c422; box-shadow: inset 0 0 0 1.5px #74e3c455; }
+
+.stats-card { grid-area: stats; display: none; padding: 10px 12px; border-radius: 14px; background: var(--chip); align-self: start; }
+.stats-card h2 { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.stats-card dl, .panel dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin-top: 6px; font-size: 13px; }
+.stats-card dt, .panel dt { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.stats-card dt { color: var(--muted); }
+.stats-card dd, .panel dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+
+.confetti { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px; animation: fall 2.4s ease-in forwards; }
+@keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #050c1cb8; }
+.overlay[hidden], .panel[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 16px); overflow: auto; background: #fffaf0; color: #1f2a44; border-radius: 26px; padding: 20px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--coral); }
+.panel p { margin-top: 8px; color: #4f5a75; font-size: 15px; line-height: 1.45; }
+.panel .emoji { font-size: 42px; line-height: 1.1; margin-bottom: 4px; }
+.panel .head-logo { width: 52px; height: 52px; margin: 0 auto 4px; display: block; }
+.panel .pick { margin-top: 12px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8590aa; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.choice { min-width: 0; padding: 10px 6px; border-radius: 18px; background: #e9edf7; color: #1f2a44; font-size: 17px; font-weight: 900; line-height: 1.15; box-shadow: 0 4px 0 #c5cde0; overflow-wrap: anywhere; }
+.choice small { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #5d6884; }
+.choice .ic { display: block; font-size: 22px; line-height: 1.2; }
+.choice[aria-pressed="true"] { background: var(--night); color: #fff; box-shadow: 0 4px 0 var(--night-dark), inset 0 0 0 2px var(--gold); }
+.choice[aria-pressed="true"] small { color: var(--sand); }
+.rules { margin-top: 8px; font-size: 13px !important; line-height: 1.4 !important; }
+.opts { display: grid; gap: 6px; margin-top: 12px; text-align: left; }
+.opt { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 4px 6px 4px 12px; border-radius: 14px; background: #eef1f8; font-size: 14px; font-weight: 800; }
+.opt > span { flex: 1; min-width: 0; }
+.seg { display: flex; gap: 3px; }
+.seg button { min-width: 34px; height: 30px; padding: 0 8px; border-radius: 10px; background: #fff; font-weight: 900; box-shadow: inset 0 0 0 1.5px #d3d9e8; }
+.seg button[aria-pressed="true"] { background: var(--night); color: #fff; box-shadow: none; }
+.tog { width: 48px; height: 28px; border-radius: 99px; background: #c9d0e0; position: relative; flex: 0 0 auto; }
+.tog::after { content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px #0004; }
+.tog[aria-checked="true"] { background: #2fae8c; }
+.tog[aria-checked="true"]::after { transform: translateX(20px); }
+.actions { display: grid; gap: 8px; margin-top: 14px; }
+.actions.two { grid-template-columns: 1fr 1fr; }
+.cta { width: 100%; padding: 13px; border-radius: 18px; background: var(--coral); color: #fff; font-size: 17px; font-weight: 800; box-shadow: 0 5px 0 var(--coral-dark); }
+.cta.gold { background: var(--gold); color: #3a2a05; box-shadow: 0 5px 0 var(--gold-dark); }
+.cta:active, .choice:active { transform: translateY(3px); }
+.cta:disabled { opacity: .55; cursor: default; }
+.ghost { width: 100%; padding: 10px; border-radius: 16px; background: #e9edf7; color: #1f2a44; font-size: 15px; font-weight: 800; }
+.panel dl { font-size: 15px; gap: 6px 12px; margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: #eef1f8; }
+.panel dt { color: #4f5a75; }
+.tabs { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+
+@media (max-width: 360px) {
+  .logo { width: 32px; height: 32px; }
+  .stat strong { font-size: 15px; }
+  .stat small { letter-spacing: 0; }
+  .tool { font-size: 10.5px; }
+  .panel { padding: 16px 13px; }
+  .opt { font-size: 13px; }
+}
+@media (max-height: 600px) {
+  .overlay { padding: 8px; }
+  .panel { padding: 14px 16px; border-radius: 22px; }
+  .panel h2 { font-size: 22px; }
+  .panel p { margin-top: 6px; font-size: 14px; line-height: 1.35; }
+  .panel .emoji { font-size: 32px; }
+  .panel .head-logo { display: none; }
+  .choice { padding: 7px 6px; font-size: 16px; }
+  .choice .ic { font-size: 18px; }
+  .opts { margin-top: 8px; gap: 5px; }
+  .opt { min-height: 34px; }
+  .actions { margin-top: 10px; }
+  .cta { padding: 10px; }
+  .ghost { padding: 8px; }
+}
+
+/* Wide frames: the table fills the height, title, HUD, tools and stats move to a side column */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: none; --side: clamp(190px, 21vw, 290px); grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: auto auto auto auto minmax(0, 1fr); grid-template-areas: "table top" "table hud" "table tools" "table stats" "table ."; column-gap: 16px; row-gap: 10px; }
+  .top { align-items: flex-start; }
+  h1 { white-space: normal; font-size: clamp(20px, 2.2vw, 30px); }
+  .sub { white-space: normal; }
+  .hud { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { padding: 6px 8px 7px; }
+  .stat strong { font-size: 20px; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tool { min-height: 56px; font-size: 13px; }
+  .stats-card { display: block; }
+  .panel.menu { width: min(100%, 620px); }
+  .panel.menu .opts { grid-template-columns: 1fr 1fr; }
+  .panel.menu .opt.wide { grid-column: span 2; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 520px) {
+  .app { --side: clamp(160px, 25vw, 220px); row-gap: 6px; column-gap: 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .logo { width: 30px; height: 30px; }
+  h1 { font-size: 18px; }
+  .sub { font-size: 11px; margin-top: 1px; }
+  .hud { gap: 4px; }
+  .stat { padding: 2px 6px 3px; }
+  .stat strong { font-size: 15px; }
+  .tools { gap: 5px; }
+  .tool { min-height: 36px; flex-direction: row; gap: 4px; font-size: 11.5px; padding: 3px 4px; border-radius: 11px; }
+  .tool .icon { font-size: 15px; }
+  .stats-card { padding: 6px 10px; }
+  .stats-card dl { font-size: 11.5px; gap: 1px 8px; margin-top: 3px; }
+  .stats-card h2 { font-size: 10.5px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 400px) {
+  .stats-card, .logo, .sub { display: none; }
+}
+@media (max-height: 460px) {
+  .panel .rules, .panel .emoji { display: none; }
+  .panel h2 { font-size: 20px; }
+  .choice small { display: none; }
+  .choice .ic { display: inline; font-size: 15px; margin-right: 4px; }
+  .choice { padding: 6px; font-size: 15px; }
+  .cta { padding: 8px; font-size: 15px; }
+  .ghost { padding: 6px; font-size: 14px; }
+  .opt { min-height: 32px; font-size: 13px; }
+  .seg button { height: 26px; }
+  .panel dl { margin-top: 6px; padding: 8px 12px; gap: 2px 10px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="s0" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C9 7 3 9.5 3 14a4.5 4.5 0 0 0 8 2.8L10 22h4l-1-5.2A4.5 4.5 0 0 0 21 14c0-4.5-6-7-9-12z"/></symbol>
+  <symbol id="s1" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-8.5-5.3-8.5-11.2A4.7 4.7 0 0 1 12 7a4.7 4.7 0 0 1 8.5 2.8C20.5 15.7 12 21 12 21z"/></symbol>
+  <symbol id="s2" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l7.5 10L12 22 4.5 12z"/></symbol>
+  <symbol id="s3" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5a4.3 4.3 0 0 0-3.6 6.7A4.3 4.3 0 1 0 10.8 17L10 22h4l-.8-5a4.3 4.3 0 1 0 2.4-7.8A4.3 4.3 0 0 0 12 2.5z"/></symbol>
+  <symbol id="logo" viewBox="0 0 48 48"><path d="M24 5 45 41H3z" fill="#f4c34f"/><path d="M24 5 45 41H24z" fill="#d79e2a"/><path d="M14 30h20M10 36h28M18 23h12" stroke="#8a5d10" stroke-width="2" opacity=".45"/><circle cx="38" cy="10" r="4" fill="#fbf5e6"/></symbol>
+</svg>
+<div class="app">
+  <header class="top">
+    <svg class="logo" aria-hidden="true"><use href="#logo"/></svg>
+    <div class="title">
+      <h1>Pyramid <span>Solitaire</span></h1>
+      <p class="sub" id="sub"></p>
+    </div>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="score"></small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="deal"></small><strong id="dealno">–</strong></div>
+    <div class="stat"><small id="stockLbl" data-i18n="stock"></small><strong id="stockNo">24</strong></div>
+    <div class="stat"><small data-i18n="time"></small><strong id="time">0:00</strong></div>
+  </div>
+  <div class="table" id="table" role="group"><div class="toast" id="toast" aria-hidden="true"></div></div>
+  <div class="tools">
+    <button class="tool" id="undoBtn" type="button"><span class="icon" aria-hidden="true">↶</span><span data-i18n="undo"></span></button>
+    <button class="tool hint-btn" id="hintBtn" type="button"><span class="icon" aria-hidden="true">💡</span><span data-i18n="hint"></span></button>
+    <button class="tool" id="statsBtn" type="button"><span class="icon" aria-hidden="true">📊</span><span data-i18n="stats"></span></button>
+    <button class="tool" id="menuBtn" type="button"><span class="icon" aria-hidden="true">☰</span><span data-i18n="menu"></span></button>
+  </div>
+  <section class="stats-card" aria-labelledby="sideStatsH">
+    <h2 id="sideStatsH"></h2>
+    <dl id="sideStats"></dl>
+  </section>
+</div>
+<div class="confetti" id="confetti" aria-hidden="true"></div>
+<div class="overlay" id="overlay">
+  <div class="panel menu" id="menuPanel" role="dialog" aria-modal="true" aria-labelledby="menuH">
+    <svg class="head-logo" aria-hidden="true"><use href="#logo"/></svg>
+    <h2 id="menuH">Pyramid <span>Solitaire</span></h2>
+    <p class="pick" data-i18n="pick"></p>
+    <div class="choices">
+      <button class="choice" type="button" id="modePyr"><span class="ic" aria-hidden="true">🔺</span><span data-i18n="pyr"></span><small data-i18n="pyrDesc"></small></button>
+      <button class="choice" type="button" id="modeTri"><span class="ic" aria-hidden="true">⛰️</span><span data-i18n="tri"></span><small data-i18n="triDesc"></small></button>
+    </div>
+    <p class="rules" id="rules"></p>
+    <div class="opts">
+      <div class="opt" id="passOpt"><span id="passLbl" data-i18n="optPasses"></span><div class="seg" role="group" aria-labelledby="passLbl" id="passSeg"></div></div>
+      <div class="opt" id="wrapOpt"><span id="wrapLbl" data-i18n="optWrap"></span><button class="tog" type="button" role="switch" id="wrapTog" aria-labelledby="wrapLbl"></button></div>
+      <div class="opt"><span id="winLbl" data-i18n="optWin"></span><button class="tog" type="button" role="switch" id="winTog" aria-labelledby="winLbl"></button></div>
+    </div>
+    <div class="actions">
+      <button class="cta gold" type="button" id="contBtn" hidden data-i18n="cont"></button>
+      <button class="cta" type="button" id="playBtn" data-i18n="play"></button>
+      <button class="ghost" type="button" id="dailyBtn"></button>
+    </div>
+  </div>
+  <div class="panel" id="winPanel" role="dialog" aria-modal="true" aria-labelledby="winH" hidden>
+    <div class="emoji" aria-hidden="true">🏆</div>
+    <h2 id="winH" data-i18n="winT"></h2>
+    <p id="winMsg"></p>
+    <dl id="winStats"></dl>
+    <div class="actions">
+      <button class="cta" type="button" id="nextBtn" data-i18n="next"></button>
+      <div class="actions two" style="margin-top:0">
+        <button class="ghost" type="button" id="replayBtn" data-i18n="replay"></button>
+        <button class="ghost" type="button" id="winMenuBtn" data-i18n="menu"></button>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="overPanel" role="dialog" aria-modal="true" aria-labelledby="overH" hidden>
+    <div class="emoji" aria-hidden="true">🏜️</div>
+    <h2 id="overH" data-i18n="overT"></h2>
+    <p id="overMsg"></p>
+    <div class="actions">
+      <button class="cta" type="button" id="retryBtn" data-i18n="retry"></button>
+      <div class="actions two" style="margin-top:0">
+        <button class="ghost" type="button" id="overNewBtn" data-i18n="next"></button>
+        <button class="ghost" type="button" id="overUndoBtn" data-i18n="undo"></button>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="statsPanel" role="dialog" aria-modal="true" aria-labelledby="statsH" hidden>
+    <h2 id="statsH" data-i18n="statsT"></h2>
+    <div class="tabs seg" role="group" id="statTabs">
+      <button type="button" data-m="pyr" data-i18n="pyr"></button>
+      <button type="button" data-m="tri" data-i18n="tri"></button>
+    </div>
+    <dl id="statsList"></dl>
+    <div class="actions two">
+      <button class="ghost" type="button" id="resetBtn" data-i18n="reset"></button>
+      <button class="cta" type="button" id="closeStats" data-i18n="close"></button>
+    </div>
+  </div>
+</div>
+<div class="sr" id="announcer" aria-live="polite"></div>
+<script>
+(() => {
+  'use strict';
+  // ---- core (pure rules + solvers) ----
+  const Core = (() => {
+    const rankOf = c => (c % 13) + 1;
+    function rng(seed) {
+      let a = seed >>> 0;
+      return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    }
+    function shuffle(seed, salt) {
+      const r = rng(seed * 7919 + salt), d = [];
+      for (let i = 0; i < 52; i++) d.push(i);
+      for (let i = 51; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+      return d;
+    }
+    // Pyramid: index = row*(row+1)/2 + i; card (r,i) is covered by (r+1,i) and (r+1,i+1).
+    const PYR_COVER = [];
+    for (let r = 0; r < 7; r++) for (let i = 0; i <= r; i++) PYR_COVER.push(r === 6 ? [] : [(r + 1) * (r + 2) / 2 + i, (r + 1) * (r + 2) / 2 + i + 1]);
+    // TriPeaks: rows of 3, 6, 9, 10 cards.
+    const TRI_ROW = [0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+    const TRI_COVER = [];
+    for (let p = 0; p < 3; p++) TRI_COVER[p] = [3 + p * 2, 4 + p * 2];
+    for (let p = 0; p < 3; p++) for (let k = 0; k < 2; k++) TRI_COVER[3 + p * 2 + k] = [9 + p * 3 + k, 10 + p * 3 + k];
+    for (let j = 0; j < 9; j++) TRI_COVER[9 + j] = [18 + j, 19 + j];
+    for (let j = 0; j < 10; j++) TRI_COVER[18 + j] = [];
+    const FULL = (1 << 28) - 1;
+    const open = (cover, mask, j) => !(mask >> j & 1) && cover[j].every(k => mask >> k & 1);
+
+    function deal(mode, seed) {
+      const d = shuffle(seed, mode === 'tri' ? 2 : 1);
+      return { table: d.slice(0, 28), stock: d.slice(28) };
+    }
+    // Next undealt, unremoved stock index at or after p (-1 if none).
+    function nextStock(dm, p) { for (let j = p; j < 24; j++) if (!(dm >> j & 1)) return j; return -1; }
+    function wasteTop(dm, sp) { for (let j = sp - 1; j >= 0; j--) if (!(dm >> j & 1)) return j; return -1; }
+
+    // Legal pyramid moves. s = {pm, dm, sp, pass}; passes = total passes allowed (0 = unlimited).
+    function pyrMoves(dl, s, passes) {
+      const out = [], ex = [];
+      for (let j = 0; j < 28; j++) if (open(PYR_COVER, s.pm, j)) ex.push(j);
+      const w = wasteTop(s.dm, s.sp);
+      for (const j of ex) if (rankOf(dl.table[j]) === 13) out.push({ t: 'k', a: j });
+      if (w >= 0 && rankOf(dl.stock[w]) === 13) out.push({ t: 'kw', a: w });
+      for (let x = 0; x < ex.length; x++) for (let y = x + 1; y < ex.length; y++)
+        if (rankOf(dl.table[ex[x]]) + rankOf(dl.table[ex[y]]) === 13) out.push({ t: 'pp', a: ex[x], b: ex[y] });
+      if (w >= 0) for (const j of ex) if (rankOf(dl.table[j]) + rankOf(dl.stock[w]) === 13) out.push({ t: 'pw', a: j, b: w });
+      if (nextStock(s.dm, s.sp) >= 0) out.push({ t: 'draw' });
+      else if (w >= 0 && (passes === 0 || s.pass < passes - 1)) out.push({ t: 'recycle' });
+      return out;
+    }
+    function pyrApply(dl, s, m) {
+      const n = { pm: s.pm, dm: s.dm, sp: s.sp, pass: s.pass };
+      if (m.t === 'k') n.pm |= 1 << m.a;
+      else if (m.t === 'kw') n.dm |= 1 << m.a;
+      else if (m.t === 'pp') n.pm |= (1 << m.a) | (1 << m.b);
+      else if (m.t === 'pw') { n.pm |= 1 << m.a; n.dm |= 1 << m.b; }
+      else if (m.t === 'draw') n.sp = nextStock(s.dm, s.sp) + 1;
+      else if (m.t === 'recycle') { n.sp = 0; n.pass++; }
+      return n;
+    }
+    // Depth-first search with a failure memo. Returns true, false, or null when the budget ran out.
+    function solvePyr(dl, passes, budget, start) {
+      const seen = new Set();
+      let nodes = 0;
+      const key = s => s.pm * 33554432 + s.dm * 32 + s.sp + (passes ? '/' + s.pass : '');
+      function dfs(s) {
+        if (s.pm === FULL) return true;
+        if (++nodes > budget) return null;
+        const k = key(s);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        const ms = pyrMoves(dl, s, passes);
+        // A king can always be removed at once without losing anything.
+        const king = ms.find(m => m.t === 'k' || m.t === 'kw');
+        for (const m of king ? [king] : ms) {
+          const r = dfs(pyrApply(dl, s, m));
+          if (r !== false) return r;
+        }
+        return false;
+      }
+      return dfs(start || { pm: 0, dm: 0, sp: 0, pass: 0 });
+    }
+
+    const triFits = (a, b, wrap) => { const d = Math.abs(rankOf(a) - rankOf(b)); return d === 1 || (wrap && d === 12); };
+    // s = {tm, sp, f} with f = foundation card.
+    function triMoves(dl, s, wrap) {
+      const out = [];
+      for (let j = 0; j < 28; j++) if (open(TRI_COVER, s.tm, j) && triFits(dl.table[j], s.f, wrap)) out.push({ t: 'play', a: j });
+      if (s.sp < 24) out.push({ t: 'draw' });
+      return out;
+    }
+    function triApply(dl, s, m) {
+      if (m.t === 'play') return { tm: s.tm | 1 << m.a, sp: s.sp, f: dl.table[m.a] };
+      return { tm: s.tm, sp: s.sp + 1, f: dl.stock[s.sp] };
+    }
+    function triStart(dl) { return { tm: 0, sp: 1, f: dl.stock[0] }; }
+    function solveTri(dl, wrap, budget) {
+      const seen = new Set();
+      let nodes = 0;
+      function dfs(s) {
+        if (s.tm === FULL) return true;
+        if (++nodes > budget) return null;
+        const k = s.tm * 2048 + s.sp * 64 + s.f;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        for (const m of triMoves(dl, s, wrap)) {
+          const r = dfs(triApply(dl, s, m));
+          if (r !== false) return r;
+        }
+        return false;
+      }
+      return dfs(triStart(dl));
+    }
+    return { rankOf, rng, deal, PYR_COVER, TRI_COVER, TRI_ROW, FULL, open, nextStock, wasteTop, pyrMoves, pyrApply, solvePyr, triFits, triMoves, triApply, triStart, solveTri };
+  })();
+  // ---- end core ----
+
+  const I18N = {
+    en: {
+      subPyr: 'Pair cards that add up to <b>13</b>', subTri: 'Play cards <b>one higher or lower</b>',
+      score: 'Score', deal: 'Deal', stock: 'Stock', pass: 'Pass', time: 'Time', undo: 'Undo', hint: 'Hint', stats: 'Stats', menu: 'Menu',
+      pick: 'Choose a game', pyr: 'Pyramid', tri: 'TriPeaks', pyrDesc: 'Pairs that make 13', triDesc: 'Runs up and down',
+      rulesPyr: 'Remove two uncovered cards that add up to 13 (A = 1, J = 11, Q = 12; a King goes alone). Tap the stock to turn a card. Clear the pyramid to win.',
+      rulesTri: 'Clear all three peaks: play any face-up card one rank above or below the pile card. Turn a stock card when stuck. Long runs score more.',
+      optPasses: 'Passes through the deck', optWrap: 'King and Ace connect', optWin: 'Winnable deals only (solver-checked)',
+      cont: 'Continue game', play: 'New deal', daily: 'Daily deal', dailyDone: 'Daily deal ✓ solved',
+      winT: 'Cleared!', winMsg: (s, t) => `${s} points in ${t}.`, next: 'New deal', replay: 'Replay', overT: 'Out of moves',
+      overMsg: n => `${n} ${n === 1 ? 'card is' : 'cards are'} still on the table. Undo a few moves or try again.`, retry: 'Try again',
+      statsT: 'Statistics', played: 'Played', won: 'Won', rate: 'Win rate', best: 'Best score', streak: 'Win streak', bestStreak: 'Best streak', close: 'Close', reset: 'Reset',
+      not13: 'Those two don’t add up to 13', notRun: 'Play a card one higher or lower', recycled: (n, m) => m ? `Deck turned over — pass ${n} of ${m}` : `Deck turned over — pass ${n}`,
+      drawHint: 'Turn a card from the stock', noMoves: 'No moves left', finding: 'Shuffling a winnable deal…', noFind: 'No winnable deal found — here is a random one',
+      peak: n => `Peak cleared! +${n}`, run: n => `Run of ${n}!`, dealNo: n => `Deal #${n}`, dailyLbl: 'Daily',
+      board: 'Card table. Tab moves between playable cards, Enter or Space plays the focused card, D turns a stock card, H shows a hint, U undoes.',
+      stockAria: n => `Stock, ${n} cards. Turn a card`, emptyStock: 'Stock empty', pileAria: 'Pile', down: 'Face-down card',
+      suits: ['spades', 'hearts', 'diamonds', 'clubs'], cardAria: (r, s) => `${r} of ${s}`,
+      won1: (s) => `You cleared the deal with ${s} points!`, lost1: 'Out of moves.',
+    },
+    vi: {
+      subPyr: 'Ghép hai lá có tổng bằng <b>13</b>', subTri: 'Đánh lá <b>lớn hơn hoặc nhỏ hơn một</b>',
+      score: 'Điểm', deal: 'Ván', stock: 'Nọc', pass: 'Lượt', time: 'Thời gian', undo: 'Hoàn tác', hint: 'Gợi ý', stats: 'Thống kê', menu: 'Menu',
+      pick: 'Chọn kiểu chơi', pyr: 'Kim tự tháp', tri: 'Ba đỉnh', pyrDesc: 'Ghép cặp tổng 13', triDesc: 'Nối lên hoặc xuống',
+      rulesPyr: 'Bỏ hai lá không bị đè có tổng bằng 13 (A = 1, J = 11, Q = 12; K được bỏ một mình). Chạm vào nọc để lật bài. Dọn sạch kim tự tháp là thắng.',
+      rulesTri: 'Dọn cả ba đỉnh: đánh lá ngửa bất kỳ lớn hơn hoặc nhỏ hơn lá trên chồng đúng một bậc. Bí thì lật nọc. Chuỗi càng dài càng nhiều điểm.',
+      optPasses: 'Số lượt chia lại nọc', optWrap: 'K và A nối nhau', optWin: 'Chỉ ván thắng được (máy đã giải thử)',
+      cont: 'Chơi tiếp', play: 'Ván mới', daily: 'Ván hằng ngày', dailyDone: 'Ván hằng ngày ✓ đã thắng',
+      winT: 'Dọn sạch!', winMsg: (s, t) => `${s} điểm trong ${t}.`, next: 'Ván mới', replay: 'Chơi lại', overT: 'Hết nước đi',
+      overMsg: n => `Còn ${n} lá trên bàn. Hãy hoàn tác vài bước hoặc chơi lại.`, retry: 'Chơi lại',
+      statsT: 'Thống kê', played: 'Đã chơi', won: 'Thắng', rate: 'Tỉ lệ thắng', best: 'Điểm cao nhất', streak: 'Chuỗi thắng', bestStreak: 'Chuỗi dài nhất', close: 'Đóng', reset: 'Đặt lại',
+      not13: 'Hai lá này không có tổng 13', notRun: 'Hãy đánh lá lớn hơn hoặc nhỏ hơn một', recycled: (n, m) => m ? `Đã chia lại nọc — lượt ${n}/${m}` : `Đã chia lại nọc — lượt ${n}`,
+      drawHint: 'Lật một lá từ nọc', noMoves: 'Hết nước đi', finding: 'Đang xào một ván thắng được…', noFind: 'Không tìm được ván chắc thắng — chơi ván ngẫu nhiên nhé',
+      peak: n => `Dọn xong một đỉnh! +${n}`, run: n => `Chuỗi ${n} lá!`, dealNo: n => `Ván #${n}`, dailyLbl: 'Hằng ngày',
+      board: 'Bàn bài. Tab để chuyển giữa các lá chơi được, Enter hoặc Space để đánh lá đang chọn, D lật nọc, H gợi ý, U hoàn tác.',
+      stockAria: n => `Nọc, còn ${n} lá. Lật một lá`, emptyStock: 'Nọc đã hết', pileAria: 'Chồng bài', down: 'Lá úp',
+      suits: ['bích', 'cơ', 'rô', 'chuồn'], cardAria: (r, s) => `${r} ${s}`,
+      won1: s => `Bạn đã dọn sạch ván với ${s} điểm!`, lost1: 'Hết nước đi.',
+    },
+    zh: {
+      subPyr: '两张牌点数相加等于 <b>13</b> 即可消除', subTri: '打出比牌堆<b>大一或小一</b>的牌',
+      score: '得分', deal: '牌局', stock: '牌库', pass: '轮次', time: '时间', undo: '撤销', hint: '提示', stats: '统计', menu: '菜单',
+      pick: '选择玩法', pyr: '金字塔', tri: '三峰', pyrDesc: '凑成 13 消除', triDesc: '顺着大小连打',
+      rulesPyr: '消除两张未被压住、点数和为 13 的牌（A=1，J=11，Q=12，K 可单独消除）。点击牌库翻牌。清空整座金字塔即获胜。',
+      rulesTri: '清空三座山峰：打出任意一张比牌堆顶大一或小一的明牌。无牌可打时翻牌库。连击越长得分越高。',
+      optPasses: '牌库可翻轮数', optWrap: 'K 与 A 相连', optWin: '只发可解牌局（求解器验证）',
+      cont: '继续游戏', play: '新牌局', daily: '每日牌局', dailyDone: '每日牌局 ✓ 已完成',
+      winT: '全部清空！', winMsg: (s, t) => `用时 ${t}，得分 ${s}。`, next: '新牌局', replay: '重玩', overT: '无路可走',
+      overMsg: n => `桌上还剩 ${n} 张牌。撤销几步或者重新开始吧。`, retry: '再试一次',
+      statsT: '统计', played: '已玩', won: '获胜', rate: '胜率', best: '最高分', streak: '连胜', bestStreak: '最长连胜', close: '关闭', reset: '重置',
+      not13: '这两张牌加起来不是 13', notRun: '请打出大一或小一的牌', recycled: (n, m) => m ? `牌库已重洗——第 ${n}/${m} 轮` : `牌库已重洗——第 ${n} 轮`,
+      drawHint: '从牌库翻一张牌', noMoves: '没有可走的牌了', finding: '正在发一局可解的牌…', noFind: '没找到可解牌局，先来一局随机的吧',
+      peak: n => `清空一座山峰！+${n}`, run: n => `${n} 连击！`, dealNo: n => `第 ${n} 局`, dailyLbl: '每日',
+      board: '牌桌。用 Tab 在可操作的牌之间切换，Enter 或空格出牌，D 翻牌库，H 提示，U 撤销。',
+      stockAria: n => `牌库，剩 ${n} 张。翻一张牌`, emptyStock: '牌库已空', pileAria: '牌堆', down: '背面朝上的牌',
+      suits: ['黑桃', '红心', '方块', '梅花'], cardAria: (r, s) => `${s}${r}`,
+      won1: s => `你以 ${s} 分清空了牌局！`, lost1: '无路可走。',
+    },
+    fr: {
+      subPyr: 'Associez deux cartes qui font <b>13</b>', subTri: 'Jouez <b>une carte au-dessus ou en dessous</b>',
+      score: 'Score', deal: 'Donne', stock: 'Talon', pass: 'Tour', time: 'Temps', undo: 'Annuler', hint: 'Indice', stats: 'Stats', menu: 'Menu',
+      pick: 'Choisissez un jeu', pyr: 'Pyramide', tri: 'TriPeaks', pyrDesc: 'Des paires qui font 13', triDesc: 'Suites montantes ou descendantes',
+      rulesPyr: 'Retirez deux cartes libres dont la somme fait 13 (A = 1, J = 11, Q = 12 ; le K part seul). Touchez le talon pour retourner une carte. Videz la pyramide pour gagner.',
+      rulesTri: 'Videz les trois sommets : jouez une carte visible d’un rang au-dessus ou en dessous de la carte de la pile. Retournez le talon si vous êtes bloqué. Les longues suites rapportent plus.',
+      optPasses: 'Tours de talon', optWrap: 'Le Roi et l’As se suivent', optWin: 'Donnes gagnables uniquement (vérifiées)',
+      cont: 'Reprendre la partie', play: 'Nouvelle donne', daily: 'Donne du jour', dailyDone: 'Donne du jour ✓ réussie',
+      winT: 'Tout est dégagé !', winMsg: (s, t) => `${s} points en ${t}.`, next: 'Nouvelle donne', replay: 'Rejouer', overT: 'Plus de coups',
+      overMsg: n => `Il reste ${n} carte${n > 1 ? 's' : ''} sur la table. Annulez quelques coups ou réessayez.`, retry: 'Réessayer',
+      statsT: 'Statistiques', played: 'Parties', won: 'Victoires', rate: 'Réussite', best: 'Meilleur score', streak: 'Série en cours', bestStreak: 'Meilleure série', close: 'Fermer', reset: 'Effacer',
+      not13: 'Ces deux cartes ne font pas 13', notRun: 'Jouez une carte juste au-dessus ou en dessous', recycled: (n, m) => m ? `Talon retourné — tour ${n} sur ${m}` : `Talon retourné — tour ${n}`,
+      drawHint: 'Retournez une carte du talon', noMoves: 'Plus aucun coup possible', finding: 'Mélange d’une donne gagnable…', noFind: 'Aucune donne gagnable trouvée — voici une donne au hasard',
+      peak: n => `Sommet dégagé ! +${n}`, run: n => `Suite de ${n} !`, dealNo: n => `Donne n° ${n}`, dailyLbl: 'Du jour',
+      board: 'Table de jeu. Tab passe d’une carte jouable à l’autre, Entrée ou Espace joue la carte, D retourne le talon, H donne un indice, U annule.',
+      stockAria: n => `Talon, ${n} cartes. Retourner une carte`, emptyStock: 'Talon vide', pileAria: 'Pile', down: 'Carte face cachée',
+      suits: ['pique', 'cœur', 'carreau', 'trèfle'], cardAria: (r, s) => `${r} de ${s}`,
+      won1: s => `Donne réussie avec ${s} points !`, lost1: 'Plus de coups.',
+    },
+    th: {
+      subPyr: 'จับคู่ไพ่สองใบที่รวมกันได้ <b>13</b>', subTri: 'ลงไพ่ที่ <b>สูงหรือต่ำกว่าหนึ่งแต้ม</b>',
+      score: 'คะแนน', deal: 'เกม', stock: 'กองจั่ว', pass: 'รอบ', time: 'เวลา', undo: 'ย้อนกลับ', hint: 'คำใบ้', stats: 'สถิติ', menu: 'เมนู',
+      pick: 'เลือกเกม', pyr: 'พีระมิด', tri: 'สามยอดเขา', pyrDesc: 'จับคู่ให้ได้ 13', triDesc: 'ไล่ขึ้นหรือลงทีละแต้ม',
+      rulesPyr: 'นำไพ่สองใบที่ไม่ถูกทับและรวมกันได้ 13 ออก (A = 1, J = 11, Q = 12 ส่วน K ออกได้ใบเดียว) แตะกองจั่วเพื่อเปิดไพ่ เคลียร์พีระมิดให้หมดเพื่อชนะ',
+      rulesTri: 'เคลียร์ทั้งสามยอด: ลงไพ่หงายใบใดก็ได้ที่สูงหรือต่ำกว่าไพ่บนกองหนึ่งแต้ม ถ้าไม่มีให้ลงก็เปิดกองจั่ว ยิ่งต่อยาวยิ่งได้คะแนนมาก',
+      optPasses: 'จำนวนรอบกองจั่ว', optWrap: 'K กับ A ต่อกันได้', optWin: 'เฉพาะเกมที่ชนะได้ (ตรวจแล้ว)',
+      cont: 'เล่นต่อ', play: 'เกมใหม่', daily: 'เกมประจำวัน', dailyDone: 'เกมประจำวัน ✓ ผ่านแล้ว',
+      winT: 'เคลียร์หมดแล้ว!', winMsg: (s, t) => `${s} คะแนน ในเวลา ${t}`, next: 'เกมใหม่', replay: 'เล่นซ้ำ', overT: 'ไม่มีตาเดินแล้ว',
+      overMsg: n => `ยังเหลือไพ่บนโต๊ะ ${n} ใบ ลองย้อนกลับสักสองสามตาหรือเริ่มใหม่`, retry: 'ลองอีกครั้ง',
+      statsT: 'สถิติ', played: 'เล่นแล้ว', won: 'ชนะ', rate: 'อัตราชนะ', best: 'คะแนนสูงสุด', streak: 'ชนะติดกัน', bestStreak: 'ติดกันสูงสุด', close: 'ปิด', reset: 'รีเซ็ต',
+      not13: 'สองใบนี้รวมกันไม่ได้ 13', notRun: 'ลงไพ่ที่สูงหรือต่ำกว่าหนึ่งแต้ม', recycled: (n, m) => m ? `วนกองจั่วใหม่ — รอบ ${n}/${m}` : `วนกองจั่วใหม่ — รอบ ${n}`,
+      drawHint: 'เปิดไพ่จากกองจั่ว', noMoves: 'ไม่มีตาเดินแล้ว', finding: 'กำลังสับเกมที่ชนะได้…', noFind: 'หาเกมที่ชนะได้ไม่เจอ — เล่นเกมสุ่มแทนนะ',
+      peak: n => `เคลียร์ยอดเขาแล้ว! +${n}`, run: n => `ต่อได้ ${n} ใบ!`, dealNo: n => `เกม #${n}`, dailyLbl: 'รายวัน',
+      board: 'โต๊ะไพ่ กด Tab เพื่อเลื่อนไปยังไพ่ที่เล่นได้ Enter หรือ Space เพื่อเล่นไพ่ D เปิดกองจั่ว H คำใบ้ U ย้อนกลับ',
+      stockAria: n => `กองจั่ว เหลือ ${n} ใบ เปิดไพ่`, emptyStock: 'กองจั่วหมดแล้ว', pileAria: 'กองไพ่', down: 'ไพ่คว่ำ',
+      suits: ['โพดำ', 'โพแดง', 'ข้าวหลามตัด', 'ดอกจิก'], cardAria: (r, s) => `${r} ${s}`,
+      won1: s => `คุณเคลียร์เกมได้ ${s} คะแนน!`, lost1: 'ไม่มีตาเดินแล้ว',
+    },
+    ja: {
+      subPyr: '合計 <b>13</b> になる2枚をペアで取る', subTri: '<b>1つ上か下</b>のカードを出す',
+      score: 'スコア', deal: '配り', stock: '山札', pass: '周回', time: 'タイム', undo: '戻す', hint: 'ヒント', stats: '成績', menu: 'メニュー',
+      pick: 'ゲームを選ぶ', pyr: 'ピラミッド', tri: 'トライピークス', pyrDesc: '合計13のペア', triDesc: '上下につなげる',
+      rulesPyr: '重なっていない2枚で合計13になるペアを取り除きます（A=1、J=11、Q=12、Kは1枚で取れます）。山札をタップしてめくります。ピラミッドを全部崩せばクリア。',
+      rulesTri: '3つの山を崩そう：場札より1つ上か下の表向きのカードを出します。出せないときは山札をめくります。長くつなげるほど高得点。',
+      optPasses: '山札の周回数', optWrap: 'KとAをつなげる', optWin: 'クリアできる配りのみ（ソルバー確認済み）',
+      cont: '続きから', play: '新しく配る', daily: 'デイリー', dailyDone: 'デイリー ✓ クリア済み',
+      winT: 'クリア！', winMsg: (s, t) => `${t}で${s}点。`, next: '新しく配る', replay: 'もう一度', overT: '手詰まり',
+      overMsg: n => `場に${n}枚残っています。何手か戻すか、やり直しましょう。`, retry: 'やり直す',
+      statsT: '成績', played: 'プレイ数', won: '勝ち', rate: '勝率', best: 'ベストスコア', streak: '連勝中', bestStreak: '最多連勝', close: '閉じる', reset: 'リセット',
+      not13: 'その2枚は合計13になりません', notRun: '1つ上か下のカードを出してください', recycled: (n, m) => m ? `山札を戻しました（${n}/${m}周目）` : `山札を戻しました（${n}周目）`,
+      drawHint: '山札をめくろう', noMoves: '動かせる手がありません', finding: 'クリアできる配りを用意中…', noFind: 'クリア可能な配りが見つからないので、ランダムに配ります',
+      peak: n => `山を崩した！+${n}`, run: n => `${n}連続！`, dealNo: n => `配り #${n}`, dailyLbl: 'デイリー',
+      board: 'カードテーブル。Tabで出せるカードを移動、EnterかSpaceで出す、Dで山札をめくる、Hでヒント、Uで戻す。',
+      stockAria: n => `山札、残り${n}枚。めくる`, emptyStock: '山札なし', pileAria: '場札', down: '裏向きのカード',
+      suits: ['スペード', 'ハート', 'ダイヤ', 'クラブ'], cardAria: (r, s) => `${s}の${r}`,
+      won1: s => `${s}点でクリアしました！`, lost1: '手詰まりです。',
+    },
+    ko: {
+      subPyr: '합이 <b>13</b>인 두 장을 짝지어 없애기', subTri: '<b>하나 높거나 낮은</b> 카드 내기',
+      score: '점수', deal: '판', stock: '덱', pass: '회차', time: '시간', undo: '되돌리기', hint: '힌트', stats: '기록', menu: '메뉴',
+      pick: '게임 선택', pyr: '피라미드', tri: '트라이피크', pyrDesc: '합 13 짝 맞추기', triDesc: '위아래로 이어 가기',
+      rulesPyr: '가려지지 않은 카드 두 장의 합이 13이면 없앨 수 있어요 (A=1, J=11, Q=12, K는 혼자 없어져요). 덱을 눌러 카드를 넘기세요. 피라미드를 모두 없애면 승리!',
+      rulesTri: '세 봉우리를 모두 치우세요: 더미 맨 위 카드보다 하나 높거나 낮은 앞면 카드를 냅니다. 막히면 덱을 넘기세요. 길게 이을수록 점수가 커요.',
+      optPasses: '덱 다시 넘기기 횟수', optWrap: 'K와 A 연결', optWin: '이길 수 있는 판만 (솔버 검증)',
+      cont: '이어서 하기', play: '새 판', daily: '오늘의 판', dailyDone: '오늘의 판 ✓ 완료',
+      winT: '클리어!', winMsg: (s, t) => `${t} 동안 ${s}점.`, next: '새 판', replay: '다시 하기', overT: '더 둘 곳이 없어요',
+      overMsg: n => `테이블에 ${n}장이 남았어요. 몇 수 되돌리거나 다시 해 보세요.`, retry: '다시 도전',
+      statsT: '기록', played: '플레이', won: '승리', rate: '승률', best: '최고 점수', streak: '연승', bestStreak: '최다 연승', close: '닫기', reset: '초기화',
+      not13: '두 카드의 합이 13이 아니에요', notRun: '하나 높거나 낮은 카드를 내세요', recycled: (n, m) => m ? `덱을 다시 넘겼어요 — ${n}/${m}회차` : `덱을 다시 넘겼어요 — ${n}회차`,
+      drawHint: '덱에서 카드를 넘기세요', noMoves: '더 둘 수 있는 수가 없어요', finding: '이길 수 있는 판을 섞는 중…', noFind: '이길 수 있는 판을 못 찾아 무작위 판을 드려요',
+      peak: n => `봉우리 정복! +${n}`, run: n => `${n}연속!`, dealNo: n => `${n}번 판`, dailyLbl: '오늘',
+      board: '카드 테이블. Tab으로 낼 수 있는 카드 사이를 이동하고, Enter나 Space로 내기, D로 덱 넘기기, H 힌트, U 되돌리기.',
+      stockAria: n => `덱, ${n}장 남음. 카드 넘기기`, emptyStock: '덱이 비었어요', pileAria: '더미', down: '뒷면 카드',
+      suits: ['스페이드', '하트', '다이아몬드', '클로버'], cardAria: (r, s) => `${s} ${r}`,
+      won1: s => `${s}점으로 판을 클리어했어요!`, lost1: '더 둘 곳이 없어요.',
+    },
+  };
+
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const T = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T[el.dataset.i18n]; });
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    table: $('table'), toast: $('toast'), sub: $('sub'), score: $('score'), dealno: $('dealno'), stockLbl: $('stockLbl'), stockNo: $('stockNo'), time: $('time'),
+    overlay: $('overlay'), menu: $('menuPanel'), win: $('winPanel'), over: $('overPanel'), stats: $('statsPanel'), announcer: $('announcer'), confetti: $('confetti'),
+  };
+  const table = els.table;
+  table.setAttribute('aria-label', T.board);
+  $('sideStatsH').textContent = T.statsT;
+
+  // ---- storage ----
+  const KEY = 'milaan.pyramidSolitaire.';
+  const read = (name, fallback) => { try { const v = JSON.parse(localStorage.getItem(KEY + name)); return v ?? fallback; } catch { return fallback; } };
+  const write = (name, value) => { try { localStorage.setItem(KEY + name, JSON.stringify(value)); } catch {} };
+  const drop = name => { try { localStorage.removeItem(KEY + name); } catch {} };
+  const blankStats = () => ({ p: 0, w: 0, b: 0, s: 0, bs: 0 });
+  const stats = Object.assign({ pyr: blankStats(), tri: blankStats() }, read('stats', {}));
+  const opts = Object.assign({ mode: 'pyr', passes: 3, wrap: true, winnable: true }, read('opts', {}));
+  const dailyDone = read('daily', {});
+
+  // ---- cards ----
+  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const suitOf = c => Math.floor(c / 13);
+  const cardName = c => T.cardAria(RANKS[c % 13], T.suits[suitOf(c)]);
+  const cardEls = [];
+  function buildCards() {
+    for (let c = 0; c < 52; c++) {
+      const b = document.createElement('button');
+      const s = suitOf(c), r = c % 13;
+      b.type = 'button';
+      b.className = 'card' + (s === 1 || s === 2 ? ' red' : '') + (r >= 10 ? ' face' : '');
+      const use = `<svg viewBox="0 0 24 24"><use href="#s${s}"/></svg>`;
+      b.innerHTML = `<span class="idx">${RANKS[r]}${use}</span>` + (r >= 10 ? `<span class="letter">${RANKS[r]}</span>` : '') + use.replace('<svg', '<svg class="big"') + '<span class="back"></span>';
+      b.addEventListener('click', () => onCard(c));
+      table.appendChild(b);
+      cardEls.push(b);
+    }
+  }
+  const stockSlot = document.createElement('button');
+  stockSlot.type = 'button';
+  stockSlot.className = 'slot stock';
+  stockSlot.innerHTML = '<span aria-hidden="true"></span><small></small>';
+  stockSlot.addEventListener('click', () => draw());
+  const pileSlot = document.createElement('div');
+  pileSlot.className = 'slot';
+  table.append(stockSlot, pileSlot);
+
+  // ---- game state ----
+  let G = null, undoStack = [], dl = null, busy = false, sel = null, geo = null;
+
+  function newGame(mode, seed, daily, settings) {
+    abandon();
+    dl = Core.deal(mode, seed);
+    G = {
+      mode, seed, daily, passes: settings.passes, wrap: settings.wrap,
+      s: mode === 'pyr' ? { pm: 0, dm: 0, sp: 0, pass: 0 } : Core.triStart(dl),
+      fp: mode === 'tri' ? [dl.stock[0]] : null,
+      score: 0, moves: 0, elapsed: 0, streak: 0, longest: 0, started: false, done: false, lost: false,
+    };
+    undoStack = [];
+    sel = null;
+    closeOverlay();
+    els.toast.classList.remove("show");
+    render(true);
+    save();
+  }
+  // Leaving a started, unfinished game breaks the win streak.
+  function abandon() {
+    if (G && G.started && !G.done && !G.lost) { stats[G.mode].s = 0; write('stats', stats); }
+  }
+  function snapshot() { return JSON.stringify({ s: G.s, fp: G.fp, score: G.score, moves: G.moves, streak: G.streak, longest: G.longest }); }
+  function commit() {
+    if (!G.started) { G.started = true; stats[G.mode].p++; write('stats', stats); updateStats(); }
+    G.moves++;
+  }
+  function save() {
+    if (!G) return;
+    if (G.done) { drop('game'); return; }
+    write('game', { G, undo: undoStack.slice(-150) });
+  }
+
+  // ---- pyramid moves ----
+  function pyrTarget(c) {
+    const j = dl.table.indexOf(c);
+    if (j >= 0) return Core.open(Core.PYR_COVER, G.s.pm, j) ? { k: 't', j, c } : null;
+    const k = dl.stock.indexOf(c);
+    return k === Core.wasteTop(G.s.dm, G.s.sp) ? { k: 'w', j: k, c } : null;
+  }
+  function pyrRemove(targets) {
+    undoStack.push(snapshot());
+    commit();
+    const rowsBefore = clearedRows();
+    let gain = 0;
+    for (const t of targets) {
+      if (t.k === 't') { G.s.pm |= 1 << t.j; gain += 10; } else { G.s.dm |= 1 << t.j; gain += 5; }
+    }
+    gain += (clearedRows() - rowsBefore) * 25;
+    G.score += gain;
+    sel = null;
+    afterMove();
+  }
+  function clearedRows() {
+    let n = 0;
+    for (let r = 0; r < 7; r++) { let all = true; for (let i = 0; i <= r; i++) if (!(G.s.pm >> (r * (r + 1) / 2 + i) & 1)) all = false; if (all) n++; }
+    return n;
+  }
+  function onPyr(c) {
+    const t = pyrTarget(c);
+    if (!t) return;
+    if (Core.rankOf(c) === 13) { pyrRemove([t]); return; }
+    if (sel && sel.c === c) { sel = null; render(); return; }
+    if (sel && Core.rankOf(sel.c) + Core.rankOf(c) === 13) { pyrRemove([sel, t]); return; }
+    if (sel) { toast(T.not13); shake(c); }
+    sel = t;
+    render();
+  }
+
+  // ---- tripeaks moves ----
+  function onTri(c) {
+    const j = dl.table.indexOf(c);
+    if (j < 0 || !Core.open(Core.TRI_COVER, G.s.tm, j)) return;
+    if (!Core.triFits(c, G.s.f, G.wrap)) { toast(T.notRun); shake(c); return; }
+    undoStack.push(snapshot());
+    commit();
+    G.s = Core.triApply(dl, G.s, { t: 'play', a: j });
+    G.fp.push(c);
+    G.streak++;
+    G.longest = Math.max(G.longest, G.streak);
+    G.score += 10 * G.streak;
+    if (j < 3) { G.score += 100; toast(T.peak(100), true); }
+    else if (G.streak >= 5 && G.streak % 5 === 0) toast(T.run(G.streak), true);
+    afterMove();
+  }
+
+  function onCard(c) {
+    if (!G || busy || G.done) return;
+    clearHint();
+    if (G.mode === 'pyr') onPyr(c); else onTri(c);
+  }
+
+  function draw() {
+    if (!G || busy || G.done) return;
+    clearHint();
+    if (G.mode === 'tri') {
+      if (G.s.sp >= 24) { toast(T.emptyStock); return; }
+      undoStack.push(snapshot());
+      commit();
+      G.fp.push(dl.stock[G.s.sp]);
+      G.s = Core.triApply(dl, G.s, { t: 'draw' });
+      G.streak = 0;
+      afterMove();
+      return;
+    }
+    const ms = Core.pyrMoves(dl, G.s, G.passes);
+    const m = ms.find(x => x.t === 'draw' || x.t === 'recycle');
+    if (!m) { toast(T.emptyStock); return; }
+    undoStack.push(snapshot());
+    commit();
+    G.s = Core.pyrApply(dl, G.s, m);
+    sel = null;
+    if (m.t === 'recycle') toast(T.recycled(G.s.pass + 1, G.passes));
+    afterMove();
+  }
+
+  function undo() {
+    if (!G || busy || !undoStack.length) return;
+    clearHint();
+    const u = JSON.parse(undoStack.pop());
+    Object.assign(G, u);
+    G.lost = false;
+    G.done = false;
+    sel = null;
+    closeOverlay();
+    render();
+    save();
+  }
+
+  function afterMove() {
+    render();
+    const won = G.mode === 'pyr' ? G.s.pm === Core.FULL : G.s.tm === Core.FULL;
+    if (won) { finishWin(); return; }
+    const left = G.mode === 'pyr' ? Core.pyrMoves(dl, G.s, G.passes) : Core.triMoves(dl, G.s, G.wrap);
+    if (!left.length) finishLoss();
+    save();
+  }
+
+  function finishWin() {
+    G.done = true;
+    const bonus = G.mode === 'pyr' ? 250 + (G.passes ? (G.passes - 1 - G.s.pass) * 50 : 0) : 500 + 20 * (24 - G.s.sp);
+    G.score += bonus;
+    const st = stats[G.mode];
+    st.w++; st.s++; st.bs = Math.max(st.bs, st.s); st.b = Math.max(st.b, G.score);
+    write('stats', stats);
+    if (G.daily) { dailyDone[G.mode] = G.daily; write('daily', dailyDone); }
+    save();
+    updateHud();
+    updateStats();
+    $('winMsg').textContent = T.winMsg(G.score, fmtTime(G.elapsed));
+    $('winStats').innerHTML = statRows(G.mode);
+    announce(T.won1(G.score));
+    confetti();
+    setTimeout(() => openPanel('win'), reduceMotion ? 50 : 650);
+  }
+  function finishLoss() {
+    G.lost = true;
+    stats[G.mode].s = 0;
+    write('stats', stats);
+    updateStats();
+    const left = 28 - popcount(G.mode === 'pyr' ? G.s.pm : G.s.tm);
+    $('overMsg').textContent = T.overMsg(left);
+    announce(T.lost1);
+    setTimeout(() => { if (G.lost) openPanel('over'); }, 500);
+  }
+  const popcount = m => { let n = 0; while (m) { n += m & 1; m >>>= 1; } return n; };
+
+  // ---- hints (visible information only: never peeks at the stock order or face-down cards) ----
+  let hinted = [];
+  function clearHint() { hinted.forEach(e => e.classList.remove('hint')); hinted = []; }
+  function showHint(list) { clearHint(); hinted = list; list.forEach(e => e.classList.add('hint')); }
+  function hint() {
+    if (!G || busy || G.done) return;
+    if (G.mode === 'pyr') {
+      const ms = Core.pyrMoves(dl, G.s, G.passes);
+      let best = null, bestScore = -1;
+      for (const m of ms) {
+        if (m.t === 'draw' || m.t === 'recycle') continue;
+        const n = Core.pyrApply(dl, G.s, m);
+        let score = m.t[0] === 'k' ? 100 : 0;
+        for (let j = 0; j < 28; j++) if (Core.open(Core.PYR_COVER, n.pm, j) && !Core.open(Core.PYR_COVER, G.s.pm, j)) score += 3;
+        if (m.t === 'pp') score += 1;
+        if (score > bestScore) { best = m; bestScore = score; }
+      }
+      if (best) {
+        const list = [];
+        if (best.t === 'k' || best.t === 'pp' || best.t === 'pw') list.push(cardEls[dl.table[best.a]]);
+        if (best.t === 'pp') list.push(cardEls[dl.table[best.b]]);
+        if (best.t === 'pw') list.push(cardEls[dl.stock[best.b]]);
+        if (best.t === 'kw') list.push(cardEls[dl.stock[best.a]]);
+        showHint(list);
+        return;
+      }
+    } else {
+      const plays = Core.triMoves(dl, G.s, G.wrap).filter(m => m.t === 'play');
+      let best = null, bestScore = -1;
+      const up = [];
+      for (let j = 0; j < 28; j++) if (Core.open(Core.TRI_COVER, G.s.tm, j)) up.push(j);
+      const chain = (f, used, depth) => {
+        if (depth > 7) return 0;
+        let m = 0;
+        for (const j of up) if (!used.has(j) && Core.triFits(dl.table[j], f, G.wrap)) { used.add(j); m = Math.max(m, 1 + chain(dl.table[j], used, depth + 1)); used.delete(j); }
+        return m;
+      };
+      for (const m of plays) {
+        const tm = G.s.tm | 1 << m.a;
+        let reveals = 0;
+        for (let j = 0; j < 28; j++) if (Core.open(Core.TRI_COVER, tm, j) && !Core.open(Core.TRI_COVER, G.s.tm, j)) reveals++;
+        const score = chain(dl.table[m.a], new Set([m.a]), 0) * 2 + reveals;
+        if (score > bestScore) { best = m; bestScore = score; }
+      }
+      if (best) { showHint([cardEls[dl.table[best.a]]]); return; }
+    }
+    const canDraw = G.mode === 'pyr' ? Core.pyrMoves(dl, G.s, G.passes).length > 0 : G.s.sp < 24;
+    if (canDraw) { showHint([stockSlot]); toast(T.drawHint); } else toast(T.noMoves);
+  }
+
+  // ---- layout ----
+  function measure() {
+    const W = table.clientWidth, H = table.clientHeight;
+    if (W < 20 || H < 20) return false;
+    const label = 18;
+    const mode = G ? G.mode : opts.mode;
+    let g;
+    if (mode === 'pyr') {
+      const a = Math.min(W / 7.6, (H - label) / 7.42), b = Math.min(W / 10.6, H / 5.6);
+      const cw = Math.min(Math.max(a, b), 118), ch = cw * 1.4, gx = cw * .1, dy = ch * .5;
+      g = { cw, ch, side: b > a, pos: [] };
+      const pw = 7 * cw + 6 * gx;
+      let left, top;
+      if (g.side) {
+        const w = pw + 3 * cw;
+        left = (W - w) / 2 + 1.5 * cw; top = (H - (ch + 6 * dy)) / 2;
+        g.stock = [left - 1.5 * cw, top + 4 * dy]; g.pile = [left + pw + .5 * cw, top + 4 * dy];
+      } else {
+        const h = ch + 6 * dy + .3 * ch + ch;
+        left = (W - pw) / 2; top = Math.max(0, (H - label - h) / 2);
+        const y = top + ch + 6 * dy + .3 * ch;
+        g.stock = [W / 2 - cw * 1.2, y]; g.pile = [W / 2 + cw * .2, y];
+      }
+      for (let r = 0; r < 7; r++) for (let i = 0; i <= r; i++) g.pos.push([left + (6 - r) * (cw + gx) / 2 + i * (cw + gx), top + r * dy]);
+      g.discard = [W - cw, 0];
+    } else {
+      const a = Math.min(W / 9.1, (H - label) / 5.32), b = Math.min(W / 13.6, (H - label) / 3.5);
+      const cw = Math.min(Math.max(a, b), 110), ch = cw * 1.4, dy = ch * .5;
+      g = { cw, ch, side: b > a, pos: [] };
+      const gx = g.side ? cw * .06 : -cw * .1, step = cw + gx, pw = 10 * cw + 9 * gx;
+      let left, top;
+      if (g.side) {
+        const w = pw + 3 * cw;
+        left = (W - w) / 2 + 1.5 * cw; top = Math.max(0, (H - label - (ch + 3 * dy)) / 2);
+        g.stock = [left - 1.5 * cw, top + 3 * dy]; g.pile = [left + pw + .5 * cw, top + 3 * dy];
+      } else {
+        const h = ch + 3 * dy + .3 * ch + ch;
+        left = (W - pw) / 2; top = Math.max(0, (H - label - h) / 2);
+        const y = top + ch + 3 * dy + .3 * ch;
+        g.stock = [W / 2 - cw * 1.3, y]; g.pile = [W / 2 + cw * .3, y];
+      }
+      for (let p = 0; p < 3; p++) g.pos[p] = [left + (p * 3 + 1.5) * step, top];
+      for (let p = 0; p < 3; p++) for (let k = 0; k < 2; k++) g.pos[3 + p * 2 + k] = [left + (p * 3 + k + 1) * step, top + dy];
+      for (let j = 0; j < 9; j++) g.pos[9 + j] = [left + (j + .5) * step, top + 2 * dy];
+      for (let j = 0; j < 10; j++) g.pos[18 + j] = [left + j * step, top + 3 * dy];
+    }
+    geo = g;
+    table.style.setProperty('--cw', g.cw.toFixed(1) + 'px');
+    table.style.setProperty('--ch', g.ch.toFixed(1) + 'px');
+    table.style.setProperty('--r', (g.cw * .1).toFixed(1) + 'px');
+    return true;
+  }
+  const place = (el, xy, z) => { el.style.transform = `translate(${xy[0].toFixed(1)}px, ${xy[1].toFixed(1)}px)`; el.style.zIndex = z; };
+
+  function setCard(c, xy, z, { up = true, live = false, gone = false } = {}) {
+    const el = cardEls[c];
+    place(el, xy, z);
+    el.classList.toggle('down', !up);
+    el.classList.toggle('live', live);
+    el.classList.toggle('gone', gone);
+    el.classList.toggle('sel', !!(sel && sel.c === c));
+    el.tabIndex = live ? 0 : -1;
+    el.disabled = false;
+    el.setAttribute('aria-label', up ? cardName(c) : T.down);
+    if (live) el.removeAttribute('aria-disabled'); else el.setAttribute('aria-disabled', 'true');
+    el.toggleAttribute('aria-hidden', gone);
+  }
+
+  function render(instant) {
+    if (!G || !measure()) return;
+    if (instant) table.classList.add('instant');
+    const s = G.s, g = geo;
+    let stockLeft = 0;
+    if (G.mode === 'pyr') {
+      for (let j = 0; j < 28; j++) {
+        const c = dl.table[j], r = rowOf(j);
+        if (s.pm >> j & 1) setCard(c, g.discard, 5, { gone: true });
+        else setCard(c, g.pos[j], 10 + r * 10 + j, { live: Core.open(Core.PYR_COVER, s.pm, j) });
+      }
+      const w = Core.wasteTop(s.dm, s.sp);
+      for (let k = 0; k < 24; k++) {
+        const c = dl.stock[k];
+        if (s.dm >> k & 1) setCard(c, g.discard, 5, { gone: true });
+        else if (k >= s.sp) { setCard(c, g.stock, 200 - k, { up: false }); stockLeft++; }
+        else setCard(c, g.pile, 300 + k, { live: k === w });
+      }
+      const canRecycle = Core.nextStock(s.dm, s.sp) < 0 && w >= 0 && (!G.passes || s.pass < G.passes - 1);
+      stockSlot.firstChild.textContent = stockLeft ? '' : canRecycle ? '↻' : '✕';
+      els.stockLbl.textContent = T.pass;
+      els.stockNo.textContent = G.passes ? `${s.pass + 1}/${G.passes}` : `${s.pass + 1}`;
+      els.sub.innerHTML = T.subPyr;
+    } else {
+      for (let j = 0; j < 28; j++) {
+        if (s.tm >> j & 1) continue;
+        const up = Core.open(Core.TRI_COVER, s.tm, j);
+        setCard(dl.table[j], g.pos[j], 10 + Core.TRI_ROW[j] * 20 + j, { up, live: up });
+      }
+      G.fp.forEach((c, i) => setCard(c, g.pile, 300 + i, {}));
+      for (let k = s.sp; k < 24; k++) { setCard(dl.stock[k], g.stock, 200 - k, { up: false }); stockLeft++; }
+      stockSlot.firstChild.textContent = stockLeft ? '' : '✕';
+      els.stockLbl.textContent = T.stock;
+      els.stockNo.textContent = stockLeft;
+      els.sub.innerHTML = T.subTri;
+    }
+    place(stockSlot, g.stock, 250);
+    stockSlot.style.background = stockLeft ? 'transparent' : '';
+    stockSlot.lastChild.textContent = stockLeft;
+    stockSlot.setAttribute('aria-label', stockLeft ? T.stockAria(stockLeft) : T.emptyStock);
+    place(pileSlot, g.pile, 1);
+    pileSlot.setAttribute('aria-label', T.pileAria);
+    updateHud();
+    if (instant) { void table.offsetWidth; table.classList.remove('instant'); }
+  }
+  function rowOf(j) { let r = 0; while ((r + 1) * (r + 2) / 2 <= j) r++; return r; }
+
+  function updateHud() {
+    if (!G) return;
+    els.score.textContent = G.score;
+    els.dealno.textContent = G.daily ? T.dailyLbl : '#' + G.seed;
+    els.time.textContent = fmtTime(G.elapsed);
+    $('undoBtn').disabled = !undoStack.length || busy;
+  }
+  const fmtTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  function statRows(mode) {
+    const st = stats[mode];
+    const rate = st.p ? Math.round(st.w / st.p * 100) + '%' : '–';
+    return [[T.played, st.p], [T.won, st.w], [T.rate, rate], [T.best, st.b || '–'], [T.streak, st.s], [T.bestStreak, st.bs]]
+      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  }
+  function updateStats() { $('sideStats').innerHTML = statRows(G ? G.mode : opts.mode); }
+
+  // ---- feedback ----
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let toastTimer = 0;
+  function toast(msg, big) {
+    els.toast.textContent = msg;
+    els.toast.classList.toggle('big', !!big);
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1800);
+  }
+  function shake(c) { const el = cardEls[c]; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+  function announce(msg) { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = msg; }, 30); }
+  function confetti() {
+    if (reduceMotion) return;
+    const colors = ['#f4c34f', '#ef6f4f', '#74e3c4', '#fbf5e6', '#8fb3ff'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('i');
+      p.style.left = Math.random() * 100 + '%';
+      p.style.background = colors[i % colors.length];
+      p.style.animationDelay = Math.random() * .6 + 's';
+      els.confetti.appendChild(p);
+    }
+    setTimeout(() => { els.confetti.innerHTML = ''; }, 3200);
+  }
+
+  // ---- deals ----
+  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  function dailySeed(key, mode) {
+    let h = mode === 'tri' ? 7 : 3;
+    for (const ch of key) h = (h * 131 + ch.charCodeAt(0)) % 99991;
+    return h + 1;
+  }
+  const solvable = (mode, seed, settings, budget) => mode === 'pyr' ? Core.solvePyr(Core.deal('pyr', seed), settings.passes, budget) : Core.solveTri(Core.deal('tri', seed), settings.wrap, budget);
+  // Tries consecutive seeds until the solver proves one winnable; work is sliced so the page stays responsive.
+  function findDeal(mode, start, settings, done) {
+    let seed = start, tries = 0;
+    busy = true;
+    toast(T.finding);
+    const tick = () => {
+      const t0 = performance.now();
+      while (performance.now() - t0 < 30) {
+        if (solvable(mode, seed, settings, 20000) === true) { busy = false; done(seed, true); return; }
+        seed = seed % 99999 + 1;
+        if (++tries > 600) { busy = false; toast(T.noFind); done(start, false); return; }
+      }
+      setTimeout(tick, 0);
+    };
+    setTimeout(tick, 30);
+  }
+  function startDeal() {
+    const mode = opts.mode, settings = { passes: opts.passes, wrap: opts.wrap };
+    const seed = 1 + Math.floor(Math.random() * 99999);
+    closeOverlay();
+    if (!opts.winnable) { newGame(mode, seed, null, settings); toast(T.dealNo(seed)); return; }
+    findDeal(mode, seed, settings, s => { newGame(mode, s, null, settings); });
+  }
+  function startDaily() {
+    const mode = opts.mode, key = todayKey(), settings = { passes: 3, wrap: true };
+    closeOverlay();
+    findDeal(mode, dailySeed(key, mode), settings, s => newGame(mode, s, key, settings));
+  }
+  function replay() {
+    const { mode, seed, daily, passes, wrap } = G;
+    newGame(mode, seed, daily, { passes, wrap });
+  }
+
+  // ---- menu / panels ----
+  function openPanel(name) {
+    ['menu', 'win', 'over', 'stats'].forEach(n => { els[n].hidden = n !== name; });
+    els.overlay.hidden = false;
+    const first = els[name].querySelector('button:not([hidden]):not(:disabled)');
+    if (first) first.focus({ preventScroll: true });
+  }
+  function closeOverlay() { els.overlay.hidden = true; }
+  function openMenu() { syncMenu(); openPanel('menu'); }
+  function syncMenu() {
+    $('modePyr').setAttribute('aria-pressed', opts.mode === 'pyr');
+    $('modeTri').setAttribute('aria-pressed', opts.mode === 'tri');
+    $('rules').textContent = opts.mode === 'pyr' ? T.rulesPyr : T.rulesTri;
+    $('passOpt').hidden = opts.mode !== 'pyr';
+    $('wrapOpt').hidden = opts.mode !== 'tri';
+    $('passOpt').style.display = opts.mode === 'pyr' ? '' : 'none';
+    $('wrapOpt').style.display = opts.mode === 'tri' ? '' : 'none';
+    $('passSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.v === opts.passes));
+    $('wrapTog').setAttribute('aria-checked', opts.wrap);
+    $('winTog').setAttribute('aria-checked', opts.winnable);
+    const resumable = G && !G.done && !G.lost && G.started;
+    $('contBtn').hidden = !resumable;
+    $('dailyBtn').textContent = dailyDone[opts.mode] === todayKey() ? T.dailyDone : T.daily;
+    write('opts', opts);
+  }
+  [1, 2, 3, 0].forEach(v => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.v = v; b.textContent = v ? v : '∞';
+    b.addEventListener('click', () => { opts.passes = v; syncMenu(); });
+    $('passSeg').appendChild(b);
+  });
+  $('modePyr').addEventListener('click', () => { opts.mode = 'pyr'; syncMenu(); });
+  $('modeTri').addEventListener('click', () => { opts.mode = 'tri'; syncMenu(); });
+  $('wrapTog').addEventListener('click', () => { opts.wrap = !opts.wrap; syncMenu(); });
+  $('winTog').addEventListener('click', () => { opts.winnable = !opts.winnable; syncMenu(); });
+  $('contBtn').addEventListener('click', () => { closeOverlay(); render(true); });
+  $('playBtn').addEventListener('click', startDeal);
+  $('dailyBtn').addEventListener('click', startDaily);
+  $('nextBtn').addEventListener('click', startDeal);
+  $('overNewBtn').addEventListener('click', startDeal);
+  $('replayBtn').addEventListener('click', replay);
+  $('retryBtn').addEventListener('click', replay);
+  $('overUndoBtn').addEventListener('click', undo);
+  $('winMenuBtn').addEventListener('click', openMenu);
+  $('menuBtn').addEventListener('click', openMenu);
+  $('undoBtn').addEventListener('click', undo);
+  $('hintBtn').addEventListener('click', hint);
+  let statTab = 'pyr';
+  function showStats(mode) {
+    statTab = mode;
+    $('statTabs').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === mode));
+    $('statsList').innerHTML = statRows(mode);
+  }
+  $('statsBtn').addEventListener('click', () => { showStats(G ? G.mode : opts.mode); openPanel('stats'); });
+  $('statTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showStats(b.dataset.m); });
+  $('resetBtn').addEventListener('click', () => { stats[statTab] = blankStats(); write('stats', stats); showStats(statTab); updateStats(); });
+  $('closeStats').addEventListener('click', () => { if (G) closeOverlay(); else openMenu(); });
+
+  // ---- keyboard ----
+  document.addEventListener('keydown', e => {
+    if (!els.overlay.hidden || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undo(); return; }
+    if (e.ctrlKey || e.metaKey) return;
+    if (k === 'd') { e.preventDefault(); draw(); }
+    else if (k === 'h') { e.preventDefault(); hint(); }
+    else if (k === 'u') { e.preventDefault(); undo(); }
+    else if (e.key.startsWith('Arrow')) {
+      const live = [...cardEls.filter(el => el.classList.contains('live')), stockSlot];
+      const pos = el => { const r = el.getBoundingClientRect(); return [r.left, r.top]; };
+      live.sort((a, b) => pos(a)[0] - pos(b)[0] || pos(a)[1] - pos(b)[1]);
+      const i = live.indexOf(document.activeElement);
+      const d = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+      e.preventDefault();
+      live[(i < 0 ? 0 : i + d + live.length) % live.length].focus();
+    }
+  });
+
+  // ---- timer ----
+  let last = performance.now();
+  setInterval(() => {
+    const now = performance.now(), dt = Math.min(now - last, 1000);
+    last = now;
+    if (!G || !G.started || G.done || G.lost || document.hidden || !els.overlay.hidden) return;
+    G.elapsed += dt;
+    els.time.textContent = fmtTime(G.elapsed);
+  }, 250);
+  document.addEventListener('visibilitychange', () => { last = performance.now(); if (document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+
+  new ResizeObserver(() => render(true)).observe(table);
+
+  if (navigator.webdriver) window.__pyramidSolitaire = {
+    state: () => G && ({ mode: G.mode, seed: G.seed, daily: G.daily, passes: G.passes, wrap: G.wrap, s: { ...G.s }, score: G.score, moves: G.moves, done: G.done, lost: G.lost, busy, undo: undoStack.length, sel: sel && sel.c,
+      table: dl.table.slice(), stock: dl.stock.slice(), pile: G.fp && G.fp.slice(), overlay: ['menu', 'win', 'over', 'stats'].find(n => !els.overlay.hidden && !els[n].hidden) || null, cw: geo && geo.cw }),
+    stats: () => JSON.parse(JSON.stringify(stats)),
+    point: c => { const r = cardEls[c].getBoundingClientRect(); return { x: r.left + r.width * .3, y: r.top + r.height * .2 }; },
+    stockPoint: () => { const r = stockSlot.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+    moves: () => G.mode === 'pyr' ? Core.pyrMoves(dl, G.s, G.passes) : Core.triMoves(dl, G.s, G.wrap),
+    solve: (budget = 200000) => G.mode === 'pyr' ? Core.solvePyr(dl, G.passes, budget, G.s) : null,
+    newGame: (mode, seed, passes = 3, wrap = true) => newGame(mode, seed, null, { passes, wrap }),
+    solvable: (mode, seed, passes = 3, wrap = true) => solvable(mode, seed, { passes, wrap }, 200000),
+    dailySeed: (key, mode) => dailySeed(key, mode),
+  };
+
+  buildCards();
+  const saved = read('game', null);
+  if (saved && saved.G && saved.G.s) {
+    G = saved.G;
+    dl = Core.deal(G.mode, G.seed);
+    undoStack = saved.undo || [];
+    render(true);
+  } else {
+    const settings = { passes: opts.passes, wrap: opts.wrap };
+    dl = Core.deal(opts.mode, 1);
+    G = { mode: opts.mode, seed: 1, daily: null, passes: settings.passes, wrap: settings.wrap, s: opts.mode === 'pyr' ? { pm: 0, dm: 0, sp: 0, pass: 0 } : Core.triStart(dl), fp: opts.mode === 'tri' ? [dl.stock[0]] : null, score: 0, moves: 0, elapsed: 0, streak: 0, longest: 0, started: false, done: false, lost: false };
+    render(true);
+  }
+  updateStats();
+  openMenu();
+})();
+</script>
+</body>
+</html>

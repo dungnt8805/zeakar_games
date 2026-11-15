@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lights Out</title>
+<style>
+:root {
+  --bg: #17123a;
+  --bg2: #241c58;
+  --ink: #f4efff;
+  --muted: #b3a8dc;
+  --cell: #312a6e;
+  --cell-hi: #3d3585;
+  --on: #ffc93c;
+  --on-glow: #ffc93c99;
+  --two: #ff6fae;
+  --two-glow: #ff6fae99;
+  --accent: #7c5cff;
+  --accent-dark: #5638d6;
+  --paper: #2a2263;
+  --chip: #ffffff14;
+  --star: #ffc93c;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font); color: var(--ink);
+  background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg) 70%);
+  overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid #a996ff; outline-offset: 3px; }
+
+.app {
+  height: 100%; max-width: 540px; margin: auto; display: grid;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "head" "hud" "tools" "board" "note"; gap: 9px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+header { grid-area: head; text-align: center; }
+h1 { font-size: clamp(22px, 7vw, 30px); font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+h1 span, .logo span { color: var(--on); text-shadow: 0 0 14px var(--on-glow); }
+.sub { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.hud { grid-area: hud; display: flex; gap: 6px; }
+.stat { flex: 1; min-width: 0; padding: 6px 4px; border-radius: 14px; background: var(--chip); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.tools { grid-area: tools; display: flex; gap: 6px; }
+.tool { flex: 1; min-height: 40px; border-radius: 14px; background: var(--paper); box-shadow: 0 4px 0 #120d33; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 0 6px; }
+.tool b { font-size: 18px; }
+.tool:active { transform: translateY(3px); box-shadow: 0 1px 0 #120d33; }
+.tool:disabled { opacity: .45; cursor: default; }
+.tool span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.board-wrap { grid-area: board; position: relative; min-height: 0; min-width: 0; }
+.board { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.board.wrap-mode { outline: 2px dashed #8f80d6; outline-offset: 6px; border-radius: 10px; }
+.cell { position: absolute; border-radius: 18%; background: var(--cell); box-shadow: inset 0 -4px 0 #0003; transition: background .15s, box-shadow .15s, transform .12s; }
+.cell.hex { border-radius: 0; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.cell:hover { background: var(--cell-hi); }
+.cell.s1 { background: var(--on); box-shadow: inset 0 -4px 0 #0002, 0 0 18px var(--on-glow); }
+.cell.s2 { background: var(--two); box-shadow: inset 0 -4px 0 #0002, 0 0 18px var(--two-glow); }
+.cell.preview::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: #ffffff55; }
+.cell.hex.preview::after { inset: 34%; }
+.cell.hinted { animation: hint 0.8s ease-in-out 3; }
+.cell.hinted::before { content: "💡"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 50%; }
+.cell:active { transform: scale(.94); }
+.cell:focus-visible { outline: 3px solid #fff; outline-offset: 1px; z-index: 2; }
+@keyframes hint { 50% { transform: scale(1.12); } }
+.board.won .cell { pointer-events: none; animation: glow .9s ease-out var(--d) both; }
+@keyframes glow { 40% { background: var(--on); box-shadow: 0 0 22px var(--on-glow); } }
+
+.note { grid-area: note; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: #0b0820b0; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 8px); overflow-y: auto; background: var(--paper); border-radius: 26px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 24px; font-weight: 900; line-height: 1.2; }
+.logo { font-size: 32px !important; letter-spacing: -.02em; }
+.panel p { margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.panel .emoji { font-size: 40px; margin: 0; }
+.modes { display: grid; gap: 8px; margin-top: 14px; }
+.mode-btn { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border-radius: 16px; background: #ffffff10; box-shadow: 0 3px 0 #120d33; }
+.mode-btn .ic { font-size: 26px; text-align: center; }
+.mode-btn strong { display: block; font-size: 16px; }
+.mode-btn small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.mode-btn em { font-style: normal; font-size: 12px; font-weight: 800; color: var(--star); white-space: nowrap; }
+.mode-btn.current { background: #7c5cff44; }
+.stars { margin-top: 6px; font-size: 38px; letter-spacing: 4px; color: #4a4290; }
+.stars b { color: var(--star); text-shadow: 0 0 12px var(--on-glow); }
+.result { font-size: 18px; font-weight: 700; color: var(--ink) !important; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--star); color: #2a1d00 !important; font-size: 14px; font-weight: 800; }
+.badge[hidden] { display: none; }
+.cta { margin-top: 18px; width: 100%; padding: 14px; border-radius: 18px; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--accent-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-dark); }
+.cta[hidden] { display: none; }
+.secondary { margin-top: 10px; width: 100%; padding: 11px; border-radius: 16px; border: 2px solid #4a4290; font-weight: 800; }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-top: 14px; }
+.level-btn { aspect-ratio: 1; display: grid; place-content: center; gap: 1px; border-radius: 12px; background: #ffffff12; box-shadow: 0 3px 0 #120d33; font-size: 16px; font-weight: 900; }
+.level-btn small { font-size: 9px; letter-spacing: 1px; color: var(--star); min-height: 10px; }
+.level-btn.current { background: var(--accent); }
+.level-btn:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 400px) {
+  .stat small { letter-spacing: 0; }
+  .stat strong { font-size: 17px; }
+  .tool { font-size: 12px; }
+  .tool span { display: none; }
+}
+@media (max-height: 600px) { .sub, .note { display: none; } }
+@media (max-height: 520px) {
+  .overlay { padding: 8px; }
+  .panel { width: min(100%, 560px); padding: 12px 16px; border-radius: 20px; }
+  .panel h2 { font-size: 20px; }
+  .logo { font-size: 26px !important; }
+  .panel .emoji { display: none; }
+  .panel p { margin-top: 4px; line-height: 1.35; }
+  .modes { gap: 6px; margin-top: 8px; }
+  .mode-btn { padding: 6px 10px; grid-template-columns: 30px 1fr auto; }
+  .mode-btn .ic { font-size: 20px; }
+  .mode-btn small { display: none; }
+  .stars { margin-top: 0; font-size: 30px; }
+  .cta { margin-top: 10px; padding: 10px; font-size: 17px; }
+  .secondary { margin-top: 6px; padding: 7px; }
+  .level-grid { grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 8px; }
+  .level-btn { font-size: 14px; border-radius: 9px; }
+}
+@media (max-height: 520px) and (min-width: 460px) { .modes { grid-template-columns: 1fr 1fr; } }
+/* Wide / landscape: title, HUD and tools move to a side column; the board takes the full height. */
+@media (min-aspect-ratio: 5/4) {
+  .app { max-width: 1240px; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto; grid-template-areas: "head board" "hud board" "tools board" ". board" "note board"; gap: 12px 22px; align-content: stretch; }
+  header { text-align: left; }
+  .hud { flex-wrap: wrap; }
+  .hud .stat { flex: 1 1 calc(50% - 3px); }
+  .tools { flex-wrap: wrap; }
+  .tool { flex: 1 1 calc(50% - 3px); min-height: 44px; }
+  .tool span { display: inline; }
+  .note { text-align: left; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 480px) {
+  .app { grid-template-columns: minmax(170px, 250px) minmax(0, 1fr); gap: 7px 16px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; }
+  .stat { padding: 3px 4px; }
+  .stat strong { font-size: 16px; }
+  .tool { min-height: 34px; font-size: 12px; }
+  .tool b { font-size: 15px; }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 340px) { .tool span { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Lights <span>Out</span></h1>
+    <p class="sub" id="sub"></p>
+  </header>
+  <div class="hud">
+    <div class="stat"><small data-i18n="level"></small><strong id="level">1</strong></div>
+    <div class="stat"><small data-i18n="moves"></small><strong id="moves">0</strong></div>
+    <div class="stat"><small data-i18n="par"></small><strong id="par">0</strong></div>
+    <div class="stat"><small data-i18n="lit"></small><strong id="lit">0</strong></div>
+  </div>
+  <div class="tools">
+    <button type="button" class="tool" id="menu-btn" data-i18n-label="menu"><b aria-hidden="true">☰</b><span data-i18n="menu"></span></button>
+    <button type="button" class="tool" id="undo-btn" data-i18n-label="undo"><b aria-hidden="true">↶</b><span data-i18n="undo"></span></button>
+    <button type="button" class="tool" id="hint-btn" data-i18n-label="hint"><b aria-hidden="true">💡</b><span data-i18n="hint"></span></button>
+    <button type="button" class="tool" id="restart-btn" data-i18n-label="restart"><b aria-hidden="true">↻</b><span data-i18n="restart"></span></button>
+  </div>
+  <div class="board-wrap" id="wrap"><div class="board" id="board" role="group"></div></div>
+  <p class="note" id="note"></p>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">💡</p>
+    <h2 class="logo" id="start-title">Lights <span>Out</span></h2>
+    <p data-i18n="intro"></p>
+    <div class="modes" id="modes"></div>
+    <button type="button" class="cta" id="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="levels" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="levels-title">
+    <h2 id="levels-title"></h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button type="button" class="secondary" id="levels-modes" data-i18n="allModes"></button>
+    <button type="button" class="secondary" id="levels-close" data-i18n="close"></button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <p class="emoji" aria-hidden="true">🌙</p>
+    <h2 id="win-title"></h2>
+    <p class="stars" id="stars"></p>
+    <p class="result" id="result"></p>
+    <p class="badge" id="new-best" data-i18n="newBest" hidden></p>
+    <button type="button" class="cta" id="next" data-i18n="next"></button>
+    <button type="button" class="secondary" id="replay" data-i18n="replay"></button>
+    <button type="button" class="secondary" id="win-levels" data-i18n="chooseLevel"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { level: 'Level', moves: 'Moves', par: 'Par', lit: 'Lit', menu: 'Levels', undo: 'Undo', hint: 'Hint', restart: 'Restart', intro: 'Tap a light to flip it and its neighbours. Switch every light off — in as few taps as you can.', play: 'Play', resume: (m, n) => `Continue: ${m} ${n}`, chooseLevel: 'Choose a level', allModes: 'All modes', close: 'Close', next: 'Next level', replay: 'Replay', newBest: 'New best!', locked: 'Locked',
+      modes: { classic: ['Classic', 'The original 5×5 board'], big: ['Big Boards', '6×6 up to 9×9'], tri: ['Three Colours', 'Dark → gold → pink → dark'], wrap: ['Wrap Around', 'Edges join the opposite side'], hex: ['Hex', 'Six neighbours per light'] },
+      notes: { classic: 'A tap flips the light and the ones above, below, left and right.', big: 'Same rules, bigger boards. Plan ahead!', tri: 'Each tap moves lights one colour on: dark → gold → pink → dark.', wrap: 'Lights on an edge also flip the light on the opposite edge.', hex: 'A tap flips the hex and its six neighbours.' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `Level ${n} cleared!`, result: (m, p) => `${m} taps · par ${p}`, hintCap: 'Hint used: up to 2 stars', allDone: m => `You cleared every ${m} level!`, starsLabel: n => `${n} of 3 stars`, levelLabel: (n, s) => `Level ${n}${s ? `, ${s} stars` : ''}`, board: 'Light board',
+      states: ['off', 'on', 'pink'], stateGold: 'gold', cell: (r, c, s) => `Row ${r}, light ${c}: ${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `Try row ${r}, light ${c}`, solvedSay: (m, p, s) => `Solved in ${m} taps, par ${p}. ${s} stars.` },
+    vi: { level: 'Màn', moves: 'Lượt', par: 'Chuẩn', lit: 'Đèn sáng', menu: 'Chọn màn', undo: 'Hoàn tác', hint: 'Gợi ý', restart: 'Chơi lại', intro: 'Chạm vào một bóng đèn để đảo nó và các đèn bên cạnh. Hãy tắt hết mọi đèn với ít lượt chạm nhất.', play: 'Chơi', resume: (m, n) => `Chơi tiếp: ${m} ${n}`, chooseLevel: 'Chọn màn chơi', allModes: 'Tất cả chế độ', close: 'Đóng', next: 'Màn tiếp theo', replay: 'Chơi lại', newBest: 'Kỷ lục mới!', locked: 'Chưa mở',
+      modes: { classic: ['Cổ điển', 'Bảng 5×5 nguyên bản'], big: ['Bảng lớn', 'Từ 6×6 đến 9×9'], tri: ['Ba màu', 'Tối → vàng → hồng → tối'], wrap: ['Nối biên', 'Mép bảng nối sang phía đối diện'], hex: ['Lục giác', 'Mỗi đèn có sáu đèn kề'] },
+      notes: { classic: 'Mỗi lần chạm đảo đèn đó cùng các đèn trên, dưới, trái, phải.', big: 'Luật như cũ, bảng lớn hơn. Tính trước nhé!', tri: 'Mỗi lần chạm chuyển đèn sang màu kế: tối → vàng → hồng → tối.', wrap: 'Đèn ở mép cũng đảo đèn ở mép đối diện.', hex: 'Mỗi lần chạm đảo ô lục giác và sáu ô xung quanh.' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `Đã qua màn ${n}!`, result: (m, p) => `${m} lượt · chuẩn ${p}`, hintCap: 'Đã dùng gợi ý: tối đa 2 sao', allDone: m => `Bạn đã qua mọi màn ${m}!`, starsLabel: n => `${n}/3 sao`, levelLabel: (n, s) => `Màn ${n}${s ? `, ${s} sao` : ''}`, board: 'Bảng đèn',
+      states: ['tắt', 'sáng', 'hồng'], stateGold: 'vàng', cell: (r, c, s) => `Hàng ${r}, đèn ${c}: ${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `Thử hàng ${r}, đèn ${c}`, solvedSay: (m, p, s) => `Giải xong trong ${m} lượt, chuẩn ${p}. ${s} sao.` },
+    zh: { level: '关卡', moves: '步数', par: '标准', lit: '亮灯', menu: '关卡', undo: '撤销', hint: '提示', restart: '重来', intro: '点击一盏灯，它和相邻的灯都会切换。用最少的步数关掉所有的灯。', play: '开始游戏', resume: (m, n) => `继续：${m} 第 ${n} 关`, chooseLevel: '选择关卡', allModes: '全部模式', close: '关闭', next: '下一关', replay: '重玩', newBest: '新纪录！', locked: '未解锁',
+      modes: { classic: ['经典', '原版 5×5 棋盘'], big: ['大棋盘', '从 6×6 到 9×9'], tri: ['三色', '暗 → 金 → 粉 → 暗'], wrap: ['循环边界', '边缘与对边相连'], hex: ['六边形', '每盏灯有六个邻居'] },
+      notes: { classic: '点击会切换这盏灯以及上下左右的灯。', big: '规则不变，棋盘更大，先想好再点！', tri: '每点一次灯变到下一种颜色：暗 → 金 → 粉 → 暗。', wrap: '边上的灯也会切换对边的灯。', hex: '点击会切换这个六边形及周围六格。' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `第 ${n} 关完成！`, result: (m, p) => `${m} 步 · 标准 ${p} 步`, hintCap: '用了提示：最多 2 星', allDone: m => `你已完成全部「${m}」关卡！`, starsLabel: n => `${n}/3 星`, levelLabel: (n, s) => `第 ${n} 关${s ? `，${s} 星` : ''}`, board: '灯板',
+      states: ['熄灭', '亮', '粉色'], stateGold: '金色', cell: (r, c, s) => `第 ${r} 行第 ${c} 盏：${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `试试第 ${r} 行第 ${c} 盏`, solvedSay: (m, p, s) => `${m} 步完成，标准 ${p} 步，获得 ${s} 星。` },
+    fr: { level: 'Niveau', moves: 'Coups', par: 'Par', lit: 'Allumées', menu: 'Niveaux', undo: 'Annuler', hint: 'Indice', restart: 'Rejouer', intro: 'Touchez une lampe pour l’inverser avec ses voisines. Éteignez tout, en un minimum de coups.', play: 'Jouer', resume: (m, n) => `Reprendre : ${m} ${n}`, chooseLevel: 'Choisir un niveau', allModes: 'Tous les modes', close: 'Fermer', next: 'Niveau suivant', replay: 'Rejouer', newBest: 'Nouveau record !', locked: 'Verrouillé',
+      modes: { classic: ['Classique', 'Le plateau 5×5 d’origine'], big: ['Grands plateaux', 'De 6×6 à 9×9'], tri: ['Trois couleurs', 'Noir → or → rose → noir'], wrap: ['Bords reliés', 'Chaque bord rejoint le bord opposé'], hex: ['Hexagones', 'Six voisines par lampe'] },
+      notes: { classic: 'Un coup inverse la lampe et celles du dessus, du dessous, de gauche et de droite.', big: 'Mêmes règles, plateaux plus grands. Anticipez !', tri: 'Chaque coup fait passer les lampes à la couleur suivante : noir → or → rose → noir.', wrap: 'Une lampe au bord inverse aussi celle du bord opposé.', hex: 'Un coup inverse l’hexagone et ses six voisins.' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `Niveau ${n} réussi !`, result: (m, p) => `${m} coups · par ${p}`, hintCap: 'Indice utilisé : 2 étoiles max.', allDone: m => `Vous avez fini tous les niveaux ${m} !`, starsLabel: n => `${n} étoile${n > 1 ? 's' : ''} sur 3`, levelLabel: (n, s) => `Niveau ${n}${s ? `, ${s} étoile${s > 1 ? 's' : ''}` : ''}`, board: 'Plateau de lampes',
+      states: ['éteinte', 'allumée', 'rose'], stateGold: 'dorée', cell: (r, c, s) => `Ligne ${r}, lampe ${c} : ${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `Essayez ligne ${r}, lampe ${c}`, solvedSay: (m, p, s) => `Résolu en ${m} coups, par ${p}. ${s} étoile${s > 1 ? 's' : ''}.` },
+    th: { level: 'ด่าน', moves: 'ครั้ง', par: 'เป้า', lit: 'ไฟติด', menu: 'เลือกด่าน', undo: 'ย้อน', hint: 'คำใบ้', restart: 'เริ่มใหม่', intro: 'แตะไฟดวงใดก็ได้เพื่อสลับมันและดวงข้าง ๆ ปิดไฟให้หมดทุกดวงด้วยจำนวนครั้งน้อยที่สุด', play: 'เล่นเลย', resume: (m, n) => `เล่นต่อ: ${m} ด่าน ${n}`, chooseLevel: 'เลือกด่าน', allModes: 'ทุกโหมด', close: 'ปิด', next: 'ด่านถัดไป', replay: 'เล่นอีกครั้ง', newBest: 'สถิติใหม่!', locked: 'ยังไม่ปลดล็อก',
+      modes: { classic: ['คลาสสิก', 'กระดาน 5×5 ต้นฉบับ'], big: ['กระดานใหญ่', '6×6 ถึง 9×9'], tri: ['สามสี', 'มืด → ทอง → ชมพู → มืด'], wrap: ['ขอบเชื่อม', 'ขอบเชื่อมกับฝั่งตรงข้าม'], hex: ['หกเหลี่ยม', 'ไฟแต่ละดวงมีเพื่อนบ้านหกดวง'] },
+      notes: { classic: 'แตะหนึ่งครั้งจะสลับไฟดวงนั้นและดวงบน ล่าง ซ้าย ขวา', big: 'กติกาเดิม กระดานใหญ่ขึ้น คิดให้ดีก่อนแตะ!', tri: 'แตะแต่ละครั้งไฟจะเปลี่ยนเป็นสีถัดไป: มืด → ทอง → ชมพู → มืด', wrap: 'ไฟที่ขอบจะสลับไฟที่ขอบฝั่งตรงข้ามด้วย', hex: 'แตะหนึ่งครั้งจะสลับช่องนั้นและหกช่องรอบ ๆ' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `ผ่านด่าน ${n} แล้ว!`, result: (m, p) => `${m} ครั้ง · เป้า ${p}`, hintCap: 'ใช้คำใบ้แล้ว: ได้สูงสุด 2 ดาว', allDone: m => `คุณผ่านทุกด่านของ${m}แล้ว!`, starsLabel: n => `${n} จาก 3 ดาว`, levelLabel: (n, s) => `ด่าน ${n}${s ? ` ${s} ดาว` : ''}`, board: 'กระดานไฟ',
+      states: ['ดับ', 'ติด', 'ชมพู'], stateGold: 'ทอง', cell: (r, c, s) => `แถว ${r} ดวงที่ ${c}: ${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `ลองแถว ${r} ดวงที่ ${c}`, solvedSay: (m, p, s) => `ผ่านใน ${m} ครั้ง เป้า ${p} ได้ ${s} ดาว` },
+    ja: { level: 'レベル', moves: '手数', par: '目標', lit: '点灯', menu: 'レベル', undo: '戻す', hint: 'ヒント', restart: 'やり直し', intro: 'ライトをタップすると、そのライトと隣のライトが切り替わります。できるだけ少ない手数で全部消しましょう。', play: 'プレイ', resume: (m, n) => `続きから：${m} ${n}`, chooseLevel: 'レベルを選ぶ', allModes: 'モード一覧', close: '閉じる', next: '次のレベル', replay: 'もう一度', newBest: '自己ベスト！', locked: 'ロック中',
+      modes: { classic: ['クラシック', 'おなじみの5×5'], big: ['ビッグ盤面', '6×6〜9×9'], tri: ['3色', '黒 → 金 → ピンク → 黒'], wrap: ['ループ', '端が反対側とつながる'], hex: ['ヘックス', '隣が6つ'] },
+      notes: { classic: 'タップしたライトと上下左右のライトが切り替わります。', big: 'ルールは同じ、盤面は大きく。先を読もう！', tri: 'タップするたび次の色へ：黒 → 金 → ピンク → 黒。', wrap: '端のライトは反対側の端のライトも切り替えます。', hex: 'タップしたマスと周りの6マスが切り替わります。' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `レベル ${n} クリア！`, result: (m, p) => `${m}手 · 目標 ${p}手`, hintCap: 'ヒント使用：星は最大2つ', allDone: m => `${m}の全レベルをクリア！`, starsLabel: n => `星 ${n}/3`, levelLabel: (n, s) => `レベル ${n}${s ? `、星${s}` : ''}`, board: 'ライトの盤面',
+      states: ['消灯', '点灯', 'ピンク'], stateGold: '金', cell: (r, c, s) => `${r}行${c}番目：${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `${r}行${c}番目を試そう`, solvedSay: (m, p, s) => `${m}手でクリア、目標 ${p}手。星${s}つ。` },
+    ko: { level: '레벨', moves: '횟수', par: '목표', lit: '켜진 불', menu: '레벨', undo: '되돌리기', hint: '힌트', restart: '다시', intro: '불을 탭하면 그 불과 이웃한 불이 바뀌어요. 최대한 적은 탭으로 모든 불을 꺼 보세요.', play: '플레이', resume: (m, n) => `이어하기: ${m} ${n}`, chooseLevel: '레벨 선택', allModes: '모든 모드', close: '닫기', next: '다음 레벨', replay: '다시 하기', newBest: '최고 기록!', locked: '잠김',
+      modes: { classic: ['클래식', '오리지널 5×5 판'], big: ['큰 판', '6×6부터 9×9까지'], tri: ['세 가지 색', '어둠 → 금색 → 분홍 → 어둠'], wrap: ['연결된 가장자리', '가장자리가 반대편과 이어져요'], hex: ['육각형', '불마다 이웃이 여섯 개'] },
+      notes: { classic: '탭하면 그 불과 위·아래·왼쪽·오른쪽 불이 바뀌어요.', big: '규칙은 같고 판은 더 커요. 미리 생각하세요!', tri: '탭할 때마다 다음 색으로: 어둠 → 금색 → 분홍 → 어둠.', wrap: '가장자리 불은 반대편 가장자리 불도 바꿔요.', hex: '탭하면 그 칸과 주변 여섯 칸이 바뀌어요.' },
+      sub: (m, n, c) => `${m} · ${n}/${c}`, won: n => `레벨 ${n} 클리어!`, result: (m, p) => `${m}회 · 목표 ${p}회`, hintCap: '힌트 사용: 별 최대 2개', allDone: m => `${m}의 모든 레벨을 클리어했어요!`, starsLabel: n => `별 ${n}/3`, levelLabel: (n, s) => `레벨 ${n}${s ? `, 별 ${s}개` : ''}`, board: '불빛 판',
+      states: ['꺼짐', '켜짐', '분홍'], stateGold: '금색', cell: (r, c, s) => `${r}행 ${c}번째 불: ${s}`, progress: (a, b) => `★ ${a}/${b}`, hintSay: (r, c) => `${r}행 ${c}번째를 눌러 보세요`, solvedSay: (m, p, s) => `${m}회 만에 클리어, 목표 ${p}회. 별 ${s}개.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Each mode: board shape, modulus p (2 = on/off, 3 = three colours) and a list of [size, presses] per level.
+  const MODES = [
+    { id: 'classic', icon: '💡', shape: 'square', p: 2, levels: [[5, 3], [5, 3], [5, 4], [5, 4], [5, 5], [5, 5], [5, 6], [5, 6], [5, 7], [5, 7], [5, 8], [5, 8], [5, 9], [5, 9], [5, 10], [5, 10], [5, 11], [5, 12], [5, 13], [5, 15]] },
+    { id: 'big', icon: '🌃', shape: 'square', p: 2, levels: [[6, 6], [6, 8], [6, 10], [6, 12], [6, 14], [7, 9], [7, 11], [7, 13], [7, 15], [7, 18], [8, 12], [8, 15], [8, 18], [8, 21], [8, 24], [9, 14], [9, 18], [9, 22], [9, 26], [9, 30]] },
+    { id: 'tri', icon: '🎨', shape: 'square', p: 3, levels: [[3, 2], [3, 3], [4, 3], [4, 4], [4, 5], [4, 6], [4, 7], [5, 5], [5, 6], [5, 7], [5, 8], [5, 10], [6, 8], [6, 10], [6, 12], [6, 14]] },
+    { id: 'wrap', icon: '🍩', shape: 'torus', p: 2, levels: [[5, 3], [5, 4], [5, 5], [5, 6], [5, 7], [6, 5], [6, 6], [6, 8], [6, 10], [7, 7], [7, 9], [7, 11], [7, 13], [7, 15]] },
+    { id: 'hex', icon: '⬢', shape: 'hex', p: 2, levels: [[2, 3], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [3, 5], [3, 6], [3, 7], [3, 8], [3, 10], [3, 12], [4, 10], [4, 14]] },
+  ];
+  const STORAGE_KEY = 'milaan.lightsOut.progress';
+  const SQ3 = Math.sqrt(3);
+
+  const $ = id => document.getElementById(id);
+  const els = { board: $('board'), wrap: $('wrap'), sub: $('sub'), level: $('level'), moves: $('moves'), par: $('par'), lit: $('lit'), note: $('note'), announcer: $('announcer'), start: $('start'), modes: $('modes'), play: $('play'), levels: $('levels'), levelsTitle: $('levels-title'), levelGrid: $('level-grid'), win: $('win'), winTitle: $('win-title'), stars: $('stars'), result: $('result'), newBest: $('new-best'), next: $('next'), undo: $('undo-btn'), hint: $('hint-btn') };
+  els.board.setAttribute('aria-label', t.board);
+
+  const defaults = () => ({ stars: {}, best: {}, unlocked: {}, last: { mode: 'classic', level: 1 } });
+  const readProgress = () => { try { return { ...defaults(), ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return defaults(); } };
+  const saveProgress = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {} };
+  const say = text => { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = text; }, 30); };
+  const starText = n => `<b>${'★'.repeat(n)}</b>${'★'.repeat(3 - n)}`;
+  const modeById = id => MODES.find(m => m.id === id) || MODES[0];
+  const keyOf = (mode, n) => `${mode.id}-${n}`;
+  const unlockedIn = mode => Math.min(mode.levels.length, Math.max(1, progress.unlocked[mode.id] || 1));
+  const starsIn = mode => mode.levels.reduce((sum, _, i) => sum + (progress.stars[keyOf(mode, i + 1)] || 0), 0);
+
+  function mulberry32(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Geometry: cell centres (in cell units) plus, for each cell, the list of cells a tap affects (itself included).
+  function buildShape(shape, size) {
+    const cells = [];
+    if (shape === 'hex') {
+      for (let r = -size; r <= size; r++) {
+        for (let q = -size; q <= size; q++) {
+          if (Math.abs(q + r) > size) continue;
+          cells.push({ q, r, row: r + size + 1, col: 0, x: SQ3 * (q + r / 2), y: 1.5 * r });
+        }
+      }
+      let row = -1, col = 0;
+      for (const c of cells) { if (c.row !== row) { row = c.row; col = 0; } c.col = ++col; }
+      const index = new Map(cells.map((c, i) => [`${c.q},${c.r}`, i]));
+      const near = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+      cells.forEach((c, i) => { c.affects = [i, ...near.map(([dq, dr]) => index.get(`${c.q + dq},${c.r + dr}`)).filter(j => j !== undefined)]; });
+    } else {
+      for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) cells.push({ row: r + 1, col: c + 1, x: c, y: r });
+      cells.forEach((cell, i) => {
+        const r = cell.row - 1, c = cell.col - 1;
+        const list = [i];
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          let nr = r + dr, nc = c + dc;
+          if (shape === 'torus') { nr = (nr + size) % size; nc = (nc + size) % size; } else if (nr < 0 || nc < 0 || nr >= size || nc >= size) continue;
+          const j = nr * size + nc;
+          if (!list.includes(j)) list.push(j);
+        }
+        cell.affects = list;
+      });
+    }
+    return cells;
+  }
+
+  // Linear algebra over GF(p): A·x ≡ −b (mod p), where A[i][j] = 1 when tapping j changes i.
+  // Returns one particular solution and a basis of the null space (the taps that change nothing).
+  function eliminate(cells, b, p) {
+    const n = cells.length;
+    const M = cells.map(() => new Array(n + 1).fill(0));
+    cells.forEach((c, j) => { for (const i of c.affects) M[i][j] = 1; });
+    b.forEach((v, i) => { M[i][n] = (p - v) % p; });
+    const pivots = [];
+    let row = 0;
+    for (let col = 0; col < n && row < n; col++) {
+      let pr = row;
+      while (pr < n && M[pr][col] === 0) pr++;
+      if (pr === n) continue;
+      [M[row], M[pr]] = [M[pr], M[row]];
+      if (M[row][col] !== 1) { const inv = M[row][col]; for (let k = col; k <= n; k++) M[row][k] = (M[row][k] * inv) % p; } // in GF(3), 2⁻¹ = 2
+      for (let r = 0; r < n; r++) {
+        const f = M[r][col];
+        if (r === row || f === 0) continue;
+        for (let k = col; k <= n; k++) M[r][k] = (M[r][k] - f * M[row][k] % p + p * p) % p;
+      }
+      pivots.push(col);
+      row++;
+    }
+    for (let r = row; r < n; r++) if (M[r][n] !== 0) return null;
+    const x = new Array(n).fill(0);
+    pivots.forEach((col, r) => { x[col] = M[r][n]; });
+    const isPivot = new Set(pivots);
+    const basis = [];
+    for (let f = 0; f < n; f++) {
+      if (isPivot.has(f)) continue;
+      const v = new Array(n).fill(0);
+      v[f] = 1;
+      pivots.forEach((col, r) => { v[col] = (p - M[r][f]) % p; });
+      basis.push(v);
+    }
+    return { x, basis };
+  }
+
+  // The fewest taps: try every combination of null-space vectors (at most a few hundred on these boards).
+  function optimalTaps(cells, b, p) {
+    const sol = eliminate(cells, b, p);
+    if (!sol) return null;
+    const { x, basis } = sol;
+    const total = p ** basis.length;
+    let best = null, bestCost = Infinity;
+    for (let combo = 0; combo < total; combo++) {
+      const y = x.slice();
+      let k = combo;
+      for (const v of basis) { const c = k % p; k = Math.floor(k / p); if (c) for (let i = 0; i < y.length; i++) y[i] = (y[i] + c * v[i]) % p; }
+      const cost = y.reduce((s, v) => s + v, 0);
+      if (cost < bestCost) { bestCost = cost; best = y; }
+    }
+    return { taps: best, cost: bestCost };
+  }
+
+  const applyTap = (state, cells, j, p, times = 1) => { for (const i of cells[j].affects) state[i] = (state[i] + times) % p; };
+
+  // Levels are generated from fixed seeds: random taps on a dark board, so every start is solvable by construction.
+  const levelCache = new Map();
+  function getLevel(mode, n) {
+    const key = keyOf(mode, n);
+    if (levelCache.has(key)) return levelCache.get(key);
+    const [size, presses] = mode.levels[n - 1];
+    const cells = buildShape(mode.shape, size);
+    const rng = mulberry32(MODES.indexOf(mode) * 7919 + n * 104729 + 17);
+    let made = null;
+    for (let attempt = 0; attempt < 60 && !made; attempt++) {
+      const state = new Array(cells.length).fill(0);
+      const order = cells.map((_, i) => i).sort(() => rng() - 0.5).slice(0, Math.min(presses, cells.length));
+      for (const j of order) applyTap(state, cells, j, mode.p, mode.p === 3 && rng() < 0.4 ? 2 : 1);
+      if (state.every(v => v === 0)) continue;
+      const opt = optimalTaps(cells, state, mode.p);
+      if (!opt || opt.cost < Math.max(1, Math.ceil(presses * 0.75)) && attempt < 59) continue;
+      made = { size, cells, start: state, par: opt.cost };
+    }
+    levelCache.set(key, made);
+    return made;
+  }
+
+  let progress = readProgress();
+  let game = null;
+  let focusIndex = 0;
+  let hintTimer = 0;
+  let winTimer = 0;
+
+  function startLevel(mode, n) {
+    clearTimeout(winTimer);
+    const L = getLevel(mode, n);
+    game = { mode, n, L, state: L.start.slice(), history: [], hintUsed: false, done: false };
+    progress.last = { mode: mode.id, level: n };
+    saveProgress();
+    focusIndex = Math.min(focusIndex, L.cells.length - 1);
+    buildBoard();
+    els.note.textContent = t.notes[mode.id];
+    render();
+    for (const o of [els.start, els.levels, els.win]) o.hidden = true;
+  }
+
+  function buildBoard() {
+    const { cells } = game.L;
+    const hex = game.mode.shape === 'hex';
+    els.board.className = 'board' + (game.mode.shape === 'torus' ? ' wrap-mode' : '');
+    els.board.innerHTML = '';
+    cells.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cell' + (hex ? ' hex' : '');
+      b.dataset.i = i;
+      b.tabIndex = i === focusIndex ? 0 : -1;
+      els.board.appendChild(b);
+    });
+    layout();
+  }
+
+  // Fit the board into the free area: compute the cell unit from the bounding box of the centres.
+  function layout() {
+    if (!game) return;
+    const { cells } = game.L;
+    const hex = game.mode.shape === 'hex';
+    const W = els.wrap.clientWidth, H = els.wrap.clientHeight;
+    const xs = cells.map(c => c.x), ys = cells.map(c => c.y);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    const cw = hex ? SQ3 : 1, ch = hex ? 2 : 1;
+    const spanX = Math.max(...xs) - minX + cw, spanY = Math.max(...ys) - minY + ch;
+    const pad = game.mode.shape === 'torus' ? 14 : 4;
+    const unit = Math.max(4, Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY, hex ? 60 : 110));
+    els.board.style.width = `${spanX * unit}px`;
+    els.board.style.height = `${spanY * unit}px`;
+    const gap = hex ? 0.06 : 0.08;
+    [...els.board.children].forEach((b, i) => {
+      const c = cells[i];
+      b.style.left = `${(c.x - minX + cw * gap / 2) * unit}px`;
+      b.style.top = `${(c.y - minY + ch * gap / 2) * unit}px`;
+      b.style.width = `${cw * (1 - gap) * unit}px`;
+      b.style.height = `${ch * (1 - gap) * unit}px`;
+      b.style.fontSize = `${unit * (hex ? 1.4 : 0.9)}px`;
+    });
+  }
+
+  function stateName(v) { return v === 1 && game.mode.p === 3 ? t.stateGold : t.states[v]; }
+
+  function render() {
+    const { cells, par } = game.L;
+    [...els.board.children].forEach((b, i) => {
+      const v = game.state[i];
+      b.classList.toggle('s1', v === 1);
+      b.classList.toggle('s2', v === 2);
+      b.setAttribute('aria-label', t.cell(cells[i].row, cells[i].col, stateName(v)));
+    });
+    const count = game.mode.levels.length;
+    els.level.textContent = `${game.n}/${count}`;
+    els.moves.textContent = game.history.length;
+    els.par.textContent = par;
+    els.lit.textContent = game.state.filter(v => v).length;
+    els.sub.textContent = t.sub(t.modes[game.mode.id][0], game.n, count);
+    els.undo.disabled = !game.history.length || game.done;
+    els.hint.disabled = game.done;
+  }
+
+  function clearPreview() { for (const b of els.board.querySelectorAll('.preview')) b.classList.remove('preview'); }
+  function showPreview(i) {
+    clearPreview();
+    if (!game || game.done || !matchMedia('(hover: hover)').matches) return;
+    for (const j of game.L.cells[i].affects) els.board.children[j].classList.add('preview');
+  }
+
+  function tap(i) {
+    if (!game || game.done) return;
+    clearHint();
+    applyTap(game.state, game.L.cells, i, game.mode.p);
+    game.history.push(i);
+    render();
+    if (game.state.every(v => v === 0)) finish();
+  }
+
+  function undo() {
+    if (!game || game.done || !game.history.length) return;
+    clearHint();
+    applyTap(game.state, game.L.cells, game.history.pop(), game.mode.p, game.mode.p - 1);
+    render();
+  }
+
+  function clearHint() { clearTimeout(hintTimer); for (const b of els.board.querySelectorAll('.hinted')) b.classList.remove('hinted'); }
+
+  // A hint is one cell from a minimum-tap solution of the board as it is now.
+  function hint() {
+    if (!game || game.done) return;
+    const opt = optimalTaps(game.L.cells, game.state, game.mode.p);
+    if (!opt) return;
+    const i = opt.taps.findIndex(v => v > 0);
+    if (i < 0) return;
+    game.hintUsed = true;
+    clearHint();
+    const b = els.board.children[i];
+    b.classList.add('hinted');
+    setFocus(i);
+    const c = game.L.cells[i];
+    say(t.hintSay(c.row, c.col));
+    hintTimer = setTimeout(clearHint, 2600);
+  }
+
+  function starsFor(moves, par, hintUsed) {
+    const s = moves <= par ? 3 : moves <= Math.ceil(par * 1.5) + 1 ? 2 : 1;
+    return hintUsed ? Math.min(2, s) : s;
+  }
+
+  function finish() {
+    game.done = true;
+    clearPreview();
+    const { mode, n } = game;
+    const moves = game.history.length, par = game.L.par;
+    const stars = starsFor(moves, par, game.hintUsed);
+    const key = keyOf(mode, n);
+    const isBest = !progress.best[key] || moves < progress.best[key];
+    if (isBest) progress.best[key] = moves;
+    progress.stars[key] = Math.max(progress.stars[key] || 0, stars);
+    progress.unlocked[mode.id] = Math.max(unlockedIn(mode), Math.min(mode.levels.length, n + 1));
+    if (n < mode.levels.length) progress.last = { mode: mode.id, level: n + 1 };
+    saveProgress();
+    render();
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    [...els.board.children].forEach((b, i) => b.style.setProperty('--d', `${(game.L.cells[i].x + game.L.cells[i].y) * 40}ms`));
+    els.board.classList.add('won');
+    const last = n === mode.levels.length;
+    els.winTitle.textContent = last ? t.allDone(t.modes[mode.id][0]) : t.won(n);
+    els.stars.innerHTML = starText(stars);
+    els.stars.setAttribute('aria-label', t.starsLabel(stars));
+    els.result.textContent = t.result(moves, par) + (game.hintUsed ? ` · ${t.hintCap}` : '');
+    els.newBest.hidden = !(isBest && progress.best[key] !== undefined && moves <= par);
+    els.next.hidden = last;
+    say(t.solvedSay(moves, par, stars));
+    winTimer = setTimeout(() => { els.win.hidden = false; (last ? $('replay') : els.next).focus({ preventScroll: true }); }, reduce ? 150 : 900);
+  }
+
+  function setFocus(i) {
+    const kids = els.board.children;
+    if (!kids[i]) return;
+    for (const b of kids) b.tabIndex = -1;
+    kids[i].tabIndex = 0;
+    focusIndex = i;
+    kids[i].focus({ preventScroll: true });
+  }
+
+  // Arrow keys move to the nearest cell in that direction (works for square and hex boards alike).
+  function moveFocus(dx, dy) {
+    const cells = game.L.cells, from = cells[focusIndex];
+    const hex = game.mode.shape === 'hex';
+    let best = -1, bestScore = Infinity;
+    cells.forEach((c, i) => {
+      const vx = c.x - from.x, vy = c.y - from.y;
+      const along = vx * dx + vy * dy;
+      if (along <= 0.01) return;
+      const across = Math.abs(vx * dy - vy * dx);
+      if (!hex && across > 0.01) return;
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = i; }
+    });
+    if (best < 0 && game.mode.shape === 'torus') {
+      const n = game.L.size, r = from.row - 1, c = from.col - 1;
+      best = ((r + dy + n) % n) * n + (c + dx + n) % n;
+    }
+    if (best >= 0) setFocus(best);
+  }
+
+  function renderModes() {
+    els.modes.innerHTML = '';
+    for (const mode of MODES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mode-btn' + (progress.last.mode === mode.id ? ' current' : '');
+      const [name, desc] = t.modes[mode.id];
+      b.innerHTML = `<span class="ic" aria-hidden="true">${mode.icon}</span><span><strong></strong><small></small></span><em></em>`;
+      b.querySelector('strong').textContent = name;
+      b.querySelector('small').textContent = desc;
+      b.querySelector('em').textContent = t.progress(starsIn(mode), mode.levels.length * 3);
+      b.addEventListener('click', () => openLevels(mode));
+      els.modes.appendChild(b);
+    }
+    const last = modeById(progress.last.mode);
+    els.play.textContent = starsIn(last) || progress.last.level > 1 ? t.resume(t.modes[last.id][0], progress.last.level) : t.play;
+  }
+
+  function openStart() {
+    renderModes();
+    els.levels.hidden = true;
+    els.win.hidden = true;
+    els.start.hidden = false;
+    els.play.focus({ preventScroll: true });
+  }
+
+  function openLevels(mode) {
+    mode = mode || game.mode;
+    els.levelsTitle.textContent = `${mode.icon} ${t.modes[mode.id][0]}`;
+    els.levelGrid.innerHTML = '';
+    const open = unlockedIn(mode);
+    let focusBtn = null;
+    mode.levels.forEach((_, i) => {
+      const n = i + 1, s = progress.stars[keyOf(mode, n)] || 0;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'level-btn' + (game && game.mode === mode && game.n === n ? ' current' : '');
+      b.disabled = n > open;
+      b.innerHTML = `${n}<small>${'★'.repeat(s)}</small>`;
+      b.setAttribute('aria-label', n > open ? `${t.levelLabel(n, 0)}, ${t.locked}` : t.levelLabel(n, s));
+      b.addEventListener('click', () => { startLevel(mode, n); setFocus(focusIndex); });
+      els.levelGrid.appendChild(b);
+      if (n === open || (game && game.mode === mode && game.n === n)) focusBtn = b;
+    });
+    els.start.hidden = true;
+    els.win.hidden = true;
+    els.levels.hidden = false;
+    (focusBtn || els.levelGrid.firstChild).focus({ preventScroll: true });
+  }
+
+  els.board.addEventListener('click', e => {
+    const b = e.target.closest('.cell');
+    if (!b) return;
+    const i = Number(b.dataset.i);
+    for (const k of els.board.children) k.tabIndex = -1;
+    b.tabIndex = 0;
+    focusIndex = i;
+    tap(i);
+  });
+  els.board.addEventListener('pointerover', e => { const b = e.target.closest('.cell'); if (b) showPreview(Number(b.dataset.i)); });
+  els.board.addEventListener('pointerleave', clearPreview);
+  els.board.addEventListener('focusin', e => { const b = e.target.closest('.cell'); if (b) focusIndex = Number(b.dataset.i); });
+
+  document.addEventListener('keydown', e => {
+    if (!game || e.ctrlKey || e.metaKey || e.altKey) return;
+    const panelOpen = !els.start.hidden || !els.levels.hidden || !els.win.hidden;
+    if (panelOpen) return;
+    const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    if (dirs[e.key]) {
+      e.preventDefault();
+      if (!els.board.contains(document.activeElement)) setFocus(focusIndex); else moveFocus(...dirs[e.key]);
+    } else if ((e.key === ' ' || e.key === 'Enter') && els.board.contains(document.activeElement)) {
+      e.preventDefault();
+      tap(focusIndex);
+    } else if (e.key === 'u' || e.key === 'U' || (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); }
+    else if (e.key === 'h' || e.key === 'H') { e.preventDefault(); hint(); }
+    else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); startLevel(game.mode, game.n); setFocus(focusIndex); }
+  });
+
+  $('menu-btn').addEventListener('click', () => openLevels());
+  els.undo.addEventListener('click', undo);
+  els.hint.addEventListener('click', hint);
+  $('restart-btn').addEventListener('click', () => { startLevel(game.mode, game.n); });
+  els.play.addEventListener('click', () => { const m = modeById(progress.last.mode); startLevel(m, Math.min(progress.last.level, unlockedIn(m))); setFocus(focusIndex); });
+  $('levels-modes').addEventListener('click', openStart);
+  $('levels-close').addEventListener('click', () => { els.levels.hidden = true; if (game.done) els.win.hidden = false; else setFocus(focusIndex); });
+  els.next.addEventListener('click', () => { startLevel(game.mode, game.n + 1); setFocus(focusIndex); });
+  $('replay').addEventListener('click', () => { startLevel(game.mode, game.n); setFocus(focusIndex); });
+  $('win-levels').addEventListener('click', () => openLevels());
+
+  new ResizeObserver(layout).observe(els.wrap);
+
+  // Test hook: only automated browsers (Playwright) get it, so players cannot script the game from the console.
+  if (navigator.webdriver) window.__lightsOut = {
+    state: () => game && { mode: game.mode.id, level: game.n, p: game.mode.p, size: game.L.size, cells: game.L.cells.map(c => c.affects.slice()), state: game.state.slice(), par: game.L.par, moves: game.history.length, done: game.done, hintUsed: game.hintUsed, overlay: [els.start, els.levels, els.win].find(o => !o.hidden)?.id || null },
+    modes: () => MODES.map(m => ({ id: m.id, count: m.levels.length })),
+    level: (id, n) => { const L = getLevel(modeById(id), n); return L && { start: L.start.slice(), par: L.par, cells: L.cells.map(c => c.affects.slice()) }; },
+    cellCenter: i => { const r = els.board.children[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+  };
+
+  const m0 = modeById(progress.last.mode);
+  startLevel(m0, Math.min(progress.last.level || 1, unlockedIn(m0)));
+  openStart();
+})();
+</script>
+</body>
+</html>
