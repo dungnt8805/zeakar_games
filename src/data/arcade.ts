@@ -54,6 +54,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('sliding-puzzle', 'Sliding Puzzle', 'puzzle'),
 	game('jigsaw', 'Jigsaw Puzzle', 'puzzle'),
 	game('candy-rope', 'Candy Rope', 'puzzle'),
+	game('color-lines', 'Color Lines', 'puzzle'),
 	// Word
 	game('word-guess', 'Word Guess', 'word'),
 	game('word-search', 'Word Search', 'word'),
@@ -65,6 +66,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('math-rush', 'Math Rush', 'brain', 'math-challenge'),
 	game('memory-pairs', 'Memory Pairs', 'brain', 'memory-pairs'),
 	game('reaction-test', 'Reaction Test', 'brain'),
+	game('simon-says', 'Simon Says', 'brain'),
 	// Board & card
 	game('solitaire', 'Solitaire', 'board'),
 	game('spider-solitaire', 'Spider Solitaire', 'board'),
@@ -89,6 +91,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('four-in-a-row', 'Four in a Row', 'board'),
 	game('mancala', 'Mancala', 'board'),
 	game('gomoku', 'Gomoku', 'board'),
+	game('backgammon', 'Backgammon', 'board'),
 	// Skill
 	game('tower-stack', 'Tower Stack', 'skill'),
 	game('stack-up', 'Stack Up', 'skill'),
@@ -116,6 +119,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('bomb-blast', 'Bomb Blast', 'arcade'),
 	game('tank-duel', 'Tank Duel', 'arcade'),
 	game('city-defense', 'City Defense', 'arcade'),
+	game('jet-dash', 'Jet Dash', 'arcade'),
 	game('beat-dash', 'Beat Dash', 'arcade'),
 	game('rail-rush', 'Rail Rush', 'arcade'),
 	game('rooftop-duel', 'Rooftop Duel', 'arcade'),
@@ -148,6 +152,7 @@ export const ARCADE_GAMES: ArcadeGame[] = [
 	game('table-tennis', 'Table Tennis', 'sports'),
 	game('head-ball', 'Head Ball', 'sports'),
 	game('beach-volley', 'Beach Volley', 'sports'),
+	game('home-run', 'Home Run', 'sports'),
 	game('billiards', 'Billiards', 'sports'),
 	game('hoop-shot', 'Hoop Shot', 'sports'),
 	game('penalty-kick', 'Penalty Kick', 'sports'),

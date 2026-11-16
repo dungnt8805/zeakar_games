@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Backgammon</title>
+<style>
+:root {
+  --bg: #13100c;
+  --bg2: #2a2017;
+  --ink: #fff6ea;
+  --muted: #d8c4a6;
+  --frame: #6b3f1d;
+  --frame-hi: #8d5629;
+  --felt: #1f5c45;
+  --felt-dk: #174634;
+  --tri-a: #e8cf9f;
+  --tri-b: #a8382c;
+  --gold: #ffcf5a;
+  --c0: #f4ead7;
+  --c0-dk: #c9b896;
+  --c1: #2b2522;
+  --c1-dk: #0c0a09;
+  --paper: #2e2218;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: radial-gradient(ellipse at 50% 30%, var(--bg2), var(--bg) 70%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:disabled { cursor: default; opacity: .4; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+.app { position: relative; height: 100%; display: flex; flex-direction: column; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.hud { display: flex; align-items: center; gap: 6px; }
+.hud .grow { flex: 1; }
+.iconbtn { width: 40px; height: 40px; border-radius: 12px; background: #00000044; border: 1px solid #ffffff22; font-size: 16px; font-weight: 900; display: grid; place-items: center; flex: none; }
+.chip { padding: 4px 10px; border-radius: 12px; background: #00000044; border: 1px solid #ffffff22; font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.score { color: var(--gold); }
+.app.menu .hud, .app.menu .stage { visibility: hidden; }
+
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.wrap { flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center; overflow: hidden; }
+.stage > * { min-width: 0; }
+.side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.players { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.who { display: flex; align-items: center; gap: 7px; font-weight: 900; font-size: 14px; padding: 5px 12px; border-radius: 99px; background: #00000033; border: 2px solid transparent; transition: border-color .2s, background .2s; white-space: nowrap; }
+.who .dot { width: 14px; height: 14px; border-radius: 50%; }
+.who.p0 .dot { background: var(--c0); box-shadow: inset 0 -2px 0 var(--c0-dk); }
+.who.p1 .dot { background: var(--c1); box-shadow: inset 0 -2px 0 #000, 0 0 0 1px #ffffff55; }
+.who small { font-weight: 700; color: var(--muted); font-size: 12px; }
+.who.on { border-color: var(--gold); background: #ffcf5a22; }
+.ctrl { display: flex; gap: 8px; align-items: center; justify-content: center; }
+.ctrl .btn { flex: none; min-width: 96px; padding: 9px 14px; }
+.status { min-height: 20px; font-size: 14px; font-weight: 800; color: var(--gold); text-align: center; }
+
+.board { position: relative; border-radius: 10px; box-shadow: 0 16px 40px #000a; cursor: default; touch-action: manipulation; }
+.board svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 10px; }
+.board.pick { cursor: pointer; }
+.chk { position: absolute; border-radius: 50%; transition: left .32s cubic-bezier(.3,.7,.3,1), top .32s cubic-bezier(.3,.7,.3,1), height .2s, border-radius .2s; pointer-events: none; z-index: 2; }
+.chk.p0 { background: radial-gradient(circle at 50% 42%, #fffaf0 0 34%, var(--c0) 36% 60%, var(--c0-dk) 62%); box-shadow: 0 2px 3px #0008, inset 0 -2px 0 #0002; }
+.chk.p1 { background: radial-gradient(circle at 50% 42%, #4a403a 0 34%, var(--c1) 36% 60%, var(--c1-dk) 62%); box-shadow: 0 2px 3px #000a, inset 0 0 0 1px #ffffff30; }
+.chk.off { border-radius: 4px; }
+.board.noanim .chk { transition: none; }
+.chk.moving { z-index: 6; }
+.hl { position: absolute; border-radius: 50%; pointer-events: none; z-index: 4; }
+.hl.src { box-shadow: 0 0 0 2px var(--gold); }
+.hl.sel { box-shadow: 0 0 0 3px #fff, 0 0 14px 3px var(--gold); }
+.hl.tgt { background: #ffcf5a55; box-shadow: 0 0 0 2px var(--gold), 0 0 12px var(--gold); animation: pulse 1s ease-in-out infinite alternate; }
+.hl.tray { border-radius: 6px; }
+.hl.cur { box-shadow: 0 0 0 3px #5fd3ff, 0 0 12px #5fd3ff; z-index: 5; }
+@keyframes pulse { from { opacity: .55; } to { opacity: 1; } }
+.cnt { position: absolute; z-index: 3; transform: translate(-50%, -50%); font-weight: 900; pointer-events: none; }
+.cnt.p0 { color: #5a3f20; } .cnt.p1 { color: #f4ead7; }
+
+.dice { position: absolute; z-index: 5; display: flex; gap: 6px; align-items: center; justify-content: center; transform: translate(-50%, -50%); }
+.die { position: relative; border-radius: 18%; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 14%; box-shadow: 0 3px 6px #0009, inset 0 -3px 0 #0003; transition: opacity .2s, transform .2s; }
+.die.d0 { background: #fffaf0; } .die.d0 i { background: #2b2522; }
+.die.d1 { background: #3a312c; box-shadow: 0 3px 6px #0009, inset 0 0 0 1px #ffffff40; } .die.d1 i { background: #fffaf0; }
+.die i { width: 72%; height: 72%; margin: auto; border-radius: 50%; visibility: hidden; }
+.die i.on { visibility: visible; }
+.die.used { opacity: .35; transform: scale(.85); }
+.die.roll { animation: tumble .14s linear infinite; }
+@keyframes tumble { 0% { transform: rotate(0) translateY(0); } 50% { transform: rotate(18deg) translateY(-8%); } 100% { transform: rotate(-12deg) translateY(0); } }
+.rollbtn { padding: .5em 1.2em; border-radius: 99px; background: var(--gold); color: #3a2208; font-weight: 900; box-shadow: 0 4px 0 #a87a14, 0 6px 14px #0008; white-space: nowrap; animation: bob 1.1s ease-in-out infinite alternate; }
+@keyframes bob { to { transform: translateY(-3px); } }
+
+.toast { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%) scale(.9); padding: 8px 18px; border-radius: 99px; background: var(--gold); color: #3a2208; font-weight: 900; font-size: 19px; white-space: nowrap; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 8; box-shadow: 0 8px 20px #0008; }
+.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+.overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 8px; background: #0f0a06a8; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 400px); max-height: calc(100% - 8px); overflow-y: auto; padding: 18px 16px; border-radius: 22px; background: var(--paper); border: 2px solid #ffcf5a55; box-shadow: 0 20px 50px #000a; text-align: center; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.title { font-size: clamp(36px, 11vw, 54px); font-weight: 900; letter-spacing: -.02em; line-height: 1; color: var(--gold); text-shadow: 0 3px 0 var(--frame); }
+.tagline { margin-top: 10px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--muted); }
+.label { margin-top: 12px; font-size: 11px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.label[hidden], .seg[hidden] { display: none; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-top: 6px; }
+.seg button { padding: 9px 6px; border-radius: 14px; background: #463224; box-shadow: 0 3px 0 #1a100a; font-weight: 900; font-size: 15px; line-height: 1.2; }
+.seg button small { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #3a2208; box-shadow: 0 3px 0 #a87a14; }
+.seg button[aria-pressed="true"] small { color: #3a2208; opacity: .8; }
+.help { margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.45; }
+.panel h2 { font-size: 25px; font-weight: 900; }
+.sub { margin-top: 4px; font-size: 15px; font-weight: 800; color: var(--gold); }
+.scores { display: flex; justify-content: center; gap: 26px; margin-top: 12px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.row { display: flex; gap: 8px; margin-top: 14px; }
+.btn { flex: 1; padding: 12px; border-radius: 14px; background: #463224; box-shadow: 0 3px 0 #1a100a; font-size: 16px; font-weight: 900; }
+.btn.primary { background: var(--gold); color: #3a2208; box-shadow: 0 4px 0 #a87a14; }
+.btn.glow:not(:disabled) { animation: bob .8s ease-in-out infinite alternate; }
+.btn:active:not(:disabled), .seg button:active { transform: translateY(2px); }
+.record { margin-top: 10px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .stage { flex-direction: row; }
+  .side { width: 170px; flex: none; justify-content: center; }
+  .players { flex-direction: column; align-items: stretch; }
+  .ctrl { flex-direction: column; align-items: stretch; }
+  .ctrl .btn { padding: 8px 10px; }
+  .panel { padding: 10px 14px; }
+  .title { font-size: 32px; }
+  .tagline { display: none; }
+  .label { margin-top: 8px; }
+  .seg button { padding: 6px 6px; }
+  .help { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app menu" id="app">
+  <div class="hud">
+    <span class="chip" id="modechip"></span>
+    <span class="chip score" id="scorechip"></span>
+    <div class="grow"></div>
+    <button type="button" class="iconbtn" id="pause" data-i18n-label="pause">II</button>
+  </div>
+  <div class="stage">
+    <div class="wrap" id="wrap">
+      <div class="board" id="board" role="group" data-i18n-label="board">
+        <svg id="svg" viewBox="0 0 15.4 12.4" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="dice" id="diceL"></div>
+        <div class="dice" id="diceR"></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="players">
+        <div class="who p1" id="who1"><span class="dot"></span><span id="name1"></span><small id="pip1"></small></div>
+        <div class="who p0" id="who0"><span class="dot"></span><span id="name0"></span><small id="pip0"></small></div>
+      </div>
+      <div class="ctrl">
+        <button type="button" class="btn" id="undo" data-i18n="undo" disabled></button>
+        <button type="button" class="btn primary glow" id="done" data-i18n="done" disabled></button>
+      </div>
+      <p class="status" id="status" aria-hidden="true"></p>
+    </div>
+  </div>
+  <div class="toast" id="toast" aria-hidden="true"></div>
+
+  <div class="overlay" id="menu">
+    <div class="panel" role="dialog" aria-labelledby="menu-title">
+      <h1 class="title" id="menu-title">Backgammon</h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <p class="label" data-i18n="opponent"></p>
+      <div class="seg" id="seg-mode">
+        <button type="button" data-mode="ai" aria-pressed="true"><span data-i18n="vsAI"></span><small data-i18n="vsAIDesc"></small></button>
+        <button type="button" data-mode="pvp" aria-pressed="false"><span data-i18n="twoP"></span><small data-i18n="twoPDesc"></small></button>
+      </div>
+      <p class="label" id="lvl-label" data-i18n="level"></p>
+      <div class="seg" id="seg-lvl">
+        <button type="button" data-lvl="0" aria-pressed="false" data-i18n="easy"></button>
+        <button type="button" data-lvl="1" aria-pressed="true" data-i18n="normal"></button>
+        <button type="button" data-lvl="2" aria-pressed="false" data-i18n="hard"></button>
+      </div>
+      <p class="label" data-i18n="matchLen"></p>
+      <div class="seg" id="seg-len">
+        <button type="button" data-len="1" aria-pressed="false">1<small class="pw"></small></button>
+        <button type="button" data-len="3" aria-pressed="true">3<small class="pw"></small></button>
+        <button type="button" data-len="5" aria-pressed="false">5<small class="pw"></small></button>
+      </div>
+      <div class="row"><button type="button" class="btn primary" id="start" data-i18n="start"></button></div>
+      <p class="record" id="record"></p>
+      <p class="help" id="help"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="panel" role="dialog" aria-labelledby="paused-title">
+      <h2 id="paused-title" data-i18n="paused"></h2>
+      <p class="help" data-i18n="rules"></p>
+      <div class="row"><button type="button" class="btn" id="quit" data-i18n="menu"></button><button type="button" class="btn primary" id="resume" data-i18n="resume"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="panel" role="dialog" aria-labelledby="over-title">
+      <h2 id="over-title"></h2>
+      <p class="sub" id="osub"></p>
+      <div class="scores">
+        <div><small id="ol0"></small><strong id="os0">0</strong></div>
+        <div><small id="ol1"></small><strong id="os1">0</strong></div>
+      </div>
+      <p class="record" id="orecord"></p>
+      <div class="row"><button type="button" class="btn" id="omenu" data-i18n="menu"></button><button type="button" class="btn primary" id="onext"></button></div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'The classic race of skill and luck. Hit blots, build primes and bear off all 15 checkers first.', opponent: 'Opponent', vsAI: 'Computer', vsAIDesc: 'Play the AI', twoP: '2 Players', twoPDesc: 'Same device', level: 'Level', easy: 'Easy', normal: 'Normal', hard: 'Hard', matchLen: 'Match length', pw: n => (n === 1 ? 'point' : 'points'), start: 'Play', helpKeys: 'Click a checker, then a glowing spot · ← → and Enter to choose · R roll · U undo · D done · P pause', helpTouch: 'Tap a checker, then tap a glowing spot to move it', you: 'You', cpu: 'Computer', white: 'White', black: 'Black', roll: 'Roll', undo: 'Undo', done: 'Done', turnOf: n => `${n} to move`, rollPrompt: n => `${n}: roll the dice`, thinking: 'Computer is playing…', noMoves: 'No legal moves', starts: (n, a, b) => `Opening roll ${a}–${b}: ${n} starts`, tie: 'Tie — roll again', rolled: (n, a, b) => `${n} rolled ${a} and ${b}`, bar: 'bar', off: 'off', moved: (a, b) => `${a} to ${b}`, hit: 'Hit!', allUsed: 'Dice used — press Done', paused: 'Paused', resume: 'Resume', menu: 'Menu', rules: 'Move your checkers around the board toward your home board using the dice. A lone checker (blot) can be hit and sent to the bar, and must re-enter before anything else moves. Doubles are played four times. You must use both dice when possible, otherwise the larger one. With all 15 at home, bear them off. Gammon (loser bore off none) scores 2, backgammon 3.', board: 'Backgammon board', pause: 'Pause', single: 'Single game · +1', gammon: 'Gammon! · +2', backgammon: 'Backgammon! · +3', gameWon: n => `${n} won the game`, win: 'You win the match!', lose: 'You lose the match', wins: n => `${n} wins the match!`, next: 'Next game', retry: 'Play again', record: (w, l) => `Matches vs computer: ${w} W · ${l} L`, modeAI: l => `vs Computer · ${l}`, modePvP: '2 Players', score: (a, b, n) => `${a} – ${b} · to ${n}`, pips: n => `${n} pips`, point: n => `point ${n}` },
+    vi: { tagline: 'Cuộc đua kinh điển giữa kỹ năng và may mắn. Đánh quân lẻ, lập hàng rào và đưa cả 15 quân ra ngoài trước.', opponent: 'Đối thủ', vsAI: 'Máy', vsAIDesc: 'Đấu với máy', twoP: '2 người', twoPDesc: 'Cùng một máy', level: 'Độ khó', easy: 'Dễ', normal: 'Thường', hard: 'Khó', matchLen: 'Độ dài trận', pw: () => 'điểm', start: 'Chơi', helpKeys: 'Nhấn một quân rồi nhấn ô đang sáng · ← → và Enter để chọn · R gieo · U hoàn tác · D xong · P tạm dừng', helpTouch: 'Chạm một quân, rồi chạm ô đang sáng để di chuyển', you: 'Bạn', cpu: 'Máy', white: 'Trắng', black: 'Đen', roll: 'Gieo', undo: 'Hoàn tác', done: 'Xong', turnOf: n => `Lượt của ${n}`, rollPrompt: n => `${n}: hãy gieo xúc xắc`, thinking: 'Máy đang đi…', noMoves: 'Không có nước đi hợp lệ', starts: (n, a, b) => `Gieo mở màn ${a}–${b}: ${n} đi trước`, tie: 'Hòa — gieo lại', rolled: (n, a, b) => `${n} gieo được ${a} và ${b}`, bar: 'thanh giữa', off: 'ra ngoài', moved: (a, b) => `${a} đến ${b}`, hit: 'Đánh trúng!', allUsed: 'Đã dùng hết xúc xắc — nhấn Xong', paused: 'Tạm dừng', resume: 'Tiếp tục', menu: 'Menu', rules: 'Di chuyển quân quanh bàn về khu nhà theo số xúc xắc. Quân đứng lẻ có thể bị đánh và đưa lên thanh giữa, phải vào lại bàn trước khi đi quân khác. Đổ đôi được đi bốn lần. Phải dùng cả hai xúc xắc nếu có thể, nếu không thì dùng số lớn hơn. Khi cả 15 quân về nhà, hãy đưa chúng ra ngoài. Gammon (bên thua chưa ra quân nào) được 2 điểm, backgammon 3 điểm.', board: 'Bàn cờ Backgammon', pause: 'Tạm dừng', single: 'Thắng thường · +1', gammon: 'Gammon! · +2', backgammon: 'Backgammon! · +3', gameWon: n => `${n} thắng ván này`, win: 'Bạn thắng trận!', lose: 'Bạn thua trận', wins: n => `${n} thắng trận!`, next: 'Ván tiếp', retry: 'Chơi lại', record: (w, l) => `Trận với máy: ${w} thắng · ${l} thua`, modeAI: l => `Đấu máy · ${l}`, modePvP: '2 người', score: (a, b, n) => `${a} – ${b} · đến ${n}`, pips: n => `${n} bước`, point: n => `ô ${n}` },
+    zh: { tagline: '技巧与运气的经典竞速。打击孤子，筑起封锁，率先移出全部 15 枚棋子。', opponent: '对手', vsAI: '电脑', vsAIDesc: '与 AI 对战', twoP: '双人', twoPDesc: '同一设备', level: '难度', easy: '简单', normal: '普通', hard: '困难', matchLen: '比赛分数', pw: () => '分', start: '开始', helpKeys: '点击棋子，再点击发光位置 · ← → 和 Enter 选择 · R 掷骰 · U 撤销 · D 完成 · P 暂停', helpTouch: '点击一枚棋子，再点击发光位置移动', you: '你', cpu: '电脑', white: '白方', black: '黑方', roll: '掷骰', undo: '撤销', done: '完成', turnOf: n => `轮到${n}`, rollPrompt: n => `${n}：请掷骰子`, thinking: '电脑行棋中…', noMoves: '没有合法走法', starts: (n, a, b) => `开局掷骰 ${a}–${b}：${n}先走`, tie: '平点，重掷', rolled: (n, a, b) => `${n}掷出 ${a} 和 ${b}`, bar: '中栏', off: '移出', moved: (a, b) => `${a} 到 ${b}`, hit: '打中！', allUsed: '骰子已用完，请按完成', paused: '已暂停', resume: '继续', menu: '菜单', rules: '按骰子点数将棋子沿棋盘移向自己的内盘。单独的棋子（孤子）可被打到中栏，必须先重新进场才能移动其他棋子。掷出对子走四次。能用两个骰子就必须都用，否则用较大的点数。15 枚棋子全部进入内盘后即可移出。全胜（对方一枚未移出）得 2 分，完胜得 3 分。', board: '双陆棋盘', pause: '暂停', single: '普通胜 · +1', gammon: '全胜！· +2', backgammon: '完胜！· +3', gameWon: n => `${n}赢得本局`, win: '你赢得比赛！', lose: '你输掉比赛', wins: n => `${n}赢得比赛！`, next: '下一局', retry: '再来一场', record: (w, l) => `对电脑比赛：${w} 胜 · ${l} 负`, modeAI: l => `对战电脑 · ${l}`, modePvP: '双人', score: (a, b, n) => `${a} – ${b} · 目标 ${n}`, pips: n => `${n} 点`, point: n => `第 ${n} 点` },
+    fr: { tagline: 'La course classique d’adresse et de chance. Frappez les dames isolées, bâtissez des primes et sortez vos 15 dames en premier.', opponent: 'Adversaire', vsAI: 'Ordinateur', vsAIDesc: 'Contre l’IA', twoP: '2 joueurs', twoPDesc: 'Même appareil', level: 'Niveau', easy: 'Facile', normal: 'Normal', hard: 'Difficile', matchLen: 'Longueur du match', pw: n => (n === 1 ? 'point' : 'points'), start: 'Jouer', helpKeys: 'Cliquez une dame puis une case lumineuse · ← → et Entrée pour choisir · R lancer · U annuler · D valider · P pause', helpTouch: 'Touchez une dame, puis une case lumineuse pour la déplacer', you: 'Vous', cpu: 'Ordinateur', white: 'Blancs', black: 'Noirs', roll: 'Lancer', undo: 'Annuler', done: 'Valider', turnOf: n => `À ${n} de jouer`, rollPrompt: n => `${n} : lancez les dés`, thinking: 'L’ordinateur joue…', noMoves: 'Aucun coup possible', starts: (n, a, b) => `Lancer d’ouverture ${a}–${b} : ${n} commence`, tie: 'Égalité — relancez', rolled: (n, a, b) => `${n} : ${a} et ${b}`, bar: 'barre', off: 'sortie', moved: (a, b) => `${a} vers ${b}`, hit: 'Frappé !', allUsed: 'Dés utilisés — appuyez sur Valider', paused: 'Pause', resume: 'Reprendre', menu: 'Menu', rules: 'Avancez vos dames vers votre jan intérieur selon les dés. Une dame seule peut être frappée et envoyée sur la barre ; elle doit rentrer avant tout autre mouvement. Les doubles se jouent quatre fois. Vous devez jouer les deux dés si possible, sinon le plus grand. Quand vos 15 dames sont rentrées, sortez-les. Gammon (perdant sans dame sortie) : 2 points, backgammon : 3.', board: 'Plateau de backgammon', pause: 'Pause', single: 'Partie simple · +1', gammon: 'Gammon ! · +2', backgammon: 'Backgammon ! · +3', gameWon: n => `${n} gagne la partie`, win: 'Vous gagnez le match !', lose: 'Vous perdez le match', wins: n => `${n} gagne le match !`, next: 'Partie suivante', retry: 'Rejouer', record: (w, l) => `Matchs contre l’ordinateur : ${w} V · ${l} D`, modeAI: l => `Contre l’ordinateur · ${l}`, modePvP: '2 joueurs', score: (a, b, n) => `${a} – ${b} · en ${n}`, pips: n => `${n} pips`, point: n => `flèche ${n}` },
+    th: { tagline: 'เกมแข่งขันคลาสสิกที่ผสมฝีมือและโชค ตีหมากเดี่ยว สร้างกำแพง และนำหมากทั้ง 15 ตัวออกก่อน', opponent: 'คู่แข่ง', vsAI: 'คอมพิวเตอร์', vsAIDesc: 'เล่นกับ AI', twoP: '2 คน', twoPDesc: 'เครื่องเดียวกัน', level: 'ระดับ', easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก', matchLen: 'ความยาวแมตช์', pw: () => 'แต้ม', start: 'เล่น', helpKeys: 'คลิกหมาก แล้วคลิกจุดที่เรืองแสง · ← → และ Enter เพื่อเลือก · R ทอย · U ย้อน · D เสร็จ · P หยุดชั่วคราว', helpTouch: 'แตะหมาก แล้วแตะจุดที่เรืองแสงเพื่อเดิน', you: 'คุณ', cpu: 'คอมพิวเตอร์', white: 'ขาว', black: 'ดำ', roll: 'ทอย', undo: 'ย้อน', done: 'เสร็จ', turnOf: n => `ตาของ${n}`, rollPrompt: n => `${n}: ทอยลูกเต๋า`, thinking: 'คอมพิวเตอร์กำลังเดิน…', noMoves: 'ไม่มีตาเดินที่ถูกกติกา', starts: (n, a, b) => `ทอยเปิดเกม ${a}–${b}: ${n}เริ่มก่อน`, tie: 'เสมอ — ทอยใหม่', rolled: (n, a, b) => `${n}ทอยได้ ${a} และ ${b}`, bar: 'บาร์', off: 'ออก', moved: (a, b) => `${a} ไป ${b}`, hit: 'ตีโดน!', allUsed: 'ใช้ลูกเต๋าครบแล้ว — กดเสร็จ', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', rules: 'เดินหมากรอบกระดานเข้าสู่บ้านของคุณตามแต้มลูกเต๋า หมากที่อยู่เดี่ยวอาจถูกตีไปที่บาร์ และต้องกลับเข้ากระดานก่อนเดินหมากอื่น ทอยได้เลขคู่เดินสี่ครั้ง ต้องใช้ลูกเต๋าทั้งสองลูกถ้าทำได้ ไม่เช่นนั้นใช้แต้มที่มากกว่า เมื่อหมากทั้ง 15 ตัวอยู่ในบ้านแล้วจึงนำออกได้ แกมมอน (ฝ่ายแพ้ยังไม่ได้นำหมากออก) ได้ 2 แต้ม แบ็กแกมมอนได้ 3', board: 'กระดานแบ็กแกมมอน', pause: 'หยุดชั่วคราว', single: 'ชนะปกติ · +1', gammon: 'แกมมอน! · +2', backgammon: 'แบ็กแกมมอน! · +3', gameWon: n => `${n}ชนะเกมนี้`, win: 'คุณชนะแมตช์!', lose: 'คุณแพ้แมตช์', wins: n => `${n}ชนะแมตช์!`, next: 'เกมถัดไป', retry: 'เล่นอีกครั้ง', record: (w, l) => `แมตช์กับคอมพิวเตอร์: ชนะ ${w} · แพ้ ${l}`, modeAI: l => `กับคอมพิวเตอร์ · ${l}`, modePvP: '2 คน', score: (a, b, n) => `${a} – ${b} · ถึง ${n}`, pips: n => `${n} ช่อง`, point: n => `ช่อง ${n}` },
+    ja: { tagline: '技と運の古典的レース。ブロットをヒットし、プライムを築き、15 個の駒を先に上げ切ろう。', opponent: '対戦相手', vsAI: 'コンピューター', vsAIDesc: 'AI と対戦', twoP: '2人対戦', twoPDesc: '同じ端末で', level: 'レベル', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', matchLen: 'マッチの長さ', pw: () => 'ポイント', start: 'プレイ', helpKeys: '駒をクリックし、光る場所をクリック · ← → と Enter で選択 · R ロール · U 取り消し · D 完了 · P 一時停止', helpTouch: '駒をタップし、光る場所をタップして動かそう', you: 'あなた', cpu: 'コンピューター', white: '白', black: '黒', roll: 'ロール', undo: '取り消し', done: '完了', turnOf: n => `${n}の番`, rollPrompt: n => `${n}：サイコロを振ろう`, thinking: 'コンピューターが指しています…', noMoves: '動かせる手がありません', starts: (n, a, b) => `オープニングロール ${a}–${b}：${n}が先手`, tie: '同じ目 — 振り直し', rolled: (n, a, b) => `${n}は ${a} と ${b}`, bar: 'バー', off: '上がり', moved: (a, b) => `${a} から ${b}`, hit: 'ヒット！', allUsed: 'サイコロを使い切りました — 完了を押そう', paused: '一時停止中', resume: '再開', menu: 'メニュー', rules: 'サイコロの目に従って駒をインナーボードへ進めます。1 個だけの駒（ブロット）はヒットされるとバーに送られ、他の駒より先に再エントリーが必要です。ゾロ目は 4 回動けます。両方の目を使えるなら必ず両方、無理なら大きい目を使います。15 個すべてがインナーボードに入ったらベアオフ。ギャモン（敗者が 1 個も上がっていない）は 2 点、バックギャモンは 3 点。', board: 'バックギャモン盤', pause: '一時停止', single: 'シングル勝ち · +1', gammon: 'ギャモン！· +2', backgammon: 'バックギャモン！· +3', gameWon: n => `${n}がこのゲームに勝利`, win: 'マッチに勝利！', lose: 'マッチに敗北', wins: n => `${n}がマッチに勝利！`, next: '次のゲーム', retry: 'もう一度', record: (w, l) => `対コンピューターのマッチ：${w}勝 · ${l}敗`, modeAI: l => `対コンピューター · ${l}`, modePvP: '2人対戦', score: (a, b, n) => `${a} – ${b} · ${n}点先取`, pips: n => `${n} ピップ`, point: n => `${n} ポイント` },
+    ko: { tagline: '실력과 운이 겨루는 고전 레이스. 블롯을 치고, 프라임을 쌓고, 15개의 말을 먼저 모두 빼내세요.', opponent: '상대', vsAI: '컴퓨터', vsAIDesc: 'AI와 대전', twoP: '2인용', twoPDesc: '같은 기기', level: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', matchLen: '매치 길이', pw: () => '점', start: '시작', helpKeys: '말을 클릭한 뒤 빛나는 곳을 클릭 · ← → 와 Enter로 선택 · R 굴리기 · U 되돌리기 · D 완료 · P 일시정지', helpTouch: '말을 탭한 뒤 빛나는 곳을 탭해 이동하세요', you: '나', cpu: '컴퓨터', white: '흰색', black: '검은색', roll: '굴리기', undo: '되돌리기', done: '완료', turnOf: n => `${n} 차례`, rollPrompt: n => `${n}: 주사위를 굴리세요`, thinking: '컴퓨터가 두는 중…', noMoves: '가능한 수가 없습니다', starts: (n, a, b) => `첫 굴림 ${a}–${b}: ${n} 먼저 시작`, tie: '동점 — 다시 굴리기', rolled: (n, a, b) => `${n}: ${a}, ${b}`, bar: '바', off: '베어오프', moved: (a, b) => `${a}에서 ${b}`, hit: '히트!', allUsed: '주사위를 모두 썼어요 — 완료를 누르세요', paused: '일시정지', resume: '계속', menu: '메뉴', rules: '주사위 눈만큼 말을 홈 보드 쪽으로 옮깁니다. 혼자 있는 말(블롯)은 맞으면 바로 보내지고, 다른 말보다 먼저 다시 들어와야 합니다. 더블은 네 번 움직입니다. 두 주사위를 모두 쓸 수 있으면 반드시 모두, 아니면 큰 수를 씁니다. 15개가 모두 홈에 들어오면 베어오프합니다. 개먼(패자가 하나도 못 뺌)은 2점, 백개먼은 3점.', board: '백개먼 판', pause: '일시정지', single: '일반 승리 · +1', gammon: '개먼! · +2', backgammon: '백개먼! · +3', gameWon: n => `${n} 이번 게임 승리`, win: '매치 승리!', lose: '매치 패배', wins: n => `${n} 매치 승리!`, next: '다음 게임', retry: '다시 하기', record: (w, l) => `컴퓨터 상대 매치: ${w}승 · ${l}패`, modeAI: l => `컴퓨터 대전 · ${l}`, modePvP: '2인용', score: (a, b, n) => `${a} – ${b} · ${n}점 선승`, pips: n => `${n} 핍`, point: n => `${n}번 포인트` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+  for (const el of document.querySelectorAll('#seg-len button')) el.querySelector('.pw').textContent = t.pw(+el.dataset.len);
+
+  const KEY = s => `milaan.backgammon.${s}`;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const $ = id => document.getElementById(id);
+  const app = $('app'), boardEl = $('board'), svg = $('svg');
+  function load(k, d) { try { const v = localStorage.getItem(KEY(k)); return v == null ? d : JSON.parse(v); } catch { return d; } }
+  function save(k, v) { try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch { /* storage blocked */ } }
+  const settings = Object.assign({ mode: 'ai', lvl: 1, len: 3 }, load('settings', {}));
+  const rec = Object.assign({ w: 0, l: 0 }, load('record', {}));
+  const LVLS = [t.easy, t.normal, t.hard];
+
+  // ---------- rules ----------
+  // b[0..23]: points (+ = player 0 / white, − = player 1 / black). b[24+p]: bar, b[26+p]: borne off.
+  // White moves 23 → 0 (home 0–5); black moves 0 → 23 (home 18–23). Move codes: f 24 = bar, t 25 = off.
+  const BAR = 24, OFF = 25;
+  const sg = p => (p ? -1 : 1);
+  const pipOf = (p, i) => (p ? 24 - i : i + 1);
+  const idxOf = (p, q) => (p ? 24 - q : q - 1);
+  const own = (b, p, i) => Math.max(0, b[i] * sg(p));
+  function initial() {
+    const b = new Array(28).fill(0);
+    b[23] = 2; b[12] = 5; b[7] = 3; b[5] = 5;
+    b[0] = -2; b[11] = -5; b[16] = -3; b[18] = -5;
+    return b;
+  }
+  function singles(b, p, d) {
+    const r = [], s = sg(p);
+    if (b[24 + p] > 0) { const i = idxOf(p, 25 - d); if (b[i] * s >= -1) r.push({ f: BAR, t: i, d }); return r; }
+    let home = true, maxQ = 0;
+    for (let i = 0; i < 24; i++) if (b[i] * s > 0) { const q = pipOf(p, i); if (q > 6) home = false; if (q > maxQ) maxQ = q; }
+    for (let i = 0; i < 24; i++) {
+      if (b[i] * s <= 0) continue;
+      const q = pipOf(p, i), tq = q - d;
+      if (tq >= 1) { const j = idxOf(p, tq); if (b[j] * s >= -1) r.push({ f: i, t: j, d }); }
+      else if (home && (tq === 0 || q === maxQ)) r.push({ f: i, t: OFF, d });
+    }
+    return r;
+  }
+  function apply(b, p, m) {
+    const s = sg(p);
+    if (m.f === BAR) b[24 + p]--; else b[m.f] -= s;
+    if (m.t === OFF) { b[26 + p]++; return false; }
+    let hit = false;
+    if (b[m.t] * s === -1) { b[m.t] = 0; b[25 - p]++; hit = true; }
+    b[m.t] += s;
+    return hit;
+  }
+  function allSeqs(b, p, dice) {
+    const out = []; let maxLen = 0;
+    const rec2 = (bb, rem, seq) => {
+      let any = false; const tried = new Set();
+      for (let k = 0; k < rem.length; k++) {
+        const d = rem[k]; if (tried.has(d)) continue; tried.add(d);
+        const nr = rem.slice(); nr.splice(k, 1);
+        for (const m of singles(bb, p, d)) {
+          any = true; const c = bb.slice(); const hit = apply(c, p, m);
+          rec2(c, nr, seq.concat([{ f: m.f, t: m.t, d, hit }]));
+        }
+      }
+      if (!any) { out.push({ seq, b: bb }); if (seq.length > maxLen) maxLen = seq.length; }
+    };
+    rec2(b, dice, []);
+    let res = out.filter(o => o.seq.length === maxLen);
+    if (maxLen === 1 && dice.length === 2 && dice[0] !== dice[1]) {
+      const hi = Math.max(dice[0], dice[1]);
+      if (res.some(o => o.seq[0].d === hi)) res = res.filter(o => o.seq[0].d === hi);
+    }
+    return { res, maxLen };
+  }
+  function gameValue(b, w) {
+    const l = 1 - w;
+    if (b[26 + l] > 0) return 1;
+    if (b[24 + l] > 0) return 3;
+    for (let i = 0; i < 24; i++) if (own(b, l, i) > 0 && pipOf(w, i) <= 6) return 3;
+    return 2;
+  }
+  function pipCount(b, p) { let n = b[24 + p] * 25; for (let i = 0; i < 24; i++) n += own(b, p, i) * pipOf(p, i); return n; }
+
+  // ---------- AI ----------
+  function evalPos(b, p, lvl) {
+    const s = sg(p), mine = new Array(26).fill(0), opp = new Array(26).fill(0);
+    let myPip = 0, opPip = 0, myMax = 0, oppMin = 25;
+    for (let i = 0; i < 24; i++) {
+      const v = b[i] * s; if (!v) continue;
+      const q = pipOf(p, i);
+      if (v > 0) { mine[q] = v; myPip += v * q; if (q > myMax) myMax = q; } else { opp[q] = -v; opPip += -v * (25 - q); if (q < oppMin) oppMin = q; }
+    }
+    const myBar = b[24 + p], opBar = b[25 - p];
+    myPip += myBar * 25; opPip += opBar * 25;
+    if (myBar) myMax = 25; if (opBar) oppMin = 0;
+    let sc = opPip - myPip;
+    if (myMax < oppMin) return sc + b[26 + p] * 2 - b[27 - p] * 2; // pure race
+    let run = 0, best = 0, homeMade = 0, oppHome = 0;
+    for (let q = 1; q <= 24; q++) {
+      if (mine[q] >= 2) {
+        if (q <= 6) homeMade++;
+        sc += q <= 6 ? 2.5 + (q === 4 || q === 5 ? 1.5 : 0) : q === 7 ? 2.5 : q <= 11 ? 1.5 : q >= 19 ? 2 : 0.6;
+        run++; if (run > best) best = run;
+        if (mine[q] > 3) sc -= (mine[q] - 3) * (lvl >= 2 ? 1 : 0.6);
+      } else run = 0;
+      if (opp[q] >= 2 && q >= 19) oppHome++;
+    }
+    if (best >= 3) sc += (best - 2) * (best - 2) * 1.6;
+    sc += opBar * (4 + homeMade * 1.6);
+    sc -= myBar * (4 + oppHome * 1.6);
+    if (lvl >= 2) {
+      // expected loss from hits over all 36 rolls (ignores blocking)
+      const blots = []; for (let q = 1; q <= 24; q++) if (mine[q] === 1 && q > oppMin) blots.push(q);
+      if (blots.length) {
+        let loss = 0;
+        for (let a = 1; a <= 6; a++) for (let c = 1; c <= 6; c++) {
+          const ds = a === c ? [a, 2 * a, 3 * a, 4 * a] : [a, c, a + c];
+          let worst = 0;
+          for (const q of blots) for (const dist of ds) {
+            const src = q - dist; if (src < 0) continue;
+            if (src === 0 ? opBar > 0 : opp[src] > 0) { const v = 25 - q + 8 + oppHome * 2; if (v > worst) worst = v; break; }
+          }
+          loss += worst;
+        }
+        sc -= loss / 36 * 1.3;
+      }
+      for (let q = 1; q <= 24; q++) if (opp[q] === 1 && q < myMax) sc += q <= 12 ? 0.8 : 0.3;
+    } else {
+      for (let q = 1; q <= 24; q++) if (mine[q] === 1 && q > oppMin) { const near = q - oppMin <= 12; sc -= near ? 2 + (25 - q) * 0.15 : 0.5; }
+    }
+    return sc;
+  }
+  function aiChoose(b, p, dice, lvl) {
+    const { res } = allSeqs(b, p, dice);
+    if (!res.length || !res[0].seq.length) return [];
+    const uniq = new Map(); for (const o of res) { const k = o.b.join(','); if (!uniq.has(k)) uniq.set(k, o); }
+    const opts = [...uniq.values()];
+    if (lvl === 0 && Math.random() < 0.3) return opts[Math.floor(Math.random() * opts.length)].seq;
+    let bestV = -Infinity, pick = opts[0];
+    const noise = [14, 1.5, 0][lvl];
+    for (const o of opts) { const v = evalPos(o.b, p, lvl) + (Math.random() - 0.5) * noise; if (v > bestV) { bestV = v; pick = o; } }
+    return pick.seq;
+  }
+
+  // ---------- geometry (board units) ----------
+  const W = 15.4, H = 12.4;
+  function colX(i) { if (i < 6) return 7.6 + (5 - i) + 0.5; if (i < 12) return 0.4 + (11 - i) + 0.5; if (i < 18) return 0.4 + (i - 12) + 0.5; return 7.6 + (i - 18) + 0.5; }
+  function slotXY(key, k, n) {
+    if (typeof key === 'number') { const sp = n > 5 ? 4 / (n - 1) : 1, o = 0.5 + k * sp; return [colX(key), key >= 12 ? 0.4 + o : 12 - o]; }
+    const sp = n > 4 ? 3.4 / (n - 1) : 0.95;
+    if (key === 'b0') return [7, 7.6 + k * sp];
+    if (key === 'b1') return [7, 4.8 - k * sp];
+    if (key === 'o0') return [14.5, 11.8 - k * 0.3];
+    return [14.5, 0.6 + k * 0.3];
+  }
+  function buildSvg() {
+    let h = '';
+    h += `<rect x="0" y="0" width="${W}" height="${H}" fill="var(--frame)"/>`;
+    h += `<rect x="0.4" y="0.4" width="6" height="11.6" fill="var(--felt)"/><rect x="7.6" y="0.4" width="6" height="11.6" fill="var(--felt)"/>`;
+    h += `<rect x="6.4" y="0" width="1.2" height="${H}" fill="var(--frame-hi)"/><rect x="13.6" y="0" width="1.8" height="${H}" fill="var(--frame-hi)"/>`;
+    h += `<rect x="13.95" y="0.4" width="1.1" height="5.2" rx="0.15" fill="var(--felt-dk)"/><rect x="13.95" y="6.8" width="1.1" height="5.2" rx="0.15" fill="var(--felt-dk)"/>`;
+    for (let i = 0; i < 24; i++) {
+      const x = colX(i), top = i >= 12, y0 = top ? 0.4 : 12, y1 = top ? 5.2 : 7.2;
+      h += `<polygon points="${x - 0.48},${y0} ${x + 0.48},${y0} ${x},${y1}" fill="${i % 2 ? 'var(--tri-b)' : 'var(--tri-a)'}" opacity=".92"/>`;
+    }
+    svg.innerHTML = h;
+  }
+
+  // ---------- state ----------
+  const S = { b: initial(), turn: 0, phase: 'menu', dice: [], seqs: null, maxLen: 0, done: [], b0: null, stk0: null, sel: null, cur: 0, token: 0, paused: false, ai: true, lvl: 1, score: [0, 0], len: 3 };
+  let stk = {}; const chkEls = []; let sc = 20;
+  function keyOf(p, code) { return code === BAR ? 'b' + p : code === OFF ? 'o' + p : code; }
+  function buildStacks(b) {
+    stk = { b0: [], b1: [], o0: [], o1: [] }; for (let i = 0; i < 24; i++) stk[i] = [];
+    let id = [0, 15];
+    for (let i = 0; i < 24; i++) { const p = b[i] > 0 ? 0 : 1; for (let k = 0; k < Math.abs(b[i]); k++) stk[i].push(id[p]++); }
+    for (const p of [0, 1]) { for (let k = 0; k < b[24 + p]; k++) stk['b' + p].push(id[p]++); for (let k = 0; k < b[26 + p]; k++) stk['o' + p].push(id[p]++); }
+  }
+  const cloneStk = s => { const c = {}; for (const k in s) c[k] = s[k].slice(); return c; };
+  function moveStacks(p, m) {
+    const id = stk[keyOf(p, m.f)].pop();
+    if (m.hit) stk['b' + (1 - p)].push(stk[m.t].pop());
+    stk[keyOf(p, m.t)].push(id);
+    return id;
+  }
+  for (let k = 0; k < 30; k++) { const el = document.createElement('div'); el.className = 'chk ' + (k < 15 ? 'p0' : 'p1'); boardEl.appendChild(el); chkEls.push(el); }
+
+  // ---------- rendering ----------
+  function names() { return S.ai ? [t.you, t.cpu] : [t.white, t.black]; }
+  const human = () => !(S.ai && S.turn === 1);
+  function fit() {
+    const w = $('wrap').clientWidth, h = $('wrap').clientHeight;
+    sc = Math.max(8, Math.min(w / W, h / H));
+    boardEl.style.width = W * sc + 'px'; boardEl.style.height = H * sc + 'px';
+    boardEl.style.fontSize = Math.max(11, sc * 0.55) + 'px';
+    boardEl.classList.add('noanim'); render();
+    requestAnimationFrame(() => requestAnimationFrame(() => boardEl.classList.remove('noanim')));
+  }
+  function place(el, x, y, w, h) { el.style.left = (x - w / 2) * sc + 'px'; el.style.top = (y - h / 2) * sc + 'px'; el.style.width = w * sc + 'px'; el.style.height = h * sc + 'px'; }
+  function render() {
+    for (const el of boardEl.querySelectorAll('.hl, .cnt')) el.remove();
+    for (const key in stk) {
+      const arr = stk[key], n = arr.length;
+      arr.forEach((id, k) => {
+        const [x, y] = slotXY(isNaN(+key) ? key : +key, k, n), el = chkEls[id];
+        const off = key[0] === 'o';
+        el.classList.toggle('off', off);
+        place(el, x, y, off ? 0.96 : 0.94, off ? 0.26 : 0.94);
+      });
+      if (n > 5 && key[0] !== 'o') {
+        const [x, y] = slotXY(isNaN(+key) ? key : +key, n - 1, n), c = document.createElement('span');
+        c.className = 'cnt ' + (chkEls[arr[0]].classList.contains('p0') ? 'p0' : 'p1'); c.textContent = n; c.style.left = x * sc + 'px'; c.style.top = y * sc + 'px'; boardEl.appendChild(c);
+      }
+    }
+    // highlights
+    const legal = S.phase === 'move' && human() && !S.paused ? nextMoves() : [];
+    const p = S.turn;
+    const mk = (cls, x, y, w, h) => { const el = document.createElement('div'); el.className = 'hl ' + cls; place(el, x, y, w, h); boardEl.appendChild(el); };
+    const topOf = code => { const k = keyOf(p, code), n = stk[k].length; return slotXY(typeof k === 'number' ? k : k, Math.max(0, n - 1), n); };
+    const cands = candidates(legal);
+    if (S.sel == null) for (const f of cands) { const [x, y] = topOf(f); mk('src', x, y, 0.98, 0.98); }
+    else {
+      const [x, y] = topOf(S.sel); mk('sel', x, y, 0.98, 0.98);
+      for (const tt of cands) {
+        if (tt === S.sel) continue;
+        if (tt === OFF) mk('tgt tray', 14.5, p ? 3 : 9.4, 1.1, 5.2);
+        else { const n = own(S.b, p, tt); const [x2, y2] = slotXY(tt, n, n + 1); mk('tgt', x2, y2, 0.8, 0.8); }
+      }
+    }
+    if (kbd && cands.length) {
+      const c = cands[((S.cur % cands.length) + cands.length) % cands.length];
+      if (c === OFF) mk('cur tray', 14.5, p ? 3 : 9.4, 1.1, 5.2);
+      else if (S.sel != null && c !== S.sel) { const n = own(S.b, p, c); const [x2, y2] = slotXY(c, n, n + 1); mk('cur', x2, y2, 0.98, 0.98); }
+      else { const [x2, y2] = topOf(c); mk('cur', x2, y2, 1.06, 1.06); }
+    }
+    boardEl.classList.toggle('pick', legal.length > 0);
+    const nm = names();
+    for (const q of [0, 1]) {
+      $('name' + q).textContent = nm[q]; $('pip' + q).textContent = t.pips(pipCount(S.b, q));
+      $('who' + q).classList.toggle('on', S.phase !== 'menu' && S.phase !== 'over' && S.turn === q);
+    }
+    $('undo').disabled = !(S.phase === 'move' && human() && S.done.length > 0);
+    $('done').disabled = !(S.phase === 'move' && human() && S.done.length === S.maxLen && S.maxLen > 0);
+    $('scorechip').textContent = t.score(S.score[0], S.score[1], S.len);
+    renderDice();
+  }
+  let diceView = { L: [], R: [], roll: null, rolling: false };
+  function dieEl(v, owner, used) {
+    const d = document.createElement('div'); d.className = `die d${owner}` + (used ? ' used' : '') + (diceView.rolling ? ' roll' : '');
+    const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+    for (let k = 0; k < 9; k++) { const i = document.createElement('i'); if (PIPS[v].includes(k)) i.className = 'on'; d.appendChild(i); }
+    const sz = diceViewSize(); d.style.width = d.style.height = sz * sc + 'px';
+    return d;
+  }
+  function diceViewSize() { return Math.max(diceView.L.length, diceView.R.length) > 2 ? 0.95 : 1.15; }
+  function renderDice() {
+    for (const side of ['L', 'R']) {
+      const box = $('dice' + side); box.textContent = '';
+      for (const d of diceView[side]) box.appendChild(dieEl(d.v, d.o, d.used));
+      if (diceView.roll === side) {
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'rollbtn'; btn.textContent = t.roll;
+        btn.addEventListener('click', e => { e.stopPropagation(); doRoll(); }); box.appendChild(btn);
+      }
+      const x = side === 'L' ? 3.4 : 10.6; box.style.left = x * sc + 'px'; box.style.top = 6.2 * sc + 'px';
+    }
+  }
+  function setDiceForTurn() {
+    const side = S.turn === 0 ? 'R' : 'L', usedCount = {};
+    for (const m of S.done) usedCount[m.d] = (usedCount[m.d] || 0) + 1;
+    const list = S.dice.map(v => { const u = usedCount[v] > 0; if (u) usedCount[v]--; return { v, o: S.turn, used: u }; });
+    if (S.maxLen === 0 && S.phase !== 'roll') for (const d of list) d.used = true;
+    diceView.L = side === 'L' ? list : []; diceView.R = side === 'R' ? list : [];
+  }
+
+  function setStatus(s, say) { $('status').textContent = s; if (say) announce(s); }
+  function announce(s) { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = s; }, 30); }
+  let toastT = 0;
+  function toast(s, ms = 1100) { const el = $('toast'); el.textContent = s; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms); announce(s); }
+
+  // ---------- turn logic ----------
+  const same = (a, b) => a.f === b.f && a.t === b.t && a.d === b.d;
+  function nextMoves() {
+    if (!S.seqs || S.done.length >= S.maxLen) return [];
+    const n = S.done.length, out = [];
+    for (const o of S.seqs) {
+      let ok = true; for (let k = 0; k < n; k++) if (!same(o.seq[k], S.done[k])) { ok = false; break; }
+      if (!ok) continue;
+      const m = o.seq[n]; if (!out.some(x => same(x, m))) out.push(m);
+    }
+    return out;
+  }
+  function candidates(legal) {
+    if (S.sel == null) { const fs = [...new Set(legal.map(m => m.f))]; return fs.sort((a, b) => sortKey(b) - sortKey(a)); }
+    const ts = [...new Set(legal.filter(m => m.f === S.sel).map(m => m.t))];
+    return ts.sort((a, b) => sortKey(b) - sortKey(a));
+  }
+  const sortKey = c => (c === BAR ? 99 : c === OFF ? -1 : pipOf(S.turn, c));
+  const label = c => (c === BAR ? t.bar : c === OFF ? t.off : t.point(pipOf(S.turn, c)));
+
+  const wait = ms => new Promise(res => { const tok = S.token; const step = () => { if (tok !== S.token) return; if (S.paused) { setTimeout(step, 100); return; } res(); }; setTimeout(step, ms); });
+  const roll1 = () => 1 + Math.floor(Math.random() * 6);
+
+  async function animateRoll(final, owners, sides) {
+    diceView.rolling = true; diceView.roll = null;
+    const steps = reducedMotion ? 1 : 7;
+    for (let k = 0; k < steps; k++) {
+      diceView.L = []; diceView.R = [];
+      final.forEach((v, j) => diceView[sides[j]].push({ v: k === steps - 1 ? v : roll1(), o: owners[j], used: false }));
+      renderDice(); await wait(reducedMotion ? 60 : 70);
+    }
+    diceView.rolling = false;
+  }
+  async function opening() {
+    const tok = S.token;
+    S.phase = 'busy'; render(); await wait(350); if (tok !== S.token) return;
+    let a, b;
+    for (;;) {
+      a = roll1(); b = roll1();
+      await animateRoll([a, b], [0, 1], ['R', 'L']); if (tok !== S.token) return;
+      diceView.L = [{ v: b, o: 1 }]; diceView.R = [{ v: a, o: 0 }]; renderDice();
+      if (a !== b) break;
+      toast(t.tie, 900); await wait(1100); if (tok !== S.token) return;
+    }
+    const p = a > b ? 0 : 1;
+    setStatus(t.starts(names()[p], a, b), true);
+    await wait(1100); if (tok !== S.token) return;
+    beginTurn(p, [Math.max(a, b), Math.min(a, b)]);
+  }
+  function promptRoll() {
+    S.phase = 'roll'; S.sel = null; S.done = [];
+    diceView.L = []; diceView.R = [];
+    if (human()) { diceView.roll = S.turn === 0 ? 'R' : 'L'; setStatus(t.rollPrompt(names()[S.turn]), true); }
+    else { diceView.roll = null; setStatus(t.thinking, false); }
+    render();
+    if (!human()) { const tok = S.token; wait(reducedMotion ? 200 : 600).then(() => { if (tok === S.token && S.phase === 'roll') doRoll(); }); }
+  }
+  async function doRoll() {
+    if (S.phase !== 'roll' || S.paused) return;
+    const tok = S.token; S.phase = 'busy'; render();
+    const a = roll1(), b = roll1(), side = S.turn === 0 ? 'R' : 'L';
+    await animateRoll([a, b], [S.turn, S.turn], [side, side]); if (tok !== S.token) return;
+    announce(t.rolled(names()[S.turn], a, b));
+    beginTurn(S.turn, a === b ? [a, a, a, a] : [a, b]);
+  }
+  function beginTurn(p, dice) {
+    S.turn = p; S.dice = dice; S.done = []; S.sel = null; S.cur = 0;
+    const { res, maxLen } = allSeqs(S.b, p, dice);
+    S.seqs = res; S.maxLen = maxLen; S.b0 = S.b.slice(); S.stk0 = cloneStk(stk);
+    S.phase = 'busy'; setDiceForTurn(); render();
+    const tok = S.token;
+    if (maxLen === 0) {
+      toast(t.noMoves, 1200); setDiceForTurn(); renderDice();
+      wait(1500).then(() => { if (tok === S.token) endTurn(); });
+      return;
+    }
+    if (!human()) { aiTurn(); return; }
+    S.phase = 'move'; setStatus(t.turnOf(names()[p]), false); render();
+  }
+  async function aiTurn() {
+    const tok = S.token;
+    setStatus(t.thinking, false);
+    await wait(reducedMotion ? 150 : 450); if (tok !== S.token) return;
+    const seq = aiChoose(S.b, S.turn, S.dice, S.lvl);
+    for (const m of seq) {
+      await doMove(m, true); if (tok !== S.token) return;
+      if (S.b[26 + S.turn] === 15) break;
+      await wait(reducedMotion ? 150 : 520); if (tok !== S.token) return;
+    }
+    if (S.b[26 + S.turn] === 15) return; // doMove ended the game
+    await wait(reducedMotion ? 150 : 350); if (tok !== S.token) return;
+    endTurn();
+  }
+  async function doMove(m, fromAI) {
+    const p = S.turn; const mv = { f: m.f, t: m.t, d: m.d, hit: m.hit };
+    mv.hit = apply(S.b, p, mv);
+    S.done.push(mv);
+    const id = moveStacks(p, mv);
+    chkEls[id].classList.add('moving'); setTimeout(() => chkEls[id].classList.remove('moving'), 400);
+    S.sel = null; S.cur = 0; setDiceForTurn(); render();
+    announce(t.moved(label(mv.f), label(mv.t)));
+    if (mv.hit) toast(t.hit, 800);
+    if (S.b[26 + p] === 15) { const tok = S.token; S.phase = 'busy'; render(); await wait(700); if (tok === S.token) gameOver(p); return; }
+    if (!fromAI && S.done.length === S.maxLen) setStatus(t.allUsed, true);
+  }
+  function undo() {
+    if (!(S.phase === 'move' && human() && S.done.length)) return;
+    const keep = S.done.slice(0, -1);
+    S.b = S.b0.slice(); stk = cloneStk(S.stk0); S.done = [];
+    for (const m of keep) { const mv = { ...m }; mv.hit = apply(S.b, S.turn, mv); moveStacks(S.turn, mv); S.done.push(mv); }
+    S.sel = null; S.cur = 0; setDiceForTurn(); setStatus(t.turnOf(names()[S.turn]), false); render();
+  }
+  function finishTurn() { if (S.phase === 'move' && human() && S.done.length === S.maxLen) endTurn(); }
+  function endTurn() { S.turn = 1 - S.turn; promptRoll(); }
+
+  function clickLoc(c) {
+    if (S.phase !== 'move' || !human() || S.paused) return;
+    const legal = nextMoves();
+    if (S.sel != null) {
+      const opts = legal.filter(m => m.f === S.sel && m.t === c).sort((a, b) => a.d - b.d);
+      if (opts.length) { doMove(opts[0], false); return; }
+    }
+    if (legal.some(m => m.f === c)) {
+      S.sel = S.sel === c ? null : c; S.cur = 0;
+      // keyboard cursor starts on first target
+      render(); return;
+    }
+    if (S.sel != null) { S.sel = null; render(); }
+  }
+  function locAt(ux, uy) {
+    if (ux >= 13.6) return OFF;
+    if (ux >= 6.4 && ux < 7.6) return BAR;
+    const right = ux >= 7.6, c = Math.max(0, Math.min(5, Math.floor(right ? ux - 7.6 : ux - 0.4)));
+    if (uy < 6.2) return right ? 18 + c : 12 + c;
+    return right ? 5 - c : 11 - c;
+  }
+  let kbd = false;
+  boardEl.addEventListener('pointerdown', e => {
+    if (e.button && e.button !== 0) return;
+    kbd = false;
+    if (S.phase === 'roll' && human()) { doRoll(); return; }
+    const r = boardEl.getBoundingClientRect();
+    clickLoc(locAt((e.clientX - r.left) / sc, (e.clientY - r.top) / sc));
+  });
+
+  // ---------- game flow ----------
+  function newGame() {
+    S.token++; S.b = initial(); buildStacks(S.b); S.done = []; S.seqs = null; S.maxLen = 0; S.sel = null; S.turn = 0; S.paused = false;
+    diceView = { L: [], R: [], roll: null, rolling: false };
+    $('menu').hidden = true; $('over').hidden = true; $('paused').hidden = true; app.classList.remove('menu');
+    setStatus('', false); render(); opening();
+  }
+  function startMatch() {
+    S.ai = settings.mode === 'ai'; S.lvl = settings.lvl; S.len = settings.len; S.score = [0, 0];
+    $('modechip').textContent = S.ai ? t.modeAI(LVLS[S.lvl]) : t.modePvP;
+    newGame();
+  }
+  function gameOver(w) {
+    S.phase = 'over'; const pts = gameValue(S.b, w);
+    S.score[w] += pts; render();
+    const nm = names(), matchDone = S.score[w] >= S.len;
+    const kind = [null, t.single, t.gammon, t.backgammon][pts];
+    let title;
+    if (matchDone) {
+      if (S.ai) { title = w === 0 ? t.win : t.lose; if (w === 0) rec.w++; else rec.l++; save('record', rec); }
+      else title = t.wins(nm[w]);
+    } else title = t.gameWon(nm[w]);
+    $('over-title').textContent = title; $('osub').textContent = kind;
+    $('ol0').textContent = nm[0]; $('ol1').textContent = nm[1]; $('os0').textContent = S.score[0]; $('os1').textContent = S.score[1];
+    $('orecord').textContent = matchDone && S.ai ? t.record(rec.w, rec.l) : t.score(S.score[0], S.score[1], S.len);
+    $('onext').textContent = matchDone ? t.retry : t.next; $('onext').dataset.act = matchDone ? 'retry' : 'next';
+    setStatus('', false); $('over').hidden = false; announce(`${title}. ${kind}`); $('onext').focus();
+  }
+  function toMenu() {
+    S.token++; S.phase = 'menu'; S.paused = false; app.classList.add('menu');
+    $('paused').hidden = true; $('over').hidden = true; $('menu').hidden = false;
+    $('record').textContent = rec.w + rec.l ? t.record(rec.w, rec.l) : '';
+    syncMenu(); $('start').focus();
+  }
+  function setPause(on) {
+    if (on && (S.phase === 'menu' || S.phase === 'over')) return;
+    S.paused = on; $('paused').hidden = !on; render();
+    if (on) $('resume').focus();
+  }
+  function syncMenu() {
+    for (const bt of $('seg-mode').children) bt.setAttribute('aria-pressed', String(bt.dataset.mode === settings.mode));
+    for (const bt of $('seg-lvl').children) bt.setAttribute('aria-pressed', String(+bt.dataset.lvl === settings.lvl));
+    for (const bt of $('seg-len').children) bt.setAttribute('aria-pressed', String(+bt.dataset.len === settings.len));
+    $('seg-lvl').hidden = $('lvl-label').hidden = settings.mode !== 'ai';
+  }
+  $('seg-mode').addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; settings.mode = bt.dataset.mode; save('settings', settings); syncMenu(); });
+  $('seg-lvl').addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; settings.lvl = +bt.dataset.lvl; save('settings', settings); syncMenu(); });
+  $('seg-len').addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; settings.len = +bt.dataset.len; save('settings', settings); syncMenu(); });
+  $('start').addEventListener('click', startMatch);
+  $('onext').addEventListener('click', () => { if ($('onext').dataset.act === 'next') newGame(); else startMatch(); });
+  $('omenu').addEventListener('click', toMenu);
+  $('quit').addEventListener('click', toMenu);
+  $('resume').addEventListener('click', () => setPause(false));
+  $('pause').addEventListener('click', () => setPause(!S.paused));
+  $('undo').addEventListener('click', undo);
+  $('done').addEventListener('click', finishTurn);
+
+  addEventListener('keydown', e => {
+    const k = e.key;
+    if (k === 'p' || k === 'P' || (k === 'Escape' && S.sel == null)) { if (!$('menu').hidden || !$('over').hidden) return; e.preventDefault(); setPause(!S.paused); return; }
+    if (S.paused || S.phase === 'menu' || S.phase === 'over') return;
+    if (!human()) return;
+    if (S.phase === 'roll' && (k === 'r' || k === 'R' || k === ' ' || k === 'Enter')) { e.preventDefault(); doRoll(); return; }
+    if (S.phase !== 'move') return;
+    if (k === 'u' || k === 'U' || k === 'Backspace') { e.preventDefault(); undo(); return; }
+    if (k === 'Escape') { e.preventDefault(); S.sel = null; render(); return; }
+    const done = S.done.length === S.maxLen;
+    if (done && (k === 'd' || k === 'D' || k === 'Enter' || k === ' ')) { e.preventDefault(); finishTurn(); return; }
+    if (k === 'd' || k === 'D') return;
+    const cands = candidates(nextMoves());
+    if (!cands.length) return;
+    if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') {
+      e.preventDefault(); kbd = true; S.cur += (k === 'ArrowRight' || k === 'ArrowDown') ? 1 : -1; render(); return;
+    }
+    if (k === 'Enter' || k === ' ') {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON' && document.activeElement.closest('.ctrl')) return;
+      e.preventDefault();
+      if (!kbd) { kbd = true; S.cur = 0; render(); return; }
+      const c = cands[((S.cur % cands.length) + cands.length) % cands.length];
+      clickLoc(c); kbd = true; render();
+    }
+  });
+  addEventListener('blur', () => { if (S.phase !== 'menu' && S.phase !== 'over' && !S.paused) setPause(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.phase !== 'menu' && S.phase !== 'over' && !S.paused) setPause(true); });
+  addEventListener('resize', fit);
+
+  $('help').textContent = coarse ? t.helpTouch : t.helpKeys;
+  buildSvg(); buildStacks(S.b);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe($('wrap'));
+  fit(); toMenu();
+})();
+</script>
+</body>
+</html>

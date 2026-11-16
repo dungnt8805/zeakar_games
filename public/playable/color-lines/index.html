@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Color Lines</title>
+<style>
+:root {
+  --ink: #f4f1ff;
+  --muted: #a9b0d6;
+  --bg: #1b1f45;
+  --panel: #fffaf2;
+  --panel-ink: #34284f;
+  --panel-muted: #7d7096;
+  --coral: #ff7a59;
+  --coral-dark: #e0573a;
+  --sun: #ffd166;
+  --chip: #2b3165;
+  --chip-edge: #151935;
+  --cell: #2a2f63;
+  --cell-alt: #262b5b;
+  --cell-edge: #1a1e44;
+  --path: #ffd16655;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at 50% -10%, #3d3f8a, transparent 60%), linear-gradient(#232857, #161937);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+.icon { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; max-width: 560px; margin: auto; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.side { display: flex; flex-direction: column; gap: 10px; }
+.top { display: flex; align-items: center; gap: 7px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(20px, 6vw, 28px); font-weight: 900; letter-spacing: -.03em; white-space: nowrap; line-height: 1; }
+h1 span { color: var(--coral); }
+.stats { display: flex; gap: 8px; align-items: stretch; }
+.stat { flex: 1; padding: 5px 8px; border-radius: 14px; background: var(--chip); text-align: center; box-shadow: 0 3px 0 var(--chip-edge); }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat.bump strong { animation: bump .35s; }
+@keyframes bump { 40% { transform: scale(1.25); color: var(--sun); } }
+.next { flex: 1.3; display: flex; flex-direction: column; align-items: center; }
+.next-balls { display: flex; gap: 6px; margin-top: 2px; }
+.next-balls .ball { position: relative; width: 22px; height: 22px; }
+.icon-btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 14px; background: var(--chip); font-size: 20px; font-weight: 900; box-shadow: 0 3px 0 var(--chip-edge); display: grid; place-items: center; }
+.icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--chip-edge); }
+.icon-btn:disabled { opacity: .4; cursor: default; }
+.icon-btn svg { width: 20px; height: 20px; }
+.hint { text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); line-height: 1.3; }
+
+.board-wrap { flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.board { position: relative; width: var(--size, 300px); height: var(--size, 300px); border-radius: 16px; padding: 6px; background: var(--cell-edge); box-shadow: 0 10px 30px #0007; touch-action: none; }
+.grid { position: absolute; inset: 6px; display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); gap: 3px; }
+.grid:focus-visible { outline: none; }
+.cell { border-radius: 7px; background: var(--cell); box-shadow: inset 0 -2px 0 #0003; transition: background .15s; }
+.cell:nth-child(odd) { background: var(--cell-alt); }
+.cell.path { background: var(--path); }
+.cell.cursor { outline: 3px solid var(--sun); outline-offset: -3px; }
+.cell.nope { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-12%); } 75% { transform: translateX(12%); } }
+.layer { position: absolute; inset: 6px; pointer-events: none; }
+.ball { position: absolute; width: calc((100% - 24px) / 9); height: calc((100% - 24px) / 9); left: 0; top: 0; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 34% 28%, #fff 0 7%, color-mix(in srgb, var(--c) 55%, #fff) 14%, var(--c) 46%, color-mix(in srgb, var(--c) 62%, #000) 100%);
+  box-shadow: inset 0 -2px 4px #0004, 0 2px 3px #0005; }
+.layer .ball { transform: scale(.82); }
+.ball svg { width: 42%; height: 42%; fill: var(--s); margin-top: 4%; }
+.ball.sel { animation: hop .6s ease-in-out infinite; }
+@keyframes hop { 50% { translate: 0 -14%; } }
+.ball.pop { animation: pop .38s ease-in forwards; }
+@keyframes pop { 30% { scale: 1.25; } 100% { scale: 0; opacity: 0; } }
+.ball.grow { animation: grow .3s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes grow { from { scale: 0; } }
+.float { position: absolute; font-weight: 900; font-size: 20px; color: var(--sun); text-shadow: 0 2px 4px #0008; transform: translate(-50%, -50%); animation: float .9s ease-out forwards; pointer-events: none; }
+@keyframes float { to { translate: 0 -40px; opacity: 0; } }
+
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: #0d102699; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: 100%; overflow: auto; background: var(--panel); color: var(--panel-ink); border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 20px 50px #0008; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+.panel h2 span { color: var(--coral); }
+.panel .emoji { font-size: 44px; line-height: 1.2; }
+.panel .text { margin-top: 8px; font-size: 15px; color: var(--panel-muted); line-height: 1.45; }
+.panel .result { margin-top: 8px; font-size: 18px; font-weight: 800; }
+.panel :focus-visible { outline-color: var(--coral-dark); }
+.cta { margin-top: 20px; width: 100%; padding: 15px; border-radius: 18px; background: var(--coral); color: #fff; font-size: 19px; font-weight: 800; box-shadow: 0 6px 0 var(--coral-dark); }
+.cta:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--coral-dark); }
+.ghost { margin-top: 12px; width: 100%; padding: 12px; border-radius: 16px; background: #fff0c9; color: #8a5a00; font-size: 16px; font-weight: 800; box-shadow: 0 4px 0 #f3d78e; }
+.ghost[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .app { max-width: none; flex-direction: row; align-items: stretch; gap: 14px; }
+  .side { width: min(240px, 36vw); justify-content: center; }
+  .stats { flex-wrap: wrap; }
+  .stats .next { flex-basis: 100%; }
+  .overlay { padding: 8px; }
+  .panel { width: min(100%, 520px); padding: 14px 18px; border-radius: 22px; }
+  .panel .emoji { display: none; }
+  .panel .text { font-size: 14px; margin-top: 4px; }
+  .cta { margin-top: 10px; padding: 11px; font-size: 18px; }
+  .ghost { margin-top: 8px; padding: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="side">
+    <header class="top">
+      <h1>Color <span>Lines</span></h1>
+      <button type="button" class="icon-btn" id="undo" data-i18n-label="undo" aria-keyshortcuts="U"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+      <button type="button" class="icon-btn" id="menu" data-i18n-label="menu">☰</button>
+    </header>
+    <div class="stats">
+      <div class="stat" id="score-box"><small data-i18n="score"></small><strong id="score">0</strong></div>
+      <div class="stat"><small data-i18n="best"></small><strong id="best">0</strong></div>
+      <div class="stat next"><small data-i18n="next"></small><div class="next-balls" id="next-balls" aria-hidden="true"></div></div>
+    </div>
+    <p class="hint" data-i18n="hint"></p>
+  </div>
+  <div class="board-wrap" id="wrap">
+    <div class="board" id="board">
+      <div class="grid" id="grid" role="grid" data-i18n-label="board" tabindex="0" aria-activedescendant=""></div>
+      <div class="layer" id="layer" aria-hidden="true"></div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<div class="overlay" id="start">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="start-title">
+    <p class="emoji" aria-hidden="true">🔴🟡🔵</p>
+    <h2 id="start-title">Color <span>Lines</span></h2>
+    <p class="text" data-i18n="tagline"></p>
+    <p class="text" data-i18n="how"></p>
+    <button type="button" class="cta" id="continue" data-i18n="continue" hidden></button>
+    <button type="button" class="cta" id="play" data-i18n="play"></button>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <p class="emoji" aria-hidden="true">🏁</p>
+    <h2 id="over-title" data-i18n="gameOver"></h2>
+    <p class="result" id="result"></p>
+    <p class="text" id="result-best"></p>
+    <button type="button" class="cta" id="again" data-i18n="again"></button>
+    <button type="button" class="ghost" id="over-undo" data-i18n="undoLast"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'Line up five glossy balls of one colour to clear them.', how: 'Tap a ball, then an empty cell it can reach. Rows of 5+ across, down or diagonally vanish and score. Otherwise 3 new balls drop in — the game ends when the board fills up.', hint: 'Tap a ball, then an empty cell', score: 'Score', best: 'Best', next: 'Next', undo: 'Undo move', undoLast: 'Undo last move', menu: 'Menu', board: 'Board, 9 by 9', play: 'New game', continue: 'Continue', again: 'Play again', gameOver: 'Board full!', result: s => `Score: ${s}`, newBest: 'New best score!', bestIs: b => `Best: ${b}`, colors: ['red', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink'], cell: (r, c, d) => `Row ${r}, column ${c}: ${d}`, empty: 'empty', ball: c => `${c} ball`, selected: c => `${c} ball selected`, noPath: 'No path to that cell.', moved: c => `Moved the ${c} ball.`, cleared: (n, p) => `Cleared ${n} balls, +${p} points.`, undone: 'Move undone.', nextIs: l => `Next: ${l}.` },
+    vi: { tagline: 'Xếp năm quả bóng cùng màu thành hàng để xoá chúng.', how: 'Chạm một quả bóng, rồi chạm ô trống mà nó đi tới được. Hàng 5+ bóng theo hàng ngang, dọc hoặc chéo sẽ biến mất và ghi điểm. Nếu không, 3 bóng mới sẽ xuất hiện — trò chơi kết thúc khi bàn đầy.', hint: 'Chạm một quả bóng, rồi chạm ô trống', score: 'Điểm', best: 'Kỷ lục', next: 'Tiếp theo', undo: 'Hoàn tác', undoLast: 'Hoàn tác nước vừa đi', menu: 'Menu', board: 'Bàn chơi 9 x 9', play: 'Ván mới', continue: 'Chơi tiếp', again: 'Chơi lại', gameOver: 'Bàn đã đầy!', result: s => `Điểm: ${s}`, newBest: 'Kỷ lục mới!', bestIs: b => `Kỷ lục: ${b}`, colors: ['đỏ', 'vàng', 'xanh lá', 'xanh lơ', 'xanh dương', 'tím', 'hồng'], cell: (r, c, d) => `Hàng ${r}, cột ${c}: ${d}`, empty: 'trống', ball: c => `bóng ${c}`, selected: c => `Đã chọn bóng ${c}`, noPath: 'Không có đường tới ô đó.', moved: c => `Đã di chuyển bóng ${c}.`, cleared: (n, p) => `Đã xoá ${n} bóng, +${p} điểm.`, undone: 'Đã hoàn tác.', nextIs: l => `Tiếp theo: ${l}.` },
+    zh: { tagline: '把五个同色彩球连成一线即可消除。', how: '点一个球，再点它能走到的空格。横、竖或斜向连成 5 个以上同色球就会消除并得分；否则会落下 3 个新球——棋盘填满时游戏结束。', hint: '先点球，再点空格', score: '得分', best: '最高分', next: '下一组', undo: '撤销', undoLast: '撤销上一步', menu: '菜单', board: '9×9 棋盘', play: '新游戏', continue: '继续', again: '再玩一次', gameOver: '棋盘满了！', result: s => `得分：${s}`, newBest: '新纪录！', bestIs: b => `最高分：${b}`, colors: ['红色', '黄色', '绿色', '青色', '蓝色', '紫色', '粉色'], cell: (r, c, d) => `第 ${r} 行第 ${c} 列：${d}`, empty: '空', ball: c => `${c}球`, selected: c => `已选中${c}球`, noPath: '没有通往该格的路径。', moved: c => `已移动${c}球。`, cleared: (n, p) => `消除了 ${n} 个球，+${p} 分。`, undone: '已撤销一步。', nextIs: l => `下一组：${l}。` },
+    fr: { tagline: 'Alignez cinq billes de la même couleur pour les faire disparaître.', how: 'Touchez une bille, puis une case vide qu’elle peut atteindre. Les lignes de 5+ billes, horizontales, verticales ou diagonales, disparaissent et rapportent des points. Sinon, 3 nouvelles billes arrivent — la partie s’arrête quand le plateau est plein.', hint: 'Touchez une bille, puis une case vide', score: 'Score', best: 'Record', next: 'Suivantes', undo: 'Annuler', undoLast: 'Annuler le dernier coup', menu: 'Menu', board: 'Plateau 9 × 9', play: 'Nouvelle partie', continue: 'Continuer', again: 'Rejouer', gameOver: 'Plateau plein !', result: s => `Score : ${s}`, newBest: 'Nouveau record !', bestIs: b => `Record : ${b}`, colors: ['rouge', 'jaune', 'verte', 'cyan', 'bleue', 'violette', 'rose'], cell: (r, c, d) => `Ligne ${r}, colonne ${c} : ${d}`, empty: 'vide', ball: c => `bille ${c}`, selected: c => `Bille ${c} sélectionnée`, noPath: 'Aucun chemin vers cette case.', moved: c => `Bille ${c} déplacée.`, cleared: (n, p) => `${n} billes effacées, +${p} points.`, undone: 'Coup annulé.', nextIs: l => `Suivantes : ${l}.` },
+    th: { tagline: 'เรียงลูกบอลสีเดียวกันห้าลูกเป็นแถวเพื่อลบออก', how: 'แตะลูกบอล แล้วแตะช่องว่างที่ไปถึงได้ แถวแนวนอน แนวตั้ง หรือแนวทแยงที่มี 5 ลูกขึ้นไปจะหายไปและได้คะแนน ถ้าไม่ได้ จะมีลูกบอลใหม่ 3 ลูก — เกมจบเมื่อกระดานเต็ม', hint: 'แตะลูกบอล แล้วแตะช่องว่าง', score: 'คะแนน', best: 'สูงสุด', next: 'ถัดไป', undo: 'ย้อนกลับ', undoLast: 'ย้อนตาล่าสุด', menu: 'เมนู', board: 'กระดาน 9 x 9', play: 'เกมใหม่', continue: 'เล่นต่อ', again: 'เล่นอีกครั้ง', gameOver: 'กระดานเต็มแล้ว!', result: s => `คะแนน: ${s}`, newBest: 'สถิติใหม่!', bestIs: b => `สูงสุด: ${b}`, colors: ['แดง', 'เหลือง', 'เขียว', 'ฟ้าอมเขียว', 'น้ำเงิน', 'ม่วง', 'ชมพู'], cell: (r, c, d) => `แถว ${r} คอลัมน์ ${c}: ${d}`, empty: 'ว่าง', ball: c => `ลูกบอลสี${c}`, selected: c => `เลือกลูกบอลสี${c}แล้ว`, noPath: 'ไปช่องนั้นไม่ได้', moved: c => `ย้ายลูกบอลสี${c}แล้ว`, cleared: (n, p) => `ลบ ${n} ลูก +${p} คะแนน`, undone: 'ย้อนกลับแล้ว', nextIs: l => `ถัดไป: ${l}` },
+    ja: { tagline: '同じ色のボールを5つ並べて消そう。', how: 'ボールをタップして、移動できる空きマスをタップ。縦・横・斜めに同じ色が5つ以上並ぶと消えて得点。並ばなければ新しいボールが3つ出現し、盤面が埋まるとゲームオーバー。', hint: 'ボールをタップして、空きマスをタップ', score: 'スコア', best: 'ベスト', next: '次', undo: '1手戻す', undoLast: '最後の手を戻す', menu: 'メニュー', board: '9×9 の盤面', play: '新しいゲーム', continue: '続きから', again: 'もう一度', gameOver: '盤面がいっぱい！', result: s => `スコア：${s}`, newBest: 'ベスト更新！', bestIs: b => `ベスト：${b}`, colors: ['赤', '黄', '緑', 'シアン', '青', '紫', 'ピンク'], cell: (r, c, d) => `${r}行 ${c}列：${d}`, empty: '空き', ball: c => `${c}のボール`, selected: c => `${c}のボールを選択`, noPath: 'そのマスへは行けません。', moved: c => `${c}のボールを動かしました。`, cleared: (n, p) => `${n}個消して +${p}点。`, undone: '1手戻しました。', nextIs: l => `次：${l}。` },
+    ko: { tagline: '같은 색 공 다섯 개를 한 줄로 맞춰 없애세요.', how: '공을 누른 다음 갈 수 있는 빈 칸을 누르세요. 가로, 세로, 대각선으로 5개 이상 이어지면 사라지고 점수를 얻어요. 아니면 새 공 3개가 나타나고, 판이 가득 차면 게임이 끝나요.', hint: '공을 누르고, 빈 칸을 누르세요', score: '점수', best: '최고', next: '다음', undo: '되돌리기', undoLast: '마지막 수 되돌리기', menu: '메뉴', board: '9×9 판', play: '새 게임', continue: '이어 하기', again: '다시 하기', gameOver: '판이 가득 찼어요!', result: s => `점수: ${s}`, newBest: '최고 기록 경신!', bestIs: b => `최고: ${b}`, colors: ['빨강', '노랑', '초록', '청록', '파랑', '보라', '분홍'], cell: (r, c, d) => `${r}행 ${c}열: ${d}`, empty: '빈 칸', ball: c => `${c} 공`, selected: c => `${c} 공 선택됨`, noPath: '그 칸으로 가는 길이 없어요.', moved: c => `${c} 공을 옮겼어요.`, cleared: (n, p) => `공 ${n}개 제거, +${p}점.`, undone: '한 수 되돌렸어요.', nextIs: l => `다음: ${l}.` },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Ball colour, symbol colour and symbol, so colours never need to be told apart by hue alone.
+  const COLORS = [['#ff4d4d', '#ffffff99'], ['#ffd60a', '#00000055'], ['#1fae5b', '#ffffff99'], ['#3ccdf0', '#00000055'], ['#3a6bff', '#ffffff99'], ['#9b5de5', '#ffffff99'], ['#ff7eb6', '#00000055']];
+  const SYMBOLS = [
+    '<circle cx="10" cy="10" r="6"/>', '<path d="M10 3 17.5 16.5h-15z"/>', '<rect x="4" y="4" width="12" height="12" rx="1.5"/>',
+    '<path d="M10 2.5 17.5 10 10 17.5 2.5 10z"/>', '<path d="m10 2.2 2.35 4.9 5.35.7-3.9 3.7 1 5.3L10 14.2l-4.8 2.6 1-5.3-3.9-3.7 5.35-.7z"/>',
+    '<path d="M8 3h4v5h5v4h-5v5H8v-5H3V8h5z"/>', '<path d="M10 17s-7-4.3-7-9a3.8 3.8 0 0 1 7-2 3.8 3.8 0 0 1 7 2c0 4.7-7 9-7 9z"/>',
+  ];
+  document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${SYMBOLS.map((s, i) => `<symbol id="sym${i}" viewBox="0 0 20 20">${s}</symbol>`).join('')}</svg>`);
+
+  const N = 9, SPAWN = 3, START = 5, LINE = 5, STEP_MS = 55;
+  const KEY = 'milaan.colorLines.';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const $ = id => document.getElementById(id);
+  const els = { wrap: $('wrap'), board: $('board'), grid: $('grid'), layer: $('layer'), score: $('score'), scoreBox: $('score-box'), best: $('best'), next: $('next-balls'), undo: $('undo'), announcer: $('announcer'), start: $('start'), cont: $('continue'), over: $('over'), result: $('result'), resultBest: $('result-best'), overUndo: $('over-undo') };
+  const read = (k, fb) => { try { return JSON.parse(localStorage.getItem(KEY + k)) ?? fb; } catch { return fb; } };
+  const write = (k, v) => { try { if (v === null) localStorage.removeItem(KEY + k); else localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} };
+
+  let best = Number(read('best', 0)) || 0;
+  let g = null;             // { board: Array(81) of colour|-1, next: [3], score, undo: snapshot|null, over }
+  let sel = -1, cursor = 40, busy = false;
+  const ballEls = new Array(N * N).fill(null);
+
+  const say = msg => { els.announcer.textContent = ''; requestAnimationFrame(() => { els.announcer.textContent = msg; }); };
+  const wait = ms => new Promise(r => setTimeout(r, reduced.matches ? 0 : ms));
+  const rnd = n => Math.floor(Math.random() * n);
+  const empties = b => b.reduce((a, v, i) => (v < 0 && a.push(i), a), []);
+  const colorName = c => t.colors[c];
+
+  function makeBall(c) {
+    const el = document.createElement('div');
+    el.className = 'ball';
+    el.style.setProperty('--c', COLORS[c][0]);
+    el.style.setProperty('--s', COLORS[c][1]);
+    el.innerHTML = `<svg viewBox="0 0 20 20"><use href="#sym${c}"/></svg>`;
+    return el;
+  }
+
+  // Board geometry: ball positions are percentages of one cell, gap included.
+  function cellXY(i) {
+    const size = els.layer.clientWidth, gap = 3, cell = (size - gap * (N - 1)) / N;
+    return [(i % N) * (cell + gap), Math.floor(i / N) * (cell + gap), cell];
+  }
+  function posBall(el, i) {
+    const [x, y, cell] = cellXY(i);
+    el.style.width = el.style.height = cell + 'px';
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  }
+
+  function buildGrid() {
+    els.grid.replaceChildren();
+    for (let r = 0; r < N; r++) {
+      const row = document.createElement('div');
+      row.setAttribute('role', 'row');
+      row.style.display = 'contents';
+      for (let c = 0; c < N; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.id = 'cell' + (r * N + c);
+        cell.setAttribute('role', 'gridcell');
+        cell.dataset.i = r * N + c;
+        row.append(cell);
+      }
+      els.grid.append(row);
+    }
+  }
+  const cellEl = i => $('cell' + i);
+
+  function render() {
+    els.layer.replaceChildren();
+    ballEls.fill(null);
+    g.board.forEach((c, i) => { if (c >= 0) { const b = makeBall(c); ballEls[i] = b; posBall(b, i); els.layer.append(b); } });
+    renderNext(); renderStats(); labelCells(); setCursor(cursor);
+  }
+  function renderNext() { els.next.replaceChildren(...g.next.map(makeBall)); }
+  function renderStats() {
+    els.score.textContent = g.score; els.best.textContent = best;
+    els.undo.disabled = !g.undo || busy;
+  }
+  function labelCells() {
+    for (let i = 0; i < N * N; i++) {
+      const c = g.board[i];
+      cellEl(i).setAttribute('aria-label', t.cell(Math.floor(i / N) + 1, i % N + 1, c < 0 ? t.empty : t.ball(colorName(c))));
+      cellEl(i).setAttribute('aria-selected', String(i === sel));
+    }
+  }
+  function setCursor(i) {
+    cellEl(cursor)?.classList.remove('cursor');
+    cursor = i;
+    if (document.activeElement === els.grid) cellEl(i).classList.add('cursor');
+    els.grid.setAttribute('aria-activedescendant', 'cell' + i);
+  }
+  function layout() {
+    const r = els.wrap.getBoundingClientRect();
+    const size = Math.max(180, Math.floor(Math.min(r.width, r.height)));
+    els.board.style.setProperty('--size', size + 'px');
+    if (g) ballEls.forEach((b, i) => b && posBall(b, i));
+  }
+  new ResizeObserver(layout).observe(els.wrap);
+
+  const snapshot = () => ({ board: g.board.slice(), next: g.next.slice(), score: g.score });
+  const save = () => write('game', g.over ? null : { board: g.board, next: g.next, score: g.score, undo: g.undo });
+  const newNext = () => Array.from({ length: SPAWN }, () => rnd(COLORS.length));
+
+  function newGame() {
+    g = { board: new Array(N * N).fill(-1), next: newNext(), score: 0, undo: null, over: false };
+    const free = empties(g.board);
+    for (let k = 0; k < START; k++) g.board[free.splice(rnd(free.length), 1)[0]] = rnd(COLORS.length);
+    sel = -1; busy = false;
+    hideOverlays(); render(); save();
+    say(t.nextIs(g.next.map(colorName).join(', ')));
+  }
+  function hideOverlays() { els.start.hidden = true; els.over.hidden = true; els.grid.focus(); }
+
+  // Breadth-first search for the shortest path between two cells through empty cells.
+  function findPath(from, to) {
+    const prev = new Array(N * N).fill(-2);
+    prev[from] = -1;
+    const q = [from];
+    while (q.length) {
+      const cur = q.shift();
+      if (cur === to) break;
+      const r = Math.floor(cur / N), c = cur % N;
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const nr = r + dr, nc = c + dc, ni = nr * N + nc;
+        if (nr < 0 || nr >= N || nc < 0 || nc >= N || prev[ni] !== -2 || g.board[ni] >= 0) continue;
+        prev[ni] = cur; q.push(ni);
+      }
+    }
+    if (prev[to] === -2) return null;
+    const path = [];
+    for (let i = to; i !== -1; i = prev[i]) path.unshift(i);
+    return path;
+  }
+
+  // Every cell that belongs to a run of LINE or more equal colours through any of the given cells.
+  function linesThrough(cells) {
+    const hit = new Set();
+    for (const i of cells) {
+      const c = g.board[i];
+      if (c < 0) continue;
+      const r0 = Math.floor(i / N), c0 = i % N;
+      for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+        const run = [i];
+        for (const s of [1, -1]) {
+          let r = r0 + dr * s, cc = c0 + dc * s;
+          while (r >= 0 && r < N && cc >= 0 && cc < N && g.board[r * N + cc] === c) { run.push(r * N + cc); r += dr * s; cc += dc * s; }
+        }
+        if (run.length >= LINE) run.forEach(x => hit.add(x));
+      }
+    }
+    return [...hit];
+  }
+  const pointsFor = n => 10 + (n - LINE) * 4;
+
+  async function clearCells(cells) {
+    const pts = pointsFor(cells.length);
+    for (const i of cells) g.board[i] = -1;
+    g.score += pts;
+    if (g.score > best) { best = g.score; write('best', best); }
+    const [x, y, cell] = cellXY(cells[Math.floor(cells.length / 2)]);
+    const f = document.createElement('div');
+    f.className = 'float'; f.textContent = '+' + pts;
+    f.style.left = x + cell / 2 + 'px'; f.style.top = y + cell / 2 + 'px';
+    els.layer.append(f); setTimeout(() => f.remove(), 950);
+    cells.forEach(i => { ballEls[i]?.classList.add('pop'); });
+    els.scoreBox.classList.remove('bump'); void els.scoreBox.offsetWidth; els.scoreBox.classList.add('bump');
+    await wait(380);
+    cells.forEach(i => { ballEls[i]?.remove(); ballEls[i] = null; });
+    renderStats();
+    say(t.cleared(cells.length, pts));
+  }
+
+  async function spawn() {
+    const free = empties(g.board);
+    const added = [];
+    for (const c of g.next) {
+      if (!free.length) break;
+      const i = free.splice(rnd(free.length), 1)[0];
+      g.board[i] = c; added.push(i);
+      const b = makeBall(c); b.classList.add('grow'); ballEls[i] = b; posBall(b, i); els.layer.append(b);
+    }
+    g.next = newNext(); renderNext();
+    await wait(300);
+    const hit = linesThrough(added);
+    if (hit.length) await clearCells(hit);
+    if (!empties(g.board).length) return gameOver();
+    say(t.nextIs(g.next.map(colorName).join(', ')));
+  }
+
+  function gameOver() {
+    g.over = true; save();
+    els.result.textContent = t.result(g.score);
+    els.resultBest.textContent = g.score >= best && g.score > 0 ? t.newBest : t.bestIs(best);
+    els.overUndo.hidden = !g.undo;
+    els.over.hidden = false;
+    $('again').focus();
+    say(t.gameOver + ' ' + t.result(g.score));
+  }
+
+  function deselect() { if (sel >= 0) ballEls[sel]?.classList.remove('sel'); sel = -1; }
+
+  async function activate(i) {
+    if (busy || !g || g.over) return;
+    setCursor(i);
+    if (g.board[i] >= 0) {
+      deselect(); sel = i; ballEls[i].classList.add('sel'); labelCells();
+      say(t.selected(colorName(g.board[i]))); return;
+    }
+    if (sel < 0) return;
+    const path = findPath(sel, i);
+    if (!path) { const c = cellEl(i); c.classList.remove('nope'); void c.offsetWidth; c.classList.add('nope'); say(t.noPath); return; }
+    busy = true;
+    const from = sel, color = g.board[from], ball = ballEls[from];
+    g.undo = snapshot();
+    deselect();
+    g.board[i] = color; g.board[from] = -1; ballEls[i] = ball; ballEls[from] = null;
+    renderStats();
+    if (!reduced.matches) {
+      path.forEach(p => cellEl(p).classList.add('path'));
+      const frames = path.map(p => { const [x, y] = cellXY(p); return { left: x + 'px', top: y + 'px' }; });
+      const duration = STEP_MS * (path.length - 1);
+      const anim = ball.animate(frames, { duration, easing: 'linear' });
+      // Hidden tabs may never finish animations, so a timer guarantees the move completes.
+      await Promise.race([anim.finished.catch(() => {}), new Promise(r => setTimeout(r, duration + 120))]);
+      anim.cancel();
+      path.forEach(p => cellEl(p).classList.remove('path'));
+    }
+    posBall(ball, i);
+    say(t.moved(colorName(color)));
+    const hit = linesThrough([i]);
+    if (hit.length) await clearCells(hit);
+    else await spawn();
+    busy = false;
+    labelCells(); renderStats(); save();
+  }
+
+  function undo() {
+    if (busy || !g || !g.undo) return;
+    Object.assign(g, g.undo, { undo: null, over: false });
+    sel = -1; els.over.hidden = true;
+    render(); save(); els.grid.focus(); say(t.undone);
+  }
+
+  els.grid.addEventListener('pointerdown', e => {
+    const cell = e.target.closest('.cell');
+    if (cell) { e.preventDefault(); els.grid.focus(); activate(Number(cell.dataset.i)); }
+  });
+  els.grid.addEventListener('focus', () => cellEl(cursor).classList.add('cursor'));
+  els.grid.addEventListener('blur', () => cellEl(cursor).classList.remove('cursor'));
+  els.grid.addEventListener('keydown', e => {
+    const r = Math.floor(cursor / N), c = cursor % N;
+    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (moves[e.key]) {
+      e.preventDefault();
+      const nr = Math.min(N - 1, Math.max(0, r + moves[e.key][0])), nc = Math.min(N - 1, Math.max(0, c + moves[e.key][1]));
+      setCursor(nr * N + nc);
+    } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(cursor); }
+    else if (e.key === 'Escape' && sel >= 0) { deselect(); labelCells(); }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key === 'z')) && els.start.hidden) { e.preventDefault(); undo(); }
+  });
+  els.undo.addEventListener('click', undo);
+  els.overUndo.addEventListener('click', undo);
+  $('play').addEventListener('click', newGame);
+  $('again').addEventListener('click', newGame);
+  els.cont.addEventListener('click', hideOverlays);
+  $('menu').addEventListener('click', () => { if (busy) return; deselect(); els.cont.hidden = !g || g.over; els.start.hidden = false; (g && !g.over ? els.cont : $('play')).focus(); });
+
+  buildGrid();
+  const saved = read('game', null);
+  if (saved && Array.isArray(saved.board) && saved.board.length === N * N && Array.isArray(saved.next) && saved.board.some(v => v < 0)) {
+    g = { board: saved.board.map(Number), next: saved.next.map(Number), score: Number(saved.score) || 0, undo: saved.undo || null, over: false };
+    els.cont.hidden = false;
+    layout(); render();
+    els.cont.focus();
+  } else {
+    g = { board: new Array(N * N).fill(-1), next: newNext(), score: 0, undo: null, over: false };
+    layout(); render();
+    $('play').focus();
+  }
+})();
+</script>
+</body>
+</html>
