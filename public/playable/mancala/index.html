@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mancala</title>
+<style>
+:root {
+  --bg: #1d130c;
+  --bg2: #2c1d12;
+  --ink: #fff6ea;
+  --muted: #d9c3a5;
+  --wood: #a8652f;
+  --wood-hi: #c98446;
+  --wood-dk: #6b3c18;
+  --pit: #4a2a12;
+  --gold: #ffcf5a;
+  --p1: #4fd1a5;
+  --p2: #ff8a65;
+  --paper: #2e2016;
+  --font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: radial-gradient(ellipse at 50% 30%, var(--bg2), var(--bg) 70%); background-color: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+.app { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.hud { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left)); }
+.hud .grow { flex: 1; }
+.iconbtn { width: 40px; height: 40px; border-radius: 12px; background: #00000044; border: 1px solid #ffffff22; font-size: 16px; font-weight: 900; display: grid; place-items: center; }
+.chip { padding: 4px 10px; border-radius: 12px; background: #00000044; border: 1px solid #ffffff22; font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.app.menu .hud, .app.menu .stage { visibility: hidden; }
+
+.stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.who { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 15px; padding: 6px 14px; border-radius: 99px; background: #00000033; border: 2px solid transparent; transition: border-color .2s, background .2s; }
+.who .dot { width: 12px; height: 12px; border-radius: 50%; }
+.who.p1 .dot { background: var(--p1); } .who.p2 .dot { background: var(--p2); }
+.who.on.p1 { border-color: var(--p1); background: #4fd1a522; }
+.who.on.p2 { border-color: var(--p2); background: #ff8a6522; }
+.who.top { transform: none; }
+.status { min-height: 22px; font-size: 15px; font-weight: 800; color: var(--gold); text-align: center; }
+
+.board { --pw: min(10.5vw, 96px); display: grid; grid-template-columns: calc(var(--pw) * 1.05) repeat(6, var(--pw)) calc(var(--pw) * 1.05); grid-template-rows: var(--pw) var(--pw); gap: calc(var(--pw) * .12); padding: calc(var(--pw) * .18); border-radius: calc(var(--pw) * .5); background: linear-gradient(180deg, var(--wood-hi), var(--wood) 45%, var(--wood-dk)); box-shadow: inset 0 2px 0 #ffffff33, inset 0 -4px 0 #0004, 0 18px 40px #0009; }
+.pit { position: relative; border-radius: 50%; background: radial-gradient(circle at 50% 38%, #2a160822, #00000000 60%), var(--pit); box-shadow: inset 0 6px 10px #000a, 0 1px 0 #ffffff33; overflow: visible; transition: box-shadow .15s, transform .15s; }
+.pit.store { border-radius: calc(var(--pw) * .5); grid-row: 1 / 3; }
+.pit .seeds { position: absolute; inset: 12%; pointer-events: none; }
+.seed { position: absolute; width: 22%; height: 22%; margin: -11% 0 0 -11%; border-radius: 50%; box-shadow: inset -2px -3px 3px #0006, inset 2px 2px 2px #fff8; }
+.store .seed { width: 20%; height: 9%; margin: -10% 0 0 -10%; }
+.pit .n { position: absolute; left: 50%; transform: translateX(-50%); font-size: clamp(11px, calc(var(--pw) * .2), 18px); font-weight: 900; font-variant-numeric: tabular-nums; color: var(--ink); text-shadow: 0 1px 2px #000; pointer-events: none; }
+.pit.bot .n { bottom: calc(var(--pw) * -.36); }
+.pit.top .n { top: calc(var(--pw) * -.36); }
+.pit.store .n { top: 50%; transform: translate(-50%, -50%); font-size: clamp(16px, calc(var(--pw) * .34), 30px); background: #0007; border-radius: 10px; padding: 0 6px; }
+.board { margin: 18px 0; }
+.pit.can { cursor: pointer; box-shadow: inset 0 6px 10px #000a, 0 0 0 3px var(--gold); }
+.pit.can:hover, .pit.can:focus-visible { transform: scale(1.05); outline: none; box-shadow: inset 0 6px 10px #000a, 0 0 0 4px #fff, 0 0 18px var(--gold); }
+.pit.hit { animation: hit .3s; }
+.pit.cap { animation: cap .6s; }
+@keyframes hit { 40% { box-shadow: inset 0 6px 10px #000a, 0 0 0 4px var(--gold), 0 0 22px var(--gold); } }
+@keyframes cap { 30% { box-shadow: inset 0 6px 10px #000a, 0 0 0 5px #ff4d4d, 0 0 26px #ff4d4d; } }
+.store.s1 { box-shadow: inset 0 6px 10px #000a, 0 0 0 2px var(--p1); }
+.store.s2 { box-shadow: inset 0 6px 10px #000a, 0 0 0 2px var(--p2); }
+.fly { position: fixed; z-index: 5; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; pointer-events: none; box-shadow: inset -2px -3px 3px #0006, inset 2px 2px 2px #fff8, 0 4px 6px #0007; transition: left .16s ease-in-out, top .16s ease-in-out; }
+
+/* phone portrait: rotate layout vertical */
+@media (max-aspect-ratio: 4/5) {
+  .board { --pw: min(19vw, 8.6vh, 96px); grid-template-columns: var(--pw) var(--pw); grid-template-rows: calc(var(--pw) * 1.05) repeat(6, var(--pw)) calc(var(--pw) * 1.05); margin: 0 30px; }
+  .pit.store { grid-row: auto; grid-column: 1 / 3; }
+  .pit.bot .n { bottom: auto; top: 50%; left: calc(var(--pw) * -.3); transform: translate(-50%, -50%); }
+  .pit.top .n { top: 50%; left: auto; right: calc(var(--pw) * -.3); transform: translate(50%, -50%); }
+  .store .seed { width: 9%; height: 20%; }
+  .stage { gap: 6px; }
+}
+
+.toast { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.9); padding: 8px 18px; border-radius: 99px; background: var(--gold); color: #3a2208; font-weight: 900; font-size: 20px; white-space: nowrap; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 6; box-shadow: 0 8px 20px #0008; }
+.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+.overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 8px; background: #120a0599; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 390px); max-height: calc(100% - 8px); overflow-y: auto; padding: 18px 16px; border-radius: 22px; background: var(--paper); border: 2px solid #ffcf5a55; box-shadow: 0 20px 50px #000a; text-align: center; animation: rise .3s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.title { font-size: clamp(38px, 12vw, 58px); font-weight: 900; letter-spacing: -.02em; line-height: 1; color: var(--gold); text-shadow: 0 3px 0 var(--wood-dk); }
+.tagline { margin-top: 10px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--muted); }
+.label { margin-top: 14px; font-size: 11px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-top: 6px; }
+.seg button { padding: 10px 6px; border-radius: 14px; background: #463224; box-shadow: 0 3px 0 #1a100a; font-weight: 900; font-size: 15px; line-height: 1.2; }
+.seg button small { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #3a2208; box-shadow: 0 3px 0 #a87a14; }
+.seg button[aria-pressed="true"] small { color: #3a2208; opacity: .8; }
+.seg[hidden] { display: none; }
+.help { margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.45; }
+.panel h2 { font-size: 26px; font-weight: 900; }
+.sub { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.scores { display: flex; justify-content: center; gap: 26px; margin-top: 12px; }
+.scores small { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+.scores strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.row { display: flex; gap: 8px; margin-top: 14px; }
+.btn { flex: 1; padding: 12px; border-radius: 14px; background: #463224; box-shadow: 0 3px 0 #1a100a; font-size: 16px; font-weight: 900; }
+.btn.primary { background: var(--gold); color: #3a2208; box-shadow: 0 4px 0 #a87a14; }
+.btn:active, .seg button:active { transform: translateY(2px); }
+.record { margin-top: 10px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 520px) {
+  .panel { padding: 10px 14px; }
+  .title { font-size: 32px; }
+  .tagline { display: none; }
+  .label { margin-top: 8px; }
+  .seg button { padding: 7px 6px; }
+  .help { margin-top: 6px; }
+  .board { --pw: min(10.5vw, 22vh, 96px); margin: 14px 0; }
+  .who { padding: 3px 12px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app menu" id="app">
+  <div class="hud">
+    <span class="chip" id="modechip"></span>
+    <div class="grow"></div>
+    <button type="button" class="iconbtn" id="pause" data-i18n-label="pause">II</button>
+  </div>
+  <div class="stage">
+    <div class="who p2 top" id="who2"><span class="dot"></span><span id="name2"></span></div>
+    <div class="board" id="board" role="group" data-i18n-label="board"></div>
+    <div class="who p1" id="who1"><span class="dot"></span><span id="name1"></span></div>
+    <p class="status" id="status" aria-hidden="true"></p>
+  </div>
+  <div class="toast" id="toast" aria-hidden="true"></div>
+
+  <div class="overlay" id="menu">
+    <div class="panel" role="dialog" aria-labelledby="menu-title">
+      <h1 class="title" id="menu-title">Mancala</h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <p class="label" data-i18n="opponent"></p>
+      <div class="seg" id="seg-mode">
+        <button type="button" data-mode="ai" aria-pressed="true"><span data-i18n="vsAI"></span><small data-i18n="vsAIDesc"></small></button>
+        <button type="button" data-mode="pvp" aria-pressed="false"><span data-i18n="twoP"></span><small data-i18n="twoPDesc"></small></button>
+      </div>
+      <p class="label" id="lvl-label" data-i18n="level"></p>
+      <div class="seg" id="seg-lvl">
+        <button type="button" data-lvl="0" aria-pressed="false" data-i18n="easy"></button>
+        <button type="button" data-lvl="1" aria-pressed="true" data-i18n="normal"></button>
+        <button type="button" data-lvl="2" aria-pressed="false" data-i18n="hard"></button>
+      </div>
+      <div class="row"><button type="button" class="btn primary" id="start" data-i18n="start"></button></div>
+      <p class="record" id="record"></p>
+      <p class="help" id="help"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="panel" role="dialog" aria-labelledby="paused-title">
+      <h2 id="paused-title" data-i18n="paused"></h2>
+      <p class="help" data-i18n="rules"></p>
+      <div class="row"><button type="button" class="btn" id="quit" data-i18n="menu"></button><button type="button" class="btn primary" id="resume" data-i18n="resume"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="panel" role="dialog" aria-labelledby="over-title">
+      <h2 id="over-title"></h2>
+      <p class="sub" id="osub"></p>
+      <div class="scores">
+        <div><small id="ol1"></small><strong id="os1">0</strong></div>
+        <div><small id="ol2"></small><strong id="os2">0</strong></div>
+      </div>
+      <p class="record" id="orecord"></p>
+      <div class="row"><button type="button" class="btn" id="omenu" data-i18n="menu"></button><button type="button" class="btn primary" id="oretry" data-i18n="retry"></button></div>
+    </div>
+  </div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+
+<script>
+(() => {
+  const I18N = {
+    en: { tagline: 'The ancient game of sowing seeds. Fill your store, earn extra turns and capture your rival’s seeds.', opponent: 'Opponent', vsAI: 'Computer', vsAIDesc: 'Play the AI', twoP: '2 Players', twoPDesc: 'Same device', level: 'Level', easy: 'Easy', normal: 'Normal', hard: 'Hard', start: 'Play', helpKeys: 'Click a glowing pit to sow · ← → and Enter, or keys 1–6 · P to pause', helpTouch: 'Tap one of your glowing pits to sow its seeds', you: 'You', cpu: 'Computer', p1: 'Player 1', p2: 'Player 2', turnOf: n => `${n} to move`, thinking: 'Computer is thinking…', extra: 'Extra turn!', capture: n => `Captured ${n}!`, paused: 'Paused', resume: 'Resume', menu: 'Menu', retry: 'Play again', win: 'You win!', lose: 'You lose', draw: 'Draw!', wins: n => `${n} wins!`, sub: (a, b) => `Final score ${a} – ${b}`, record: (w, l, d) => `Record vs computer: ${w} W · ${l} L · ${d} D`, board: 'Mancala board', pause: 'Pause', pit: (i, n) => `Pit ${i}, ${n} seeds`, store: (who, n) => `${who} store, ${n} seeds`, rules: 'Pick one of your pits and sow its seeds one by one counter-clockwise. Last seed in your store: go again. Last seed in an empty pit on your side: capture the seeds opposite. Most seeds wins.', modeAI: l => `vs Computer · ${l}`, modePvP: '2 Players' },
+    vi: { tagline: 'Trò chơi rải hạt cổ xưa. Lấp đầy kho, giành thêm lượt và ăn hạt của đối thủ.', opponent: 'Đối thủ', vsAI: 'Máy', vsAIDesc: 'Đấu với máy', twoP: '2 người', twoPDesc: 'Cùng một máy', level: 'Độ khó', easy: 'Dễ', normal: 'Thường', hard: 'Khó', start: 'Chơi', helpKeys: 'Nhấn vào ô đang sáng để rải · ← → và Enter, hoặc phím 1–6 · P để tạm dừng', helpTouch: 'Chạm vào một ô đang sáng của bạn để rải hạt', you: 'Bạn', cpu: 'Máy', p1: 'Người 1', p2: 'Người 2', turnOf: n => `Lượt của ${n}`, thinking: 'Máy đang suy nghĩ…', extra: 'Thêm lượt!', capture: n => `Ăn ${n} hạt!`, paused: 'Tạm dừng', resume: 'Tiếp tục', menu: 'Menu', retry: 'Chơi lại', win: 'Bạn thắng!', lose: 'Bạn thua', draw: 'Hòa!', wins: n => `${n} thắng!`, sub: (a, b) => `Tỉ số chung cuộc ${a} – ${b}`, record: (w, l, d) => `Thành tích với máy: ${w} thắng · ${l} thua · ${d} hòa`, board: 'Bàn Mancala', pause: 'Tạm dừng', pit: (i, n) => `Ô ${i}, ${n} hạt`, store: (who, n) => `Kho của ${who}, ${n} hạt`, rules: 'Chọn một ô của bạn và rải lần lượt từng hạt ngược chiều kim đồng hồ. Hạt cuối rơi vào kho: được đi tiếp. Hạt cuối rơi vào ô trống bên mình: ăn các hạt ở ô đối diện. Nhiều hạt nhất sẽ thắng.', modeAI: l => `Đấu máy · ${l}`, modePvP: '2 người' },
+    zh: { tagline: '古老的播种游戏。装满你的仓库，赢得额外回合，吃掉对手的种子。', opponent: '对手', vsAI: '电脑', vsAIDesc: '与 AI 对战', twoP: '双人', twoPDesc: '同一设备', level: '难度', easy: '简单', normal: '普通', hard: '困难', start: '开始', helpKeys: '点击发光的坑播种 · ← → 和 Enter，或数字键 1–6 · P 暂停', helpTouch: '点击你发光的坑来播种', you: '你', cpu: '电脑', p1: '玩家 1', p2: '玩家 2', turnOf: n => `轮到${n}`, thinking: '电脑思考中…', extra: '额外回合！', capture: n => `吃掉 ${n} 颗！`, paused: '已暂停', resume: '继续', menu: '菜单', retry: '再来一局', win: '你赢了！', lose: '你输了', draw: '平局！', wins: n => `${n}获胜！`, sub: (a, b) => `最终比分 ${a} – ${b}`, record: (w, l, d) => `对电脑战绩：${w} 胜 · ${l} 负 · ${d} 平`, board: '播棋棋盘', pause: '暂停', pit: (i, n) => `第 ${i} 坑，${n} 颗种子`, store: (who, n) => `${who}的仓库，${n} 颗种子`, rules: '选择你的一个坑，按逆时针方向逐颗播种。最后一颗落入自己的仓库：再走一次。最后一颗落入自己一侧的空坑：吃掉对面坑的种子。种子最多者获胜。', modeAI: l => `对战电脑 · ${l}`, modePvP: '双人' },
+    fr: { tagline: 'L’ancien jeu de semailles. Remplissez votre grenier, gagnez des tours bonus et capturez les graines adverses.', opponent: 'Adversaire', vsAI: 'Ordinateur', vsAIDesc: 'Contre l’IA', twoP: '2 joueurs', twoPDesc: 'Même appareil', level: 'Niveau', easy: 'Facile', normal: 'Normal', hard: 'Difficile', start: 'Jouer', helpKeys: 'Cliquez un trou lumineux pour semer · ← → et Entrée, ou touches 1–6 · P pour la pause', helpTouch: 'Touchez un de vos trous lumineux pour semer ses graines', you: 'Vous', cpu: 'Ordinateur', p1: 'Joueur 1', p2: 'Joueur 2', turnOf: n => `À ${n} de jouer`, thinking: 'L’ordinateur réfléchit…', extra: 'Tour bonus !', capture: n => `${n} capturées !`, paused: 'Pause', resume: 'Reprendre', menu: 'Menu', retry: 'Rejouer', win: 'Victoire !', lose: 'Défaite', draw: 'Égalité !', wins: n => `${n} gagne !`, sub: (a, b) => `Score final ${a} – ${b}`, record: (w, l, d) => `Bilan contre l’ordinateur : ${w} V · ${l} D · ${d} N`, board: 'Plateau de mancala', pause: 'Pause', pit: (i, n) => `Trou ${i}, ${n} graines`, store: (who, n) => `Grenier de ${who}, ${n} graines`, rules: 'Choisissez un de vos trous et semez ses graines une à une dans le sens antihoraire. Dernière graine dans votre grenier : rejouez. Dernière graine dans un trou vide de votre côté : capturez les graines d’en face. Le plus de graines l’emporte.', modeAI: l => `Contre l’ordinateur · ${l}`, modePvP: '2 joueurs' },
+    th: { tagline: 'เกมหว่านเมล็ดโบราณ เติมยุ้งของคุณ รับตาเพิ่ม และกินเมล็ดของคู่แข่ง', opponent: 'คู่แข่ง', vsAI: 'คอมพิวเตอร์', vsAIDesc: 'เล่นกับ AI', twoP: '2 คน', twoPDesc: 'เครื่องเดียวกัน', level: 'ระดับ', easy: 'ง่าย', normal: 'ปกติ', hard: 'ยาก', start: 'เล่น', helpKeys: 'คลิกหลุมที่เรืองแสงเพื่อหว่าน · ← → และ Enter หรือปุ่ม 1–6 · P เพื่อหยุดชั่วคราว', helpTouch: 'แตะหลุมที่เรืองแสงของคุณเพื่อหว่านเมล็ด', you: 'คุณ', cpu: 'คอมพิวเตอร์', p1: 'ผู้เล่น 1', p2: 'ผู้เล่น 2', turnOf: n => `ตาของ${n}`, thinking: 'คอมพิวเตอร์กำลังคิด…', extra: 'ได้เล่นต่อ!', capture: n => `กิน ${n} เมล็ด!`, paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', menu: 'เมนู', retry: 'เล่นอีกครั้ง', win: 'คุณชนะ!', lose: 'คุณแพ้', draw: 'เสมอ!', wins: n => `${n}ชนะ!`, sub: (a, b) => `คะแนนสุดท้าย ${a} – ${b}`, record: (w, l, d) => `สถิติกับคอมพิวเตอร์: ชนะ ${w} · แพ้ ${l} · เสมอ ${d}`, board: 'กระดานแมนคาลา', pause: 'หยุดชั่วคราว', pit: (i, n) => `หลุม ${i} มี ${n} เมล็ด`, store: (who, n) => `ยุ้งของ${who} มี ${n} เมล็ด`, rules: 'เลือกหลุมของคุณแล้วหว่านเมล็ดทีละเมล็ดทวนเข็มนาฬิกา เมล็ดสุดท้ายลงยุ้งของคุณ: เล่นต่อ เมล็ดสุดท้ายลงหลุมว่างฝั่งคุณ: กินเมล็ดในหลุมตรงข้าม ใครมีเมล็ดมากที่สุดชนะ', modeAI: l => `กับคอมพิวเตอร์ · ${l}`, modePvP: '2 คน' },
+    ja: { tagline: '種をまく古代のゲーム。ストアを満たし、追加ターンを得て、相手の種を奪おう。', opponent: '対戦相手', vsAI: 'コンピューター', vsAIDesc: 'AI と対戦', twoP: '2人対戦', twoPDesc: '同じ端末で', level: 'レベル', easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい', start: 'プレイ', helpKeys: '光る穴をクリックして種まき · ← → と Enter、または 1〜6 キー · P で一時停止', helpTouch: '光っている自分の穴をタップして種をまこう', you: 'あなた', cpu: 'コンピューター', p1: 'プレイヤー1', p2: 'プレイヤー2', turnOf: n => `${n}の番`, thinking: 'コンピューターが考え中…', extra: 'もう一回！', capture: n => `${n}個獲得！`, paused: '一時停止中', resume: '再開', menu: 'メニュー', retry: 'もう一度', win: 'あなたの勝ち！', lose: 'あなたの負け', draw: '引き分け！', wins: n => `${n}の勝ち！`, sub: (a, b) => `最終スコア ${a} – ${b}`, record: (w, l, d) => `対コンピューター戦績：${w}勝 · ${l}敗 · ${d}分`, board: 'マンカラの盤', pause: '一時停止', pit: (i, n) => `穴 ${i}、種 ${n} 個`, store: (who, n) => `${who}のストア、種 ${n} 個`, rules: '自分の穴を1つ選び、種を反時計回りに1個ずつまきます。最後の種が自分のストアに入ればもう一回。自分側の空の穴に入れば、向かいの穴の種を獲得。種が多い方の勝ち。', modeAI: l => `対コンピューター · ${l}`, modePvP: '2人対戦' },
+    ko: { tagline: '씨앗을 뿌리는 고대 게임. 창고를 채우고, 추가 턴을 얻고, 상대의 씨앗을 빼앗으세요.', opponent: '상대', vsAI: '컴퓨터', vsAIDesc: 'AI와 대전', twoP: '2인용', twoPDesc: '같은 기기', level: '난이도', easy: '쉬움', normal: '보통', hard: '어려움', start: '시작', helpKeys: '빛나는 구멍을 클릭해 씨앗 뿌리기 · ← → 와 Enter 또는 1–6 키 · P로 일시정지', helpTouch: '빛나는 내 구멍을 탭해 씨앗을 뿌리세요', you: '나', cpu: '컴퓨터', p1: '플레이어 1', p2: '플레이어 2', turnOf: n => `${n} 차례`, thinking: '컴퓨터가 생각 중…', extra: '한 번 더!', capture: n => `${n}개 획득!`, paused: '일시정지', resume: '계속', menu: '메뉴', retry: '다시 하기', win: '승리!', lose: '패배', draw: '무승부!', wins: n => `${n} 승리!`, sub: (a, b) => `최종 점수 ${a} – ${b}`, record: (w, l, d) => `컴퓨터 상대 전적: ${w}승 · ${l}패 · ${d}무`, board: '만칼라 판', pause: '일시정지', pit: (i, n) => `구멍 ${i}, 씨앗 ${n}개`, store: (who, n) => `${who} 창고, 씨앗 ${n}개`, rules: '내 구멍 하나를 골라 씨앗을 시계 반대 방향으로 하나씩 뿌립니다. 마지막 씨앗이 내 창고에 들어가면 한 번 더. 내 쪽 빈 구멍에 들어가면 맞은편 씨앗을 가져옵니다. 씨앗이 가장 많은 쪽이 승리.', modeAI: l => `컴퓨터 대전 · ${l}`, modePvP: '2인용' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+  for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', t[el.dataset.i18nLabel]);
+
+  // Board indices: 0–5 player 1 pits, 6 player 1 store, 7–12 player 2 pits, 13 player 2 store.
+  const KEY = s => `milaan.mancala.${s}`;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const $ = id => document.getElementById(id);
+  const app = $('app'), boardEl = $('board');
+  function load(k, d) { try { const v = localStorage.getItem(KEY(k)); return v == null ? d : JSON.parse(v); } catch { return d; } }
+  function store(k, v) { try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch { /* storage blocked */ } }
+  const settings = Object.assign({ mode: 'ai', lvl: 1 }, load('settings', {}));
+  const rec = Object.assign({ w: 0, l: 0, d: 0 }, load('record', {}));
+  const LVLS = [t.easy, t.normal, t.hard];
+  const COLORS = ['#f2c14e', '#e76f51', '#7bd389', '#5fa8d3', '#c77dff', '#f4f1de', '#ef476f'];
+
+  const S = { b: [], turn: 0, busy: false, over: true, paused: false, focus: 0, token: 0, seeds: [] };
+  const storeOf = p => (p === 0 ? 6 : 13);
+  const ownPit = (p, i) => (p === 0 ? i >= 0 && i <= 5 : i >= 7 && i <= 12);
+
+  // ---------- rules ----------
+  function apply(b, i, p, trace) {
+    let n = b[i]; b[i] = 0; let k = i;
+    const skip = storeOf(1 - p);
+    while (n > 0) { k = (k + 1) % 14; if (k === skip) continue; b[k]++; n--; if (trace) trace.push({ t: 'sow', k }); }
+    let extra = k === storeOf(p), cap = 0;
+    if (!extra && ownPit(p, k) && b[k] === 1 && b[12 - k] > 0) {
+      cap = b[12 - k] + 1; b[storeOf(p)] += cap; b[k] = 0; b[12 - k] = 0;
+      if (trace) trace.push({ t: 'cap', k, o: 12 - k, n: cap });
+    }
+    let ended = false;
+    const s0 = b[0] + b[1] + b[2] + b[3] + b[4] + b[5], s1 = b[7] + b[8] + b[9] + b[10] + b[11] + b[12];
+    if (s0 === 0 || s1 === 0) {
+      ended = true; extra = false;
+      for (let j = 0; j < 6; j++) { b[6] += b[j]; b[13] += b[j + 7]; b[j] = 0; b[j + 7] = 0; }
+      if (trace) trace.push({ t: 'end' });
+    }
+    return { extra, cap, ended };
+  }
+  const moves = (b, p) => { const r = []; const o = p === 0 ? 0 : 7; for (let j = 0; j < 6; j++) if (b[o + j]) r.push(o + j); return r; };
+
+  // ---------- AI (player 2, maximises store13 - store6) ----------
+  function evalB(b) { return (b[13] - b[6]) * 4 + (b[7] + b[8] + b[9] + b[10] + b[11] + b[12]) - (b[0] + b[1] + b[2] + b[3] + b[4] + b[5]); }
+  function search(b, p, depth, a, be, deadline) {
+    const ms = moves(b, p);
+    if (depth === 0 || !ms.length || performance.now() > deadline) return evalB(b);
+    // order: extra-turn moves first
+    ms.sort((x, y) => ((y + b[y]) % 14 === storeOf(p)) - ((x + b[x]) % 14 === storeOf(p)));
+    if (p === 1) {
+      let best = -Infinity;
+      for (const m of ms) {
+        const c = b.slice(); const r = apply(c, m, p);
+        const v = r.ended ? (c[13] - c[6]) * 100 : search(c, r.extra ? p : 0, r.extra ? depth : depth - 1, a, be, deadline);
+        if (v > best) best = v; if (best > a) a = best; if (a >= be) break;
+      }
+      return best;
+    }
+    let best = Infinity;
+    for (const m of ms) {
+      const c = b.slice(); const r = apply(c, m, p);
+      const v = r.ended ? (c[13] - c[6]) * 100 : search(c, r.extra ? p : 1, r.extra ? depth : depth - 1, a, be, deadline);
+      if (v < best) best = v; if (best < be) be = best; if (a >= be) break;
+    }
+    return best;
+  }
+  function aiMove(b, lvl) {
+    const ms = moves(b, 1);
+    if (lvl === 0 && Math.random() < 0.45) return ms[Math.floor(Math.random() * ms.length)];
+    const depth = [1, 4, 9][lvl], deadline = performance.now() + 900;
+    let best = -Infinity, pick = [];
+    for (const m of ms) {
+      const c = b.slice(); const r = apply(c, m, 1);
+      const v = r.ended ? (c[13] - c[6]) * 100 : search(c, r.extra ? 1 : 0, r.extra ? depth : depth - 1, -Infinity, Infinity, deadline);
+      if (v > best) { best = v; pick = [m]; } else if (v === best) pick.push(m);
+    }
+    return pick[Math.floor(Math.random() * pick.length)];
+  }
+
+  // ---------- rendering ----------
+  const pitEls = [];
+  function hash(n) { n = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b); n ^= n >>> 13; n = Math.imul(n, 0xc2b2ae35); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; }
+  function buildBoard() {
+    boardEl.textContent = '';
+    for (let i = 0; i < 14; i++) {
+      const el = document.createElement(i === 6 || i === 13 ? 'div' : 'button');
+      el.className = 'pit';
+      if (i === 6 || i === 13) el.classList.add('store', i === 6 ? 's1' : 's2');
+      else { el.type = 'button'; el.classList.add(i < 6 ? 'bot' : 'top'); el.addEventListener('click', () => human(i)); el.addEventListener('focus', () => { S.focus = i; }); }
+      el.innerHTML = '<div class="seeds"></div><span class="n">0</span>';
+      boardEl.appendChild(el); pitEls[i] = el;
+    }
+    layout();
+  }
+  function layout() {
+    const portrait = matchMedia('(max-aspect-ratio: 4/5)').matches;
+    for (let i = 0; i < 14; i++) {
+      const s = pitEls[i].style;
+      if (!portrait) {
+        if (i === 13) { s.gridColumn = '1'; s.gridRow = '1 / 3'; }
+        else if (i === 6) { s.gridColumn = '8'; s.gridRow = '1 / 3'; }
+        else if (i < 6) { s.gridColumn = String(i + 2); s.gridRow = '2'; }
+        else { s.gridColumn = String(14 - i); s.gridRow = '1'; }
+      } else {
+        if (i === 13) { s.gridColumn = '1 / 3'; s.gridRow = '1'; }
+        else if (i === 6) { s.gridColumn = '1 / 3'; s.gridRow = '8'; }
+        else if (i < 6) { s.gridColumn = '1'; s.gridRow = String(i + 2); }
+        else { s.gridColumn = '2'; s.gridRow = String(14 - i); }
+      }
+    }
+  }
+  function seedHTML(i, n) {
+    const storeP = i === 6 || i === 13, portrait = matchMedia('(max-aspect-ratio: 4/5)').matches;
+    let h = '';
+    const shown = Math.min(n, storeP ? 48 : 18);
+    for (let s = 0; s < shown; s++) {
+      const id = i * 97 + s * 13;
+      const ang = hash(id) * Math.PI * 2, r = Math.sqrt(hash(id + 1)) * 0.4;
+      let x = 50 + Math.cos(ang) * r * 100, y = 50 + Math.sin(ang) * r * 100;
+      if (storeP) { const u = hash(id + 2), v = hash(id + 3); if (portrait) { x = 8 + u * 84; y = 18 + v * 64; } else { x = 18 + u * 64; y = 8 + v * 84; } }
+      h += `<span class="seed" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;background:${COLORS[(id >> 2) % COLORS.length]}"></span>`;
+    }
+    return h;
+  }
+  function names() { return settings.mode === 'ai' && S.ai ? [t.you, t.cpu] : [t.p1, t.p2]; }
+  function render() {
+    const nm = names();
+    for (let i = 0; i < 14; i++) {
+      const el = pitEls[i], n = S.b[i];
+      if (el._n !== n) { el.querySelector('.seeds').innerHTML = seedHTML(i, n); el.querySelector('.n').textContent = n; el._n = n; }
+      if (i === 6 || i === 13) { el.setAttribute('aria-label', t.store(i === 6 ? nm[0] : nm[1], n)); continue; }
+      const can = canClick(i);
+      el.classList.toggle('can', can);
+      el.disabled = !can;
+      el.setAttribute('aria-label', t.pit(i < 6 ? i + 1 : i - 6, n));
+    }
+    $('name1').textContent = `${nm[0]} · ${S.b[6]}`; $('name2').textContent = `${nm[1]} · ${S.b[13]}`;
+    $('who1').classList.toggle('on', !S.over && S.turn === 0); $('who2').classList.toggle('on', !S.over && S.turn === 1);
+  }
+  const canClick = i => !S.over && !S.busy && !S.paused && !(S.ai && S.turn === 1) && ownPit(S.turn, i) && S.b[i] > 0;
+  function setStatus(s, say) { $('status').textContent = s; if (say) announce(s); }
+  function announce(s) { const a = $('announcer'); a.textContent = ''; setTimeout(() => { a.textContent = s; }, 30); }
+  let toastT = 0;
+  function toast(s) { const el = $('toast'); el.textContent = s; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 900); announce(s); }
+  function turnText() { return S.ai && S.turn === 1 ? t.thinking : t.turnOf(names()[S.turn]); }
+
+  // ---------- flow ----------
+  const wait = ms => new Promise(res => { const tok = S.token; const step = () => { if (tok !== S.token) return; if (S.paused) { setTimeout(step, 100); return; } res(); }; setTimeout(step, ms); });
+  function center(el) { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+
+  async function play(i) {
+    S.busy = true; render();
+    const tok = S.token, p = S.turn, trace = [], work = S.b.slice();
+    const res = apply(work, i, p, trace);
+    const spd = reducedMotion ? 60 : Math.max(110, 230 - S.b[i] * 8);
+    const n0 = S.b[i]; S.b[i] = 0; render();
+    let fly = null;
+    if (!reducedMotion) { fly = document.createElement('span'); fly.className = 'fly'; fly.style.background = COLORS[i % COLORS.length]; const [x, y] = center(pitEls[i]); fly.style.left = x + 'px'; fly.style.top = y + 'px'; document.body.appendChild(fly); }
+    let left = n0;
+    for (const st of trace) {
+      if (st.t === 'sow') {
+        if (fly) { const [x, y] = center(pitEls[st.k]); fly.style.left = x + 'px'; fly.style.top = y + 'px'; }
+        await wait(spd); if (tok !== S.token) { fly && fly.remove(); return; }
+        S.b[st.k]++; left--; pitEls[st.k].classList.remove('hit'); void pitEls[st.k].offsetWidth; pitEls[st.k].classList.add('hit'); render();
+        if (fly && left === 0) fly.remove();
+      } else if (st.t === 'cap') {
+        await wait(reducedMotion ? 100 : 260); if (tok !== S.token) return;
+        pitEls[st.k].classList.add('cap'); pitEls[st.o].classList.add('cap');
+        toast(t.capture(st.n));
+        await wait(reducedMotion ? 150 : 500); if (tok !== S.token) return;
+        pitEls[st.k].classList.remove('cap'); pitEls[st.o].classList.remove('cap');
+        S.b[storeOf(p)] += st.n; S.b[st.k] = 0; S.b[st.o] = 0; render();
+      } else if (st.t === 'end') {
+        await wait(400); if (tok !== S.token) return;
+        S.b = work.slice(); render();
+      }
+    }
+    if (fly) fly.remove();
+    S.b = work; S.busy = false;
+    if (res.ended) { await wait(500); if (tok === S.token) finish(); return; }
+    if (res.extra) toast(t.extra); else S.turn = 1 - p;
+    render(); setStatus(turnText(), !S.ai || S.turn === 0);
+    next();
+  }
+  async function next() {
+    if (S.over) return;
+    if (S.ai && S.turn === 1) {
+      const tok = S.token;
+      await wait(reducedMotion ? 200 : 550); if (tok !== S.token || S.over) return;
+      play(aiMove(S.b.slice(), S.lvl));
+    } else {
+      const ms = moves(S.b, S.turn);
+      if (!ms.includes(S.focus)) S.focus = ms[0];
+      if (!coarse && document.activeElement && (document.activeElement === document.body || document.activeElement.classList.contains('pit'))) pitEls[S.focus].focus({ preventScroll: true });
+    }
+  }
+  function human(i) { if (canClick(i)) play(i); }
+
+  function start() {
+    S.token++; S.b = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0]; S.turn = 0; S.busy = false; S.over = false; S.paused = false;
+    S.ai = settings.mode === 'ai'; S.lvl = settings.lvl; S.focus = 0;
+    for (const el of pitEls) el._n = -1;
+    $('modechip').textContent = S.ai ? t.modeAI(LVLS[S.lvl]) : t.modePvP;
+    $('menu').hidden = true; $('over').hidden = true; $('paused').hidden = true; app.classList.remove('menu');
+    render(); setStatus(turnText(), true); next();
+  }
+  function finish() {
+    S.over = true; render();
+    const a = S.b[6], b = S.b[13], nm = names();
+    let title;
+    if (S.ai) {
+      if (a > b) { title = t.win; rec.w++; } else if (a < b) { title = t.lose; rec.l++; } else { title = t.draw; rec.d++; }
+      store('record', rec);
+    } else title = a === b ? t.draw : t.wins(a > b ? nm[0] : nm[1]);
+    $('over-title').textContent = title; $('osub').textContent = t.sub(a, b);
+    $('ol1').textContent = nm[0]; $('ol2').textContent = nm[1]; $('os1').textContent = a; $('os2').textContent = b;
+    $('orecord').textContent = S.ai ? t.record(rec.w, rec.l, rec.d) : '';
+    setStatus('', false); $('over').hidden = false; announce(`${title} ${t.sub(a, b)}`); $('oretry').focus();
+  }
+  function toMenu() {
+    S.token++; S.over = true; S.paused = false; app.classList.add('menu');
+    $('paused').hidden = true; $('over').hidden = true; $('menu').hidden = false;
+    $('record').textContent = rec.w + rec.l + rec.d ? t.record(rec.w, rec.l, rec.d) : '';
+    syncMenu(); $('start').focus();
+  }
+  function setPause(on) {
+    if (S.over && on) return;
+    S.paused = on; $('paused').hidden = !on; render();
+    if (on) $('resume').focus(); else next();
+  }
+  function syncMenu() {
+    for (const bt of $('seg-mode').children) bt.setAttribute('aria-pressed', String(bt.dataset.mode === settings.mode));
+    for (const bt of $('seg-lvl').children) bt.setAttribute('aria-pressed', String(+bt.dataset.lvl === settings.lvl));
+    $('seg-lvl').hidden = $('lvl-label').hidden = settings.mode !== 'ai';
+  }
+  $('seg-mode').addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; settings.mode = bt.dataset.mode; store('settings', settings); syncMenu(); });
+  $('seg-lvl').addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; settings.lvl = +bt.dataset.lvl; store('settings', settings); syncMenu(); });
+  $('start').addEventListener('click', start);
+  $('oretry').addEventListener('click', start);
+  $('omenu').addEventListener('click', toMenu);
+  $('quit').addEventListener('click', toMenu);
+  $('resume').addEventListener('click', () => setPause(false));
+  $('pause').addEventListener('click', () => setPause(!S.paused));
+
+  addEventListener('keydown', e => {
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { if (!$('menu').hidden || !$('over').hidden) return; e.preventDefault(); setPause(!S.paused); return; }
+    if (S.over || S.paused || S.busy || (S.ai && S.turn === 1)) return;
+    const ms = moves(S.b, S.turn);
+    if (/^[1-6]$/.test(e.key)) { const i = (S.turn === 0 ? 0 : 7) + +e.key - 1; if (canClick(i)) { e.preventDefault(); play(i); } return; }
+    let d = 0;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') d = 1; else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') d = -1;
+    if (d && ms.length) {
+      e.preventDefault();
+      if (S.turn === 1) d = -d; // player 2's row runs right-to-left on screen
+      let k = ms.indexOf(S.focus); k = k < 0 ? 0 : (k + d + ms.length) % ms.length;
+      S.focus = ms[k]; pitEls[S.focus].focus();
+    } else if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && !document.activeElement.classList.contains('pit') && canClick(S.focus)) { e.preventDefault(); play(S.focus); }
+  });
+  addEventListener('blur', () => { if (!S.over && !S.paused) setPause(true); });
+  addEventListener('resize', () => { layout(); for (const el of pitEls) el._n = -1; if (S.b.length) render(); });
+
+  $('help').textContent = coarse ? t.helpTouch : t.helpKeys;
+  buildBoard();
+  S.b = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0]; render();
+  toMenu();
+  if (new URLSearchParams(location.search).has('demo')) {
+    // screenshot helper: jump into a mid-game position
+    settings.mode = 'ai'; start(); S.b = [0, 6, 2, 7, 5, 1, 9, 3, 5, 0, 6, 4, 2, 6]; S.turn = 0; for (const el of pitEls) el._n = -1; render(); setStatus(turnText());
+  }
+})();
+</script>
+</body>
+</html>

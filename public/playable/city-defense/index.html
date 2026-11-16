@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>City Defense</title>
+<style>
+:root {
+  --bg: #050816;
+  --text: #f1f5ff;
+  --muted: #93a2c4;
+  --accent: #ffcf4a;
+  --accent-dark: #b98a0e;
+  --cyan: #5ef2ff;
+  --red: #ff4d5e;
+  --green: #6dff9e;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--text); background: var(--bg); overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.app { position: fixed; inset: 0; }
+canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; background: linear-gradient(#060a20 0%, #10153a 60%, #2a1840 100%); }
+canvas:focus-visible { outline: none; }
+.hud { position: absolute; top: max(8px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; z-index: 2; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.2; text-shadow: 0 0 10px #5ef2ff55; }
+.stat.score strong { color: var(--accent); }
+.spacer { flex: 1; }
+.hud .icon { pointer-events: auto; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: #ffffff10; box-shadow: inset 0 0 0 1px #ffffff22; font-size: 16px; }
+.hud .icon[hidden] { display: none; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; background: #02040cb0; z-index: 3; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 370px); max-height: calc(100% - 8px); overflow-y: auto; padding: 22px 20px; border-radius: 24px; text-align: center; background: #0c1230ee; box-shadow: 0 0 0 1px #5ef2ff40, 0 0 40px #5ef2ff22, 0 24px 48px #000a; animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+.panel h1, .panel h2 { font-size: clamp(28px, 9vw, 40px); font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+.panel h1 { color: var(--cyan); text-shadow: 0 0 16px #5ef2ff77; }
+.panel h1 span { color: var(--accent); text-shadow: 0 0 16px #ffcf4a88; }
+.panel p { margin-top: 8px; color: #d4def0; font-size: 15px; line-height: 1.4; }
+.panel .small { font-size: 12px; color: var(--muted); }
+.cta { margin-top: 16px; width: 100%; padding: 14px; border-radius: 16px; background: var(--accent); color: #2a1a00; font-size: 18px; font-weight: 900; box-shadow: 0 5px 0 var(--accent-dark), 0 0 24px #ffcf4a55; }
+.cta:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.ghost { margin-top: 10px; width: 100%; padding: 11px; border-radius: 14px; background: #ffffff0d; box-shadow: inset 0 0 0 1px #ffffff24; font-weight: 800; }
+.badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 99px; background: var(--green); color: #032312 !important; font-weight: 800; font-size: 13px !important; }
+.badge[hidden] { display: none; }
+.banner { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 2; }
+.banner[hidden] { display: none; }
+.banner div { text-align: center; padding: 0 16px; }
+.banner h2 { font-size: clamp(26px, 7vw, 44px); font-weight: 900; text-shadow: 0 0 18px #5ef2ff, 0 4px 20px #000; }
+.banner p { margin-top: 6px; font-size: clamp(14px, 3.6vw, 18px); font-weight: 800; color: var(--accent); text-shadow: 0 2px 10px #000; white-space: pre-line; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-height: 460px) {
+  .panel { padding: 12px 16px; width: min(100%, 520px); }
+  .panel h1, .panel h2 { font-size: 26px; }
+  .panel p { font-size: 13px; margin-top: 4px; }
+  .cta { margin-top: 10px; padding: 10px; font-size: 16px; }
+  .ghost { margin-top: 6px; padding: 8px; }
+  .stat strong { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <canvas id="canvas" tabindex="0" role="img" data-i18n-label="canvas"></canvas>
+  <div class="hud">
+    <div class="stat score"><small data-i18n="score"></small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="wave"></small><strong id="wave">1</strong></div>
+    <div class="spacer"></div>
+    <div class="stat"><small data-i18n="best"></small><strong id="best">0</strong></div>
+    <button type="button" class="icon" id="sound" data-i18n-label="sound">🔊</button>
+    <button type="button" class="icon" id="pause" data-i18n-label="pause" hidden>❚❚</button>
+  </div>
+  <div class="banner" id="banner" hidden><div><h2 id="banner-title"></h2><p id="banner-text"></p></div></div>
+
+  <section class="overlay" id="intro">
+    <div class="panel">
+      <h1>City <span>Defense</span></h1>
+      <p data-i18n="how"></p>
+      <p class="small" data-i18n="keys"></p>
+      <p class="small"><span data-i18n="best"></span>: <strong id="intro-best">0</strong></p>
+      <button type="button" class="cta" id="play" data-i18n="play"></button>
+    </div>
+  </section>
+  <section class="overlay" id="paused" hidden>
+    <div class="panel">
+      <h2 data-i18n="paused"></h2>
+      <button type="button" class="cta" id="resume" data-i18n="resume"></button>
+      <button type="button" class="ghost" id="restart" data-i18n="restart"></button>
+    </div>
+  </section>
+  <section class="overlay" id="over" hidden>
+    <div class="panel">
+      <h2 data-i18n="gameOver"></h2>
+      <p id="final"></p>
+      <span class="badge" id="new-best" data-i18n="newBest" hidden></span>
+      <button type="button" class="cta" id="again" data-i18n="again"></button>
+    </div>
+  </section>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const I18N = {
+    en: { play: 'Defend!', resume: 'Resume', restart: 'Restart', again: 'Play again', paused: 'Paused', gameOver: 'The End', score: 'Score', best: 'Best', wave: 'Wave', newBest: 'New best!', canvas: 'City Defense playfield', sound: 'Sound', pause: 'Pause',
+      how: 'Tap or click the sky to fire interceptors. Their blasts destroy incoming missiles. Protect your six cities!',
+      keys: 'Arrows/WASD aim · Space fires · 1 2 3 pick a base · P pause · M mute',
+      waveN: n => `Wave ${n}`, ready: 'Defend the cities', bonus: (c, a, p) => `${c} cities · ${a} ammo\n+${p} bonus`, extra: 'City rebuilt!', cityLost: 'A city was destroyed', final: (s, w) => `Score ${s} · reached wave ${w}` },
+    vi: { play: 'Phòng thủ!', resume: 'Tiếp tục', restart: 'Chơi lại', again: 'Chơi lại', paused: 'Tạm dừng', gameOver: 'Kết thúc', score: 'Điểm', best: 'Kỷ lục', wave: 'Đợt', newBest: 'Kỷ lục mới!', canvas: 'Màn chơi City Defense', sound: 'Âm thanh', pause: 'Tạm dừng',
+      how: 'Chạm hoặc nhấp lên bầu trời để bắn tên lửa đánh chặn. Vụ nổ sẽ phá hủy tên lửa địch. Hãy bảo vệ sáu thành phố!',
+      keys: 'Mũi tên/WASD ngắm · Space bắn · 1 2 3 chọn căn cứ · P tạm dừng · M tắt tiếng',
+      waveN: n => `Đợt ${n}`, ready: 'Bảo vệ thành phố', bonus: (c, a, p) => `${c} thành phố · ${a} đạn\n+${p} thưởng`, extra: 'Thành phố được xây lại!', cityLost: 'Một thành phố bị phá hủy', final: (s, w) => `Điểm ${s} · tới đợt ${w}` },
+    zh: { play: '开始防御！', resume: '继续', restart: '重新开始', again: '再玩一次', paused: '已暂停', gameOver: '游戏结束', score: '得分', best: '最高分', wave: '波次', newBest: '新纪录！', canvas: '城市防御游戏区域', sound: '声音', pause: '暂停',
+      how: '点击天空发射拦截导弹，爆炸会摧毁来袭导弹。守护你的六座城市！',
+      keys: '方向键/WASD 瞄准 · 空格 发射 · 1 2 3 选择基地 · P 暂停 · M 静音',
+      waveN: n => `第 ${n} 波`, ready: '保卫城市', bonus: (c, a, p) => `${c} 座城市 · ${a} 发弹药\n奖励 +${p}`, extra: '城市已重建！', cityLost: '一座城市被摧毁', final: (s, w) => `得分 ${s} · 到达第 ${w} 波` },
+    fr: { play: 'Défendre !', resume: 'Reprendre', restart: 'Recommencer', again: 'Rejouer', paused: 'Pause', gameOver: 'Fin', score: 'Score', best: 'Record', wave: 'Vague', newBest: 'Nouveau record !', canvas: 'Zone de jeu City Defense', sound: 'Son', pause: 'Pause',
+      how: 'Touchez ou cliquez le ciel pour tirer des intercepteurs. Leurs explosions détruisent les missiles. Protégez vos six villes !',
+      keys: 'Flèches/WASD viser · Espace tirer · 1 2 3 choisir la base · P pause · M muet',
+      waveN: n => `Vague ${n}`, ready: 'Défendez les villes', bonus: (c, a, p) => `${c} villes · ${a} munitions\n+${p} bonus`, extra: 'Ville reconstruite !', cityLost: 'Une ville a été détruite', final: (s, w) => `Score ${s} · vague ${w} atteinte` },
+    th: { play: 'ป้องกัน!', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', again: 'เล่นอีกครั้ง', paused: 'หยุดชั่วคราว', gameOver: 'จบเกม', score: 'คะแนน', best: 'สูงสุด', wave: 'ระลอก', newBest: 'สถิติใหม่!', canvas: 'สนามเกม City Defense', sound: 'เสียง', pause: 'หยุด',
+      how: 'แตะหรือคลิกบนท้องฟ้าเพื่อยิงขีปนาวุธสกัดกั้น แรงระเบิดจะทำลายขีปนาวุธที่พุ่งมา ปกป้องเมืองทั้งหกไว้!',
+      keys: 'ลูกศร/WASD เล็ง · Space ยิง · 1 2 3 เลือกฐาน · P หยุด · M ปิดเสียง',
+      waveN: n => `ระลอก ${n}`, ready: 'ปกป้องเมือง', bonus: (c, a, p) => `${c} เมือง · กระสุน ${a}\nโบนัส +${p}`, extra: 'สร้างเมืองใหม่แล้ว!', cityLost: 'เมืองหนึ่งถูกทำลาย', final: (s, w) => `คะแนน ${s} · ถึงระลอก ${w}` },
+    ja: { play: '防衛開始！', resume: '再開', restart: 'やり直す', again: 'もう一度', paused: '一時停止', gameOver: 'ゲームオーバー', score: 'スコア', best: 'ベスト', wave: 'ウェーブ', newBest: 'ベスト更新！', canvas: 'City Defense のプレイ画面', sound: 'サウンド', pause: '一時停止',
+      how: '空をタップ／クリックして迎撃ミサイルを発射。爆風で飛来するミサイルを破壊し、6つの都市を守り抜こう！',
+      keys: '矢印/WASD 照準 · スペース 発射 · 1 2 3 基地選択 · P 一時停止 · M ミュート',
+      waveN: n => `ウェーブ ${n}`, ready: '都市を守れ', bonus: (c, a, p) => `都市 ${c} · 弾薬 ${a}\nボーナス +${p}`, extra: '都市を再建！', cityLost: '都市が破壊された', final: (s, w) => `スコア ${s} · ウェーブ ${w} まで到達` },
+    ko: { play: '방어 시작!', resume: '계속', restart: '다시 시작', again: '다시 하기', paused: '일시정지', gameOver: '게임 오버', score: '점수', best: '최고', wave: '웨이브', newBest: '최고 기록!', canvas: 'City Defense 게임 화면', sound: '소리', pause: '일시정지',
+      how: '하늘을 탭하거나 클릭해 요격 미사일을 발사하세요. 폭발로 날아오는 미사일을 파괴해 여섯 도시를 지키세요!',
+      keys: '방향키/WASD 조준 · Space 발사 · 1 2 3 기지 선택 · P 일시정지 · M 음소거',
+      waveN: n => `웨이브 ${n}`, ready: '도시를 지켜라', bonus: (c, a, p) => `도시 ${c} · 탄약 ${a}\n보너스 +${p}`, extra: '도시 재건!', cityLost: '도시가 파괴되었습니다', final: (s, w) => `점수 ${s} · 웨이브 ${w} 도달` }
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t[el.dataset.i18n]; });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => { el.setAttribute('aria-label', t[el.dataset.i18nLabel]); el.title = t[el.dataset.i18nLabel]; });
+
+  const $ = id => document.getElementById(id);
+  const els = { score: $('score'), wave: $('wave'), best: $('best'), introBest: $('intro-best'), intro: $('intro'), over: $('over'), paused: $('paused'), final: $('final'), newBest: $('new-best'), banner: $('banner'), bannerTitle: $('banner-title'), bannerText: $('banner-text'), announcer: $('announcer'), pause: $('pause'), sound: $('sound') };
+  const KEY = 'milaan.cityDefense.';
+  const store = {
+    get(name, fallback) { try { const v = localStorage.getItem(KEY + name); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+    set(name, value) { try { localStorage.setItem(KEY + name, JSON.stringify(value)); } catch {} }
+  };
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let best = store.get('best', 0) | 0;
+  let muted = !!store.get('muted', false);
+
+  // ---------- Audio ----------
+  let ac = null;
+  function audio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(freq, dur, type = 'square', vol = 0.12, slide = 0) {
+    if (muted) return; const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain(), now = a.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, now);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), now + dur);
+    g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    o.connect(g).connect(a.destination); o.start(now); o.stop(now + dur + 0.02);
+  }
+  function noise(dur, vol = 0.25, freq = 900) {
+    if (muted) return; const a = audio(); if (!a) return;
+    const len = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    f.type = 'lowpass'; f.frequency.value = freq; g.gain.value = vol;
+    s.buffer = buf; s.connect(f).connect(g).connect(a.destination); s.start();
+  }
+  const sfx = {
+    fire: () => tone(880, 0.12, 'square', 0.06, -500),
+    boom: () => noise(0.45, 0.22, 1200),
+    kill: () => tone(320, 0.15, 'triangle', 0.1, 400),
+    city: () => { noise(0.9, 0.4, 500); tone(160, 0.7, 'sawtooth', 0.1, -120); },
+    empty: () => tone(120, 0.1, 'square', 0.06),
+    wave: () => { [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'triangle', 0.1), i * 110)); },
+    tick: () => tone(1200, 0.04, 'square', 0.04),
+    bonus: () => { [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.16, 'triangle', 0.1), i * 90)); },
+    over: () => { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, 0.35, 'sawtooth', 0.08), i * 220)); }
+  };
+  function syncSound() { els.sound.textContent = muted ? '🔇' : '🔊'; els.sound.setAttribute('aria-pressed', String(!muted)); }
+
+  // ---------- World ----------
+  const canvas = $('canvas'), ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1, groundY = 0, unit = 1;
+  const CITY_X = [0.2, 0.28, 0.36, 0.64, 0.72, 0.8];
+  const BASE_X = [0.07, 0.5, 0.93];
+  const AMMO = 10, EXTRA_EVERY = 10000;
+  const COLORS = [['#ff4d5e', '#5ef2ff'], ['#ff9f43', '#6dff9e'], ['#ff5fd2', '#ffcf4a'], ['#ffcf4a', '#a37bff'], ['#6dff9e', '#ff4d5e']];
+  let stars = [];
+  const S = { state: 'menu', score: 0, wave: 1, cities: [], bases: [], enemies: [], shots: [], blasts: [], bombers: [], parts: [], toSpawn: 0, spawnT: 0, bomberT: 0, stock: 0, nextExtra: EXTRA_EVERY, shake: 0, flash: 0, interT: 0, aim: { x: 0, y: 0 }, prefBase: -1, tally: null };
+
+  function resize() {
+    const oW = W || 1, oH = H || 1;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    unit = Math.min(W, H * 1.2) / 600;
+    groundY = H - Math.max(34, H * 0.07) - safeBottom();
+    const sx = W / oW, sy = H / oH;
+    for (const list of [S.enemies, S.shots, S.blasts, S.bombers, S.parts]) for (const o of list) {
+      for (const k of ['x', 'y', 'sx', 'sy', 'tx', 'ty']) if (k in o) o[k] *= (k[k.length - 1] === 'x' ? sx : sy);
+    }
+    S.aim.x *= sx; S.aim.y *= sy;
+    stars = Array.from({ length: Math.round(W * H / 5000) }, () => ({ x: Math.random() * W, y: Math.random() * groundY * 0.85, r: Math.random() * 1.3 + 0.3, p: Math.random() * 6 }));
+  }
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  function safeBottom() { return probe.offsetHeight || 0; }
+
+  const cityPos = i => ({ x: CITY_X[i] * W, y: groundY });
+  const basePos = i => ({ x: BASE_X[i] * W, y: groundY - 14 * unit });
+  function blastR() { return 42 * unit; }
+
+  function newGame() {
+    S.score = 0; S.wave = 1; S.stock = 0; S.nextExtra = EXTRA_EVERY;
+    S.cities = CITY_X.map(() => ({ alive: true }));
+    S.enemies = []; S.shots = []; S.blasts = []; S.bombers = []; S.parts = [];
+    S.aim = { x: W / 2, y: groundY * 0.5 };
+    startWave();
+    S.state = 'play';
+    [els.intro, els.over, els.paused].forEach(e => e.hidden = true);
+    els.pause.hidden = false;
+    canvas.focus();
+    hud();
+  }
+  function startWave() {
+    S.bases = BASE_X.map(() => ({ ammo: AMMO, alive: true }));
+    S.toSpawn = 8 + Math.min(S.wave * 2, 24);
+    S.spawnT = 2.2; S.bomberT = 6 + Math.random() * 4; S.tally = null;
+    S.palette = COLORS[(S.wave - 1) % COLORS.length];
+    showBanner(t.waveN(S.wave), S.wave === 1 ? t.ready : '', 2);
+    els.announcer.textContent = t.waveN(S.wave);
+    sfx.wave(); hud();
+  }
+  function mult() { return Math.min(6, 1 + Math.floor((S.wave - 1) / 2)); }
+  function speed() { return (34 + S.wave * 7) * unit * (H / 600 > 1 ? 1 : 1); }
+
+  function targets() {
+    const list = [];
+    S.cities.forEach((c, i) => c.alive && list.push(cityPos(i)));
+    S.bases.forEach((b, i) => b.alive && list.push({ x: BASE_X[i] * W, y: groundY }));
+    return list;
+  }
+  function spawnEnemy(x, y, splitAllowed) {
+    const tg = targets(); if (!tg.length) return;
+    const tp = tg[(Math.random() * tg.length) | 0];
+    const v = speed() * (0.8 + Math.random() * 0.4);
+    const dx = tp.x - x, dy = tp.y - y, d = Math.hypot(dx, dy) || 1;
+    const canSplit = splitAllowed && S.wave >= 3 && Math.random() < Math.min(0.45, 0.1 + S.wave * 0.04);
+    S.enemies.push({ sx: x, sy: y, x, y, tx: tp.x, ty: tp.y, vx: dx / d * v, vy: dy / d * v, split: canSplit ? groundY * (0.3 + Math.random() * 0.2) : -1 });
+  }
+
+  function fire(tx, ty, baseIdx) {
+    if (S.state !== 'play') return;
+    ty = Math.min(ty, groundY - 30 * unit);
+    let idx = baseIdx;
+    if (idx == null || idx < 0 || !S.bases[idx].alive || S.bases[idx].ammo <= 0) {
+      idx = -1; let bd = Infinity;
+      S.bases.forEach((b, i) => { if (b.alive && b.ammo > 0) { const d = Math.abs(BASE_X[i] * W - tx) + (i === 1 ? -W * 0.05 : 0); if (d < bd) { bd = d; idx = i; } } });
+    }
+    if (idx < 0) { sfx.empty(); return; }
+    S.bases[idx].ammo--;
+    const p = basePos(idx);
+    const v = (idx === 1 ? 620 : 460) * unit;
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
+    S.shots.push({ sx: p.x, sy: p.y, x: p.x, y: p.y, tx, ty, vx: dx / d * v, vy: dy / d * v, left: d / v });
+    sfx.fire();
+  }
+  function blast(x, y, maxR, friendly) {
+    S.blasts.push({ x, y, r: 0, max: maxR, t: 0, friendly });
+  }
+  function burst(x, y, color, n = 10) {
+    if (reduced) n = Math.ceil(n / 3);
+    for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = (40 + Math.random() * 120) * unit; S.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40 * unit, life: 0.6 + Math.random() * 0.5, c: color }); }
+  }
+  function addScore(n) {
+    S.score += n;
+    while (S.score >= S.nextExtra) { S.stock++; S.nextExtra += EXTRA_EVERY; }
+    hud();
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    for (const s of stars) s.p += dt;
+    if (S.flash > 0) S.flash -= dt;
+    if (S.shake > 0) S.shake = Math.max(0, S.shake - dt * 30);
+    for (let i = S.parts.length - 1; i >= 0; i--) { const p = S.parts[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 160 * unit * dt; if (p.life <= 0) S.parts.splice(i, 1); }
+    if (S.state !== 'play') return;
+
+    if (S.tally) { S.tally.t -= dt; if (S.tally.t <= 0) endTally(); updateBlasts(dt); return; }
+
+    // spawn
+    if (S.toSpawn > 0) {
+      S.spawnT -= dt;
+      if (S.spawnT <= 0) {
+        const n = Math.min(S.toSpawn, 1 + ((Math.random() * Math.min(4, 1 + S.wave / 2)) | 0));
+        for (let i = 0; i < n; i++) spawnEnemy(Math.random() * W, -6, true);
+        S.toSpawn -= n;
+        S.spawnT = Math.max(0.9, 3.4 - S.wave * 0.18) * (0.6 + Math.random() * 0.8);
+      }
+    }
+    if (S.wave >= 4 && S.toSpawn > 0) {
+      S.bomberT -= dt;
+      if (S.bomberT <= 0) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        S.bombers.push({ x: dir > 0 ? -30 : W + 30, y: groundY * (0.18 + Math.random() * 0.2), dir, v: (50 + S.wave * 4) * unit, drop: 1 + Math.random() * 1.5, sat: Math.random() < 0.4 });
+        S.bomberT = Math.max(5, 12 - S.wave * 0.5) * (0.7 + Math.random() * 0.6);
+      }
+    }
+    for (let i = S.bombers.length - 1; i >= 0; i--) {
+      const b = S.bombers[i]; b.x += b.dir * b.v * dt; b.drop -= dt;
+      if (b.drop <= 0 && b.x > W * 0.05 && b.x < W * 0.95) { spawnEnemy(b.x, b.y + 6, false); b.drop = 1.8 + Math.random() * 1.6; }
+      if (b.x < -60 || b.x > W + 60) S.bombers.splice(i, 1);
+    }
+    // interceptors
+    for (let i = S.shots.length - 1; i >= 0; i--) {
+      const s = S.shots[i]; s.left -= dt; s.x += s.vx * dt; s.y += s.vy * dt;
+      if (s.left <= 0) { blast(s.tx, s.ty, blastR(), true); sfx.boom(); S.shots.splice(i, 1); }
+    }
+    // enemies
+    for (let i = S.enemies.length - 1; i >= 0; i--) {
+      const e = S.enemies[i]; e.x += e.vx * dt; e.y += e.vy * dt;
+      if (e.split > 0 && e.y >= e.split) {
+        S.enemies.splice(i, 1);
+        const n = 2 + (Math.random() < 0.4 ? 1 : 0);
+        for (let k = 0; k < n; k++) { spawnEnemy(e.x, e.y, false); const ne = S.enemies[S.enemies.length - 1]; if (ne) { ne.sx = e.sx; ne.sy = e.sy; ne.trail = [e.x, e.y]; } }
+        tone(600, 0.12, 'square', 0.05, 300);
+        continue;
+      }
+      if (e.y >= e.ty) { S.enemies.splice(i, 1); impact(e.tx, e.ty); }
+    }
+    updateBlasts(dt);
+
+    // wave over?
+    if (S.toSpawn <= 0 && !S.enemies.length && !S.bombers.length && !S.shots.length && !S.blasts.length) {
+      if (!S.cities.some(c => c.alive) && !S.stock) return gameOver();
+      beginTally();
+    }
+  }
+  function updateBlasts(dt) {
+    for (let i = S.blasts.length - 1; i >= 0; i--) {
+      const b = S.blasts[i]; b.t += dt;
+      const grow = 0.35, hold = 0.35, fade = 0.5;
+      b.r = b.t < grow ? b.max * (b.t / grow) : b.t < grow + hold ? b.max : b.max * Math.max(0, 1 - (b.t - grow - hold) / fade);
+      if (b.t > grow + hold + fade) { S.blasts.splice(i, 1); continue; }
+      if (!b.friendly) continue;
+      for (let j = S.enemies.length - 1; j >= 0; j--) {
+        const e = S.enemies[j];
+        if (Math.hypot(e.x - b.x, e.y - b.y) < b.r) {
+          S.enemies.splice(j, 1); addScore(25 * mult());
+          blast(e.x, e.y, blastR() * 0.6, true); burst(e.x, e.y, S.palette[0], 6); sfx.kill();
+        }
+      }
+      for (let j = S.bombers.length - 1; j >= 0; j--) {
+        const e = S.bombers[j];
+        if (Math.hypot(e.x - b.x, e.y - b.y) < b.r + 10 * unit) {
+          S.bombers.splice(j, 1); addScore(100 * mult());
+          blast(e.x, e.y, blastR() * 0.8, true); burst(e.x, e.y, '#ffffff', 14); sfx.kill();
+        }
+      }
+    }
+  }
+  function impact(x, y) {
+    blast(x, y, blastR() * 0.7, false); burst(x, y, '#ff9f43', 16);
+    if (!reduced) S.shake = 8; S.flash = reduced ? 0 : 0.15;
+    for (let i = 0; i < CITY_X.length; i++) if (S.cities[i].alive && Math.abs(cityPos(i).x - x) < 4) { S.cities[i].alive = false; els.announcer.textContent = t.cityLost; sfx.city(); return; }
+    for (let i = 0; i < BASE_X.length; i++) if (S.bases[i].alive && Math.abs(BASE_X[i] * W - x) < 4) { S.bases[i].alive = false; S.bases[i].ammo = 0; sfx.city(); return; }
+  }
+  function beginTally() {
+    const c = S.cities.filter(c => c.alive).length, a = S.bases.reduce((s, b) => s + (b.alive ? b.ammo : 0), 0);
+    const pts = (c * 100 + a * 5) * mult();
+    addScore(pts);
+    S.tally = { t: 3 };
+    showBanner(t.waveN(S.wave) + ' ✓', t.bonus(c, a, pts), 2.8);
+    els.announcer.textContent = t.bonus(c, a, pts).replace('\n', ' ');
+    sfx.bonus();
+  }
+  function endTally() {
+    if (S.stock > 0) {
+      const dead = S.cities.map((c, i) => c.alive ? -1 : i).filter(i => i >= 0);
+      while (S.stock > 0 && dead.length) { const i = dead.splice((Math.random() * dead.length) | 0, 1)[0]; S.cities[i].alive = true; S.stock--; els.announcer.textContent = t.extra; }
+    }
+    if (!S.cities.some(c => c.alive)) return gameOver();
+    S.wave++; startWave();
+  }
+  function gameOver() {
+    S.state = 'over'; els.pause.hidden = true;
+    const nb = S.score > best;
+    if (nb) { best = S.score; store.set('best', best); }
+    els.newBest.hidden = !nb;
+    els.final.textContent = t.final(S.score, S.wave);
+    setTimeout(() => { els.over.hidden = false; $('again').focus(); }, 900);
+    els.banner.hidden = true;
+    els.announcer.textContent = `${t.gameOver}. ${els.final.textContent}`;
+    sfx.over(); hud();
+  }
+  let bannerTimer = 0;
+  function showBanner(title, text, secs) {
+    els.bannerTitle.textContent = title; els.bannerText.textContent = text; els.banner.hidden = false;
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { els.banner.hidden = true; }, secs * 1000);
+  }
+  function hud() {
+    els.score.textContent = S.score.toLocaleString(lang); els.wave.textContent = S.wave;
+    els.best.textContent = Math.max(best, S.score).toLocaleString(lang); els.introBest.textContent = best.toLocaleString(lang);
+  }
+
+  // ---------- Draw ----------
+  function draw() {
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    if (S.shake > 0) ctx.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
+    for (const s of stars) { ctx.globalAlpha = reduced ? 0.6 : 0.35 + 0.35 * Math.sin(s.p * 1.5); ctx.fillStyle = '#fff'; ctx.fillRect(s.x, s.y, s.r, s.r); }
+    ctx.globalAlpha = 1;
+    // ground
+    const g = ctx.createLinearGradient(0, groundY, 0, H);
+    g.addColorStop(0, '#3a2a14'); g.addColorStop(1, '#1a1208');
+    ctx.fillStyle = g; ctx.fillRect(-20, groundY, W + 40, H - groundY + 20);
+    ctx.fillStyle = '#d9a441'; ctx.fillRect(-20, groundY, W + 40, 2);
+    // cities
+    S.cities.forEach((c, i) => drawCity(cityPos(i).x, groundY, c.alive));
+    // bases
+    S.bases.forEach((b, i) => drawBase(BASE_X[i] * W, groundY, b, i));
+    // enemy trails
+    const [ec, ic] = S.palette || COLORS[0];
+    ctx.lineWidth = Math.max(1.5, 2 * unit); ctx.lineCap = 'round';
+    for (const e of S.enemies) {
+      ctx.strokeStyle = ec; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.moveTo(e.sx, e.sy);
+      if (e.trail) ctx.lineTo(e.trail[0], e.trail[1]);
+      ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff'; ctx.fillRect(e.x - 2, e.y - 2, 4, 4);
+    }
+    for (const s of S.shots) {
+      ctx.strokeStyle = ic; ctx.beginPath(); ctx.moveTo(s.sx, s.sy); ctx.lineTo(s.x, s.y); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
+      const k = 5 * unit; ctx.strokeStyle = ic; ctx.beginPath(); ctx.moveTo(s.tx - k, s.ty - k); ctx.lineTo(s.tx + k, s.ty + k); ctx.moveTo(s.tx + k, s.ty - k); ctx.lineTo(s.tx - k, s.ty + k); ctx.stroke();
+    }
+    for (const b of S.bombers) drawBomber(b);
+    const now = performance.now();
+    for (const b of S.blasts) {
+      if (b.r <= 0) continue;
+      const hue = reduced ? 40 : (now / 6 + b.x) % 360;
+      const gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, b.friendly ? `hsl(${hue},100%,65%)` : '#ffb347'); gr.addColorStop(1, b.friendly ? `hsla(${hue},100%,50%,0.15)` : '#ff4d5e22');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const p of S.parts) { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.5)); ctx.fillStyle = p.c; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    ctx.globalAlpha = 1;
+    // crosshair
+    if (S.state === 'play') {
+      const a = S.aim, k = 10 * unit; ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(a.x, a.y, k * 0.6, 0, Math.PI * 2); ctx.moveTo(a.x - k, a.y); ctx.lineTo(a.x - k * 0.3, a.y); ctx.moveTo(a.x + k * 0.3, a.y); ctx.lineTo(a.x + k, a.y); ctx.moveTo(a.x, a.y - k); ctx.lineTo(a.x, a.y - k * 0.3); ctx.moveTo(a.x, a.y + k * 0.3); ctx.lineTo(a.x, a.y + k); ctx.stroke();
+    }
+    ctx.restore();
+    if (S.flash > 0) { ctx.fillStyle = `rgba(255,120,90,${S.flash})`; ctx.fillRect(0, 0, W, H); }
+  }
+  function drawCity(x, y, alive) {
+    const s = unit * 1.1;
+    if (!alive) {
+      ctx.fillStyle = '#4a3a2a';
+      ctx.beginPath(); ctx.moveTo(x - 18 * s, y); ctx.lineTo(x - 10 * s, y - 5 * s); ctx.lineTo(x - 2 * s, y - 3 * s); ctx.lineTo(x + 6 * s, y - 7 * s); ctx.lineTo(x + 18 * s, y); ctx.fill();
+      return;
+    }
+    const blds = [[-18, 8, 14], [-10, 7, 24], [-3, 7, 18], [4, 8, 28], [12, 6, 16]];
+    for (const [ox, w, h] of blds) {
+      ctx.fillStyle = '#2f6fd8'; ctx.fillRect(x + ox * s, y - h * s, w * s, h * s);
+      ctx.fillStyle = '#ffe48a';
+      for (let wy = y - h * s + 3 * s; wy < y - 3 * s; wy += 5 * s) for (let wx = x + ox * s + 1.5 * s; wx < x + (ox + w - 2) * s; wx += 3 * s) if (((wx * 7 + wy * 3) | 0) % 5) ctx.fillRect(wx, wy, 1.4 * s, 2 * s);
+    }
+    ctx.fillStyle = '#5ef2ff'; ctx.fillRect(x - 18 * s, y - 2 * s, 36 * s, 2 * s);
+  }
+  function drawBase(x, y, b, i) {
+    const s = unit * 1.1;
+    ctx.fillStyle = b.alive ? '#7a5a2e' : '#4a3a2a';
+    ctx.beginPath(); ctx.moveTo(x - 30 * s, y); ctx.lineTo(x - 14 * s, y - 16 * s); ctx.lineTo(x + 14 * s, y - 16 * s); ctx.lineTo(x + 30 * s, y); ctx.fill();
+    if (!b.alive) return;
+    // ammo pyramid
+    ctx.fillStyle = b.ammo <= 3 ? '#ff4d5e' : '#5ef2ff';
+    const rows = [4, 3, 2, 1]; let n = 0;
+    rows.forEach((cnt, r) => { for (let c = 0; c < cnt; c++) { if (n++ >= b.ammo) continue; ctx.fillRect(x + (c - (cnt - 1) / 2) * 5 * s - 1.5 * s, y - 3 * s - r * 4 * s - 3 * s, 3 * s, 3 * s); } });
+    if (S.prefBase === i) { ctx.strokeStyle = '#ffcf4a'; ctx.lineWidth = 2; ctx.strokeRect(x - 16 * s, y - 22 * s, 32 * s, 22 * s); }
+    if (b.ammo === 0 && S.state === 'play') { ctx.fillStyle = '#ff4d5e'; ctx.font = `800 ${11 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('0', x, y - 20 * s); }
+  }
+  function drawBomber(b) {
+    const s = unit * 1.2;
+    ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.dir, 1);
+    if (b.sat) {
+      ctx.fillStyle = '#ff5fd2'; ctx.beginPath(); ctx.arc(0, 0, 7 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(-14 * s, -2 * s, 28 * s, 4 * s);
+    } else {
+      ctx.fillStyle = '#d0d6e8';
+      ctx.beginPath(); ctx.moveTo(14 * s, 0); ctx.lineTo(-12 * s, -4 * s); ctx.lineTo(-12 * s, 4 * s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff4d5e'; ctx.fillRect(-4 * s, -10 * s, 6 * s, 20 * s); ctx.fillRect(-13 * s, -7 * s, 3 * s, 7 * s);
+    }
+    ctx.restore();
+  }
+
+  // ---------- Loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S.state !== 'paused') update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Input ----------
+  function pt(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  canvas.addEventListener('pointerdown', e => {
+    audio(); e.preventDefault();
+    if (S.state !== 'play') return;
+    const p = pt(e); S.aim = { x: p.x, y: Math.min(p.y, groundY - 30 * unit) };
+    fire(p.x, p.y, S.prefBase);
+  });
+  canvas.addEventListener('pointermove', e => { if (S.state === 'play' && e.pointerType === 'mouse') { const p = pt(e); S.aim = { x: p.x, y: Math.min(p.y, groundY - 30 * unit) }; } });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  const held = new Set();
+  window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'm') { toggleMute(); return; }
+    if (k === 'p' || k === 'escape') { if (S.state === 'play') pause(); else if (S.state === 'paused') resume(); return; }
+    if (S.state !== 'play') { if ((k === 'enter' || k === ' ') && document.activeElement === document.body) { e.preventDefault(); if (!els.intro.hidden) newGame(); } return; }
+    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(k)) { held.add(k); e.preventDefault(); }
+    if (k === ' ' || k === 'enter') { e.preventDefault(); if (!e.repeat) fire(S.aim.x, S.aim.y, S.prefBase); }
+    if (k === '1' || k === '2' || k === '3' || k === 'z' || k === 'x' || k === 'c') { const i = { 1: 0, 2: 1, 3: 2, z: 0, x: 1, c: 2 }[k]; if (!e.repeat) fire(S.aim.x, S.aim.y, i); }
+  });
+  window.addEventListener('keyup', e => held.delete(e.key.toLowerCase()));
+  setInterval(() => {
+    if (S.state !== 'play' || !held.size) return;
+    const v = 9 * unit;
+    if (held.has('arrowleft') || held.has('a')) S.aim.x -= v;
+    if (held.has('arrowright') || held.has('d')) S.aim.x += v;
+    if (held.has('arrowup') || held.has('w')) S.aim.y -= v;
+    if (held.has('arrowdown') || held.has('s')) S.aim.y += v;
+    S.aim.x = Math.max(0, Math.min(W, S.aim.x)); S.aim.y = Math.max(0, Math.min(groundY - 30 * unit, S.aim.y));
+  }, 16);
+
+  function pause() { if (S.state !== 'play') return; S.state = 'paused'; els.paused.hidden = false; $('resume').focus(); els.announcer.textContent = t.paused; }
+  function resume() { if (S.state !== 'paused') return; S.state = 'play'; els.paused.hidden = true; last = performance.now(); canvas.focus(); }
+  function toggleMute() { muted = !muted; store.set('muted', muted); syncSound(); if (!muted) sfx.tick(); }
+  $('play').addEventListener('click', () => { audio(); newGame(); });
+  $('again').addEventListener('click', () => { audio(); newGame(); });
+  $('resume').addEventListener('click', resume);
+  $('restart').addEventListener('click', newGame);
+  els.pause.addEventListener('click', pause);
+  els.sound.addEventListener('click', toggleMute);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  window.addEventListener('resize', resize);
+
+  resize();
+  S.cities = CITY_X.map(() => ({ alive: true }));
+  S.bases = BASE_X.map(() => ({ ammo: AMMO, alive: true }));
+  S.palette = COLORS[0];
+  // attract-mode demo
+  if (/[?&]demo=1/.test(location.search)) {
+    S.wave = 5; S.score = 4275; S.state = 'play'; els.intro.hidden = true; els.pause.hidden = false;
+    S.palette = COLORS[4 % COLORS.length]; S.cities[2].alive = false; S.bases[0].ammo = 4; S.bases[1].ammo = 6; S.bases[2].ammo = 7;
+    for (let i = 0; i < 7; i++) { spawnEnemy(Math.random() * W, -6, false); const e = S.enemies[S.enemies.length - 1]; const f = 0.2 + Math.random() * 0.5; e.x += e.vx * (e.ty / e.vy) * f; e.y += e.vy * (e.ty / e.vy) * f; }
+    S.bombers.push({ x: W * 0.3, y: groundY * 0.22, dir: 1, v: 60 * unit, drop: 9, sat: false });
+    S.blasts.push({ x: W * 0.42, y: groundY * 0.45, r: 0, max: blastR(), t: 0.4, friendly: true }, { x: W * 0.7, y: groundY * 0.35, r: 0, max: blastR(), t: 0.2, friendly: true });
+    S.shots.push({ sx: W * 0.5, sy: groundY - 14 * unit, x: W * 0.55, y: groundY * 0.65, tx: W * 0.62, ty: groundY * 0.3, vx: 0, vy: 0, left: 99 });
+    S.aim = { x: W * 0.62, y: groundY * 0.3 }; S.toSpawn = 99; S.spawnT = 99; S.bomberT = 99;
+    updateBlasts(0); hud();
+  }
+  syncSound(); hud();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2a44">
+<title>Word Scramble</title>
+<style>
+:root {
+  --bg1: #1f2a44;
+  --bg2: #3b2f63;
+  --ink: #23324a;
+  --paper: #fffaf0;
+  --tile: #ffe8a8;
+  --tile-edge: #d8a83c;
+  --slot: rgba(255,255,255,.12);
+  --slot-edge: rgba(255,255,255,.35);
+  --text: #f6f3ff;
+  --muted: #b9b4d6;
+  --accent: #ff8a4c;
+  --green: #3cc98a;
+  --red: #ff5d6c;
+  --blue: #6aa8ff;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --tile-size: clamp(36px, 11vw, 58px);
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg1) 70%);
+  background-color: var(--bg1);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { height: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { flex: 1; min-width: 0; font-size: clamp(20px, 6vw, 28px); font-weight: 900; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat { flex: none; min-width: 56px; padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,.1); text-align: center; }
+.stat small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.stat strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.icon-btn { flex: none; width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.12); font-size: 18px; font-weight: 900; }
+
+.meta { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.meta .streak { margin-left: auto; color: var(--accent); }
+.timer { height: 10px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; }
+.timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--green), #9be36b); transform-origin: left; border-radius: 6px; }
+.timer.low i { background: linear-gradient(90deg, var(--red), var(--accent)); }
+
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: clamp(16px, 4vh, 34px); }
+.clue { min-height: 1.4em; font-size: 14px; font-weight: 700; color: var(--muted); text-align: center; }
+.row { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(4px, 1.4vw, 8px); max-width: 100%; }
+.slot, .tile { width: var(--tile-size); height: calc(var(--tile-size) * 1.12); border-radius: 12px; display: grid; place-items: center; font-size: calc(var(--tile-size) * .52); font-weight: 900; }
+.slot { background: var(--slot); border: 2px dashed var(--slot-edge); color: var(--ink); }
+.slot.filled { border: 0; background: var(--tile); box-shadow: 0 4px 0 var(--tile-edge); cursor: pointer; }
+.slot.locked { background: #cfe2ff; box-shadow: 0 4px 0 #7ea3e0; cursor: default; }
+.slot.next { border-color: var(--accent); }
+.tile { background: var(--tile); color: var(--ink); box-shadow: 0 5px 0 var(--tile-edge); transition: transform .08s, opacity .15s; }
+.tile:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--tile-edge); }
+.tile.used { opacity: .18; box-shadow: none; cursor: default; }
+.answer.win .slot { background: var(--green); box-shadow: 0 4px 0 #1f8a5b; color: #fff; animation: pop .35s ease-out backwards; }
+.answer.shake { animation: shake .35s; }
+@keyframes pop { 50% { transform: scale(1.15); } }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.status { min-height: 1.4em; text-align: center; font-size: 15px; font-weight: 800; }
+.status.good { color: var(--green); }
+.status.bad { color: var(--red); }
+
+.controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ctl { min-height: 48px; padding: 6px 4px; border-radius: 14px; background: rgba(255,255,255,.12); font-size: 14px; font-weight: 800; line-height: 1.15; }
+.ctl small { display: block; font-size: 11px; color: var(--muted); font-weight: 700; }
+.ctl.primary { background: var(--accent); color: #2a1606; }
+.ctl:disabled { opacity: .35; cursor: default; }
+
+.float { position: fixed; pointer-events: none; font-weight: 900; font-size: 26px; color: var(--green); text-shadow: 0 2px 0 #0004; animation: rise 1s ease-out forwards; }
+@keyframes rise { to { transform: translateY(-60px); opacity: 0; } }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(15, 18, 36, .72); z-index: 5; }
+.overlay[hidden] { display: none; }
+.panel { width: min(100%, 360px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 26px 22px; border-radius: 22px; background: var(--paper); color: var(--ink); text-align: center; box-shadow: 0 18px 50px #0007; animation: panelIn .3s ease-out; }
+@keyframes panelIn { from { transform: translateY(16px); opacity: 0; } }
+.panel h2 { font-size: 28px; font-weight: 900; margin-bottom: 8px; }
+.panel p { font-size: 14px; color: #5a6680; line-height: 1.45; }
+.panel .logo { display: flex; justify-content: center; gap: 5px; margin-bottom: 14px; }
+.panel .logo span { width: 36px; height: 40px; border-radius: 9px; display: grid; place-items: center; background: var(--tile); box-shadow: 0 4px 0 var(--tile-edge); font-weight: 900; font-size: 20px; }
+.panel .logo span:nth-child(odd) { transform: rotate(-6deg); }
+.panel .logo span:nth-child(even) { transform: rotate(5deg) translateY(3px); }
+.panel ul { text-align: left; margin: 12px 0 4px; padding-left: 18px; font-size: 13px; color: #5a6680; line-height: 1.5; }
+.panel .big { font-size: 44px; font-weight: 900; color: var(--accent); margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.panel .reveal { margin-top: 10px; font-size: 15px; font-weight: 800; color: var(--ink); }
+.panel .btns { display: grid; gap: 10px; margin-top: 18px; }
+.pbtn { min-height: 48px; border-radius: 14px; background: var(--accent); color: #2a1606; font-size: 17px; font-weight: 900; box-shadow: 0 4px 0 #c45d27; }
+.pbtn.alt { background: #e6e9f2; color: var(--ink); box-shadow: 0 4px 0 #b8bfd0; }
+.pbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 #c45d27; }
+
+@media (min-width: 720px) and (min-height: 600px) {
+  :root { --tile-size: 60px; }
+  .ctl { min-height: 56px; font-size: 15px; }
+}
+@media (max-height: 560px) {
+  :root { --tile-size: clamp(32px, 8vh, 48px); }
+  .stage { gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="top">
+    <h1 data-i18n="title">Word Scramble</h1>
+    <div class="stat"><small data-i18n="score">Score</small><strong id="score">0</strong></div>
+    <div class="stat"><small data-i18n="best">Best</small><strong id="best">0</strong></div>
+    <button type="button" class="icon-btn" id="pause-btn" aria-label="Pause">II</button>
+  </div>
+  <div class="meta"><span id="round"></span><span id="len"></span><span class="streak" id="streak"></span></div>
+  <div class="timer" id="timer" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="timer-bar"></i></div>
+  <div class="stage">
+    <div class="clue" id="clue"></div>
+    <div class="row answer" id="answer" aria-label="Answer"></div>
+    <div class="status" id="status"></div>
+    <div class="row pool" id="pool" aria-label="Letters"></div>
+  </div>
+  <div class="controls">
+    <button type="button" class="ctl" id="hint-btn"><span data-i18n="hint">Hint</span><small id="hint-left"></small></button>
+    <button type="button" class="ctl" id="shuffle-btn"><span data-i18n="shuffle">Shuffle</span><small>Space</small></button>
+    <button type="button" class="ctl" id="clear-btn"><span data-i18n="clear">Clear</span><small>Esc</small></button>
+    <button type="button" class="ctl" id="skip-btn"><span data-i18n="skip">Skip</span><small id="skip-left"></small></button>
+  </div>
+</div>
+
+<div class="overlay" id="menu">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <div class="logo" aria-hidden="true"><span>W</span><span>O</span><span>R</span><span>D</span></div>
+    <h2 id="menu-title" data-i18n="title">Word Scramble</h2>
+    <p data-i18n="intro"></p>
+    <ul>
+      <li data-i18n="how1"></li>
+      <li data-i18n="how2"></li>
+      <li data-i18n="how3"></li>
+    </ul>
+    <p id="menu-note" style="margin-top:8px;font-size:12px"></p>
+    <div class="btns"><button type="button" class="pbtn" id="play-btn" data-i18n="play">Play</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <h2 id="pause-title" data-i18n="paused">Paused</h2>
+    <div class="btns">
+      <button type="button" class="pbtn" id="resume-btn" data-i18n="resume">Resume</button>
+      <button type="button" class="pbtn alt" id="restart-btn" data-i18n="restart">Restart</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="over-title">
+    <h2 id="over-title" data-i18n="timeUp">Time's up!</h2>
+    <p class="reveal" id="over-word"></p>
+    <div class="big" id="over-score">0</div>
+    <p id="over-text"></p>
+    <div class="btns"><button type="button" class="pbtn" id="again-btn" data-i18n="again">Play again</button></div>
+  </div>
+</div>
+
+<div class="sr" aria-live="polite" id="announcer"></div>
+
+<script>
+(() => {
+  const I18N = {
+    en: { title: 'Word Scramble', score: 'Score', best: 'Best', hint: 'Hint', shuffle: 'Shuffle', clear: 'Clear', skip: 'Skip', play: 'Play', paused: 'Paused', resume: 'Resume', restart: 'Restart', timeUp: "Time's up!", again: 'Play again',
+      intro: 'Put the jumbled letters back in order before the clock runs out.',
+      how1: 'Tap the tiles in order, or just type the word.', how2: 'Words get longer every two rounds — keep a streak for bonus points.', how3: 'Hints place a correct letter; skips are limited.',
+      note: '', round: n => `Round ${n}`, letters: n => `${n} letters`, streak: n => `🔥 ×${n}`, left: n => `${n} left`,
+      correct: p => `Correct! +${p}`, wrong: 'Not quite — try again', skipped: w => `Skipped: ${w}`, wordWas: w => `The word was ${w}`, overText: (r, b) => `You solved ${r} words. Best streak: ${b}.`, newBest: 'New best score!', clue: 'Unscramble the word' },
+    vi: { title: 'Xếp Chữ', score: 'Điểm', best: 'Kỷ lục', hint: 'Gợi ý', shuffle: 'Trộn', clear: 'Xóa', skip: 'Bỏ qua', play: 'Chơi', paused: 'Tạm dừng', resume: 'Tiếp tục', restart: 'Chơi lại', timeUp: 'Hết giờ!', again: 'Chơi lại',
+      intro: 'Sắp xếp lại các chữ cái bị xáo trộn trước khi hết giờ.',
+      how1: 'Chạm vào các ô chữ theo thứ tự hoặc gõ từ trên bàn phím.', how2: 'Từ dài dần sau mỗi hai vòng — giữ chuỗi đúng để được thưởng điểm.', how3: 'Gợi ý điền sẵn một chữ đúng; số lần bỏ qua có hạn.',
+      note: 'Từ tiếng Việt viết không dấu, liền nhau (ví dụ: HOAHONG = hoa hồng).', round: n => `Vòng ${n}`, letters: n => `${n} chữ cái`, streak: n => `🔥 ×${n}`, left: n => `còn ${n}`,
+      correct: p => `Chính xác! +${p}`, wrong: 'Chưa đúng — thử lại nhé', skipped: w => `Đã bỏ qua: ${w}`, wordWas: w => `Đáp án là ${w}`, overText: (r, b) => `Bạn giải được ${r} từ. Chuỗi dài nhất: ${b}.`, newBest: 'Kỷ lục mới!', clue: 'Hãy sắp xếp lại từ' },
+    zh: { title: '单词拼拼乐', score: '得分', best: '最佳', hint: '提示', shuffle: '打乱', clear: '清除', skip: '跳过', play: '开始', paused: '已暂停', resume: '继续', restart: '重新开始', timeUp: '时间到！', again: '再玩一次',
+      intro: '在倒计时结束前，把打乱的字母重新排成英文单词。',
+      how1: '按顺序点击字母块，或直接用键盘输入。', how2: '每两轮单词会变长——保持连胜可获得额外分数。', how3: '提示会放入一个正确字母；跳过次数有限。',
+      note: '本游戏使用英文单词。', round: n => `第 ${n} 轮`, letters: n => `${n} 个字母`, streak: n => `🔥 ×${n}`, left: n => `剩 ${n}`,
+      correct: p => `正确！+${p}`, wrong: '不对，再试一次', skipped: w => `已跳过：${w}`, wordWas: w => `答案是 ${w}`, overText: (r, b) => `你解出了 ${r} 个单词。最长连胜：${b}。`, newBest: '新纪录！', clue: '把字母拼成英文单词' },
+    fr: { title: 'Mots Mêlés', score: 'Score', best: 'Record', hint: 'Indice', shuffle: 'Mélanger', clear: 'Effacer', skip: 'Passer', play: 'Jouer', paused: 'Pause', resume: 'Reprendre', restart: 'Recommencer', timeUp: 'Temps écoulé !', again: 'Rejouer',
+      intro: 'Remettez les lettres mélangées dans l’ordre avant la fin du chrono.',
+      how1: 'Touchez les lettres dans l’ordre ou tapez le mot au clavier.', how2: 'Les mots s’allongent toutes les deux manches — enchaînez pour gagner des bonus.', how3: 'Un indice place une bonne lettre ; les passes sont limitées.',
+      note: 'Les accents sont ignorés : tapez E pour É, C pour Ç.', round: n => `Manche ${n}`, letters: n => `${n} lettres`, streak: n => `🔥 ×${n}`, left: n => `reste ${n}`,
+      correct: p => `Bravo ! +${p}`, wrong: 'Pas tout à fait — réessayez', skipped: w => `Passé : ${w}`, wordWas: w => `Le mot était ${w}`, overText: (r, b) => `Vous avez trouvé ${r} mots. Meilleure série : ${b}.`, newBest: 'Nouveau record !', clue: 'Retrouvez le mot' },
+    th: { title: 'เรียงคำ', score: 'คะแนน', best: 'สูงสุด', hint: 'คำใบ้', shuffle: 'สลับ', clear: 'ล้าง', skip: 'ข้าม', play: 'เล่น', paused: 'หยุดชั่วคราว', resume: 'เล่นต่อ', restart: 'เริ่มใหม่', timeUp: 'หมดเวลา!', again: 'เล่นอีกครั้ง',
+      intro: 'เรียงตัวอักษรที่สลับกันให้เป็นคำภาษาอังกฤษก่อนหมดเวลา',
+      how1: 'แตะตัวอักษรตามลำดับ หรือพิมพ์คำด้วยแป้นพิมพ์', how2: 'คำจะยาวขึ้นทุกสองรอบ — ตอบถูกต่อเนื่องเพื่อรับโบนัส', how3: 'คำใบ้จะวางตัวอักษรที่ถูกให้หนึ่งตัว ข้ามได้จำนวนจำกัด',
+      note: 'เกมนี้ใช้คำศัพท์ภาษาอังกฤษ', round: n => `รอบ ${n}`, letters: n => `${n} ตัวอักษร`, streak: n => `🔥 ×${n}`, left: n => `เหลือ ${n}`,
+      correct: p => `ถูกต้อง! +${p}`, wrong: 'ยังไม่ถูก ลองใหม่', skipped: w => `ข้ามแล้ว: ${w}`, wordWas: w => `คำตอบคือ ${w}`, overText: (r, b) => `คุณเรียงคำได้ ${r} คำ ต่อเนื่องสูงสุด: ${b}`, newBest: 'สถิติใหม่!', clue: 'เรียงตัวอักษรให้เป็นคำ' },
+    ja: { title: 'ワードスクランブル', score: 'スコア', best: 'ベスト', hint: 'ヒント', shuffle: 'シャッフル', clear: 'クリア', skip: 'スキップ', play: 'プレイ', paused: '一時停止', resume: '再開', restart: 'やり直す', timeUp: 'タイムアップ！', again: 'もう一度',
+      intro: '時間切れになる前に、バラバラの文字を並べ替えて英単語を作ろう。',
+      how1: 'タイルを順番にタップするか、キーボードで入力。', how2: '2ラウンドごとに単語が長くなります。連続正解でボーナス！', how3: 'ヒントで正しい文字を1つ配置。スキップは回数制限あり。',
+      note: 'このゲームは英単語を使います。', round: n => `ラウンド ${n}`, letters: n => `${n} 文字`, streak: n => `🔥 ×${n}`, left: n => `残り ${n}`,
+      correct: p => `正解！ +${p}`, wrong: '惜しい、もう一度', skipped: w => `スキップ：${w}`, wordWas: w => `正解は ${w}`, overText: (r, b) => `${r} 語を解きました。最高連続正解：${b}`, newBest: 'ベスト更新！', clue: '文字を並べ替えよう' },
+    ko: { title: '단어 스크램블', score: '점수', best: '최고', hint: '힌트', shuffle: '섞기', clear: '지우기', skip: '건너뛰기', play: '시작', paused: '일시정지', resume: '계속하기', restart: '다시 시작', timeUp: '시간 종료!', again: '다시 하기',
+      intro: '시간이 다 되기 전에 뒤섞인 글자를 바르게 배열해 영어 단어를 만드세요.',
+      how1: '타일을 순서대로 누르거나 키보드로 입력하세요.', how2: '두 라운드마다 단어가 길어져요. 연속 정답이면 보너스 점수!', how3: '힌트는 맞는 글자 하나를 놓아 줘요. 건너뛰기는 횟수 제한이 있어요.',
+      note: '이 게임은 영어 단어를 사용합니다.', round: n => `라운드 ${n}`, letters: n => `${n}글자`, streak: n => `🔥 ×${n}`, left: n => `${n}회 남음`,
+      correct: p => `정답! +${p}`, wrong: '아쉬워요, 다시 해 보세요', skipped: w => `건너뜀: ${w}`, wordWas: w => `정답은 ${w}`, overText: (r, b) => `${r}개의 단어를 풀었어요. 최고 연속 정답: ${b}`, newBest: '최고 기록 경신!', clue: '글자를 배열해 단어를 만드세요' },
+  };
+  const requested = new URLSearchParams(location.search).get('lang');
+  const lang = I18N[requested] ? requested : 'en';
+  const t = I18N[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : lang;
+  document.title = t.title;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t[el.dataset.i18n];
+
+  // Word lists. vi/fr are native words; letters are normalized (no diacritics, no spaces).
+  // zh/ja/ko/th fall back to English words — their scripts don't scramble meaningfully as tiles.
+  const WORDS = {
+    en: 'cake frog moon star tree fish bird rain ship lamp game kite milk ring wolf leaf snow door ' +
+      'apple tiger zebra pizza beach cloud river bread chair house horse lemon music ocean piano plant robot smile train water ' +
+      'banana castle dragon flower garden guitar jungle kitten monkey orange pencil planet rabbit rocket summer turtle window winter ' +
+      'balloon chicken dolphin kingdom library monster painter penguin pyramid rainbow sunrise teacher volcano weather ' +
+      'airplane birthday computer dinosaur elephant football hospital mountain sandwich squirrel treasure umbrella ' +
+      'adventure astronaut butterfly chocolate crocodile dragonfly fireworks happiness pineapple waterfall',
+    fr: 'chat lune lion vélo pain pomme poire table livre arbre fleur plage pluie neige avion école train lapin cerise citron ' +
+      'orange ananas tomate maison jardin bateau soleil étoile nuage chaise piano cheval oiseau tortue girafe fraise banane hiver ' +
+      'poisson voiture fenêtre musique guitare fromage gâteau famille voyage dragon pirate trésor château forêt rivière crayon cahier ' +
+      'éléphant papillon chocolat montagne croissant baguette printemps automne carotte bonheur',
+    vi: 'con mèo|con chó|con gà|cá heo|con voi|con khỉ|con hổ|chim én|quả cam|quả táo|xoài|dưa hấu|sầu riêng|quả chuối|hoa hồng|' +
+      'mặt trời|mặt trăng|ngôi sao|bầu trời|cầu vồng|đám mây|mưa rào|biển cả|cây xanh|mùa xuân|mùa hè|mùa thu|mùa đông|' +
+      'trường học|bệnh viện|thư viện|thành phố|làng quê|máy bay|xe đạp|tàu hỏa|điện thoại|đồng hồ|máy tính|bút chì|quyển sách|' +
+      'ba lô|bánh mì|phở bò|cà phê|trà sữa|bóng đá|âm nhạc|gia đình|bạn bè|cô giáo|bác sĩ|nông dân|ca sĩ|họa sĩ|kính râm|cái bàn|cái ghế',
+  };
+  const listLang = WORDS[lang] ? lang : 'en';
+  const raw = listLang === 'vi' ? WORDS.vi.split('|') : WORDS[listLang].split(' ');
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^a-z]/gi, '').toUpperCase();
+  const POOL = raw.map(w => ({ display: w.toUpperCase(), letters: norm(w) })).filter(w => w.letters.length >= 3 && w.letters.length <= 10);
+  const LENGTHS = [...new Set(POOL.map(w => w.letters.length))].sort((a, b) => a - b);
+
+  const STORE = 'milaan.wordScramble.';
+  const load = (k, d) => { try { const v = localStorage.getItem(STORE + k); return v == null ? d : Number(v) || d; } catch { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(STORE + k, String(v)); } catch {} };
+
+  const $ = id => document.getElementById(id);
+  const els = { app: $('app'), score: $('score'), best: $('best'), round: $('round'), len: $('len'), streak: $('streak'), timer: $('timer'), bar: $('timer-bar'),
+    clue: $('clue'), answer: $('answer'), pool: $('pool'), status: $('status'), hint: $('hint-btn'), hintLeft: $('hint-left'), shuffle: $('shuffle-btn'), clear: $('clear-btn'),
+    skip: $('skip-btn'), skipLeft: $('skip-left'), menu: $('menu'), pause: $('pause'), over: $('over'), overWord: $('over-word'), overScore: $('over-score'), overText: $('over-text'),
+    overTitle: $('over-title'), announcer: $('announcer'), pauseBtn: $('pause-btn') };
+  $('menu-note').textContent = t.note;
+  els.pauseBtn.setAttribute('aria-label', t.paused);
+
+  const announce = msg => { els.announcer.textContent = ''; setTimeout(() => { els.announcer.textContent = msg; }, 30); };
+  const shuffleArr = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  const HINTS = 3, SKIPS = 3;
+  let state = 'menu', best = load('best', 0);
+  let score, round, streak, bestStreak, solved, hints, skips, used;
+  let word, tiles, slots, timeMax, timeLeft, lastTs, busy, hintsThisWord;
+  els.best.textContent = best;
+
+  function newGame() {
+    score = 0; round = 0; streak = 0; bestStreak = 0; solved = 0; hints = HINTS; skips = SKIPS; used = new Set();
+    nextWord();
+    setState('play');
+  }
+
+  function pickWord() {
+    const target = Math.min(4 + Math.floor(round / 2), LENGTHS[LENGTHS.length - 1]);
+    let pool = POOL.filter(w => !used.has(w.letters));
+    if (!pool.length) { used.clear(); pool = POOL; }
+    const dist = w => Math.abs(w.letters.length - target);
+    const min = Math.min(...pool.map(dist));
+    const choices = pool.filter(w => dist(w) === min);
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  function nextWord() {
+    round++;
+    word = pickWord();
+    used.add(word.letters);
+    hintsThisWord = 0;
+    busy = false;
+    let letters;
+    do { letters = shuffleArr([...word.letters]); } while (letters.join('') === word.letters && new Set(letters).size > 1);
+    tiles = letters.map((ch, i) => ({ ch, id: i, slot: -1 }));
+    slots = Array(word.letters.length).fill(null).map(() => ({ tile: null, locked: false }));
+    timeMax = 20 + word.letters.length * 5;
+    timeLeft = timeMax;
+    els.answer.classList.remove('win', 'shake');
+    setStatus('');
+    render();
+    announce(`${t.round(round)}. ${t.letters(word.letters.length)}: ${letters.join(' ')}`);
+  }
+
+  function render() {
+    els.score.textContent = score;
+    els.round.textContent = t.round(round);
+    els.len.textContent = '· ' + t.letters(word.letters.length);
+    els.streak.textContent = streak > 1 ? t.streak(streak) : '';
+    els.clue.textContent = t.clue;
+    els.hintLeft.textContent = t.left(hints);
+    els.skipLeft.textContent = t.left(skips);
+    els.hint.disabled = hints <= 0 || busy;
+    els.skip.disabled = skips <= 0 || busy;
+    const n = word.letters.length;
+    const size = Math.min(window.innerWidth - 40, 620) / n - 8;
+    document.documentElement.style.setProperty('--tile-size', `${Math.max(28, Math.min(size, innerHeight > 560 ? 60 : 46))}px`);
+    const nextIdx = slots.findIndex(s => !s.tile);
+    els.answer.replaceChildren(...slots.map((s, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'slot' + (s.tile ? ' filled' : '') + (s.locked ? ' locked' : '') + (i === nextIdx && !busy ? ' next' : '');
+      b.textContent = s.tile ? s.tile.ch : '';
+      b.setAttribute('aria-label', s.tile ? s.tile.ch : '_');
+      b.addEventListener('click', () => removeAt(i));
+      return b;
+    }));
+    els.pool.replaceChildren(...tiles.map(tile => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tile' + (tile.slot >= 0 ? ' used' : '');
+      b.textContent = tile.ch;
+      b.disabled = tile.slot >= 0 || busy;
+      b.addEventListener('click', () => place(tile));
+      return b;
+    }));
+  }
+
+  function setStatus(msg, cls = '') { els.status.textContent = msg; els.status.className = 'status ' + cls; }
+
+  function place(tile) {
+    if (state !== 'play' || busy || tile.slot >= 0) return;
+    const i = slots.findIndex(s => !s.tile);
+    if (i < 0) return;
+    slots[i].tile = tile; tile.slot = i;
+    setStatus('');
+    render();
+    if (slots.every(s => s.tile)) check();
+  }
+
+  function removeAt(i) {
+    if (state !== 'play' || busy) return;
+    const s = slots[i];
+    if (!s.tile || s.locked) return;
+    s.tile.slot = -1; s.tile = null;
+    render();
+  }
+
+  function backspace() {
+    for (let i = slots.length - 1; i >= 0; i--) if (slots[i].tile && !slots[i].locked) { removeAt(i); return; }
+  }
+
+  function clearAll() {
+    if (busy) return;
+    slots.forEach(s => { if (s.tile && !s.locked) { s.tile.slot = -1; s.tile = null; } });
+    render();
+  }
+
+  function typeLetter(ch) {
+    const tile = tiles.find(x => x.slot < 0 && x.ch === ch);
+    if (tile) place(tile);
+  }
+
+  function doShuffle() {
+    if (state !== 'play' || busy) return;
+    shuffleArr(tiles);
+    render();
+  }
+
+  function useHint() {
+    if (state !== 'play' || busy || hints <= 0) return;
+    const i = slots.findIndex((s, k) => !s.locked && (!s.tile || s.tile.ch !== word.letters[k]));
+    if (i < 0) return;
+    // free the slot and any tile holding the needed letter that isn't locked
+    slots.forEach(s => { if (s.tile && !s.locked) { s.tile.slot = -1; s.tile = null; } });
+    const tile = tiles.find(x => x.slot < 0 && x.ch === word.letters[i]);
+    if (!tile) return;
+    slots[i].tile = tile; slots[i].locked = true; tile.slot = i;
+    hints--; hintsThisWord++;
+    render();
+    announce(`${t.hint}: ${i + 1} = ${tile.ch}`);
+    if (slots.every(s => s.tile)) check();
+  }
+
+  function skip() {
+    if (state !== 'play' || busy || skips <= 0) return;
+    skips--; streak = 0;
+    const msg = t.skipped(word.display);
+    busy = true;
+    reveal();
+    setStatus(msg, 'bad');
+    announce(msg);
+    setTimeout(() => { if (state === 'play' || state === 'paused') nextWord(); }, 1100);
+  }
+
+  function reveal() {
+    slots.forEach((s, i) => { const tile = tiles.find(x => x.slot === -1 && x.ch === word.letters[i]); if (!s.tile || s.tile.ch !== word.letters[i]) { if (s.tile) s.tile.slot = -1; s.tile = null; } });
+    slots.forEach((s, i) => { if (!s.tile) { const tile = tiles.find(x => x.slot === -1 && x.ch === word.letters[i]); s.tile = tile; tile.slot = i; } });
+    render();
+  }
+
+  function check() {
+    const guess = slots.map(s => s.tile.ch).join('');
+    if (guess === word.letters) {
+      busy = true;
+      streak++; solved++; bestStreak = Math.max(bestStreak, streak);
+      const base = word.letters.length * 10;
+      const mult = 1 + Math.min(streak - 1, 10) * 0.2;
+      const pts = Math.round(base * mult * Math.pow(0.7, hintsThisWord) + Math.ceil(timeLeft) * 2);
+      score += pts;
+      render();
+      els.answer.classList.add('win');
+      [...els.answer.children].forEach((c, i) => { c.style.animationDelay = `${i * 40}ms`; });
+      const msg = t.correct(pts) + (word.display !== word.letters ? ` · ${word.display}` : '');
+      setStatus(msg, 'good');
+      announce(msg);
+      floatText('+' + pts);
+      setTimeout(() => { if (state === 'play' || state === 'paused') nextWord(); }, 1200);
+    } else {
+      setStatus(t.wrong, 'bad');
+      announce(t.wrong);
+      els.answer.classList.remove('shake'); void els.answer.offsetWidth; els.answer.classList.add('shake');
+      busy = true;
+      setTimeout(() => { busy = false; clearAll(); }, 450);
+    }
+  }
+
+  function floatText(text) {
+    const r = els.answer.getBoundingClientRect();
+    const f = document.createElement('div');
+    f.className = 'float'; f.textContent = text;
+    f.style.left = `${r.left + r.width / 2 - 30}px`; f.style.top = `${r.top - 10}px`;
+    document.body.append(f);
+    setTimeout(() => f.remove(), 1000);
+  }
+
+  function gameOver() {
+    setState('over');
+    reveal();
+    els.overWord.textContent = t.wordWas(word.display);
+    els.overScore.textContent = score;
+    let text = t.overText(solved, bestStreak);
+    if (score > best) { best = score; save('best', best); els.best.textContent = best; text = t.newBest + ' ' + text; }
+    els.overText.textContent = text;
+    announce(`${t.timeUp} ${t.wordWas(word.display)}. ${t.score}: ${score}. ${text}`);
+    $('again-btn').focus();
+  }
+
+  function setState(s) {
+    state = s;
+    els.menu.hidden = s !== 'menu';
+    els.pause.hidden = s !== 'paused';
+    els.over.hidden = s !== 'over';
+    if (s === 'play') lastTs = performance.now();
+    if (s === 'paused') $('resume-btn').focus();
+  }
+
+  function tick(ts) {
+    if (state === 'play' && !busy) {
+      timeLeft -= Math.min(0.25, (ts - lastTs) / 1000);
+      if (timeLeft <= 0) { timeLeft = 0; gameOver(); }
+    }
+    lastTs = ts;
+    if (word) {
+      const pct = Math.max(0, timeLeft / timeMax);
+      els.bar.style.transform = `scaleX(${pct})`;
+      els.timer.classList.toggle('low', pct < 0.25);
+      els.timer.setAttribute('aria-valuenow', Math.round(pct * 100));
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  $('play-btn').addEventListener('click', newGame);
+  $('again-btn').addEventListener('click', newGame);
+  $('resume-btn').addEventListener('click', () => setState('play'));
+  $('restart-btn').addEventListener('click', newGame);
+  els.pauseBtn.addEventListener('click', () => { if (state === 'play') setState('paused'); });
+  els.hint.addEventListener('click', useHint);
+  els.shuffle.addEventListener('click', doShuffle);
+  els.clear.addEventListener('click', clearAll);
+  els.skip.addEventListener('click', skip);
+
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (state === 'menu' || state === 'over') {
+      if (k === 'Enter' || k === ' ') { e.preventDefault(); newGame(); }
+      return;
+    }
+    if (state === 'paused') {
+      if (k === 'Escape' || k === 'p' || k === 'P' || k === 'Enter') { e.preventDefault(); setState('play'); }
+      return;
+    }
+    if (k === 'Escape') { e.preventDefault(); if (slots.some(s => s.tile && !s.locked)) clearAll(); else setState('paused'); return; }
+    if (k === 'Backspace') { e.preventDefault(); backspace(); return; }
+    if (k === ' ') { e.preventDefault(); doShuffle(); return; }
+    if (k === '?' ) { useHint(); return; }
+    if (k === 'Tab') return;
+    if (k === 'Enter') { if (document.activeElement && document.activeElement.tagName === 'BUTTON') return; e.preventDefault(); return; }
+    const ch = norm(k);
+    if (ch.length === 1) { e.preventDefault(); typeLetter(ch); }
+  });
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') setState('paused'); });
+  window.addEventListener('resize', () => { if (word) render(); });
+
+  // Demo background on the menu
+  word = POOL[0]; round = 0; streak = 0; hints = HINTS; skips = SKIPS; score = 0; busy = true; hintsThisWord = 0;
+  tiles = shuffleArr([...word.letters]).map((ch, i) => ({ ch, id: i, slot: -1 }));
+  slots = word.letters.split('').map(() => ({ tile: null, locked: false }));
+  timeMax = timeLeft = 1;
+  render();
+  els.round.textContent = ''; els.len.textContent = '';
+  $('play-btn').focus();
+})();
+</script>
+</body>
+</html>
