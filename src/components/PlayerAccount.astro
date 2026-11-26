@@ -1,0 +1,169 @@
+---
+/** Header player button plus the sign-in / sign-up / verify / reset dialog, available on every page with a Navbar. */
+import type { Locale } from '../i18n/ui';
+import { localizedPath } from '../i18n/ui';
+import PLAYER from '../i18n/player.json';
+interface Props { lang: Locale; }
+const { lang } = Astro.props;
+const p = PLAYER[lang];
+---
+<a href={localizedPath(lang, '/profile/')} class="player-btn" id="player-btn" data-signed-out>
+  <span class="player-avatar" aria-hidden="true">👤</span>
+  <span class="player-name">{p.signIn}</span>
+</a>
+
+<dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+  <form method="dialog" class="auth-close"><button aria-label={p.close}>✕</button></form>
+  <form id="auth-form" class="auth-form" novalidate>
+    <h2 id="auth-title"></h2>
+    <p id="auth-text" class="auth-text"></p>
+    <label data-field="email"><span>{p.email}</span><input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
+    <label data-field="code"><span>{p.code}</span><input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" /></label>
+    <label data-field="password"><span id="password-label">{p.password}</span><input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="200" /><small>{p.passwordHint}</small></label>
+    <label data-field="nickname"><span>{p.nickname}</span><input name="nickname" autocomplete="nickname" maxlength="20" /><small>{p.nicknameHint}</small></label>
+    <p id="auth-error" class="auth-error" role="alert"></p>
+    <button type="submit" class="auth-submit" id="auth-submit"></button>
+    <div class="auth-links">
+      <button type="button" data-go="forgot">{p.forgot}</button>
+      <button type="button" data-go="resend">{p.resend}</button>
+      <button type="button" data-go="signup">{p.noAccount}</button>
+      <button type="button" data-go="login">{p.haveAccount}</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="application/json" id="player-i18n" set:html={JSON.stringify(p)} />
+
+<script>
+  import { AVATARS, api, cachedPlayer, loadProfile, setCachedPlayer, type PlayerProfile } from '../lib/player-client';
+
+  type Step = 'login' | 'signup' | 'verify' | 'forgot' | 'reset';
+  const t = JSON.parse(document.getElementById('player-i18n')!.textContent!);
+  const button = document.getElementById('player-btn') as HTMLAnchorElement;
+  const dialog = document.getElementById('auth-dialog') as HTMLDialogElement;
+  const form = document.getElementById('auth-form') as HTMLFormElement;
+  const title = document.getElementById('auth-title')!;
+  const text = document.getElementById('auth-text')!;
+  const error = document.getElementById('auth-error')!;
+  const submit = document.getElementById('auth-submit') as HTMLButtonElement;
+  const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+
+  const render = (player: PlayerProfile['player'] | null) => {
+    button.toggleAttribute('data-signed-out', !player);
+    button.querySelector('.player-avatar')!.textContent = player ? AVATARS[player.avatar] ?? '🙂' : '👤';
+    button.querySelector('.player-name')!.textContent = player ? player.nickname : t.signIn;
+    button.title = player ? t.accountFor.replace('{name}', player.nickname) : t.signIn;
+  };
+  render(cachedPlayer());
+  window.addEventListener('lamian:player', event => render((event as CustomEvent).detail));
+  // Refresh quietly so a session that expired elsewhere shows as signed out.
+  if (cachedPlayer()) loadProfile().catch(() => {});
+
+  const STEPS: Record<Step, { title: string; text: string; submit: string; fields: string[]; links: string[] }> = {
+    login: { title: t.signInTitle, text: t.signInText, submit: t.signIn, fields: ['email', 'password'], links: ['forgot', 'signup'] },
+    signup: { title: t.signUpTitle, text: t.signInText, submit: t.createAccount, fields: ['email', 'password', 'nickname'], links: ['login'] },
+    verify: { title: t.verifyTitle, text: t.verifyText, submit: t.verify, fields: ['code'], links: ['resend'] },
+    forgot: { title: t.resetTitle, text: t.resetText, submit: t.sendCode, fields: ['email'], links: ['login'] },
+    reset: { title: t.resetTitle, text: t.verifyText, submit: t.setPassword, fields: ['code', 'password'], links: ['resend'] },
+  };
+  let step: Step = 'login';
+
+  const show = (next: Step, message = '') => {
+    step = next;
+    const s = STEPS[next];
+    title.textContent = s.title;
+    text.textContent = s.text.replace('{email}', field('email').value);
+    submit.textContent = s.submit;
+    error.textContent = message;
+    error.classList.remove('is-info');
+    form.querySelectorAll<HTMLElement>('[data-field]').forEach(el => { el.hidden = !s.fields.includes(el.dataset.field!); });
+    form.querySelectorAll<HTMLElement>('[data-go]').forEach(el => { el.hidden = !s.links.includes(el.dataset.go!); });
+    document.getElementById('password-label')!.textContent = next === 'reset' ? t.newPassword : t.password;
+    field('password').autocomplete = next === 'login' ? 'current-password' : 'new-password';
+    if (next === 'verify' || next === 'reset') field('code').value = '';
+    const first = form.querySelector<HTMLInputElement>('[data-field]:not([hidden]) input');
+    requestAnimationFrame(() => first?.focus());
+  };
+
+  function openAuth(next: Step = 'login') {
+    show(next);
+    if (!dialog.open) dialog.showModal();
+  }
+  (window as any).lamianOpenAuth = openAuth;
+
+  button.addEventListener('click', event => {
+    if (cachedPlayer()) return; // signed in: the link goes to the profile page
+    event.preventDefault();
+    openAuth('login');
+  });
+
+  const signedIn = (profile: PlayerProfile) => {
+    setCachedPlayer(profile.player);
+    dialog.close();
+    form.reset();
+  };
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const email = field('email').value.trim();
+    const password = field('password').value;
+    const code = field('code').value.trim();
+    submit.disabled = true;
+    error.textContent = '';
+    try {
+      if (step === 'login') signedIn(await api('/api/auth/login', { body: { email, password } }));
+      else if (step === 'signup') { await api('/api/auth/signup', { body: { email, password, nickname: field('nickname').value.trim() } }); show('verify'); }
+      else if (step === 'verify') signedIn(await api('/api/auth/verify', { body: { email, code } }));
+      else if (step === 'forgot') { await api('/api/auth/forgot', { body: { email } }); show('reset'); }
+      else if (step === 'reset') signedIn(await api('/api/auth/reset', { body: { email, code, password } }));
+    } catch (err) {
+      const codeName = (err as Error).message;
+      if (codeName === 'unverified') show('verify', t.errors.unverified);
+      else error.textContent = t.errors[codeName] ?? t.errors.server;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  form.querySelectorAll<HTMLButtonElement>('[data-go]').forEach(link => link.addEventListener('click', async () => {
+    const go = link.dataset.go!;
+    if (go !== 'resend') return show(go as Step);
+    try {
+      await api('/api/auth/resend', { body: { email: field('email').value.trim(), purpose: step === 'reset' ? 'reset' : 'verify' } });
+      error.textContent = t.resent;
+      error.classList.add('is-info');
+    } catch (err) {
+      error.textContent = t.errors[(err as Error).message] ?? t.errors.server;
+    }
+  }));
+</script>
+
+<style>
+  .player-btn { display: inline-flex; align-items: center; gap: 8px; max-width: 180px; padding: 6px 12px 6px 6px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-soft); white-space: nowrap; }
+  .player-btn:hover { border-color: var(--accent-text); color: var(--accent-text); }
+  .player-avatar { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); font-size: 16px; line-height: 1; }
+  .player-name { overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 640px) { .player-btn { padding: 4px; } .player-name { display: none; } }
+
+  .auth-dialog { width: min(420px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-solid); border-radius: 20px; background: var(--bg); color: var(--text-body); box-shadow: 0 30px 80px var(--shadow); }
+  .auth-dialog::backdrop { background: rgb(0 0 0 / .55); backdrop-filter: blur(3px); }
+  .auth-close { position: absolute; top: 10px; right: 10px; }
+  .auth-close button { width: 36px; height: 36px; border-radius: 10px; color: var(--text-dim); }
+  .auth-close button:hover { background: var(--surface-hover); color: var(--accent-text); }
+  .auth-form { display: grid; gap: 14px; padding: 28px 24px 22px; }
+  .auth-form h2 { padding-right: 32px; font: 700 21px/1.3 var(--font-display); color: var(--text-soft); }
+  .auth-text { margin-top: -6px; font-size: 14px; line-height: 1.6; color: var(--text-dim); }
+  .auth-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+  .auth-form label[hidden], .auth-links [hidden] { display: none; }
+  .auth-form input { width: 100%; padding: 11px 13px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--text-soft); font: 500 15px var(--font-sans); }
+  .auth-form input:focus { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+  .auth-form input[name="code"] { letter-spacing: .4em; font-size: 20px; text-align: center; }
+  .auth-form small { font-weight: 400; color: var(--text-dim); }
+  .auth-error { min-height: 1.2em; margin: -4px 0; font-size: 13px; color: #f87171; }
+  .auth-error.is-info { color: var(--accent-text); }
+  .auth-submit { padding: 12px; border-radius: 12px; background: var(--accent-text); color: var(--bg); font-weight: 700; font-size: 15px; }
+  .auth-submit:disabled { opacity: .6; }
+  .auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+  .auth-links button { padding: 4px 0; font-size: 13px; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
+  .auth-links button:hover { color: var(--accent-text); }
+</style>

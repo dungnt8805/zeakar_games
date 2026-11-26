@@ -11,6 +11,8 @@ import { getGames } from '../data/games';
 import CONTENT from '../i18n/arcade-games.json';
 import { HTML_LANG, localizedArcadePath, localizedGamePath, localizedPath, UI_TRANSLATIONS, type Locale } from '../i18n/ui';
 import { metaDescription, withBrand } from '../lib/seo';
+import { LEADERBOARDS } from '../data/leaderboards';
+import PLAYER from '../i18n/player.json';
 
 interface Props { lang: Locale; game: ArcadeGame; }
 const { lang, game } = Astro.props;
@@ -25,6 +27,8 @@ const title = withBrand(heading);
 const pageUrl = new URL(localizedArcadePath(lang, game.id), Astro.site).href;
 const cover = new URL(arcadeCover(game), Astro.site).href;
 const others = ARCADE_GAMES.filter(entry => entry.id !== game.id);
+const board = LEADERBOARDS[game.id];
+const p = PLAYER[lang];
 
 const structuredData = [
   {
@@ -81,7 +85,9 @@ const structuredData = [
             <span>{game.title}</span>
             <button type="button" id="play-exit">{a.exitFullscreen} <span aria-hidden="true">✕</span></button>
           </div>
-          <iframe src={playableUrl(game, lang)} title={game.title} sandbox={game.sandbox} allow="fullscreen"></iframe>
+          <iframe data-src={playableUrl(game, lang)} data-game={game.id} title={game.title} sandbox={game.sandbox} allow="fullscreen"></iframe>
+          {/* Guests start the game at once; signed-in players wait (briefly) for their synced save to be restored first. */}
+          <script is:inline>(() => { const f = document.currentScript.previousElementSibling; let signedIn = false; try { signedIn = !!localStorage.getItem('lamian.player'); } catch {} if (!signedIn) f.src = f.dataset.src; })();</script>
           {game.portraitOnly && (
             <div class="rotate-hint" role="status">
               <svg viewBox="0 0 48 48" width="56" height="56" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="6" width="18" height="32" rx="3"/><path d="M22 33h4"/><path d="M38 20a14 14 0 0 1-4 14m0 0v-5m0 5h-5"/></svg>
@@ -94,6 +100,22 @@ const structuredData = [
 
       <div class="play-info">
         <p class="play-intro">{content.intro}</p>
+        {board && (
+          <section class="board" id="leaderboard" aria-labelledby="board-title" data-game={game.id} data-order={board.order} data-unit={board.unit ?? ''} data-locale={HTML_LANG[lang]}>
+            <div class="board-head">
+              <h2 id="board-title" class="play-subtitle">{p.leaderboard}</h2>
+              <div class="board-tabs" role="group" aria-label={p.leaderboard}>
+                <button type="button" data-period="day">{p.today}</button>
+                <button type="button" data-period="week" aria-pressed="true">{p.thisWeek}</button>
+                <button type="button" data-period="all">{p.allTime}</button>
+              </div>
+            </div>
+            <ol class="board-list" aria-live="polite"></ol>
+            <p class="board-empty" hidden>{p.emptyBoard}</p>
+            <p class="board-mine"></p>
+            <button type="button" class="board-signin" hidden>{p.signInToRank}</button>
+          </section>
+        )}
         <section aria-labelledby="how-to-title">
           <h2 id="how-to-title" class="play-subtitle">{a.howToTitle}</h2>
           <ol class="play-steps">{content.howTo.map(step => <li>{step}</li>)}</ol>
@@ -133,6 +155,56 @@ const structuredData = [
 </Layout>
 
 <script>
+  import { AVATARS, api, cachedPlayer, startGameSync } from '../lib/player-client';
+
+  // Synced saves: restore before the game starts, then keep uploading changes and new best scores.
+  const gameFrame = document.querySelector<HTMLIFrameElement>('iframe[data-game]');
+  const boardEl = document.getElementById('leaderboard');
+  if (gameFrame && !gameFrame.src) {
+    const start = () => { if (!gameFrame.src) gameFrame.src = gameFrame.dataset.src!; };
+    setTimeout(start, 2500);
+    startGameSync(gameFrame.dataset.game!, () => loadBoard()).finally(start);
+  }
+
+  // Leaderboard
+  const t = JSON.parse(document.getElementById('player-i18n')!.textContent!);
+  let period = 'week';
+  async function loadBoard() {
+    if (!boardEl) return;
+    const { game, unit, locale } = boardEl.dataset;
+    const fmt = (n: number) => `${n.toLocaleString(locale)}${unit ? ' ' + unit : ''}`;
+    const list = boardEl.querySelector('.board-list')!;
+    try {
+      const data = await api(`/api/leaderboard/${game}?period=${period}`);
+      list.replaceChildren(...data.entries.slice(0, 10).map((e: any) => {
+        const li = document.createElement('li');
+        li.className = e.me ? 'is-me' : '';
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = `${AVATARS[e.avatar] ?? '🙂'} ${e.nickname}`;
+        li.append(Object.assign(document.createElement('span'), { className: 'pos', textContent: `#${e.rank}` }), name, Object.assign(document.createElement('span'), { className: 'pts', textContent: fmt(e.score) }));
+        return li;
+      }));
+      boardEl.querySelector<HTMLElement>('.board-empty')!.hidden = data.entries.length > 0;
+      boardEl.querySelector('.board-mine')!.textContent = data.mine ? t.yourRank.replace('{rank}', data.mine.rank.toLocaleString(locale)).replace('{score}', fmt(data.mine.best)) : '';
+    } catch { list.replaceChildren(); }
+    boardEl.querySelector<HTMLElement>('.board-signin')!.hidden = !!cachedPlayer();
+  }
+  if (boardEl) {
+    boardEl.querySelectorAll<HTMLButtonElement>('[data-period]').forEach(b => b.addEventListener('click', () => {
+      period = b.dataset.period!;
+      boardEl.querySelectorAll('[data-period]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      loadBoard();
+    }));
+    boardEl.querySelector('.board-signin')!.addEventListener('click', () => (window as any).lamianOpenAuth('login'));
+    loadBoard();
+  }
+  // Signing in on this page: pull the account's save into the running game and send any guest best score.
+  window.addEventListener('lamian:player', event => {
+    if (!(event as CustomEvent).detail || !gameFrame) return loadBoard();
+    startGameSync(gameFrame.dataset.game!, () => loadBoard()).then(() => { gameFrame.src = gameFrame.dataset.src!; loadBoard(); });
+  });
+
   const frame = document.querySelector<HTMLElement>('#play-frame');
   const enter = document.querySelector<HTMLButtonElement>('#play-fullscreen');
   const exit = document.querySelector<HTMLButtonElement>('#play-exit');
@@ -211,6 +283,21 @@ const structuredData = [
   .play-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--accent-soft); color: var(--accent-text); font-weight: 700; font-size: 13px; }
   .play-features { margin-top: 12px; display: grid; gap: 8px; padding-left: 20px; list-style: disc; font-size: 14px; line-height: 1.7; color: var(--text-body); }
   .play-features li::marker { color: var(--accent-text); }
+  .board { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+  .board-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .board-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; }
+  .board-tabs button { padding: 5px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .board-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); }
+  .board-list { display: grid; gap: 4px; }
+  .board-list :global(li) { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; font-size: 14px; color: var(--text-body); }
+  .board-list :global(li:nth-child(odd)) { background: var(--surface-hover); }
+  .board-list :global(li.is-me) { outline: 1px solid var(--accent-text); color: var(--text-soft); }
+  .board-list :global(.pos) { width: 34px; font-weight: 700; color: var(--accent-text); font-variant-numeric: tabular-nums; }
+  .board-list :global(.name) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board-list :global(.pts) { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .board-empty, .board-mine { font-size: 13px; color: var(--text-dim); }
+  .board-mine:empty { display: none; }
+  .board-signin { justify-self: start; font-size: 13px; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
   .play-store { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 
 

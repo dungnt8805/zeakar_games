@@ -1,0 +1,216 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from './Navbar.astro';
+import Footer from './Footer.astro';
+import { ARCADE_GAMES, arcadeCover } from '../data/arcade';
+import { localizedArcadePath, localizedPath, HTML_LANG, type Locale } from '../i18n/ui';
+import { LEADERBOARDS } from '../data/leaderboards';
+import PLAYER from '../i18n/player.json';
+import { withBrand } from '../lib/seo';
+
+interface Props { lang: Locale; }
+const { lang } = Astro.props;
+const p = PLAYER[lang];
+// Titles, links and covers the browser script needs to render the player's games.
+const games = Object.fromEntries(ARCADE_GAMES.map(g => [g.id, { title: g.title, href: localizedArcadePath(lang, g.id), cover: arcadeCover(g), unit: LEADERBOARDS[g.id]?.unit ?? '' }]));
+---
+
+<Layout lang={lang} title={withBrand(p.profileTitle)} description={p.guestText}>
+  <Fragment slot="head"><meta name="robots" content="noindex" /></Fragment>
+  <Navbar lang={lang} />
+
+  <main id="main-content" tabindex="-1" class="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
+    <section id="guest" class="profile-card guest" hidden>
+      <span class="big-avatar" aria-hidden="true">👤</span>
+      <h1 class="section-title">{p.guestTitle}</h1>
+      <p class="muted">{p.guestText}</p>
+      <div class="row">
+        <button type="button" class="btn primary" data-auth="login">{p.signIn}</button>
+        <button type="button" class="btn" data-auth="signup">{p.createAccount}</button>
+      </div>
+    </section>
+
+    <div id="member" hidden>
+      <section class="profile-card head">
+        <span class="big-avatar" id="avatar" aria-hidden="true"></span>
+        <div class="grow">
+          <h1 class="section-title" id="nickname"></h1>
+          <p class="muted" id="since"></p>
+        </div>
+        <div class="row">
+          <button type="button" class="btn" id="edit-open">{p.editProfile}</button>
+          <button type="button" class="btn" id="sign-out">{p.signOut}</button>
+        </div>
+      </section>
+
+      <form id="edit" class="profile-card edit" hidden>
+        <label><span>{p.nickname}</span><input name="nickname" maxlength="20" required /></label>
+        <fieldset><legend>{p.avatar}</legend><div class="avatars" id="avatars"></div></fieldset>
+        <p class="error" id="edit-error" role="alert"></p>
+        <div class="row"><button class="btn primary">{p.save}</button><button type="button" class="btn" id="edit-cancel">{p.back}</button></div>
+      </form>
+
+      <section class="block" aria-labelledby="bests-title">
+        <h2 id="bests-title" class="block-title">{p.yourBests}</h2>
+        <ul id="bests" class="list" role="list"></ul>
+        <p id="no-bests" class="muted" hidden>{p.noScores}</p>
+      </section>
+
+      <section class="block" aria-labelledby="saves-title">
+        <h2 id="saves-title" class="block-title">{p.continuePlaying}</h2>
+        <ul id="saves" class="tiles" role="list"></ul>
+        <p id="no-saves" class="muted" hidden>{p.noSaves}</p>
+      </section>
+
+      <details class="block danger">
+        <summary>{p.deleteAccount}</summary>
+        <form id="delete" class="row">
+          <p class="muted">{p.deleteText}</p>
+          <input name="password" type="password" autocomplete="current-password" aria-label={p.password} placeholder={p.password} required />
+          <button class="btn danger-btn">{p.deleteConfirm}</button>
+          <p class="error" id="delete-error" role="alert"></p>
+        </form>
+      </details>
+    </div>
+  </main>
+
+  <Footer lang={lang} />
+</Layout>
+
+<script type="application/json" id="profile-data" set:html={JSON.stringify({ games, locale: HTML_LANG[lang], home: localizedPath(lang) })} />
+
+<script>
+  import { AVATARS, api, loadProfile, setCachedPlayer, signOut, type PlayerProfile } from '../lib/player-client';
+
+  const t = JSON.parse(document.getElementById('player-i18n')!.textContent!);
+  const { games, locale, home } = JSON.parse(document.getElementById('profile-data')!.textContent!);
+  const $ = (id: string) => document.getElementById(id)!;
+  const date = (ms: number) => new Date(ms).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
+  const num = (n: number) => n.toLocaleString(locale);
+  let current: PlayerProfile | null = null;
+
+  const li = (html: string) => Object.assign(document.createElement('li'), { innerHTML: html });
+  const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+  function render(profile: PlayerProfile | null) {
+    current = profile;
+    $('guest').hidden = !!profile;
+    $('member').hidden = !profile;
+    if (!profile) return;
+    const { player } = profile;
+    $('avatar').textContent = AVATARS[player.avatar] ?? '🙂';
+    $('nickname').textContent = player.nickname;
+    $('since').textContent = `${t.memberSince.replace('{date}', date(player.createdAt))} · ${player.email}`;
+
+    const bests = profile.bests.filter(b => games[b.game]).sort((a, b) => a.rank - b.rank || b.last - a.last);
+    $('bests').replaceChildren(...bests.map(b => {
+      const g = games[b.game];
+      return li(`<a href="${g.href}" class="best"><img src="${g.cover}" alt="" width="64" height="34" loading="lazy" /><span class="grow"><strong>${esc(g.title)}</strong><small>${t.plays}: ${num(b.plays)}</small></span><span class="score">${num(b.best)}${g.unit ? ' ' + g.unit : ''}</span><span class="rank">#${num(b.rank)}</span></a>`);
+    }));
+    $('no-bests').hidden = bests.length > 0;
+
+    const saves = profile.games.filter(s => games[s.game]);
+    $('saves').replaceChildren(...saves.map(s => {
+      const g = games[s.game];
+      return li(`<a href="${g.href}" class="tile"><img src="${g.cover}" alt="" loading="lazy" /><strong>${esc(g.title)}</strong><small>${t.lastSaved.replace('{date}', date(s.updatedAt))}</small></a>`);
+    }));
+    $('no-saves').hidden = saves.length > 0;
+  }
+
+  loadProfile().then(render).catch(() => render(null));
+  window.addEventListener('lamian:player', event => {
+    if (!(event as CustomEvent).detail) render(null);
+    else if (!current) loadProfile().then(render);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-auth]').forEach(b => b.addEventListener('click', () => (window as any).lamianOpenAuth(b.dataset.auth)));
+  $('sign-out').addEventListener('click', async () => { await signOut(); location.href = home; });
+
+  // Edit nickname and avatar
+  const edit = $('edit') as HTMLFormElement;
+  let chosen = 0;
+  const avatars = $('avatars');
+  avatars.replaceChildren(...AVATARS.map((a, i) => {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: a, className: 'avatar-choice' });
+    b.setAttribute('aria-label', `${t.avatar} ${i + 1}`);
+    b.addEventListener('click', () => { chosen = i; avatars.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-pressed', String(j === i))); });
+    return b;
+  }));
+  $('edit-open').addEventListener('click', () => {
+    if (!current) return;
+    chosen = current.player.avatar;
+    (edit.elements.namedItem('nickname') as HTMLInputElement).value = current.player.nickname;
+    avatars.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-pressed', String(j === chosen)));
+    edit.hidden = false;
+    (edit.elements.namedItem('nickname') as HTMLInputElement).focus();
+  });
+  $('edit-cancel').addEventListener('click', () => { edit.hidden = true; });
+  edit.addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      const profile = await api<PlayerProfile>('/api/me', { method: 'PATCH', body: { nickname: (edit.elements.namedItem('nickname') as HTMLInputElement).value, avatar: chosen } });
+      setCachedPlayer(profile.player);
+      render(profile);
+      edit.hidden = true;
+      $('edit-error').textContent = '';
+    } catch (err) {
+      $('edit-error').textContent = t.errors[(err as Error).message] ?? t.errors.server;
+    }
+  });
+
+  $('delete').addEventListener('submit', async event => {
+    event.preventDefault();
+    const password = ((event.target as HTMLFormElement).elements.namedItem('password') as HTMLInputElement).value;
+    try {
+      await api('/api/me', { method: 'DELETE', body: { password } });
+      setCachedPlayer(null);
+      location.href = home;
+    } catch (err) {
+      $('delete-error').textContent = t.errors[(err as Error).message] ?? t.errors.server;
+    }
+  });
+</script>
+
+<style>
+  .profile-card { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+  .guest { flex-direction: column; text-align: center; padding: 48px 24px; }
+  .guest .muted { max-width: 46ch; }
+  .big-avatar { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--accent-soft); font-size: 40px; flex-shrink: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { font-size: 14px; line-height: 1.6; color: var(--text-dim); overflow-wrap: anywhere; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .btn { padding: 10px 16px; border: 1px solid var(--line-strong); border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--text-soft); }
+  .btn:hover { border-color: var(--accent-text); color: var(--accent-text); }
+  .btn.primary { border-color: var(--accent-text); background: var(--accent-text); color: var(--bg); }
+  .btn.primary:hover { color: var(--bg); opacity: .9; }
+
+  .edit { display: grid; margin-top: 16px; }
+  .edit label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+  .edit input, .danger input { padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--text-soft); font-size: 15px; }
+  .edit fieldset { border: 0; padding: 0; }
+  .edit legend { margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+  .avatars { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; }
+  .avatars :global(.avatar-choice) { height: 44px; border: 2px solid transparent; border-radius: 12px; background: var(--bg); font-size: 24px; }
+  .avatars :global(.avatar-choice[aria-pressed="true"]) { border-color: var(--accent-text); background: var(--accent-soft); }
+  .error { min-height: 1em; font-size: 13px; color: #f87171; }
+
+  .block { margin-top: 40px; }
+  .block-title { margin-bottom: 14px; font: 700 20px var(--font-display); letter-spacing: -.02em; }
+  .list { display: grid; gap: 8px; }
+  .list :global(.best) { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; }
+  .list :global(.best:hover) { border-color: var(--accent-text); }
+  .list :global(img) { width: 64px; height: 34px; border-radius: 6px; object-fit: cover; }
+  .list :global(strong), .tiles :global(strong) { display: block; font-size: 15px; color: var(--text-soft); }
+  .list :global(small), .tiles :global(small) { font-size: 12px; color: var(--text-dim); }
+  .list :global(.score) { font: 700 16px var(--font-display); font-variant-numeric: tabular-nums; color: var(--text-soft); }
+  .list :global(.rank) { min-width: 52px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-weight: 700; font-size: 13px; text-align: center; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+  .tiles :global(.tile) { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; }
+  .tiles :global(.tile:hover) { border-color: var(--accent-text); }
+  .tiles :global(img) { width: 100%; aspect-ratio: 1200 / 630; border-radius: 8px; object-fit: cover; }
+  .danger summary { cursor: pointer; font-size: 14px; color: var(--text-dim); }
+  .danger form { margin-top: 14px; }
+  .danger-btn { border-color: #f87171; color: #f87171; }
+  .danger-btn:hover { border-color: #ef4444; color: #ef4444; }
+  @media (max-width: 520px) { .list :global(.best small) { display: none; } }
+</style>
